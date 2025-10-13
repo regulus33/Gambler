@@ -12,6 +12,10 @@ PluginProcessor::PluginProcessor()
                      #endif
                        )
 {
+    if (sequencer.test())
+    {
+        DBG("sequencer.test() == true");
+    }
 }
 
 PluginProcessor::~PluginProcessor()
