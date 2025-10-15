@@ -34,7 +34,7 @@ using std::make_unique;
     delete editor;
 }
 
-APVTS createTestApvts(PluginProcessor& processoer)
+inline APVTS createTestApvts(PluginProcessor& processoer)
 {
     APVTS::ParameterLayout layout;
     // Add common test parameters

@@ -16,24 +16,7 @@ PluginProcessor::PluginProcessor()
 
 APVTS::ParameterLayout PluginProcessor::createParameterLayout()
 {
-    juce::AudioProcessorValueTreeState::ParameterLayout layout;
-
-    // Add your parameters here
-    layout.add(std::make_unique<juce::AudioParameterFloat>(
-        "gain",                                    // parameter ID
-        "Gain",                                    // parameter name
-        juce::NormalisableRange<float>(0.0f, 1.0f), // range
-        0.5f));                                    // default value
-
-    layout.add(std::make_unique<juce::AudioParameterInt>(
-        "steps",
-        "Steps",
-        1, 16,      // min, max
-        8));        // default
-
-    // Add more parameters as needed...
-
-    return layout;
+  return GamblerParams::createDefaultParameterLayout();
 }
 
 PluginProcessor::~PluginProcessor()

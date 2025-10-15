@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "sequencer/Sequencer.h"
+#include "data/GamblerParams.h"
 
 #if (MSVC)
 #include "ipps.h"

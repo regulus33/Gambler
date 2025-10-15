@@ -1,9 +1,13 @@
 #include <catch2/catch_test_macros.hpp>
 #include <sequencer/Sequencer.h>
+#include "helpers/test_helpers.h"
 
-TEST_CASE("Sequencer::test returns true", "[sequencer]")
+TEST_CASE("getCurrentStep() retrieves the raw parameter value of ", "[sequencer]")
 {
-    Sequencer seq();
-    CHECK(seq.test());
+    PluginProcessor plugin;
+    auto apvts = createTestApvts(plugin);
+    Sequencer seq(apvts);
+    Step step = seq.getCurrentStep();
+    REQUIRE(step.midiNote == 60);
 }
 
