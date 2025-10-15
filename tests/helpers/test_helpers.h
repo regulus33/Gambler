@@ -1,5 +1,9 @@
 #pragma once
 #include <PluginProcessor.h>
+#include <juce_audio_processors/juce_audio_processors.h>
+
+using std::make_unique;
+
 
 /* This is a helper function to run tests within the context of a plugin editor.
  *
@@ -28,4 +32,13 @@
 
     plugin.editorBeingDeleted (editor);
     delete editor;
+}
+
+APVTS createTestApvts(PluginProcessor& processoer)
+{
+    APVTS::ParameterLayout layout;
+    // Add common test parameters
+    layout.add(std::make_unique<juce::AudioParameterInt>("stepCount", "Step Count", 1, 128, 16));
+
+    return juce::AudioProcessorValueTreeState (processoer, nullptr, "TEST", std::move(layout));
 }

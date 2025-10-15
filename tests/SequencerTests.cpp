@@ -3,7 +3,7 @@
 
 TEST_CASE("Sequencer::test returns true", "[sequencer]")
 {
-    Sequencer seq;
+    Sequencer seq();
     CHECK(seq.test());
 }
 
