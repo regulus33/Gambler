@@ -30,16 +30,16 @@ public:
 
     Step getCurrentStep()
     {
-        juce::String noteParamID = StepKeyBuilder::noteParamID (getStepIndex().getValue());
-        int note = state.getParameterAsValue (noteParamID).getValue();
+        // gets the id
+        juce::String noteParamID = StepKeyBuilder::noteParamID (getStepIndex());
+        juce::var note = state.getParameterAsValue (noteParamID).getValue();
         return Step(static_cast<int>(note));
     }
 
-    juce::Value getStepIndex()
+    int getStepIndex()
     {
-         auto a = (state.getParameterAsValue (ParamStrings::currentStepId));
-        return a;
-
+        auto a = (state.getParameterAsValue (ParamStrings::currentStepId));
+        return static_cast<int>(juce::Value(a).getValue());
     }
 
 
