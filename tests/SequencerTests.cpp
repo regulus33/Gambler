@@ -5,9 +5,9 @@
 TEST_CASE("getCurrentStep() retrieves the raw parameter value of ", "[sequencer]")
 {
     PluginProcessor plugin;
-    auto apvts = createTestApvts(plugin);
+    auto& apvts = plugin.getAPVTS();
     Sequencer seq(apvts);
     Step step = seq.getCurrentStep();
-    REQUIRE(step.midiNote == 60);
+    REQUIRE(step.midiNote == 99);
 }
 

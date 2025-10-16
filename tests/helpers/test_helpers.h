@@ -33,12 +33,3 @@ using std::make_unique;
     plugin.editorBeingDeleted (editor);
     delete editor;
 }
-
-inline APVTS createTestApvts(PluginProcessor& processoer)
-{
-    APVTS::ParameterLayout layout;
-    // Add common test parameters
-    layout.add(std::make_unique<juce::AudioParameterInt>("stepCount", "Step Count", 1, 128, 16));
-
-    return juce::AudioProcessorValueTreeState (processoer, nullptr, "TEST", std::move(layout));
-}

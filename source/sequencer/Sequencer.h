@@ -30,18 +30,26 @@ public:
 
     Step getCurrentStep()
     {
-        // gets the id
         juce::String noteParamID = StepKeyBuilder::noteParamID (getStepIndex());
-        juce::var note = state.getParameterAsValue (noteParamID).getValue();
-        return Step(static_cast<int>(note));
+        int midiNote = getIntParameter (noteParamID);
+        Step step{};
+        step.midiNote = midiNote;
+        return step;
     }
 
     int getStepIndex()
     {
-        auto a = (state.getParameterAsValue (ParamStrings::currentStepId));
-        return static_cast<int>(juce::Value(a).getValue());
+        return getIntParameter (ParamStrings::CURRENT_STEP);
     }
 
+
+    // helper methods ====================================
+    int getIntParameter(const juce::String& parameterID)
+    {
+        auto* selection = dynamic_cast<juce::AudioParameterInt*> (state.getParameter (parameterID));
+        auto intValue = selection->get();
+        return intValue;
+    }
 
     APVTS& state;
     StepArray stepArray = {};

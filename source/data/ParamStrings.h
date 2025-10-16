@@ -7,14 +7,11 @@
 struct ParamStrings
 {
     // Global parameters
-    static constexpr const char* stepLengthId   = "step_length";
-    static constexpr const char* stepLengthName = "Step Length";
+    static constexpr const char* STEP_LENGTH   = "step_length";
+    static constexpr const char* LABEL_STEP_LENGTH = "Step Length";
 
-    static constexpr const char* currentStepId   = "currentStep";
-    static constexpr const char* currentStepName = "Current Step";
-
-    static constexpr const char* swingId   = "swing";
-    static constexpr const char* swingName = "Swing";
+    static constexpr const char* CURRENT_STEP   = "currentStep";
+    static constexpr const char* LABEL_CURRENT_STEP = "Current Step";
 };
 
 #endif // GAMBLER_PARAMSTRINGS_H
