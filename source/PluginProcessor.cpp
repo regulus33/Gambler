@@ -10,13 +10,13 @@ PluginProcessor::PluginProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       ), apvts(*this, nullptr, "Parameters", createParameterLayout()), sequencer(apvts)
+                       ), apvts(*this, nullptr, "Parameters", createParameterLayout()), repo(apvts), sequencer(repo)
 {
 }
 
 APVTS::ParameterLayout PluginProcessor::createParameterLayout()
 {
-  return GamblerParams::createDefaultParameterLayout();
+  return Params::createDefaultParameterLayout();
 }
 
 PluginProcessor::~PluginProcessor()

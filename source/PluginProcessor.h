@@ -1,8 +1,8 @@
 #pragma once
 
+#include "data/Params.h"
+#include "sequencer/SequencerService.h"
 #include <juce_audio_processors/juce_audio_processors.h>
-#include "sequencer/Sequencer.h"
-#include "data/GamblerParams.h"
 
 #if (MSVC)
 #include "ipps.h"
@@ -49,7 +49,9 @@ public:
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
     APVTS apvts;
-    Sequencer sequencer;
+    SequencerRepository repo;
+
+    SequencerService sequencer;
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();
 };
