@@ -4,93 +4,71 @@
 
 #ifndef GAMBLER_SEQUENCER_H
 #define GAMBLER_SEQUENCER_H
-#include <juce_audio_processors/juce_audio_processors.h>
 #include "Step.h"
-#include "../data/Params.h"
+#include <array>
 
-#include <simd/common.h>
-
-using APVTS = juce::AudioProcessorValueTreeState;
-using namespace juce;
-using namespace std;
-using StepArray = Step[128];
-
-class SequencerRepository
+class Sequencer
 {
 public:
-    explicit SequencerRepository(APVTS& state) : state(state) {}
-
-    int getStepLength() const
+    Sequencer()
     {
-        return getIntParameter (Params::Keys::ID::STEP_LENGTH);
-    }
-
-    int getIntParameter(const juce::String& parameterID) const
-    {
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-        auto* selection = static_cast<AudioParameterInt*>(state.getParameter(parameterID));
-        jassert(selection != nullptr);
-        return selection->get();
-    }
-
-    bool setIntParameter(const juce::String& parameterID, int value)
-    {
-        if (auto* param = state.getParameter(parameterID))
+        // Initialize steps with default values
+        for (int i = 0; i < 128; ++i)
         {
-            auto range = param->getNormalisableRange();
-            auto normalized = range.convertTo0to1(static_cast<float>(value));
-            param->setValueNotifyingHost(normalized);
-            return true;
+            steps[i].stepIndex = i;
+            steps[i].midiNote = i; // Default note matches step index
         }
-        return false;
-    }
-
-    int getStepIndex()
-    {
-        return getIntParameter (Params::Keys::ID::STEP_INDEX);
-    }
-
-    bool setStepIndex(int stepIndex)
-    {
-        return setIntParameter (Params::Keys::ID::STEP_INDEX, stepIndex);
-    }
-
-private:
-    APVTS& state;
-};
-
-class SequencerService
-{
-public:
-    explicit SequencerService(SequencerRepository& repository) : repo(repository)
-    {
-
     }
 
     void advance()
     {
-        auto length = repo.getStepLength();
-        auto index = repo.getStepIndex();
-        auto newIndex = (index + 1) % length;
-        repo.setStepIndex(newIndex);
+        stepIndex = (stepIndex + 1) % stepLength;
     }
 
-    Step getCurrentStep()
+    Step getCurrentStep() const
     {
-        juce::String noteParamID = Params::Keys::ID::STEP_NOTE(getStepIndex());
-        int midiNote = repo.getIntParameter(noteParamID);
-        Step step{};
-        step.midiNote = midiNote;
-        return step;
+        return steps[stepIndex];
     }
 
-    int getStepIndex()
+    int getStepIndex() const
     {
-        return repo.getIntParameter(Params::Keys::ID::STEP_INDEX);
+        return stepIndex;
     }
 
-    SequencerRepository& repo;
-    StepArray stepArray = {};
+    void setStepIndex(int index)
+    {
+        if (index >= 0 && index < 128)
+        {
+            stepIndex = index;
+        }
+    }
+
+    int getStepLength() const
+    {
+        return stepLength;
+    }
+
+    void setStepLength(int length)
+    {
+        if (length >= 1 && length <= 128)
+        {
+            stepLength = length;
+        }
+    }
+
+    Step& getStep(int index)
+    {
+        return steps[index];
+    }
+
+    const Step& getStep(int index) const
+    {
+        return steps[index];
+    }
+
+private:
+    std::array<Step, 128> steps;
+    int stepIndex = 0;
     int stepLength = 16;
 };
 

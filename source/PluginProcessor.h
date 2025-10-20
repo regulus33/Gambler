@@ -49,9 +49,7 @@ public:
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
     APVTS apvts;
-    SequencerRepository repo;
-
-    SequencerService sequencer;
+    Sequencer sequencer;
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();
 };
