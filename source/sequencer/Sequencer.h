@@ -4,8 +4,10 @@
 
 #ifndef GAMBLER_SEQUENCER_H
 #define GAMBLER_SEQUENCER_H
+#include "Controls.h"
 #include "Step.h"
 #include <array>
+#include <random>
 
 class Sequencer
 {
@@ -22,6 +24,12 @@ public:
 
     void advance()
     {
+        // If random mode is enabled, randomize the note of the current step before advancing
+        if (controls.getRandom())
+        {
+            steps[stepIndex].midiNote = getRandomNote();
+        }
+
         stepIndex = (stepIndex + 1) % stepLength;
     }
 
@@ -66,10 +74,24 @@ public:
         return steps[index];
     }
 
+    Controls& getControls()
+    {
+        return controls;
+    }
+
 private:
+    int getRandomNote()
+    {
+        std::uniform_int_distribution<int> distribution(0, 127);
+        return distribution(randomEngine);
+    }
+
+    Controls controls;
     std::array<Step, 128> steps;
     int stepIndex = 0;
     int stepLength = 16;
+    // seed the
+    std::mt19937 randomEngine{std::random_device{}()};
 };
 
 #endif //GAMBLER_SEQUENCER_H

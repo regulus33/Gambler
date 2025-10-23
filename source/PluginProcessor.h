@@ -1,7 +1,7 @@
 #pragma once
 
 #include "data/Params.h"
-#include "sequencer/SequencerService.h"
+#include "sequencer/Sequencer.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #if (MSVC)

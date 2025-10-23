@@ -96,6 +96,7 @@ add_library(SharedCode INTERFACE
         source/sequencer/Step.h
         source/sequencer/SubStep.h
         source/sequencer/SubSequence.h
+        source/sequencer/Controls.h
 )
 
 clap_juce_extensions_plugin(TARGET "${PROJECT_NAME}"
