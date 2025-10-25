@@ -1,3 +1,4 @@
+#include "backend/Sequence.h"
 #include "helpers/test_helpers.h"
 #include <PluginProcessor.h>
 #include <catch2/catch_test_macros.hpp>
@@ -5,134 +6,65 @@
 #include <sequencer/Sequencer.h>
 #include <vector>
 
-TEST_CASE ("Step") {
-    SECTION("Given a single lone step") {
-        Step step;
-        SECTION ("When the subStepLength is 1") {
-            // Step step
-            // step.setLength(1)
-            // var noteFirst = seq.getNote()
-            // seq.advance()
-            // var noteNext = seq.getNote()
-            // REQUIRE(noteNext == noteFirst)
-
+TEST_CASE ("Gambler") {
+    SECTION ("Sequence") {
+        Sequence sequence;
+        SECTION ("Has steps") {
 
         }
     }
-
-
-}
-TEST_CASE ("Sequencer") {
-    PluginProcessor plugin;
-
-    SECTION ("basics") {
-        SECTION ("Step") {
-            // TODO: test that we can getMidiNote()
-            // and it will even go                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             grab dddddddddddddddddddq
+    SECTION ("Note") {
+        Note note;
+        SECTION ("Has a vector of ints") {
+            bool isDefaultLength = note.midi_notes.size() == DEFAULT_MIDI_NOTE_LENGTH;
+            REQUIRE (isDefaultLength);
         }
-    }
-
-    SECTION ("Given a sequencer with default settings") {
-        Sequencer sequencer;
-
-        SECTION ("When advance is called") {
-            SECTION ("Then the step index increments by 1") {
-                int initialStepIndex = sequencer.getStepIndex();
-                sequencer.advance();
-                REQUIRE (sequencer.getStepIndex() == (initialStepIndex + 1));
+        SECTION ("Has a midi note length that can be changed") {
+            SECTION ("Has default length") {
+                REQUIRE (note.length == DEFAULT_MIDI_NOTE_LENGTH);
             }
-        }
 
-        SECTION ("When advance is called <stepLength> times") {
-            SECTION ("Then the step index wraps back to 0") {
-                int initialStepIndex = sequencer.getStepIndex();
-                int stepLength = sequencer.getStepLength();
+            SECTION ("Can be increased") {
+                auto initLength = note.length;
+                note.increaseMidiNotes();
+                auto newLength = note.length;
+                REQUIRE (newLength == initLength + 1);
 
-                for (int i = 0; i < stepLength; ++i) {
-                    REQUIRE (sequencer.getStepIndex() == (initialStepIndex + i));
-                    sequencer.advance();
-                }
-
-                REQUIRE (sequencer.getStepIndex() == 0);
-            }
-        }
-    }
-
-    SECTION ("Given a sequencer") {
-        Sequencer sequencer;
-
-        SECTION ("When random mode is enabled") {
-            sequencer.getControls().setRandom (true);
-
-            SECTION ("Then notes change randomly on each advance") {
-                // Store initial notes for all steps
-                std::vector<int> initialNotes;
-                for (int i = 0; i < sequencer.getStepLength(); ++i) {
-                    initialNotes.push_back (sequencer.getStep (i).getMidiNote());
-                }
-
-                // Advance through all steps once
-                for (int i = 0; i < sequencer.getStepLength(); ++i) {
-                    sequencer.advance();
-                }
-
-                // Count how many notes changed
-                int changedCount = 0;
-                for (int i = 0; i < sequencer.getStepLength(); ++i) {
-                    if (sequencer.getStep (i).getMidiNote() != initialNotes[i]) {
-                        changedCount++;
+                SECTION ("but not more than the max subsequence length") {
+                    for (int i = 0; i < MAX_MIDI_NOTE_LENGTH; i++) {
+                        note.increaseMidiNotes();
                     }
-                }
 
-                // With random mode, we expect most notes to have changed
-                // (statistically, at least 90% should be different)
-                REQUIRE (changedCount > sequencer.getStepLength() * 0.9);
+                    auto finalLength = note.length;
+                    REQUIRE (finalLength == MAX_MIDI_NOTE_LENGTH);
+                }
             }
 
-            SECTION ("Then all random notes are within valid MIDI range") {
-                // Advance through multiple cycles to test randomization
-                for (int cycle = 0; cycle < 5; ++cycle) {
-                    for (int i = 0; i < sequencer.getStepLength(); ++i) {
-                        sequencer.advance();
+            SECTION ("Can be decreased") {
+                auto initLength = note.length;
+                note.decreaseMidiNotes();
+                auto newLength = note.length;
+                REQUIRE (newLength == initLength);
 
-                        // Check that the note is within valid MIDI range (0-127)
-                        int note = sequencer.getCurrentStep().getMidiNote();
-                        REQUIRE (note >= 0);
-                        REQUIRE (note <= 127);
+                SECTION ("but not less than the min subsequence length") {
+                    for (int i = 0; i < MAX_MIDI_NOTE_LENGTH; i++) {
+                        note.decreaseMidiNotes();
                     }
-                }
-            }
-        }
 
-        SECTION ("When random mode is disabled") {
-            sequencer.getControls().setRandom (false);
-
-            SECTION ("Then notes remain unchanged after advancing") {
-                // Store initial notes
-                std::vector<int> initialNotes;
-                for (int i = 0; i < sequencer.getStepLength(); ++i) {
-                    initialNotes.push_back (sequencer.getStep (i).getMidiNote());
-                }
-
-                // Advance through all steps once
-                for (int i = 0; i < sequencer.getStepLength(); ++i) {
-                    sequencer.advance();
-                }
-
-                // Check that all notes remain unchanged
-                for (int i = 0; i < sequencer.getStepLength(); ++i) {
-                    REQUIRE (sequencer.getStep (i).getMidiNote() == initialNotes[i]);
+                    auto finalLength = note.length;
+                    REQUIRE (finalLength == 1);
                 }
             }
         }
     }
 
-    // SECTION ("Plugin instance", "[instance]")
-    // {
-    //     SECTION ("name")
-    //     {
-    //         CHECK_THAT (plugin.getName().toStdString(),
-    //             Catch::Matchers::Equals ("Gambler"));
-    //     }
-    // }
+
+    SECTION ("Plugin instance", "[instance]") {
+        PluginProcessor plugin;
+
+        SECTION ("name") {
+            CHECK_THAT (plugin.getName().toStdString(),
+                Catch::Matchers::Equals ("Gambler"));
+        }
+    }
 }
