@@ -26,8 +26,7 @@ public:
     Sequencer() {
         // Initialize steps with default values
         for (int i = 0; i < 128; ++i) {
-            this->steps[i].stepIndex = i;
-            this->steps[i].midiNote = i; // Default note matches step index
+            this->steps[i].setMidiNote(i); // Default note matches step index
         }
     }
 
@@ -41,7 +40,7 @@ public:
     void advance() {
         // If random mode is enabled, randomize the note of the current step before advancing
         if (controls.getRandom()) {
-            steps[stepIndex].midiNote = getRandomNote();
+            steps[stepIndex].setMidiNote(getRandomNote());
         }
 
         stepIndex = (stepIndex + 1) % stepLength;

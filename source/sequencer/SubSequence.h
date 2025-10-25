@@ -8,13 +8,16 @@
 
 using StepArray = std::array<Step, 128>;
 
+/**
+* @class Subsequence
+* @details Belongs to a step
+ */
 class Subsequence {
 public:
     Subsequence() {
         // Initialize steps with default values
         for (int i = 0; i < 8; ++i) {
-            this->steps[i].stepIndex = i;
-            this->steps[i].midiNote = i; // Default note matches step index
+            this->steps[i].setMidiNote(i); // Default note matches step index
         }
     }
 
@@ -24,7 +27,6 @@ public:
     void setStepLength(int length) {
         this->stepLength = length;
     }
-
 
     int getStepLength() {
         return stepLength;

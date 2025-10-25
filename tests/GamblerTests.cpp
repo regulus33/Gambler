@@ -5,16 +5,30 @@
 #include <sequencer/Sequencer.h>
 #include <vector>
 
-TEST_CASE ("Subsequence") {
-    Subsequence subsequence;
+TEST_CASE ("Step") {
+    SECTION("Given a single lone step") {
+        Step step;
+        SECTION ("When the subStepLength is 1") {
+            // Step step
+            // step.setLength(1)
+            // var noteFirst = seq.getNote()
+            // seq.advance()
+            // var noteNext = seq.getNote()
+            // REQUIRE(noteNext == noteFirst)
+
+
+        }
+    }
+
 
 }
 TEST_CASE ("Sequencer") {
     PluginProcessor plugin;
 
     SECTION ("basics") {
-        SECTION ("has a Subsequence") {
-
+        SECTION ("Step") {
+            // TODO: test that we can getMidiNote()
+            // and it will even go                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             grab dddddddddddddddddddq
         }
     }
 
@@ -54,7 +68,7 @@ TEST_CASE ("Sequencer") {
                 // Store initial notes for all steps
                 std::vector<int> initialNotes;
                 for (int i = 0; i < sequencer.getStepLength(); ++i) {
-                    initialNotes.push_back (sequencer.getStep (i).midiNote);
+                    initialNotes.push_back (sequencer.getStep (i).getMidiNote());
                 }
 
                 // Advance through all steps once
@@ -65,7 +79,7 @@ TEST_CASE ("Sequencer") {
                 // Count how many notes changed
                 int changedCount = 0;
                 for (int i = 0; i < sequencer.getStepLength(); ++i) {
-                    if (sequencer.getStep (i).midiNote != initialNotes[i]) {
+                    if (sequencer.getStep (i).getMidiNote() != initialNotes[i]) {
                         changedCount++;
                     }
                 }
@@ -82,7 +96,7 @@ TEST_CASE ("Sequencer") {
                         sequencer.advance();
 
                         // Check that the note is within valid MIDI range (0-127)
-                        int note = sequencer.getCurrentStep().midiNote;
+                        int note = sequencer.getCurrentStep().getMidiNote();
                         REQUIRE (note >= 0);
                         REQUIRE (note <= 127);
                     }
@@ -97,7 +111,7 @@ TEST_CASE ("Sequencer") {
                 // Store initial notes
                 std::vector<int> initialNotes;
                 for (int i = 0; i < sequencer.getStepLength(); ++i) {
-                    initialNotes.push_back (sequencer.getStep (i).midiNote);
+                    initialNotes.push_back (sequencer.getStep (i).getMidiNote());
                 }
 
                 // Advance through all steps once
@@ -107,7 +121,7 @@ TEST_CASE ("Sequencer") {
 
                 // Check that all notes remain unchanged
                 for (int i = 0; i < sequencer.getStepLength(); ++i) {
-                    REQUIRE (sequencer.getStep (i).midiNote == initialNotes[i]);
+                    REQUIRE (sequencer.getStep (i).getMidiNote() == initialNotes[i]);
                 }
             }
         }
