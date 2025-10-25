@@ -10,13 +10,12 @@ TEST_CASE ("Gambler") {
     SECTION ("Sequence") {
         Sequence sequence;
         SECTION ("Has steps") {
-
         }
     }
     SECTION ("Note") {
         Note note;
-        SECTION ("Has a vector of ints") {
-            bool isDefaultLength = note.midi_notes.size() == DEFAULT_MIDI_NOTE_LENGTH;
+        SECTION ("Has a vector of ints representing notes") {
+            bool isDefaultLength = note.notes.size() == DEFAULT_MIDI_NOTE_LENGTH;
             REQUIRE (isDefaultLength);
         }
         SECTION ("Has a midi note length that can be changed") {
@@ -56,8 +55,40 @@ TEST_CASE ("Gambler") {
                 }
             }
         }
+
+        SECTION ("setNote()") {
+            SECTION ("Allows you to set a note at any index,") {
+                auto initialZeroNote = note.notes[0];
+                REQUIRE (initialZeroNote == DEFAULT_MIDI_NOTE);
+                note.setNote (0, 127);
+                REQUIRE (note.notes[0] == 127);
+                SECTION ("but never lets you set an invalid midi note") {
+                    note.setNote (0, 999);
+                    REQUIRE (note.notes[0] == 127);
+                }
+                SECTION ("or a note index that is outside the length range") {
+                    int bigIndex = 11;
+                    int noteInt = note.notes[bigIndex];
+                    note.setNote (bigIndex, 30);
+                    REQUIRE (note.notes[bigIndex] != 30);
+                }
+
+            }
+        }
+
+        SECTION ("tick()") {
+            SECTION ("tick returns the next note") {
+                int noteNum = note.tick();
+                REQUIRE (noteNum == DEFAULT_MIDI_NOTE);
+            }
+        }
     }
 
+    SECTION ("Sequence") {
+        SECTION ("tick") {
+
+        }
+    }
 
     SECTION ("Plugin instance", "[instance]") {
         PluginProcessor plugin;

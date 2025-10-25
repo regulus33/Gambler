@@ -14,19 +14,41 @@ constexpr int MAX_MIDI_NOTE_LENGTH = 8; // we just can't fit more on the screen.
 constexpr int MIN_MIDI_NOTE_LENGTH = 8; // we just can't fit more on the screen.
 
 struct Note {
-    MidiNotes midi_notes;
+    MidiNotes notes;
     int length = DEFAULT_MIDI_NOTE_LENGTH;
+    int index = 0;
+
     Note() {
-        for (int i=0; i < DEFAULT_MIDI_NOTE_LENGTH; i++) {
-            midi_notes.push_back (DEFAULT_MIDI_NOTE);
+        for (int i = 0; i < DEFAULT_MIDI_NOTE_LENGTH; i++) {
+            notes.push_back (DEFAULT_MIDI_NOTE);
         }
+    }
+
+    void setNote (int index, int note) {
+        if (index > this->length || index < 0) {
+            DBG ("Cannot set a note that is outside length!");
+            jassertfalse;
+            return;
+        }
+        if (!(note <= 127 && note >= 0)) {
+            DBG ("Midi note out of bounds!");
+            jassertfalse;
+            return;
+        }
+
+        notes[index] = note;
+    }
+
+    int tick() {
+        index = (index + 1) % length;
+        return notes[index];
     }
 
     void increaseMidiNotes() {
         if (length < MAX_MIDI_NOTE_LENGTH) {
             length++;
         } else {
-            DBG("[Note][increaseMidiNotes] Max length reached!");
+            DBG ("[Note][increaseMidiNotes] Max length reached!");
         }
     }
 
@@ -34,7 +56,7 @@ struct Note {
         if (length > MIN_MIDI_NOTE_LENGTH) {
             length--;
         } else {
-            DBG("[Note][decreaseMidiNotes] Min length reached!");
+            DBG ("[Note][decreaseMidiNotes] Min length reached!");
         }
     }
 };
