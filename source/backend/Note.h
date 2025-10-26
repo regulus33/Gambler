@@ -20,7 +20,7 @@ constexpr int DEFAULT_VELOCITY = 100;
 struct Note {
     MidiNotes notes;
     int length = DEFAULT_MIDI_NOTE_LENGTH;
-    int index = 0;
+    int index = -1;  // Start at -1 so first tick() advances to 0
     std::array<Slot, NUM_SLOTS> slots;
 
     Note() {
@@ -52,9 +52,8 @@ struct Note {
     }
 
     int tick() {
-        int currentNote = notes[index];
         index = (index + 1) % length;
-        return currentNote;
+        return notes[index];
     }
 
     void increaseMidiNotes() {

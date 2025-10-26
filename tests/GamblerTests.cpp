@@ -269,6 +269,55 @@ TEST_CASE ("Gambler") {
                 REQUIRE (sequence.tick() == 60); // step 2
                 REQUIRE (sequence.tick() == 60); // step 3, substep 0 again
             }
+
+            SECTION ("Sequence index never returns to -1 after first tick") {
+                // Initial state should be -1
+                REQUIRE (sequence.index == -1);
+
+                // After first tick, should be 0
+                sequence.tick();
+                REQUIRE (sequence.index == 0);
+
+                // Tick through entire sequence multiple times
+                for (int pass = 0; pass < 3; pass++) {
+                    for (int i = 0; i < 128; i++) {
+                        sequence.tick();
+                        // Index should never be -1 after initialization
+                        REQUIRE (sequence.index >= 0);
+                        REQUIRE (sequence.index < 128);
+                    }
+                }
+
+                // After wrapping, should be at 0, not -1
+                REQUIRE (sequence.index == 0);
+            }
        }
+
+        SECTION ("Note") {
+            SECTION ("Note index never returns to -1 after first tick") {
+                Note note;
+                note.increaseMidiNotes();  // Length = 2
+                note.setNote(0, 60);
+                note.setNote(1, 70);
+
+                // Initial state should be -1
+                REQUIRE (note.index == -1);
+
+                // After first tick, should be 0
+                note.tick();
+                REQUIRE (note.index == 0);
+
+                // Tick through multiple cycles
+                for (int cycle = 0; cycle < 10; cycle++) {
+                    note.tick();
+                    // Index should never be -1 after initialization
+                    REQUIRE (note.index >= 0);
+                    REQUIRE (note.index < note.length);
+                }
+
+                // After wrapping, should be at 0, not -1
+                REQUIRE (note.index == 0);
+            }
+        }
     }
 }
