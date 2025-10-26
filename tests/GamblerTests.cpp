@@ -115,6 +115,49 @@ TEST_CASE ("Gambler") {
                     REQUIRE (tickedNote.notes[0] == i); // Check it returns 0, 1, 2... 127
                 }
             }
+
+            SECTION ("The sequence is restarted at correct boundary") {
+                // Tick through the entire sequence (128 steps)
+                for (int i = 1; i < 128; i++) {
+                    sequence.tick();
+                }
+
+                // At this point, index should be at 127
+                REQUIRE (sequence.index == 127);
+
+                // One more tick should wrap around to 0
+                auto wrappedNote = sequence.tick();
+                REQUIRE (sequence.index == 0);
+                REQUIRE (wrappedNote.notes[0] == 0);
+
+                // Verify it continues from 0
+                auto nextNote = sequence.tick();
+                REQUIRE (sequence.index == 1);
+                REQUIRE (nextNote.notes[0] == 1);
+            }
+
+            SECTION ("The sequence wraps at custom length boundary") {
+                // Set a custom length (e.g., 16 steps)
+                sequence.length = 16;
+
+                // Tick through 15 steps (starting from 0, we'll be at index 15)
+                for (int i = 1; i < 16; i++) {
+                    sequence.tick();
+                }
+
+                // At this point, index should be at 15
+                REQUIRE (sequence.index == 15);
+
+                // One more tick should wrap around to 0
+                auto wrappedNote = sequence.tick();
+                REQUIRE (sequence.index == 0);
+                REQUIRE (wrappedNote.notes[0] == 0);
+
+                // Verify it continues from 0
+                auto nextNote = sequence.tick();
+                REQUIRE (sequence.index == 1);
+                REQUIRE (nextNote.notes[0] == 1);
+            }
        }
     }
 }
