@@ -82,6 +82,74 @@ TEST_CASE ("Gambler") {
                 REQUIRE (noteNum == DEFAULT_MIDI_NOTE);
             }
         }
+
+        SECTION ("Slots") {
+            SECTION ("Has 7 slots") {
+                REQUIRE (note.slots.size() == NUM_SLOTS);
+            }
+
+            SECTION ("First slot defaults to Velocity type") {
+                REQUIRE (note.slots[0].type == SlotType::Velocity);
+                REQUIRE (note.slots[0].value == DEFAULT_VELOCITY);
+            }
+
+            SECTION ("Other slots default to CC type") {
+                for (int i = 1; i < NUM_SLOTS; i++) {
+                    REQUIRE (note.slots[i].type == SlotType::CC);
+                    REQUIRE (note.slots[i].ccNumber == i);
+                    REQUIRE (note.slots[i].value == 64);
+                }
+            }
+
+            SECTION ("Can set slot type") {
+                note.setSlotType(0, SlotType::CC);
+                REQUIRE (note.slots[0].type == SlotType::CC);
+
+                note.setSlotType(1, SlotType::Velocity);
+                REQUIRE (note.slots[1].type == SlotType::Velocity);
+            }
+
+            SECTION ("Can set slot CC number") {
+                note.setSlotCCNumber(0, 74); // Filter cutoff
+                REQUIRE (note.slots[0].ccNumber == 74);
+
+                SECTION ("but not invalid CC numbers") {
+                    note.setSlotCCNumber(0, 200);
+                    REQUIRE (note.slots[0].ccNumber == 74); // Should remain unchanged
+                }
+            }
+
+            SECTION ("Can set slot value") {
+                note.setSlotValue(0, 127);
+                REQUIRE (note.slots[0].value == 127);
+
+                note.setSlotValue(1, 0);
+                REQUIRE (note.slots[1].value == 0);
+
+                SECTION ("but not invalid values") {
+                    note.setSlotValue(0, 200);
+                    REQUIRE (note.slots[0].value == 127); // Should remain unchanged
+                }
+            }
+
+            SECTION ("Can configure a slot for different CC types") {
+                // Configure slot 0 for filter cutoff (CC 74)
+                note.setSlotType(0, SlotType::CC);
+                note.setSlotCCNumber(0, 74);
+                note.setSlotValue(0, 100);
+
+                REQUIRE (note.slots[0].type == SlotType::CC);
+                REQUIRE (note.slots[0].ccNumber == 74);
+                REQUIRE (note.slots[0].value == 100);
+
+                // Configure slot 1 for velocity
+                note.setSlotType(1, SlotType::Velocity);
+                note.setSlotValue(1, 127);
+
+                REQUIRE (note.slots[1].type == SlotType::Velocity);
+                REQUIRE (note.slots[1].value == 127);
+            }
+        }
     }
 
     SECTION ("Sequence") {
@@ -110,20 +178,25 @@ TEST_CASE ("Gambler") {
                 REQUIRE (nextNote == 13);
             }
             SECTION ("tick() 128 times always gives you the next expected note") {
-                for (int i = 1; i < 128; i++) {
+                for (int i = 0; i < 128; i++) {
                     auto tickedNote = sequence.tick();
-                    REQUIRE (tickedNote == i); // Check it returns 1, 2, 3... 127
+                    REQUIRE (tickedNote == i); // Check it returns 0, 1, 2, 3... 127
                 }
             }
 
             SECTION ("The sequence is restarted at correct boundary") {
                 // Tick through the entire sequence (128 steps)
-                for (int i = 1; i < 128; i++) {
+                for (int i = 0; i < 127; i++) {
                     sequence.tick();
                 }
 
-                // At this point, index should be at 127
+                // At this point, index should be at 126 (we've ticked 127 times from -1)
+                REQUIRE (sequence.index == 126);
+
+                // One more tick should wrap around to 127
+                auto note127 = sequence.tick();
                 REQUIRE (sequence.index == 127);
+                REQUIRE (note127 == 127);
 
                 // One more tick should wrap around to 0
                 auto wrappedNote = sequence.tick();
@@ -140,13 +213,18 @@ TEST_CASE ("Gambler") {
                 // Set a custom length (e.g., 16 steps)
                 sequence.length = 16;
 
-                // Tick through 15 steps (starting from 0, we'll be at index 15)
-                for (int i = 1; i < 16; i++) {
+                // Tick through 15 steps (starting from -1, we'll be at index 14)
+                for (int i = 0; i < 15; i++) {
                     sequence.tick();
                 }
 
-                // At this point, index should be at 15
+                // At this point, index should be at 14 (we've ticked 15 times from -1)
+                REQUIRE (sequence.index == 14);
+
+                // One more tick should get us to 15
+                auto note15 = sequence.tick();
                 REQUIRE (sequence.index == 15);
+                REQUIRE (note15 == 15);
 
                 // One more tick should wrap around to 0
                 auto wrappedNote = sequence.tick();
@@ -169,7 +247,7 @@ TEST_CASE ("Gambler") {
                 sequence.setNote(2, 60);
 
                 // Step 3: 2-note subsequence [60, 70]
-                sequence.notes[3].length = 2;
+                sequence.notes[3].increaseMidiNotes();  // Increase length from 1 to 2
                 sequence.notes[3].setNote(0, 60);
                 sequence.notes[3].setNote(1, 70);
 
