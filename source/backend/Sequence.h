@@ -25,9 +25,10 @@ struct Sequence {
         notes[index].setNote (0, note);
     }
 
-    Note tick() {
+    int tick() {
         index = (index + 1) % length;
-        return notes[index];
+        // Tick the Note's internal subsequence and return the actual MIDI note value
+        return notes[index].tick();
     }
 
     void initSteps() {

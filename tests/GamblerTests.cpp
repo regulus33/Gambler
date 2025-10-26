@@ -107,12 +107,12 @@ TEST_CASE ("Gambler") {
                 sequence.index = 12;
                 REQUIRE (sequence.notes[12].notes[0] == 12);
                 auto nextNote = sequence.tick();
-                REQUIRE (nextNote.notes[0] == 13);
+                REQUIRE (nextNote == 13);
             }
             SECTION ("tick() 128 times always gives you the next expected note") {
-                for (int i = 1; i < 128; i++) {  // Should be 128, not 127
+                for (int i = 1; i < 128; i++) {
                     auto tickedNote = sequence.tick();
-                    REQUIRE (tickedNote.notes[0] == i); // Check it returns 0, 1, 2... 127
+                    REQUIRE (tickedNote == i); // Check it returns 1, 2, 3... 127
                 }
             }
 
@@ -128,12 +128,12 @@ TEST_CASE ("Gambler") {
                 // One more tick should wrap around to 0
                 auto wrappedNote = sequence.tick();
                 REQUIRE (sequence.index == 0);
-                REQUIRE (wrappedNote.notes[0] == 0);
+                REQUIRE (wrappedNote == 0);
 
                 // Verify it continues from 0
                 auto nextNote = sequence.tick();
                 REQUIRE (sequence.index == 1);
-                REQUIRE (nextNote.notes[0] == 1);
+                REQUIRE (nextNote == 1);
             }
 
             SECTION ("The sequence wraps at custom length boundary") {
@@ -151,12 +151,45 @@ TEST_CASE ("Gambler") {
                 // One more tick should wrap around to 0
                 auto wrappedNote = sequence.tick();
                 REQUIRE (sequence.index == 0);
-                REQUIRE (wrappedNote.notes[0] == 0);
+                REQUIRE (wrappedNote == 0);
 
                 // Verify it continues from 0
                 auto nextNote = sequence.tick();
                 REQUIRE (sequence.index == 1);
-                REQUIRE (nextNote.notes[0] == 1);
+                REQUIRE (nextNote == 1);
+            }
+
+            SECTION ("Notes with subsequences create evolving patterns") {
+                // Create a 4-step sequence
+                sequence.length = 4;
+
+                // Steps 0-2: single note (60)
+                sequence.setNote(0, 60);
+                sequence.setNote(1, 60);
+                sequence.setNote(2, 60);
+
+                // Step 3: 2-note subsequence [60, 70]
+                sequence.notes[3].length = 2;
+                sequence.notes[3].setNote(0, 60);
+                sequence.notes[3].setNote(1, 70);
+
+                // First pass through the sequence
+                REQUIRE (sequence.tick() == 60); // step 0
+                REQUIRE (sequence.tick() == 60); // step 1
+                REQUIRE (sequence.tick() == 60); // step 2
+                REQUIRE (sequence.tick() == 60); // step 3, substep 0
+
+                // Second pass - step 3 should now play substep 1
+                REQUIRE (sequence.tick() == 60); // step 0
+                REQUIRE (sequence.tick() == 60); // step 1
+                REQUIRE (sequence.tick() == 60); // step 2
+                REQUIRE (sequence.tick() == 70); // step 3, substep 1
+
+                // Third pass - step 3 wraps back to substep 0
+                REQUIRE (sequence.tick() == 60); // step 0
+                REQUIRE (sequence.tick() == 60); // step 1
+                REQUIRE (sequence.tick() == 60); // step 2
+                REQUIRE (sequence.tick() == 60); // step 3, substep 0 again
             }
        }
     }
