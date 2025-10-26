@@ -10,7 +10,7 @@ PluginProcessor::PluginProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       ), apvts(*this, nullptr, "Parameters", createParameterLayout()), sequencer()
+                       ), apvts(*this, nullptr, "Parameters", createParameterLayout())
 {
 }
 
