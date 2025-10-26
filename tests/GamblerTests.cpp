@@ -6,12 +6,13 @@
 #include <sequencer/Sequencer.h>
 #include <vector>
 
+
+
+// Seed once at program start
+
 TEST_CASE ("Gambler") {
-    SECTION ("Sequence") {
-        Sequence sequence;
-        SECTION ("Has steps") {
-        }
-    }
+    // over engineering - using some random numbers later so we need to seed the srand lib
+
     SECTION ("Note") {
         Note note;
         SECTION ("Has a vector of ints representing notes") {
@@ -72,7 +73,6 @@ TEST_CASE ("Gambler") {
                     note.setNote (bigIndex, 30);
                     REQUIRE (note.notes[bigIndex] != 30);
                 }
-
             }
         }
 
@@ -85,17 +85,36 @@ TEST_CASE ("Gambler") {
     }
 
     SECTION ("Sequence") {
-        SECTION ("tick") {
-
+        Sequence sequence;
+        SECTION ("Setting a note in Sequence just sets Note at index's first note in Note's note vector") {
+            sequence.setNote (0, 33);
+            REQUIRE (sequence.notes[0].notes[0] == 33);
         }
-    }
+        SECTION ("Sequencer Notes") {
+            // Setup all the notes 0 - 127 with midi notes 0 - 127
+            for (int i = 0; i < 128; i++) {
+                sequence.setNote (i, i);
+            }
 
-    SECTION ("Plugin instance", "[instance]") {
-        PluginProcessor plugin;
+            // check that some random note is what we'd expect based on index.
+            auto someIndex = getRandFromZeroToExcluding(128);
+            auto expectedNote = someIndex;
+            auto note = sequence.notes[someIndex];
 
-        SECTION ("name") {
-            CHECK_THAT (plugin.getName().toStdString(),
-                Catch::Matchers::Equals ("Gambler"));
-        }
+            REQUIRE (note.notes[0] == expectedNote);
+
+            SECTION ("tick() returns note in NEXT index") {
+                sequence.index = 12;
+                REQUIRE (sequence.notes[12].notes[0] == 12);
+                auto nextNote = sequence.tick();
+                REQUIRE (nextNote.notes[0] == 13);
+            }
+            SECTION ("tick() 128 times always gives you the next expected note") {
+                for (int i = 1; i < 128; i++) {  // Should be 128, not 127
+                    auto tickedNote = sequence.tick();
+                    REQUIRE (tickedNote.notes[0] == i); // Check it returns 0, 1, 2... 127
+                }
+            }
+       }
     }
 }

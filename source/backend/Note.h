@@ -20,6 +20,7 @@ struct Note {
 
     Note() {
         for (int i = 0; i < DEFAULT_MIDI_NOTE_LENGTH; i++) {
+
             notes.push_back (DEFAULT_MIDI_NOTE);
         }
     }

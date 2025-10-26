@@ -1,6 +1,8 @@
 #pragma once
 #include <PluginProcessor.h>
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <cstdlib>
+#include <ctime>
 
 using std::make_unique;
 
@@ -32,4 +34,10 @@ using std::make_unique;
 
     plugin.editorBeingDeleted (editor);
     delete editor;
+}
+
+// Warning don't call this too much bc it seeds on every call which is slow I think. For high performance seed once at start.
+static int getRandFromZeroToExcluding(int max) {
+    srand(time(0));
+    return rand() % max;
 }

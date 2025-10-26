@@ -10,12 +10,24 @@
 
 using Notes = std::vector<Note>;
 int constexpr DEFAULT_STEPS = 128;
+int constexpr DEFAULT_INDEX = 0;
 
 struct Sequence {
     Notes notes;
+    int length = DEFAULT_STEPS;
+    int index = DEFAULT_INDEX;
 
     Sequence() {
         initSteps();
+    }
+
+    void setNote(int index, int note) {
+        notes[index].setNote (0, note);
+    }
+
+    Note tick() {
+        index = (index + 1) % length;
+        return notes[index];
     }
 
     void initSteps() {
@@ -23,7 +35,6 @@ struct Sequence {
             notes.push_back (Note());
         }
     }
-
 };
 
 #endif //GAMBLER_SEQUENCE_H
