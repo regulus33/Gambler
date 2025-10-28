@@ -76,11 +76,6 @@ struct Note {
         }
     }
 
-    /**
-     * @brief Sets the type of a slot (CC or Velocity)
-     * @param slotIndex Index of the slot (0-6)
-     * @param type The type to set (CC or Velocity)
-     */
     void setSlotType(int slotIndex, SlotType type) {
         if (slotIndex >= 0 && slotIndex < NUM_SLOTS) {
             slots[slotIndex].type = type;
@@ -90,11 +85,6 @@ struct Note {
         }
     }
 
-    /**
-     * @brief Sets the CC number for a slot
-     * @param slotIndex Index of the slot (0-6)
-     * @param ccNumber CC number (0-127)
-     */
     void setSlotCCNumber(int slotIndex, int ccNumber) {
         if (slotIndex >= 0 && slotIndex < NUM_SLOTS) {
             if (ccNumber >= 0 && ccNumber <= 127) {
@@ -109,11 +99,6 @@ struct Note {
         }
     }
 
-    /**
-     * @brief Sets the value for a slot
-     * @param slotIndex Index of the slot (0-6)
-     * @param value Value (0-127)
-     */
     void setSlotValue(int slotIndex, int value) {
         if (slotIndex >= 0 && slotIndex < NUM_SLOTS) {
             if (value >= 0 && value <= 127) {
@@ -128,11 +113,6 @@ struct Note {
         }
     }
 
-    /**
-     * @brief Gets a slot by index
-     * @param slotIndex Index of the slot (0-6)
-     * @return Reference to the slot
-     */
     Slot& getSlot(int slotIndex) {
         if (slotIndex >= 0 && slotIndex < NUM_SLOTS) {
             return slots[slotIndex];
