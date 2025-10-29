@@ -6,7 +6,9 @@
 #define GAMBLER_SEQUENCE_H
 
 #include <vector>
+#include <random>
 #include "Note.h"
+#include "Controls.h"
 
 using Notes = std::vector<Note>;
 int constexpr DEFAULT_STEPS = 128;
@@ -16,8 +18,13 @@ struct Sequence {
     Notes notes;
     int length = DEFAULT_STEPS;
     int index = DEFAULT_INDEX;
+    Controls* controls = nullptr;
 
     Sequence() {
+        initSteps();
+    }
+
+    Sequence(Controls& ctrl) : controls(&ctrl) {
         initSteps();
     }
 
@@ -27,6 +34,17 @@ struct Sequence {
 
     int tick() {
         index = (index + 1) % length;
+
+        // If Roll button is pressed, randomize the note
+        if (controls && controls->isRollPressed()) {
+            // Get a random note value between 0-127
+            static std::random_device rd;
+            static std::mt19937 gen(rd());
+            std::uniform_int_distribution<> dis(0, 127);
+            int randomNote = dis(gen);
+            notes[index].setNote(0, randomNote);
+        }
+
         // Tick the Note's internal subsequence and return the actual MIDI note value
         return notes[index].tick();
     }

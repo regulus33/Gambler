@@ -10,7 +10,42 @@
 // Seed once at program start
 
 TEST_CASE ("Gambler") {
-    // over engineering - using some random numbers later so we need to seed the srand lib
+    SECTION ("Controls") {
+        Controls controls;
+        Sequence sequence(controls);
+        std::vector<int> firstCollectedNotes;
+
+        // Set sequence length to something manageable for testing
+        sequence.length = 8;
+
+        // Initialize notes with known values
+        for (int i = 0; i < sequence.length; i++) {
+            sequence.setNote(i, 60 + i);  // Notes: 60, 61, 62, 63, 64, 65, 66, 67
+        }
+
+        // Collect notes without Roll pressed
+        for (int i = 0; i < sequence.length; i++) {
+            firstCollectedNotes.push_back(sequence.tick());
+        }
+
+        // Press the Roll button
+        controls.setRollPressed(true);
+
+        // Reset sequence index to start over
+        sequence.index = -1;
+
+        // Collect notes with Roll pressed
+        std::vector<int> secondCollectedNotes;
+        for (int i = 0; i < sequence.length; i++) {
+            secondCollectedNotes.push_back(sequence.tick());
+        }
+
+        // Release the Roll button
+        controls.setRollPressed(false);
+
+        // The notes should be different when Roll is pressed
+        REQUIRE(firstCollectedNotes != secondCollectedNotes);
+    }
 
     SECTION ("Note") {
         Note note;
