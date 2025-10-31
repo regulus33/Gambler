@@ -96,6 +96,9 @@ add_library(SharedCode INTERFACE
         source/backend/Sequence.h
         source/backend/Note.h
         source/backend/Slot.h
+        source/backend/Controls.h
+        source/backend/StepButton.h
+        source/backend/SequencerOptions.h
 )
 
 clap_juce_extensions_plugin(TARGET "${PROJECT_NAME}"

@@ -9,6 +9,7 @@
 #include <random>
 #include "Note.h"
 #include "Controls.h"
+#include "SequencerOptions.h"
 
 using Notes = std::vector<Note>;
 int constexpr DEFAULT_STEPS = 128;
@@ -19,12 +20,13 @@ struct Sequence {
     int length = DEFAULT_STEPS;
     int index = DEFAULT_INDEX;
     Controls* controls = nullptr;
+    SequencerOptions* options = nullptr;
 
     Sequence() {
         initSteps();
     }
 
-    Sequence(Controls& ctrl) : controls(&ctrl) {
+    Sequence(Controls& ctrl, SequencerOptions& opts) : controls(&ctrl), options(&opts) {
         initSteps();
     }
 
@@ -53,6 +55,10 @@ struct Sequence {
         for (int i = 0; i < DEFAULT_STEPS; i++) {
             notes.push_back (Note());
         }
+    }
+
+    SequencerOptions* getOptions() const {
+        return options;
     }
 };
 

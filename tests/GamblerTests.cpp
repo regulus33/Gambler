@@ -11,40 +11,70 @@
 
 TEST_CASE ("Gambler") {
     SECTION ("Controls") {
-        Controls controls;
-        Sequence sequence(controls);
-        std::vector<int> firstCollectedNotes;
+        SECTION ("setScale(keys[int])") {
+            // The scale is passed as 12 positional int arguments, C would be 0th arg, B would be 11th
+            Controls controls;
+            SequencerOptions options;
 
-        // Set sequence length to something manageable for testing
-        sequence.length = 8;
+            // Set a scale: C major (C=1, D=1, E=1, F=1, G=1, A=1, B=1, others=0)
+            options.setScale(1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1);
 
-        // Initialize notes with known values
-        for (int i = 0; i < sequence.length; i++) {
-            sequence.setNote(i, 60 + i);  // Notes: 60, 61, 62, 63, 64, 65, 66, 67
+            Sequence sequence(controls, options);
+
+            // Verify the sequence has access to the options
+            REQUIRE(sequence.getOptions() != nullptr);
+
+            // Verify the scale was set correctly
+            REQUIRE(sequence.getOptions()->scale[0] == 1);  // C
+            REQUIRE(sequence.getOptions()->scale[1] == 0);  // Db
+            REQUIRE(sequence.getOptions()->scale[2] == 1);  // D
+            REQUIRE(sequence.getOptions()->scale[3] == 0);  // Eb
+            REQUIRE(sequence.getOptions()->scale[4] == 1);  // E
+            REQUIRE(sequence.getOptions()->scale[5] == 1);  // F
+            REQUIRE(sequence.getOptions()->scale[6] == 0);  // Gb
+            REQUIRE(sequence.getOptions()->scale[7] == 1);  // G
+            REQUIRE(sequence.getOptions()->scale[8] == 0);  // Ab
+            REQUIRE(sequence.getOptions()->scale[9] == 1);  // A
+            REQUIRE(sequence.getOptions()->scale[10] == 0); // Bb
+            REQUIRE(sequence.getOptions()->scale[11] == 1); // B
         }
+        SECTION ("setRoll()") {
+            Controls controls;
+            SequencerOptions options;
+            Sequence sequence(controls, options);
+            std::vector<int> firstCollectedNotes;
 
-        // Collect notes without Roll pressed
-        for (int i = 0; i < sequence.length; i++) {
-            firstCollectedNotes.push_back(sequence.tick());
+            // Set sequence length to something manageable for testing
+            sequence.length = 8;
+
+            // Initialize notes with known values
+            for (int i = 0; i < sequence.length; i++) {
+                sequence.setNote(i, 60 + i);  // Notes: 60, 61, 62, 63, 64, 65, 66, 67
+            }
+
+            // Collect notes without Roll pressed
+            for (int i = 0; i < sequence.length; i++) {
+                firstCollectedNotes.push_back(sequence.tick());
+            }
+
+            // Press the Roll button
+            controls.setRollPressed(true);
+
+            // Reset sequence index to start over
+            sequence.index = -1;
+
+            // Collect notes with Roll pressed
+            std::vector<int> secondCollectedNotes;
+            for (int i = 0; i < sequence.length; i++) {
+                secondCollectedNotes.push_back(sequence.tick());
+            }
+
+            // Release the Roll button
+            controls.setRollPressed(false);
+
+            // The notes should be different when Roll is pressed
+            REQUIRE(firstCollectedNotes != secondCollectedNotes);
         }
-
-        // Press the Roll button
-        controls.setRollPressed(true);
-
-        // Reset sequence index to start over
-        sequence.index = -1;
-
-        // Collect notes with Roll pressed
-        std::vector<int> secondCollectedNotes;
-        for (int i = 0; i < sequence.length; i++) {
-            secondCollectedNotes.push_back(sequence.tick());
-        }
-
-        // Release the Roll button
-        controls.setRollPressed(false);
-
-        // The notes should be different when Roll is pressed
-        REQUIRE(firstCollectedNotes != secondCollectedNotes);
     }
 
     SECTION ("Note") {

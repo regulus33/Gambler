@@ -1,6 +1,7 @@
 #pragma once
 
 #include "data/Params.h"
+#include "backend/Controls.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #if (MSVC)
@@ -9,7 +10,7 @@
 
 using APVTS = juce::AudioProcessorValueTreeState;
 
-class PluginProcessor : public juce::AudioProcessor
+class PluginProcessor : public juce::AudioProcessor, private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     PluginProcessor();
@@ -44,10 +45,37 @@ public:
     APVTS& getAPVTS() noexcept { return apvts; }
     const APVTS& getAPVTS() const noexcept { return apvts; }
 
+    // Access to domain layer
+    Controls& getControls() noexcept { return controls; }
+    const Controls& getControls() const noexcept { return controls; }
+
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
+
+    // ========================================
+    // Application Layer - Controller
+    // ========================================
+
+    // Persistence layer (APVTS)
     APVTS apvts;
+
+    // Domain layer
+    Controls controls;
+
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();
+
+    // ========================================
+    // Sync Methods: APVTS ↔ Controls
+    // ========================================
+
+    // Called when APVTS parameter changes (from UI or preset load)
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+
+    // Sync all Controls state → APVTS (for saving presets)
+    void syncControlsToApvts();
+
+    // Sync all APVTS → Controls state (for loading presets)
+    void syncApvtsToControls();
 };
