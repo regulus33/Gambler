@@ -10,38 +10,36 @@
 // Seed once at program start
 
 TEST_CASE ("Gambler") {
-    SECTION ("Controls") {
+    SECTION ("State") {
         SECTION ("setScale(keys[int])") {
             // The scale is passed as 12 positional int arguments, C would be 0th arg, B would be 11th
-            Controls controls;
-            SequencerOptions options;
+            State state;
 
             // Set a scale: C major (C=1, D=1, E=1, F=1, G=1, A=1, B=1, others=0)
-            options.setScale(1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1);
+            state.setScale(1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1);
 
-            Sequence sequence(controls, options);
+            Sequence sequence(state);
 
-            // Verify the sequence has access to the options
-            REQUIRE(sequence.getOptions() != nullptr);
+            // Verify the sequence has access to the state
+            REQUIRE(sequence.state != nullptr);
 
             // Verify the scale was set correctly
-            REQUIRE(sequence.getOptions()->scale[0] == 1);  // C
-            REQUIRE(sequence.getOptions()->scale[1] == 0);  // Db
-            REQUIRE(sequence.getOptions()->scale[2] == 1);  // D
-            REQUIRE(sequence.getOptions()->scale[3] == 0);  // Eb
-            REQUIRE(sequence.getOptions()->scale[4] == 1);  // E
-            REQUIRE(sequence.getOptions()->scale[5] == 1);  // F
-            REQUIRE(sequence.getOptions()->scale[6] == 0);  // Gb
-            REQUIRE(sequence.getOptions()->scale[7] == 1);  // G
-            REQUIRE(sequence.getOptions()->scale[8] == 0);  // Ab
-            REQUIRE(sequence.getOptions()->scale[9] == 1);  // A
-            REQUIRE(sequence.getOptions()->scale[10] == 0); // Bb
-            REQUIRE(sequence.getOptions()->scale[11] == 1); // B
+            REQUIRE(sequence.state->getScale()[0] == 1);  // C
+            REQUIRE(sequence.state->getScale()[1] == 0);  // Db
+            REQUIRE(sequence.state->getScale()[2] == 1);  // D
+            REQUIRE(sequence.state->getScale()[3] == 0);  // Eb
+            REQUIRE(sequence.state->getScale()[4] == 1);  // E
+            REQUIRE(sequence.state->getScale()[5] == 1);  // F
+            REQUIRE(sequence.state->getScale()[6] == 0);  // Gb
+            REQUIRE(sequence.state->getScale()[7] == 1);  // G
+            REQUIRE(sequence.state->getScale()[8] == 0);  // Ab
+            REQUIRE(sequence.state->getScale()[9] == 1);  // A
+            REQUIRE(sequence.state->getScale()[10] == 0); // Bb
+            REQUIRE(sequence.state->getScale()[11] == 1); // B
         }
         SECTION ("setRoll()") {
-            Controls controls;
-            SequencerOptions options;
-            Sequence sequence(controls, options);
+            State state;
+            Sequence sequence(state);
             std::vector<int> firstCollectedNotes;
 
             // Set sequence length to something manageable for testing
@@ -58,7 +56,7 @@ TEST_CASE ("Gambler") {
             }
 
             // Press the Roll button
-            controls.setRollPressed(true);
+            state.setRollPressed(true);
 
             // Reset sequence index to start over
             sequence.index = -1;
@@ -70,7 +68,7 @@ TEST_CASE ("Gambler") {
             }
 
             // Release the Roll button
-            controls.setRollPressed(false);
+            state.setRollPressed(false);
 
             // The notes should be different when Roll is pressed
             REQUIRE(firstCollectedNotes != secondCollectedNotes);

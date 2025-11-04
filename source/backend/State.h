@@ -5,15 +5,16 @@
 #include "StepButton.h"
 
 /**
- * Controls class - Central data class for all UI controls in the Gambler application.
- * This acts as the controller in an MVC pattern, providing a single interface point
- * for all control states and values.
+ * State class - Central domain state class for the Gambler application.
+ * This is a pure domain object that holds all application state.
+ * The actual UI controls interface will be closer to the UI layer.
  */
-class Controls {
+class State {
 public:
     // Constants
     static constexpr int NUM_STEP_BUTTONS = 8;
     static constexpr int NUM_CC_SLOTS = 7;
+    static constexpr int NUM_SCALE_NOTES = 12;  // 12 chromatic notes
     static constexpr int MIN_OCTAVE = -4;
     static constexpr int MAX_OCTAVE = 4;
     static constexpr int MIN_NOTE = 0;
@@ -31,10 +32,10 @@ public:
         NOTE_TO_CC
     };
     
-    Controls() {
+    State() {
         // Initialize step buttons
         stepButtons.resize(NUM_STEP_BUTTONS);
-        
+
         // Initialize CC controls with default values
         for (int i = 0; i < NUM_CC_SLOTS; ++i) {
             ccNumbers[i] = i + 1;  // Default CC 1-7
@@ -202,26 +203,64 @@ public:
     // ========================================
     // Note Range Control (Vertical slider on right)
     // ========================================
-    
+
     int getNoteRangeMin() const { return noteRangeMin; }
     void setNoteRangeMin(int value) {
         if (value >= MIN_NOTE && value <= MAX_NOTE && value <= noteRangeMax) {
             noteRangeMin = value;
         }
     }
-    
+
     int getNoteRangeMax() const { return noteRangeMax; }
     void setNoteRangeMax(int value) {
         if (value >= MIN_NOTE && value <= MAX_NOTE && value >= noteRangeMin) {
             noteRangeMax = value;
         }
     }
-    
+
     void setNoteRange(int min, int max) {
         if (min >= MIN_NOTE && max <= MAX_NOTE && min <= max) {
             noteRangeMin = min;
             noteRangeMax = max;
         }
+    }
+
+    // ========================================
+    // Scale Control (12 chromatic notes)
+    // ========================================
+
+    // Get the scale array (C, Db, D, Eb, E, F, Gb, G, Ab, A, Bb, B)
+    const std::array<int, NUM_SCALE_NOTES>& getScale() const { return scale; }
+
+    // Get individual scale note state (0 = not in scale, 1 = in scale)
+    int getScaleNote(int index) const {
+        if (index >= 0 && index < NUM_SCALE_NOTES) {
+            return scale[index];
+        }
+        return 0;
+    }
+
+    // Set individual scale note state
+    void setScaleNote(int index, int value) {
+        if (index >= 0 && index < NUM_SCALE_NOTES) {
+            scale[index] = (value != 0) ? 1 : 0;  // Normalize to 0 or 1
+        }
+    }
+
+    // Set entire scale at once (C, Db, D, Eb, E, F, Gb, G, Ab, A, Bb, B)
+    void setScale(int c, int db, int d, int eb, int e, int f, int gb, int g, int ab, int a, int bb, int b) {
+        scale[0] = (c != 0) ? 1 : 0;
+        scale[1] = (db != 0) ? 1 : 0;
+        scale[2] = (d != 0) ? 1 : 0;
+        scale[3] = (eb != 0) ? 1 : 0;
+        scale[4] = (e != 0) ? 1 : 0;
+        scale[5] = (f != 0) ? 1 : 0;
+        scale[6] = (gb != 0) ? 1 : 0;
+        scale[7] = (g != 0) ? 1 : 0;
+        scale[8] = (ab != 0) ? 1 : 0;
+        scale[9] = (a != 0) ? 1 : 0;
+        scale[10] = (bb != 0) ? 1 : 0;
+        scale[11] = (b != 0) ? 1 : 0;
     }
     
     // ========================================
@@ -297,9 +336,13 @@ private:
     // CC controls (7 slots)
     std::array<int, NUM_CC_SLOTS> ccNumbers;
     std::array<int, NUM_CC_SLOTS> ccValues;
-    
+
     // Note range control
     int noteRangeMin = 0;
     int noteRangeMax = 127;
+
+    // Scale control (12 chromatic notes: C, Db, D, Eb, E, F, Gb, G, Ab, A, Bb, B)
+    // 0 = not in scale, 1 = in scale
+    std::array<int, NUM_SCALE_NOTES> scale = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 };
 

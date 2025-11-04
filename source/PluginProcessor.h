@@ -1,7 +1,7 @@
 #pragma once
 
 #include "data/Params.h"
-#include "backend/Controls.h"
+#include "backend/State.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #if (MSVC)
@@ -46,8 +46,8 @@ public:
     const APVTS& getAPVTS() const noexcept { return apvts; }
 
     // Access to domain layer
-    Controls& getControls() noexcept { return controls; }
-    const Controls& getControls() const noexcept { return controls; }
+    State& getState() noexcept { return state; }
+    const State& getState() const noexcept { return state; }
 
 
 private:
@@ -61,21 +61,21 @@ private:
     APVTS apvts;
 
     // Domain layer
-    Controls controls;
+    State state;
 
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();
 
     // ========================================
-    // Sync Methods: APVTS ↔ Controls
+    // Sync Methods: APVTS ↔ State
     // ========================================
 
     // Called when APVTS parameter changes (from UI or preset load)
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
-    // Sync all Controls state → APVTS (for saving presets)
-    void syncControlsToApvts();
+    // Sync all State → APVTS (for saving presets)
+    void syncStateToApvts();
 
-    // Sync all APVTS → Controls state (for loading presets)
-    void syncApvtsToControls();
+    // Sync all APVTS → State (for loading presets)
+    void syncApvtsToState();
 };

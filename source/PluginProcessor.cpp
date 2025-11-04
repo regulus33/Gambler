@@ -12,11 +12,11 @@ PluginProcessor::PluginProcessor()
 #endif
               ),
       apvts (*this, nullptr, "Parameters", createParameterLayout()) {
-    // Initialize Controls from APVTS (in case we're loading a saved state)
-    syncApvtsToControls();
+    // Initialize State from APVTS (in case we're loading a saved state)
+    syncApvtsToState();
 
     // Register as listener for all parameter changes
-    // This ensures Controls stays in sync when parameters change from UI
+    // This ensures State stays in sync when parameters change from UI
     for (auto* param : apvts.processor.getParameters()) {
         if (auto* paramWithID = dynamic_cast<juce::RangedAudioParameter*> (param)) {
             apvts.addParameterListener (paramWithID->paramID, this);
@@ -166,12 +166,12 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor() {
 
 //==============================================================================
 void PluginProcessor::getStateInformation (juce::MemoryBlock& destData) {
-    // Sync Controls → APVTS before saving
-    syncControlsToApvts();
+    // Sync State → APVTS before saving
+    syncStateToApvts();
 
     // Save APVTS state
-    auto state = apvts.copyState();
-    std::unique_ptr<juce::XmlElement> xml (state.createXml());
+    auto valueTreeState = apvts.copyState();
+    std::unique_ptr<juce::XmlElement> xml (valueTreeState.createXml());
     copyXmlToBinary (*xml, destData);
 }
 
@@ -183,122 +183,122 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
         if (xmlState->hasTagName (apvts.state.getType())) {
             apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
 
-            // Sync APVTS → Controls after loading
-            syncApvtsToControls();
+            // Sync APVTS → State after loading
+            syncApvtsToState();
         }
     }
 }
 
 //==============================================================================
-// Sync Methods: APVTS ↔ Controls
+// Sync Methods: APVTS ↔ State
 //==============================================================================
 
 void PluginProcessor::parameterChanged (const juce::String& parameterID, float newValue) {
     // This is called when a parameter changes (from UI or automation)
-    // Update the corresponding Controls property
+    // Update the corresponding State property
 
     using namespace Params::Keys::ID;
 
     // Bottom row buttons
     if (parameterID == ROLL)
-        controls.setRollPressed (newValue > 0.5f);
+        state.setRollPressed (newValue > 0.5f);
     else if (parameterID == INDEX_LEFT)
-        controls.setIndexLeftPressed (newValue > 0.5f);
+        state.setIndexLeftPressed (newValue > 0.5f);
     else if (parameterID == INDEX_RIGHT)
-        controls.setIndexRightPressed (newValue > 0.5f);
+        state.setIndexRightPressed (newValue > 0.5f);
     else if (parameterID == LENGTH_MINUS)
-        controls.setLengthMinusPressed (newValue > 0.5f);
+        state.setLengthMinusPressed (newValue > 0.5f);
     else if (parameterID == LENGTH_PLUS)
-        controls.setLengthPlusPressed (newValue > 0.5f);
+        state.setLengthPlusPressed (newValue > 0.5f);
     else if (parameterID == NUDGE_LEFT)
-        controls.setNudgeLeftPressed (newValue > 0.5f);
+        state.setNudgeLeftPressed (newValue > 0.5f);
     else if (parameterID == NUDGE_RIGHT)
-        controls.setNudgeRightPressed (newValue > 0.5f);
+        state.setNudgeRightPressed (newValue > 0.5f);
     else if (parameterID == SHIFT)
-        controls.setShiftPressed (newValue > 0.5f);
+        state.setShiftPressed (newValue > 0.5f);
 
     // Top right buttons
     else if (parameterID == EXPORT)
-        controls.setExportPressed (newValue > 0.5f);
+        state.setExportPressed (newValue > 0.5f);
     else if (parameterID == SAVE)
-        controls.setSavePressed (newValue > 0.5f);
+        state.setSavePressed (newValue > 0.5f);
     else if (parameterID == LOAD)
-        controls.setLoadPressed (newValue > 0.5f);
+        state.setLoadPressed (newValue > 0.5f);
 
     // Sub notes buttons
     else if (parameterID == SUB_NOTES_PLUS)
-        controls.setSubNotesPlusPressed (newValue > 0.5f);
+        state.setSubNotesPlusPressed (newValue > 0.5f);
     else if (parameterID == SUB_NOTES_MINUS)
-        controls.setSubNotesMinusPressed (newValue > 0.5f);
+        state.setSubNotesMinusPressed (newValue > 0.5f);
 
     // Main controls
     else if (parameterID == OCTAVE)
-        controls.setOctave (static_cast<int> (newValue));
+        state.setOctave (static_cast<int> (newValue));
     else if (parameterID == NOTE)
-        controls.setNote (static_cast<int> (newValue));
+        state.setNote (static_cast<int> (newValue));
     else if (parameterID == PROBABILITY)
-        controls.setProbability (static_cast<int> (newValue));
+        state.setProbability (static_cast<int> (newValue));
 
     // MIDI mode
     else if (parameterID == MIDI_MODE) {
-        controls.setMidiMode (newValue > 0.5f ? Controls::MidiMode::NOTE_TO_CC : Controls::MidiMode::CC_TO_NOTE);
+        state.setMidiMode (newValue > 0.5f ? State::MidiMode::NOTE_TO_CC : State::MidiMode::CC_TO_NOTE);
     }
 
     // Note range
     else if (parameterID == NOTE_RANGE_MIN)
-        controls.setNoteRangeMin (static_cast<int> (newValue));
+        state.setNoteRangeMin (static_cast<int> (newValue));
     else if (parameterID == NOTE_RANGE_MAX)
-        controls.setNoteRangeMax (static_cast<int> (newValue));
+        state.setNoteRangeMax (static_cast<int> (newValue));
 
     // Step buttons
     else {
-        for (int i = 0; i < Controls::NUM_STEP_BUTTONS; ++i) {
+        for (int i = 0; i < State::NUM_STEP_BUTTONS; ++i) {
             if (parameterID == stepButtonSelected (i)) {
-                controls.getStepButton (i).setSelected (newValue > 0.5f);
+                state.getStepButton (i).setSelected (newValue > 0.5f);
                 return;
             } else if (parameterID == stepButtonHighlighted (i)) {
-                controls.getStepButton (i).setHighlighted (newValue > 0.5f);
+                state.getStepButton (i).setHighlighted (newValue > 0.5f);
                 return;
             }
         }
 
         // CC controls
-        for (int i = 0; i < Controls::NUM_CC_SLOTS; ++i) {
+        for (int i = 0; i < State::NUM_CC_SLOTS; ++i) {
             if (parameterID == ccNumber (i)) {
-                controls.setCCNumber (i, static_cast<int> (newValue));
+                state.setCCNumber (i, static_cast<int> (newValue));
                 return;
             } else if (parameterID == ccValue (i)) {
-                controls.setCCValue (i, static_cast<int> (newValue));
+                state.setCCValue (i, static_cast<int> (newValue));
                 return;
             }
         }
     }
 }
 
-void PluginProcessor::syncControlsToApvts() {
-    // Sync Controls → APVTS (for saving presets)
-    // This updates APVTS from the current Controls state
+void PluginProcessor::syncStateToApvts() {
+    // Sync State → APVTS (for saving presets)
+    // This updates APVTS from the current State
 
     using namespace Params::Keys::ID;
 
     // Bottom row buttons
-    apvts.getParameter (ROLL)->setValueNotifyingHost (controls.isRollPressed() ? 1.0f : 0.0f);
-    apvts.getParameter (INDEX_LEFT)->setValueNotifyingHost (controls.isIndexLeftPressed() ? 1.0f : 0.0f);
-    apvts.getParameter (INDEX_RIGHT)->setValueNotifyingHost (controls.isIndexRightPressed() ? 1.0f : 0.0f);
-    apvts.getParameter (LENGTH_MINUS)->setValueNotifyingHost (controls.isLengthMinusPressed() ? 1.0f : 0.0f);
-    apvts.getParameter (LENGTH_PLUS)->setValueNotifyingHost (controls.isLengthPlusPressed() ? 1.0f : 0.0f);
-    apvts.getParameter (NUDGE_LEFT)->setValueNotifyingHost (controls.isNudgeLeftPressed() ? 1.0f : 0.0f);
-    apvts.getParameter (NUDGE_RIGHT)->setValueNotifyingHost (controls.isNudgeRightPressed() ? 1.0f : 0.0f);
-    apvts.getParameter (SHIFT)->setValueNotifyingHost (controls.isShiftPressed() ? 1.0f : 0.0f);
+    apvts.getParameter (ROLL)->setValueNotifyingHost (state.isRollPressed() ? 1.0f : 0.0f);
+    apvts.getParameter (INDEX_LEFT)->setValueNotifyingHost (state.isIndexLeftPressed() ? 1.0f : 0.0f);
+    apvts.getParameter (INDEX_RIGHT)->setValueNotifyingHost (state.isIndexRightPressed() ? 1.0f : 0.0f);
+    apvts.getParameter (LENGTH_MINUS)->setValueNotifyingHost (state.isLengthMinusPressed() ? 1.0f : 0.0f);
+    apvts.getParameter (LENGTH_PLUS)->setValueNotifyingHost (state.isLengthPlusPressed() ? 1.0f : 0.0f);
+    apvts.getParameter (NUDGE_LEFT)->setValueNotifyingHost (state.isNudgeLeftPressed() ? 1.0f : 0.0f);
+    apvts.getParameter (NUDGE_RIGHT)->setValueNotifyingHost (state.isNudgeRightPressed() ? 1.0f : 0.0f);
+    apvts.getParameter (SHIFT)->setValueNotifyingHost (state.isShiftPressed() ? 1.0f : 0.0f);
 
     // Top right buttons
-    apvts.getParameter (EXPORT)->setValueNotifyingHost (controls.isExportPressed() ? 1.0f : 0.0f);
-    apvts.getParameter (SAVE)->setValueNotifyingHost (controls.isSavePressed() ? 1.0f : 0.0f);
-    apvts.getParameter (LOAD)->setValueNotifyingHost (controls.isLoadPressed() ? 1.0f : 0.0f);
+    apvts.getParameter (EXPORT)->setValueNotifyingHost (state.isExportPressed() ? 1.0f : 0.0f);
+    apvts.getParameter (SAVE)->setValueNotifyingHost (state.isSavePressed() ? 1.0f : 0.0f);
+    apvts.getParameter (LOAD)->setValueNotifyingHost (state.isLoadPressed() ? 1.0f : 0.0f);
 
     // Sub notes buttons
-    apvts.getParameter (SUB_NOTES_PLUS)->setValueNotifyingHost (controls.isSubNotesPlusPressed() ? 1.0f : 0.0f);
-    apvts.getParameter (SUB_NOTES_MINUS)->setValueNotifyingHost (controls.isSubNotesMinusPressed() ? 1.0f : 0.0f);
+    apvts.getParameter (SUB_NOTES_PLUS)->setValueNotifyingHost (state.isSubNotesPlusPressed() ? 1.0f : 0.0f);
+    apvts.getParameter (SUB_NOTES_MINUS)->setValueNotifyingHost (state.isSubNotesMinusPressed() ? 1.0f : 0.0f);
 
     // Main controls (need to normalize to 0-1 range)
     auto* octaveParam = dynamic_cast<juce::AudioParameterInt*> (apvts.getParameter (OCTAVE));
@@ -306,16 +306,16 @@ void PluginProcessor::syncControlsToApvts() {
     auto* probabilityParam = dynamic_cast<juce::AudioParameterInt*> (apvts.getParameter (PROBABILITY));
 
     if (octaveParam)
-        octaveParam->operator= (controls.getOctave());
+        octaveParam->operator= (state.getOctave());
     if (noteParam)
-        noteParam->operator= (controls.getNote());
+        noteParam->operator= (state.getNote());
     if (probabilityParam)
-        probabilityParam->operator= (controls.getProbability());
+        probabilityParam->operator= (state.getProbability());
 
     // MIDI mode
     auto* midiModeParam = dynamic_cast<juce::AudioParameterInt*> (apvts.getParameter (MIDI_MODE));
     if (midiModeParam) {
-        midiModeParam->operator= (controls.getMidiMode() == Controls::MidiMode::CC_TO_NOTE ? 0 : 1);
+        midiModeParam->operator= (state.getMidiMode() == State::MidiMode::CC_TO_NOTE ? 0 : 1);
     }
 
     // Note range
@@ -323,77 +323,77 @@ void PluginProcessor::syncControlsToApvts() {
     auto* noteRangeMaxParam = dynamic_cast<juce::AudioParameterInt*> (apvts.getParameter (NOTE_RANGE_MAX));
 
     if (noteRangeMinParam)
-        noteRangeMinParam->operator= (controls.getNoteRangeMin());
+        noteRangeMinParam->operator= (state.getNoteRangeMin());
     if (noteRangeMaxParam)
-        noteRangeMaxParam->operator= (controls.getNoteRangeMax());
+        noteRangeMaxParam->operator= (state.getNoteRangeMax());
 
     // Step buttons
-    for (int i = 0; i < Controls::NUM_STEP_BUTTONS; ++i) {
-        const auto& button = controls.getStepButton (i);
+    for (int i = 0; i < State::NUM_STEP_BUTTONS; ++i) {
+        const auto& button = state.getStepButton (i);
         apvts.getParameter (stepButtonSelected (i))->setValueNotifyingHost (button.isSelected() ? 1.0f : 0.0f);
         apvts.getParameter (stepButtonHighlighted (i))->setValueNotifyingHost (button.isHighlighted() ? 1.0f : 0.0f);
     }
 
     // CC controls
-    for (int i = 0; i < Controls::NUM_CC_SLOTS; ++i) {
+    for (int i = 0; i < State::NUM_CC_SLOTS; ++i) {
         auto* ccNumParam = dynamic_cast<juce::AudioParameterInt*> (apvts.getParameter (ccNumber (i)));
         auto* ccValParam = dynamic_cast<juce::AudioParameterInt*> (apvts.getParameter (ccValue (i)));
 
         if (ccNumParam)
-            ccNumParam->operator= (controls.getCCNumber (i));
+            ccNumParam->operator= (state.getCCNumber (i));
         if (ccValParam)
-            ccValParam->operator= (controls.getCCValue (i));
+            ccValParam->operator= (state.getCCValue (i));
     }
 }
 
-void PluginProcessor::syncApvtsToControls() {
-    // Sync APVTS → Controls (for loading presets)
-    // This updates Controls from the current APVTS state
+void PluginProcessor::syncApvtsToState() {
+    // Sync APVTS → State (for loading presets)
+    // This updates State from the current APVTS state
 
     using namespace Params::Keys::ID;
 
     // Bottom row buttons
-    controls.setRollPressed (apvts.getRawParameterValue (ROLL)->load() > 0.5f);
-    controls.setIndexLeftPressed (apvts.getRawParameterValue (INDEX_LEFT)->load() > 0.5f);
-    controls.setIndexRightPressed (apvts.getRawParameterValue (INDEX_RIGHT)->load() > 0.5f);
-    controls.setLengthMinusPressed (apvts.getRawParameterValue (LENGTH_MINUS)->load() > 0.5f);
-    controls.setLengthPlusPressed (apvts.getRawParameterValue (LENGTH_PLUS)->load() > 0.5f);
-    controls.setNudgeLeftPressed (apvts.getRawParameterValue (NUDGE_LEFT)->load() > 0.5f);
-    controls.setNudgeRightPressed (apvts.getRawParameterValue (NUDGE_RIGHT)->load() > 0.5f);
-    controls.setShiftPressed (apvts.getRawParameterValue (SHIFT)->load() > 0.5f);
+    state.setRollPressed (apvts.getRawParameterValue (ROLL)->load() > 0.5f);
+    state.setIndexLeftPressed (apvts.getRawParameterValue (INDEX_LEFT)->load() > 0.5f);
+    state.setIndexRightPressed (apvts.getRawParameterValue (INDEX_RIGHT)->load() > 0.5f);
+    state.setLengthMinusPressed (apvts.getRawParameterValue (LENGTH_MINUS)->load() > 0.5f);
+    state.setLengthPlusPressed (apvts.getRawParameterValue (LENGTH_PLUS)->load() > 0.5f);
+    state.setNudgeLeftPressed (apvts.getRawParameterValue (NUDGE_LEFT)->load() > 0.5f);
+    state.setNudgeRightPressed (apvts.getRawParameterValue (NUDGE_RIGHT)->load() > 0.5f);
+    state.setShiftPressed (apvts.getRawParameterValue (SHIFT)->load() > 0.5f);
 
     // Top right buttons
-    controls.setExportPressed (apvts.getRawParameterValue (EXPORT)->load() > 0.5f);
-    controls.setSavePressed (apvts.getRawParameterValue (SAVE)->load() > 0.5f);
-    controls.setLoadPressed (apvts.getRawParameterValue (LOAD)->load() > 0.5f);
+    state.setExportPressed (apvts.getRawParameterValue (EXPORT)->load() > 0.5f);
+    state.setSavePressed (apvts.getRawParameterValue (SAVE)->load() > 0.5f);
+    state.setLoadPressed (apvts.getRawParameterValue (LOAD)->load() > 0.5f);
 
     // Sub notes buttons
-    controls.setSubNotesPlusPressed (apvts.getRawParameterValue (SUB_NOTES_PLUS)->load() > 0.5f);
-    controls.setSubNotesMinusPressed (apvts.getRawParameterValue (SUB_NOTES_MINUS)->load() > 0.5f);
+    state.setSubNotesPlusPressed (apvts.getRawParameterValue (SUB_NOTES_PLUS)->load() > 0.5f);
+    state.setSubNotesMinusPressed (apvts.getRawParameterValue (SUB_NOTES_MINUS)->load() > 0.5f);
 
     // Main controls
-    controls.setOctave (static_cast<int> (apvts.getRawParameterValue (OCTAVE)->load()));
-    controls.setNote (static_cast<int> (apvts.getRawParameterValue (NOTE)->load()));
-    controls.setProbability (static_cast<int> (apvts.getRawParameterValue (PROBABILITY)->load()));
+    state.setOctave (static_cast<int> (apvts.getRawParameterValue (OCTAVE)->load()));
+    state.setNote (static_cast<int> (apvts.getRawParameterValue (NOTE)->load()));
+    state.setProbability (static_cast<int> (apvts.getRawParameterValue (PROBABILITY)->load()));
 
     // MIDI mode
     int midiModeValue = static_cast<int> (apvts.getRawParameterValue (MIDI_MODE)->load());
-    controls.setMidiMode (midiModeValue == 0 ? Controls::MidiMode::CC_TO_NOTE : Controls::MidiMode::NOTE_TO_CC);
+    state.setMidiMode (midiModeValue == 0 ? State::MidiMode::CC_TO_NOTE : State::MidiMode::NOTE_TO_CC);
 
     // Note range
-    controls.setNoteRangeMin (static_cast<int> (apvts.getRawParameterValue (NOTE_RANGE_MIN)->load()));
-    controls.setNoteRangeMax (static_cast<int> (apvts.getRawParameterValue (NOTE_RANGE_MAX)->load()));
+    state.setNoteRangeMin (static_cast<int> (apvts.getRawParameterValue (NOTE_RANGE_MIN)->load()));
+    state.setNoteRangeMax (static_cast<int> (apvts.getRawParameterValue (NOTE_RANGE_MAX)->load()));
 
     // Step buttons
-    for (int i = 0; i < Controls::NUM_STEP_BUTTONS; ++i) {
-        controls.getStepButton (i).setSelected (apvts.getRawParameterValue (stepButtonSelected (i))->load() > 0.5f);
-        controls.getStepButton (i).setHighlighted (apvts.getRawParameterValue (stepButtonHighlighted (i))->load() > 0.5f);
+    for (int i = 0; i < State::NUM_STEP_BUTTONS; ++i) {
+        state.getStepButton (i).setSelected (apvts.getRawParameterValue (stepButtonSelected (i))->load() > 0.5f);
+        state.getStepButton (i).setHighlighted (apvts.getRawParameterValue (stepButtonHighlighted (i))->load() > 0.5f);
     }
 
     // CC controls
-    for (int i = 0; i < Controls::NUM_CC_SLOTS; ++i) {
-        controls.setCCNumber (i, static_cast<int> (apvts.getRawParameterValue (ccNumber (i))->load()));
-        controls.setCCValue (i, static_cast<int> (apvts.getRawParameterValue (ccValue (i))->load()));
+    for (int i = 0; i < State::NUM_CC_SLOTS; ++i) {
+        state.setCCNumber (i, static_cast<int> (apvts.getRawParameterValue (ccNumber (i))->load()));
+        state.setCCValue (i, static_cast<int> (apvts.getRawParameterValue (ccValue (i))->load()));
     }
 }
 
