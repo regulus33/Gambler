@@ -11,7 +11,7 @@
 #include "State.h"
 
 using Notes = std::vector<Note>;
-int constexpr DEFAULT_STEPS = 128;
+int constexpr DEFAULT_STEPS = 64;
 int constexpr DEFAULT_INDEX = -1;  // Start at -1 so first tick() advances to 0
 
 struct Sequence {

@@ -222,12 +222,12 @@ TEST_CASE ("Gambler") {
         }
         SECTION ("Sequencer Notes") {
             // Setup all the notes 0 - 127 with midi notes 0 - 127
-            for (int i = 0; i < 128; i++) {
+            for (int i = 0; i < 64; i++) {
                 sequence.setNote (i, i);
             }
 
             // check that some random note is what we'd expect based on index.
-            auto someIndex = getRandFromZeroToExcluding(128);
+            auto someIndex = getRandFromZeroToExcluding(64);
             auto expectedNote = someIndex;
             auto note = sequence.notes[someIndex];
 
@@ -239,15 +239,15 @@ TEST_CASE ("Gambler") {
                 auto nextNote = sequence.tick();
                 REQUIRE (nextNote == 13);
             }
-            SECTION ("tick() 128 times always gives you the next expected note") {
-                for (int i = 0; i < 128; i++) {
+            SECTION ("tick() 64 times always gives you the next expected note") {
+                for (int i = 0; i < 64; i++) {
                     auto tickedNote = sequence.tick();
                     REQUIRE (tickedNote == i); // Check it returns 0, 1, 2, 3... 127
                 }
             }
 
             SECTION ("The sequence is restarted at correct boundary") {
-                // Tick through the entire sequence (128 steps)
+                // Tick through the entire sequence (64 steps)
                 for (int i = 0; i < 127; i++) {
                     sequence.tick();
                 }
@@ -342,11 +342,11 @@ TEST_CASE ("Gambler") {
 
                 // Tick through entire sequence multiple times
                 for (int pass = 0; pass < 3; pass++) {
-                    for (int i = 0; i < 128; i++) {
+                    for (int i = 0; i < 64; i++) {
                         sequence.tick();
                         // Index should never be -1 after initialization
                         REQUIRE (sequence.index >= 0);
-                        REQUIRE (sequence.index < 128);
+                        REQUIRE (sequence.index < 64);
                     }
                 }
 

@@ -40,7 +40,7 @@ A MIDI sequencer plugin with probabilistic and generative features, inspired by 
 ### Current Features
 
 #### 1. **Sequence Management**
-- **128 steps** by default (configurable length)
+- **64 steps** by default (configurable length)
 - Each step contains a `Note` object with:
   - MIDI note value (0-127)
   - Subsequence of up to 8 notes for evolving patterns
@@ -88,7 +88,7 @@ A MIDI sequencer plugin with probabilistic and generative features, inspired by 
 #### Domain Objects
 
 **`Sequence`**
-- Manages 128 Note objects
+- Manages 64 Note objects
 - Handles sequence playback via `tick()`
 - Integrates with State for Roll functionality and scale quantization
 - Configurable sequence length with wrapping
