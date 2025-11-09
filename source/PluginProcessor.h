@@ -1,7 +1,7 @@
 #pragma once
 
 #include "data/Params.h"
-#include "backend/State.h"
+#include "backend/Sequence.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #if (MSVC)
@@ -46,8 +46,8 @@ public:
     const APVTS& getAPVTS() const noexcept { return apvts; }
 
     // Access to domain layer
-    State& getState() noexcept { return state; }
-    const State& getState() const noexcept { return state; }
+    Sequence& getSequence() noexcept { return sequence; }
+    const Sequence& getSequence() const noexcept { return sequence; }
 
 
 private:
@@ -61,7 +61,7 @@ private:
     APVTS apvts;
 
     // Domain layer
-    State state;
+    Sequence sequence;
 
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();

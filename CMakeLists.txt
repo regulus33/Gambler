@@ -93,11 +93,13 @@ juce_add_plugin("${PROJECT_NAME}"
 # Without running into ODR violations
 add_library(SharedCode INTERFACE
         source/data/Params.h
+        source/backend/StepNote.h
+        source/backend/StepNotes.h
+        source/backend/StepModulation.h
+        source/backend/StepModulations.h
+        source/backend/Scale.h
+        source/backend/Step.h
         source/backend/Sequence.h
-        source/backend/Note.h
-        source/backend/Slot.h
-        source/backend/State.h
-        source/backend/StepButton.h
 )
 
 clap_juce_extensions_plugin(TARGET "${PROJECT_NAME}"

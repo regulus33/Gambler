@@ -1,0 +1,125 @@
+#pragma once
+
+#include "StepNotes.h"
+#include "StepModulations.h"
+#include "Scale.h"
+#include <random>
+
+/**
+ * Step - A single step in the sequence
+ * 
+ * Each Step contains:
+ * - StepNotes: A sub-sequence of up to 8 notes that cycle on each trigger
+ * - StepModulations: 7 modulation slots (CC/velocity) that can be sent with the note
+ * 
+ * Step is responsible for forwarding data update messages to its children
+ * and coordinating the tick() behavior.
+ */
+class Step {
+public:
+    Step() = default;
+    
+    // Getters
+    StepNotes& getStepNotes() { return stepNotes; }
+    const StepNotes& getStepNotes() const { return stepNotes; }
+    
+    StepModulations& getStepModulations() { return stepModulations; }
+    const StepModulations& getStepModulations() const { return stepModulations; }
+    
+    /**
+     * Tick this step - advances the StepNotes sub-sequence
+     * and returns the current note number
+     * 
+     * @return MIDI note number to play
+     */
+    int tick() {
+        return stepNotes.tick();
+    }
+    
+    /**
+     * Get the modulations for this step (doesn't advance anything)
+     * 
+     * @return Vector of selected modulations
+     */
+    std::vector<StepModulation> getModulations() const {
+        return stepModulations.tick();
+    }
+    
+    // Note operations
+    
+    /**
+     * Randomize the current note in StepNotes
+     * Uses the provided Scale for quantization
+     */
+    void randomizeNote(const Scale& scale) {
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(0, 127);
+        
+        int randomNote = dis(gen);
+        int quantized = scale.quantizeAndApplyRange(randomNote);
+        
+        // Set the current note (or first note if not yet ticked)
+        int idx = stepNotes.getCurrentIndex();
+        if (idx == -1) idx = 0;
+        stepNotes.setNote(idx, quantized);
+    }
+    
+    /**
+     * Update the current note number
+     * @param noteNumber MIDI note number (0-127)
+     */
+    void updateCurrentNoteNumber(int noteNumber) {
+        int idx = stepNotes.getCurrentIndex();
+        if (idx == -1) idx = 0;
+        stepNotes.setNote(idx, noteNumber);
+    }
+    
+    /**
+     * Update the current note's octave
+     * @param octaveOffset Octave offset (-4 to +4)
+     */
+    void updateCurrentNoteOctave(int octaveOffset) {
+        int idx = stepNotes.getCurrentIndex();
+        if (idx == -1) idx = 0;
+        
+        int currentNote = stepNotes.getNote(idx).getNoteNumber();
+        int pitchClass = currentNote % 12;
+        int newNote = pitchClass + ((octaveOffset + 5) * 12);  // +5 to handle negative offsets
+        
+        // Clamp to valid MIDI range
+        if (newNote < 0) newNote = 0;
+        if (newNote > 127) newNote = 127;
+        
+        stepNotes.setNote(idx, newNote);
+    }
+    
+    // Modulation operations
+    
+    /**
+     * Randomize all modulation values
+     */
+    void randomizeModulations() {
+        stepModulations.randomize();
+    }
+    
+    /**
+     * Update modulation values
+     * @param values Array of 7 values to set
+     */
+    void updateModulations(const std::array<int, StepModulations::NUM_MODULATIONS>& values) {
+        stepModulations.updateModulations(values);
+    }
+    
+    /**
+     * Reset this step to initial state
+     */
+    void reset() {
+        stepNotes.reset();
+    }
+    
+private:
+    StepNotes stepNotes;
+    StepModulations stepModulations;
+};
+
