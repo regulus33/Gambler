@@ -100,6 +100,10 @@ add_library(SharedCode INTERFACE
         source/backend/Scale.h
         source/backend/Step.h
         source/backend/Sequence.h
+        source/backend/ClockMode.h
+        source/backend/InternalClock.h
+        source/backend/Clock.h
+        source/backend/DawSync.h
 )
 
 clap_juce_extensions_plugin(TARGET "${PROJECT_NAME}"
