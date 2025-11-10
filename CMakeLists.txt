@@ -104,6 +104,7 @@ add_library(SharedCode INTERFACE
         source/backend/InternalClock.h
         source/backend/Clock.h
         source/backend/DawSync.h
+        source/ui/PianoRollComponent.h
 )
 
 clap_juce_extensions_plugin(TARGET "${PROJECT_NAME}"
