@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "../backend/Scale.h"
+#include "BinaryData.h"
 
 /**
  * KeyData - Data structure for a single piano key
@@ -31,6 +32,12 @@ class PianoRollComponent : public juce::Component
 public:
     PianoRollComponent()
     {
+        // Load Inter font from binary data
+        interFont = juce::Typeface::createSystemTypefaceFor(
+            BinaryData::InterVariableFont_ttf,
+            BinaryData::InterVariableFont_ttfSize
+        );
+
         // Note names and colors matching the design
         struct KeyInfo {
             const char* name;
@@ -179,7 +186,11 @@ private:
 
         // Draw note name
         g.setColour(juce::Colours::black);
-        g.setFont(12.0f);
+
+        // Use Inter font at 12px Regular
+        juce::Font font(interFont);
+        font.setHeight(12.0f);
+        g.setFont(font);
 
         // Get the bounds of the path for text positioning
         auto pathBounds = key.path.getBounds();
@@ -390,6 +401,7 @@ private:
     }
 
     juce::OwnedArray<KeyData> keys;
+    juce::Typeface::Ptr interFont;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PianoRollComponent)
 };
