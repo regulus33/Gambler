@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include "backend/StepNote.h"
 #include "backend/StepNotes.h"
 #include "backend/StepModulation.h"
@@ -19,92 +20,87 @@
 // StepNote Tests
 // ============================================================================
 
-TEST_CASE("StepNote") {
-    SECTION("Construction") {
-        SECTION("Given default construction, Then note is 60 and not selected") {
-            // Arrange & Act
-            StepNote note;
+SCENARIO("StepNote construction and manipulation", "[stepnote]") {
+    GIVEN("Default construction") {
+        StepNote note;
 
-            // Assert
+        THEN("Note is 60 and not selected") {
             REQUIRE(note.getNoteNumber() == 60);
             REQUIRE(note.isSelected() == false);
         }
+    }
 
-        SECTION("Given construction with note number, Then note is set correctly") {
-            // Arrange & Act
-            StepNote note(72);
+    GIVEN("Construction with note number") {
+        StepNote note(72);
 
-            // Assert
+        THEN("Note is set correctly") {
             REQUIRE(note.getNoteNumber() == 72);
             REQUIRE(note.isSelected() == false);
         }
+    }
 
-        SECTION("Given construction with note and selection, Then both are set") {
-            // Arrange & Act
-            StepNote note(48, true);
+    GIVEN("Construction with note and selection") {
+        StepNote note(48, true);
 
-            // Assert
+        THEN("Both are set") {
             REQUIRE(note.getNoteNumber() == 48);
             REQUIRE(note.isSelected() == true);
         }
     }
 
-    SECTION("setNoteNumber()") {
-        SECTION("Given valid MIDI note, When set, Then note is updated") {
-            // Arrange
-            StepNote note;
+    GIVEN("A StepNote") {
+        StepNote note;
 
-            // Act
+        WHEN("Valid MIDI note is set") {
             note.setNoteNumber(127);
 
-            // Assert
-            REQUIRE(note.getNoteNumber() == 127);
-        }
-
-        SECTION("Given invalid MIDI note (> 127), When set, Then note is not updated") {
-            // Arrange
-            StepNote note(60);
-
-            // Act
-            note.setNoteNumber(200);
-
-            // Assert
-            REQUIRE(note.getNoteNumber() == 60);
-        }
-
-        SECTION("Given invalid MIDI note (< 0), When set, Then note is not updated") {
-            // Arrange
-            StepNote note(60);
-
-            // Act
-            note.setNoteNumber(-10);
-
-            // Assert
-            REQUIRE(note.getNoteNumber() == 60);
+            THEN("Note is updated") {
+                REQUIRE(note.getNoteNumber() == 127);
+            }
         }
     }
 
-    SECTION("setSelected()") {
-        SECTION("Given unselected note, When selected, Then isSelected returns true") {
-            // Arrange
-            StepNote note;
+    GIVEN("A StepNote with value 60") {
+        StepNote note(60);
 
-            // Act
-            note.setSelected(true);
+        WHEN("Invalid MIDI note > 127 is set") {
+            note.setNoteNumber(200);
 
-            // Assert
-            REQUIRE(note.isSelected() == true);
+            THEN("Note is not updated") {
+                REQUIRE(note.getNoteNumber() == 60);
+            }
         }
 
-        SECTION("Given selected note, When deselected, Then isSelected returns false") {
-            // Arrange
-            StepNote note(60, true);
+        WHEN("Invalid MIDI note < 0 is set") {
+            note.setNoteNumber(-10);
 
-            // Act
+            THEN("Note is not updated") {
+                REQUIRE(note.getNoteNumber() == 60);
+            }
+        }
+    }
+
+    GIVEN("An unselected note") {
+        StepNote note;
+
+        WHEN("Selected") {
+            note.setSelected(true);
+
+            THEN("isSelected returns true") {
+                REQUIRE(note.isSelected() == true);
+            }
+        }
+    }
+
+    GIVEN("A selected note") {
+        StepNote note(60, true);
+
+        WHEN("Deselected") {
             note.setSelected(false);
 
-            // Assert
-            REQUIRE(note.isSelected() == false);
+            THEN("isSelected returns false") {
+                REQUIRE(note.isSelected() == false);
+            }
         }
     }
 }
@@ -113,255 +109,240 @@ TEST_CASE("StepNote") {
 // StepNotes Tests
 // ============================================================================
 
-TEST_CASE("StepNotes") {
-    SECTION("Construction") {
-        SECTION("Given default construction, Then length is 1 and index is -1") {
-            // Arrange & Act
-            StepNotes stepNotes;
+SCENARIO("StepNotes construction and basic operations", "[stepnotes]") {
+    GIVEN("Default construction") {
+        StepNotes stepNotes;
 
-            // Assert
+        THEN("Length is 1 and index is -1") {
             REQUIRE(stepNotes.getLength() == 1);
             REQUIRE(stepNotes.getCurrentIndex() == -1);
         }
 
-        SECTION("Given default construction, Then all notes are initialized to 60") {
-            // Arrange & Act
-            StepNotes stepNotes;
-
-            // Assert
+        THEN("All notes are initialized to 60") {
             for (int i = 0; i < StepNotes::MAX_LENGTH; i++) {
                 REQUIRE(stepNotes.getNote(i).getNoteNumber() == 60);
             }
         }
     }
 
-    SECTION("setNote()") {
-        SECTION("Given valid index, When note is set, Then note is updated") {
-            // Arrange
-            StepNotes stepNotes;
+    GIVEN("A StepNotes instance") {
+        StepNotes stepNotes;
 
-            // Act
+        WHEN("A note is set at valid index") {
             stepNotes.setNote(0, 72);
 
-            // Assert
-            REQUIRE(stepNotes.getNote(0).getNoteNumber() == 72);
+            THEN("Note is updated") {
+                REQUIRE(stepNotes.getNote(0).getNoteNumber() == 72);
+            }
         }
 
-        SECTION("Given multiple notes, When set, Then all are stored correctly") {
-            // Arrange
-            StepNotes stepNotes;
+        WHEN("Multiple notes are set") {
             stepNotes.setLength(3);
-
-            // Act
             stepNotes.setNote(0, 60);
             stepNotes.setNote(1, 64);
             stepNotes.setNote(2, 67);
 
-            // Assert
-            REQUIRE(stepNotes.getNote(0).getNoteNumber() == 60);
-            REQUIRE(stepNotes.getNote(1).getNoteNumber() == 64);
-            REQUIRE(stepNotes.getNote(2).getNoteNumber() == 67);
+            THEN("All are stored correctly") {
+                REQUIRE(stepNotes.getNote(0).getNoteNumber() == 60);
+                REQUIRE(stepNotes.getNote(1).getNoteNumber() == 64);
+                REQUIRE(stepNotes.getNote(2).getNoteNumber() == 67);
+            }
         }
-    }
 
-    SECTION("setLength()") {
-        SECTION("Given valid length, When set, Then length is updated") {
-            // Arrange
-            StepNotes stepNotes;
-
-            // Act
+        WHEN("Valid length is set") {
             stepNotes.setLength(5);
 
-            // Assert
-            REQUIRE(stepNotes.getLength() == 5);
+            THEN("Length is updated") {
+                REQUIRE(stepNotes.getLength() == 5);
+            }
         }
 
-        SECTION("Given length > MAX_LENGTH, When set, Then length is not updated") {
-            // Arrange
-            StepNotes stepNotes;
-
-            // Act
+        WHEN("Length > MAX_LENGTH is set") {
             stepNotes.setLength(10);
 
-            // Assert
-            REQUIRE(stepNotes.getLength() == 1);
+            THEN("Length is not updated") {
+                REQUIRE(stepNotes.getLength() == 1);
+            }
         }
 
-        SECTION("Given length < MIN_LENGTH, When set, Then length is not updated") {
-            // Arrange
-            StepNotes stepNotes;
-
-            // Act
+        WHEN("Length < MIN_LENGTH is set") {
             stepNotes.setLength(0);
 
-            // Assert
-            REQUIRE(stepNotes.getLength() == 1);
+            THEN("Length is not updated") {
+                REQUIRE(stepNotes.getLength() == 1);
+            }
         }
-    }
 
-    SECTION("increaseLength()") {
-        SECTION("Given length < MAX_LENGTH, When increased, Then length increments by 1") {
-            // Arrange
-            StepNotes stepNotes;
+        WHEN("Length is increased") {
             int initialLength = stepNotes.getLength();
-
-            // Act
             stepNotes.increaseLength();
 
-            // Assert
-            REQUIRE(stepNotes.getLength() == initialLength + 1);
-        }
-
-        SECTION("Given length = MAX_LENGTH, When increased, Then length stays at MAX_LENGTH") {
-            // Arrange
-            StepNotes stepNotes;
-            stepNotes.setLength(StepNotes::MAX_LENGTH);
-
-            // Act
-            stepNotes.increaseLength();
-
-            // Assert
-            REQUIRE(stepNotes.getLength() == StepNotes::MAX_LENGTH);
-        }
-    }
-
-    SECTION("decreaseLength()") {
-        SECTION("Given length > MIN_LENGTH, When decreased, Then length decrements by 1") {
-            // Arrange
-            StepNotes stepNotes;
-            stepNotes.setLength(5);
-
-            // Act
-            stepNotes.decreaseLength();
-
-            // Assert
-            REQUIRE(stepNotes.getLength() == 4);
-        }
-
-        SECTION("Given length = MIN_LENGTH, When decreased, Then length stays at MIN_LENGTH") {
-            // Arrange
-            StepNotes stepNotes;
-            stepNotes.setLength(StepNotes::MIN_LENGTH);
-
-            // Act
-            stepNotes.decreaseLength();
-
-            // Assert
-            REQUIRE(stepNotes.getLength() == StepNotes::MIN_LENGTH);
-        }
-    }
-
-    SECTION("tick()") {
-        SECTION("Given StepNotes with 3 notes, When ticked 3 times, Then cycles through all notes") {
-            // Arrange
-            StepNotes stepNotes;
-            stepNotes.setLength(3);
-            stepNotes.setNote(0, 60);
-            stepNotes.setNote(1, 64);
-            stepNotes.setNote(2, 67);
-
-            // Act & Assert
-            REQUIRE(stepNotes.tick() == 60);
-            REQUIRE(stepNotes.tick() == 64);
-            REQUIRE(stepNotes.tick() == 67);
-        }
-
-        SECTION("Given StepNotes at last note, When ticked, Then wraps to first note") {
-            // Arrange
-            StepNotes stepNotes;
-            stepNotes.setLength(2);
-            stepNotes.setNote(0, 60);
-            stepNotes.setNote(1, 70);
-            stepNotes.tick();  // -> 60
-            stepNotes.tick();  // -> 70
-
-            // Act
-            int wrappedNote = stepNotes.tick();
-
-            // Assert
-            REQUIRE(wrappedNote == 60);
-            REQUIRE(stepNotes.getCurrentIndex() == 0);
-        }
-
-        SECTION("Given StepNotes, When ticked, Then updates selection to current note") {
-            // Arrange
-            StepNotes stepNotes;
-            stepNotes.setLength(2);
-
-            // Act
-            stepNotes.tick();
-
-            // Assert
-            REQUIRE(stepNotes.getNote(0).isSelected() == true);
-            REQUIRE(stepNotes.getNote(1).isSelected() == false);
-        }
-
-        SECTION("Given StepNotes, When ticked multiple times, Then selection follows current index") {
-            // Arrange
-            StepNotes stepNotes;
-            stepNotes.setLength(3);
-
-            // Act & Assert - first tick
-            stepNotes.tick();
-            REQUIRE(stepNotes.getNote(0).isSelected() == true);
-            REQUIRE(stepNotes.getNote(1).isSelected() == false);
-            REQUIRE(stepNotes.getNote(2).isSelected() == false);
-
-            // Act & Assert - second tick
-            stepNotes.tick();
-            REQUIRE(stepNotes.getNote(0).isSelected() == false);
-            REQUIRE(stepNotes.getNote(1).isSelected() == true);
-            REQUIRE(stepNotes.getNote(2).isSelected() == false);
-
-            // Act & Assert - third tick
-            stepNotes.tick();
-            REQUIRE(stepNotes.getNote(0).isSelected() == false);
-            REQUIRE(stepNotes.getNote(1).isSelected() == false);
-            REQUIRE(stepNotes.getNote(2).isSelected() == true);
-        }
-
-        SECTION("Given StepNotes index never returns to -1 after first tick") {
-            // Arrange
-            StepNotes stepNotes;
-            stepNotes.setLength(2);
-
-            // Act - tick through multiple cycles
-            for (int cycle = 0; cycle < 10; cycle++) {
-                stepNotes.tick();
-
-                // Assert - index should never be -1 after first tick
-                REQUIRE(stepNotes.getCurrentIndex() >= 0);
-                REQUIRE(stepNotes.getCurrentIndex() < stepNotes.getLength());
+            THEN("Length increments by 1") {
+                REQUIRE(stepNotes.getLength() == initialLength + 1);
             }
         }
     }
 
-    SECTION("reset()") {
-        SECTION("Given StepNotes that has been ticked, When reset, Then index returns to -1") {
-            // Arrange
-            StepNotes stepNotes;
-            stepNotes.tick();
-            stepNotes.tick();
+    GIVEN("StepNotes at MAX_LENGTH") {
+        StepNotes stepNotes;
+        stepNotes.setLength(StepNotes::MAX_LENGTH);
 
-            // Act
-            stepNotes.reset();
+        WHEN("Length is increased") {
+            stepNotes.increaseLength();
 
-            // Assert
-            REQUIRE(stepNotes.getCurrentIndex() == -1);
+            THEN("Length stays at MAX_LENGTH") {
+                REQUIRE(stepNotes.getLength() == StepNotes::MAX_LENGTH);
+            }
         }
+    }
 
-        SECTION("Given StepNotes with selections, When reset, Then all selections are cleared") {
-            // Arrange
-            StepNotes stepNotes;
-            stepNotes.setLength(3);
+    GIVEN("StepNotes with length 5") {
+        StepNotes stepNotes;
+        stepNotes.setLength(5);
+
+        WHEN("Length is decreased") {
+            stepNotes.decreaseLength();
+
+            THEN("Length decrements by 1") {
+                REQUIRE(stepNotes.getLength() == 4);
+            }
+        }
+    }
+
+    GIVEN("StepNotes at MIN_LENGTH") {
+        StepNotes stepNotes;
+        stepNotes.setLength(StepNotes::MIN_LENGTH);
+
+        WHEN("Length is decreased") {
+            stepNotes.decreaseLength();
+
+            THEN("Length stays at MIN_LENGTH") {
+                REQUIRE(stepNotes.getLength() == StepNotes::MIN_LENGTH);
+            }
+        }
+    }
+
+
+    GIVEN("StepNotes with 3 notes") {
+        StepNotes stepNotes;
+        stepNotes.setLength(3);
+        stepNotes.setNote(0, 60);
+        stepNotes.setNote(1, 64);
+        stepNotes.setNote(2, 67);
+
+        WHEN("Ticked 3 times") {
+            THEN("Cycles through all notes") {
+                REQUIRE(stepNotes.tick() == 60);
+                REQUIRE(stepNotes.tick() == 64);
+                REQUIRE(stepNotes.tick() == 67);
+            }
+        }
+    }
+
+    GIVEN("StepNotes at last note") {
+        StepNotes stepNotes;
+        stepNotes.setLength(2);
+        stepNotes.setNote(0, 60);
+        stepNotes.setNote(1, 70);
+        stepNotes.tick();  // -> 60
+        stepNotes.tick();  // -> 70
+
+        WHEN("Ticked again") {
+            int wrappedNote = stepNotes.tick();
+
+            THEN("Wraps to first note") {
+                REQUIRE(wrappedNote == 60);
+                REQUIRE(stepNotes.getCurrentIndex() == 0);
+            }
+        }
+    }
+
+    GIVEN("StepNotes with length 2") {
+        StepNotes stepNotes;
+        stepNotes.setLength(2);
+
+        WHEN("Ticked once") {
             stepNotes.tick();
 
-            // Act
+            THEN("Updates selection to current note") {
+                REQUIRE(stepNotes.getNote(0).isSelected() == true);
+                REQUIRE(stepNotes.getNote(1).isSelected() == false);
+            }
+        }
+    }
+
+    GIVEN("StepNotes with length 3") {
+        StepNotes stepNotes;
+        stepNotes.setLength(3);
+
+        WHEN("Ticked multiple times") {
+            stepNotes.tick();
+
+            THEN("Selection follows current index on first tick") {
+                REQUIRE(stepNotes.getNote(0).isSelected() == true);
+                REQUIRE(stepNotes.getNote(1).isSelected() == false);
+                REQUIRE(stepNotes.getNote(2).isSelected() == false);
+            }
+
+            stepNotes.tick();
+
+            THEN("Selection follows current index on second tick") {
+                REQUIRE(stepNotes.getNote(0).isSelected() == false);
+                REQUIRE(stepNotes.getNote(1).isSelected() == true);
+                REQUIRE(stepNotes.getNote(2).isSelected() == false);
+            }
+
+            stepNotes.tick();
+
+            THEN("Selection follows current index on third tick") {
+                REQUIRE(stepNotes.getNote(0).isSelected() == false);
+                REQUIRE(stepNotes.getNote(1).isSelected() == false);
+                REQUIRE(stepNotes.getNote(2).isSelected() == true);
+            }
+        }
+    }
+
+    GIVEN("StepNotes ticked through multiple cycles") {
+        StepNotes stepNotes;
+        stepNotes.setLength(2);
+
+        WHEN("Ticked 10 times") {
+            THEN("Index never returns to -1 after first tick") {
+                for (int cycle = 0; cycle < 10; cycle++) {
+                    stepNotes.tick();
+                    REQUIRE(stepNotes.getCurrentIndex() >= 0);
+                    REQUIRE(stepNotes.getCurrentIndex() < stepNotes.getLength());
+                }
+            }
+        }
+    }
+
+    GIVEN("StepNotes that has been ticked") {
+        StepNotes stepNotes;
+        stepNotes.tick();
+        stepNotes.tick();
+
+        WHEN("Reset") {
             stepNotes.reset();
 
-            // Assert
-            for (int i = 0; i < StepNotes::MAX_LENGTH; i++) {
-                REQUIRE(stepNotes.getNote(i).isSelected() == false);
+            THEN("Index returns to -1") {
+                REQUIRE(stepNotes.getCurrentIndex() == -1);
+            }
+        }
+    }
+
+    GIVEN("StepNotes with selections") {
+        StepNotes stepNotes;
+        stepNotes.setLength(3);
+        stepNotes.tick();
+
+        WHEN("Reset") {
+            stepNotes.reset();
+
+            THEN("All selections are cleared") {
+                for (int i = 0; i < StepNotes::MAX_LENGTH; i++) {
+                    REQUIRE(stepNotes.getNote(i).isSelected() == false);
+                }
             }
         }
     }

@@ -2,6 +2,7 @@
 
 #include "StepNote.h"
 #include <array>
+#include <juce_core/juce_core.h>
 
 /**
  * StepNotes - Sub-sequence of notes within a Step
@@ -113,7 +114,40 @@ public:
             notes[i].setSelected(false);
         }
     }
-    
+
+    /**
+     * Serialize to XML
+     */
+    std::unique_ptr<juce::XmlElement> toXml() const {
+        auto xml = std::make_unique<juce::XmlElement>("StepNotes");
+        xml->setAttribute("length", length);
+        xml->setAttribute("currentIndex", currentIndex);
+
+        for (int i = 0; i < MAX_LENGTH; i++) {
+            xml->addChildElement(notes[i].toXml().release());
+        }
+
+        return xml;
+    }
+
+    /**
+     * Deserialize from XML
+     */
+    void fromXml(const juce::XmlElement& xml) {
+        if (xml.getTagName() != "StepNotes") return;
+
+        length = xml.getIntAttribute("length", DEFAULT_LENGTH);
+        currentIndex = xml.getIntAttribute("currentIndex", -1);
+
+        int noteIndex = 0;
+        for (auto* noteXml : xml.getChildIterator()) {
+            if (noteIndex < MAX_LENGTH && noteXml->getTagName() == "StepNote") {
+                notes[noteIndex].fromXml(*noteXml);
+                noteIndex++;
+            }
+        }
+    }
+
 private:
     std::array<StepNote, MAX_LENGTH> notes;
     int length = DEFAULT_LENGTH;

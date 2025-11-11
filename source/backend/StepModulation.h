@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <juce_core/juce_core.h>
 
 /**
  * StepModulation - Individual modulation data (CC or Velocity)
@@ -54,6 +55,30 @@ struct StepModulation {
     // Helper to get a string representation of the type
     std::string getTypeString() const {
         return (type == ModulationType::Velocity) ? "Velocity" : "CC";
+    }
+
+    /**
+     * Serialize to XML
+     */
+    std::unique_ptr<juce::XmlElement> toXml() const {
+        auto xml = std::make_unique<juce::XmlElement>("StepModulation");
+        xml->setAttribute("type", static_cast<int>(type));
+        xml->setAttribute("ccNumber", ccNumber);
+        xml->setAttribute("value", value);
+        xml->setAttribute("selected", selected);
+        return xml;
+    }
+
+    /**
+     * Deserialize from XML
+     */
+    void fromXml(const juce::XmlElement& xml) {
+        if (xml.getTagName() != "StepModulation") return;
+
+        type = static_cast<ModulationType>(xml.getIntAttribute("type", 0));
+        ccNumber = xml.getIntAttribute("ccNumber", 1);
+        value = xml.getIntAttribute("value", 64);
+        selected = xml.getBoolAttribute("selected", false);
     }
 };
 

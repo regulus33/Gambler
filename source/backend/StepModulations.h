@@ -4,6 +4,7 @@
 #include <array>
 #include <vector>
 #include <random>
+#include <juce_core/juce_core.h>
 
 /**
  * StepModulations - Container for 7 modulation slots per step
@@ -117,7 +118,35 @@ public:
     std::vector<StepModulation> tick() const {
         return getSelectedModulations();
     }
-    
+
+    /**
+     * Serialize to XML
+     */
+    std::unique_ptr<juce::XmlElement> toXml() const {
+        auto xml = std::make_unique<juce::XmlElement>("StepModulations");
+
+        for (int i = 0; i < NUM_MODULATIONS; i++) {
+            xml->addChildElement(modulations[i].toXml().release());
+        }
+
+        return xml;
+    }
+
+    /**
+     * Deserialize from XML
+     */
+    void fromXml(const juce::XmlElement& xml) {
+        if (xml.getTagName() != "StepModulations") return;
+
+        int modIndex = 0;
+        for (auto* modXml : xml.getChildIterator()) {
+            if (modIndex < NUM_MODULATIONS && modXml->getTagName() == "StepModulation") {
+                modulations[modIndex].fromXml(*modXml);
+                modIndex++;
+            }
+        }
+    }
+
 private:
     std::array<StepModulation, NUM_MODULATIONS> modulations;
 };

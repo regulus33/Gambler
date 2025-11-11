@@ -6,6 +6,7 @@
 #include <vector>
 #include <algorithm>
 #include <random>
+#include <juce_core/juce_core.h>
 
 /**
  * Sequence - Master orchestrator of the sequencer
@@ -240,12 +241,86 @@ public:
             step.reset();
         }
     }
-    
+
+    /**
+     * Serialize entire sequence state to XML
+     * This is the main entry point for saving plugin state
+     */
+    std::unique_ptr<juce::XmlElement> toXml() const {
+        auto xml = std::make_unique<juce::XmlElement>("Sequence");
+
+        // Serialize basic properties
+        xml->setAttribute("currentIndex", currentIndex);
+        xml->setAttribute("length", length);
+        xml->setAttribute("isRandom", isRandom);
+        xml->setAttribute("isShift", isShift);
+
+        // Serialize scale
+        xml->addChildElement(scale.toXml().release());
+
+        // Serialize play probability as comma-separated string
+        juce::String playProbStr;
+        for (int i = 0; i < MAX_STEPS; i++) {
+            if (i > 0) playProbStr += ",";
+            playProbStr += playProbability[i] ? "1" : "0";
+        }
+        xml->setAttribute("playProbability", playProbStr);
+
+        // Serialize all steps
+        auto stepsXml = std::make_unique<juce::XmlElement>("Steps");
+        for (int i = 0; i < MAX_STEPS; i++) {
+            auto stepXml = steps[i].toXml();
+            stepXml->setAttribute("index", i);
+            stepsXml->addChildElement(stepXml.release());
+        }
+        xml->addChildElement(stepsXml.release());
+
+        return xml;
+    }
+
+    /**
+     * Deserialize entire sequence state from XML
+     * This is the main entry point for loading plugin state
+     */
+    void fromXml(const juce::XmlElement& xml) {
+        if (xml.getTagName() != "Sequence") return;
+
+        // Deserialize basic properties
+        currentIndex = xml.getIntAttribute("currentIndex", -1);
+        length = xml.getIntAttribute("length", DEFAULT_LENGTH);
+        isRandom = xml.getBoolAttribute("isRandom", false);
+        isShift = xml.getBoolAttribute("isShift", false);
+
+        // Deserialize play probability
+        juce::String playProbStr = xml.getStringAttribute("playProbability");
+        juce::StringArray tokens = juce::StringArray::fromTokens(playProbStr, ",", "");
+        for (int i = 0; i < MAX_STEPS && i < tokens.size(); i++) {
+            playProbability[i] = (tokens[i].getIntValue() != 0);
+        }
+
+        // Deserialize scale
+        for (auto* childXml : xml.getChildIterator()) {
+            if (childXml->getTagName() == "Scale") {
+                scale.fromXml(*childXml);
+            } else if (childXml->getTagName() == "Steps") {
+                // Deserialize all steps
+                for (auto* stepXml : childXml->getChildIterator()) {
+                    if (stepXml->getTagName() == "Step") {
+                        int index = stepXml->getIntAttribute("index", -1);
+                        if (index >= 0 && index < MAX_STEPS) {
+                            steps[index].fromXml(*stepXml);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 private:
     std::array<Step, MAX_STEPS> steps;
     Scale scale;
     std::array<bool, MAX_STEPS> playProbability;
-    
+
     int currentIndex = -1;  // Start at -1 so first tick() advances to 0
     int length = DEFAULT_LENGTH;
     bool isRandom = false;

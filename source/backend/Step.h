@@ -4,6 +4,7 @@
 #include "StepModulations.h"
 #include "Scale.h"
 #include <random>
+#include <juce_core/juce_core.h>
 
 /**
  * Step - A single step in the sequence
@@ -117,7 +118,32 @@ public:
     void reset() {
         stepNotes.reset();
     }
-    
+
+    /**
+     * Serialize to XML
+     */
+    std::unique_ptr<juce::XmlElement> toXml() const {
+        auto xml = std::make_unique<juce::XmlElement>("Step");
+        xml->addChildElement(stepNotes.toXml().release());
+        xml->addChildElement(stepModulations.toXml().release());
+        return xml;
+    }
+
+    /**
+     * Deserialize from XML
+     */
+    void fromXml(const juce::XmlElement& xml) {
+        if (xml.getTagName() != "Step") return;
+
+        for (auto* childXml : xml.getChildIterator()) {
+            if (childXml->getTagName() == "StepNotes") {
+                stepNotes.fromXml(*childXml);
+            } else if (childXml->getTagName() == "StepModulations") {
+                stepModulations.fromXml(*childXml);
+            }
+        }
+    }
+
 private:
     StepNotes stepNotes;
     StepModulations stepModulations;

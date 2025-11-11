@@ -1,5 +1,7 @@
 #pragma once
 
+#include <juce_core/juce_core.h>
+
 /**
  * StepNote - Individual note within a StepNotes sub-sequence
  * 
@@ -30,6 +32,26 @@ struct StepNote {
     
     void setSelected(bool isSelected) {
         selected = isSelected;
+    }
+
+    /**
+     * Serialize to XML
+     */
+    std::unique_ptr<juce::XmlElement> toXml() const {
+        auto xml = std::make_unique<juce::XmlElement>("StepNote");
+        xml->setAttribute("noteNumber", noteNumber);
+        xml->setAttribute("selected", selected);
+        return xml;
+    }
+
+    /**
+     * Deserialize from XML
+     */
+    void fromXml(const juce::XmlElement& xml) {
+        if (xml.getTagName() != "StepNote") return;
+
+        noteNumber = xml.getIntAttribute("noteNumber", 60);
+        selected = xml.getBoolAttribute("selected", false);
     }
 };
 

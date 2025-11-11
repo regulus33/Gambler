@@ -3,6 +3,7 @@
 #include <array>
 #include <string>
 #include <vector>
+#include <juce_core/juce_core.h>
 
 /**
  * Scale - Handles note quantization and range limiting
@@ -180,7 +181,44 @@ public:
         int quantized = quantize(noteNumber);
         return applyRange(quantized);
     }
-    
+
+    /**
+     * Serialize to XML
+     */
+    std::unique_ptr<juce::XmlElement> toXml() const {
+        auto xml = std::make_unique<juce::XmlElement>("Scale");
+        xml->setAttribute("rangeMin", rangeMin);
+        xml->setAttribute("rangeMax", rangeMax);
+
+        // Serialize scale notes as comma-separated string
+        juce::String scaleNotesStr;
+        for (int i = 0; i < NUM_CHROMATIC_NOTES; i++) {
+            if (i > 0) scaleNotesStr += ",";
+            scaleNotesStr += juce::String(scaleNotes[i]);
+        }
+        xml->setAttribute("scaleNotes", scaleNotesStr);
+
+        return xml;
+    }
+
+    /**
+     * Deserialize from XML
+     */
+    void fromXml(const juce::XmlElement& xml) {
+        if (xml.getTagName() != "Scale") return;
+
+        rangeMin = xml.getIntAttribute("rangeMin", MIN_MIDI_NOTE);
+        rangeMax = xml.getIntAttribute("rangeMax", MAX_MIDI_NOTE);
+
+        // Parse scale notes from comma-separated string
+        juce::String scaleNotesStr = xml.getStringAttribute("scaleNotes");
+        juce::StringArray tokens = juce::StringArray::fromTokens(scaleNotesStr, ",", "");
+
+        for (int i = 0; i < NUM_CHROMATIC_NOTES && i < tokens.size(); i++) {
+            scaleNotes[i] = tokens[i].getIntValue();
+        }
+    }
+
 private:
     std::array<int, NUM_CHROMATIC_NOTES> scaleNotes;
     int rangeMin = MIN_MIDI_NOTE;
