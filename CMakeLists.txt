@@ -147,6 +147,9 @@ target_compile_definitions(SharedCode
 
     # JucePlugin_Name is for some reason doesn't use the nicer PRODUCT_NAME
     PRODUCT_NAME_WITHOUT_VERSION="Gambler"
+
+    # Repository root path for dev features (e.g., XML snapshot saving)
+    REPO_ROOT_PATH="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
 # Link to any other modules you added (with juce_add_module) here!

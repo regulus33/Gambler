@@ -6,7 +6,8 @@
 #include "ui/PianoRollComponent.h"
 
 //==============================================================================
-class PluginEditor : public juce::AudioProcessorEditor
+class PluginEditor : public juce::AudioProcessorEditor,
+                     public juce::KeyListener
 {
 public:
     explicit PluginEditor (PluginProcessor&);
@@ -15,6 +16,9 @@ public:
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
+
+    // KeyListener override
+    bool keyPressed (const juce::KeyPress& key, juce::Component* originatingComponent) override;
 
 private:
     // This reference is provided as a quick way for your editor to
