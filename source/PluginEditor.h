@@ -4,6 +4,7 @@
 #include "BinaryData.h"
 #include "melatonin_inspector/melatonin_inspector.h"
 #include "ui/PianoRollComponent.h"
+#include "ui/SequencerStepsComponent.h"
 
 //==============================================================================
 class PluginEditor : public juce::AudioProcessorEditor,
@@ -20,6 +21,9 @@ public:
     // KeyListener override
     bool keyPressed (const juce::KeyPress& key, juce::Component* originatingComponent) override;
 
+    // Helper to set active step and update piano roll
+    void setActiveStepAndNote (int stepIndex);
+
 private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
@@ -27,6 +31,7 @@ private:
 
     // UI Components
     PianoRollComponent pianoRoll;
+    SequencerStepsComponent sequencerSteps;
 
     // Inspector
     std::unique_ptr<melatonin::Inspector> inspector;
