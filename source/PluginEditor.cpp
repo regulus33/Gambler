@@ -61,7 +61,8 @@ bool PluginEditor::keyPressed (const juce::KeyPress& key, juce::Component* origi
 {
     juce::ignoreUnused(originatingComponent);
 
-    // TODO: Remove this dev hotkey after moving on from dev phase
+    // TODO: Remove these dev hotkeys after moving on from dev phase
+
     // Hotkey 'x' - Save XML snapshot of Sequencer state to state.xml
     if (key.getKeyCode() == 'x' || key.getKeyCode() == 'X')
     {
@@ -102,6 +103,30 @@ bool PluginEditor::keyPressed (const juce::KeyPress& key, juce::Component* origi
                 "OK"
             );
         }
+
+        return true; // Key was handled
+    }
+
+    // Hotkey 'n' - Cycle through notes to test active note indicator
+    if (key.getKeyCode() == 'n' || key.getKeyCode() == 'N')
+    {
+        // Cycle through chromatic scale: C, Db, D, Eb, E, F, Gb, G, Ab, A, Bb, B
+        int currentNote = pianoRoll.getActiveNote();
+        int nextNote = (currentNote + 1) % 12;
+        pianoRoll.setActiveNote(nextNote);
+
+        // Note names for debug output
+        const char* noteNames[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
+        DBG("Active note set to: " + juce::String(noteNames[nextNote]) + " (index " + juce::String(nextNote) + ")");
+
+        return true; // Key was handled
+    }
+
+    // Hotkey 'm' - Clear active note (set to -1)
+    if (key.getKeyCode() == 'm' || key.getKeyCode() == 'M')
+    {
+        pianoRoll.setActiveNote(-1);
+        DBG("Active note cleared");
 
         return true; // Key was handled
     }

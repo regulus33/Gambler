@@ -78,14 +78,14 @@ public:
         // Draw black keys first (so they appear behind)
         for (int i = 0; i < 12; i++) {
             if (keys[i]->isBlack) {
-                drawKey (g, *keys[i]);
+                drawKey (g, *keys[i], i);
             }
         }
 
         // Draw white keys on top (they overlap the black keys)
         for (int i = 0; i < 12; i++) {
             if (!keys[i]->isBlack) {
-                drawKey (g, *keys[i]);
+                drawKey (g, *keys[i], i);
             }
         }
     }
@@ -144,6 +144,24 @@ public:
     }
 
     /**
+     * Set the active note (0-11 for chromatic scale, -1 for none)
+     * This highlights the currently playing note in the sequence
+     */
+    void setActiveNote (int noteIndex) {
+        if (activeNoteIndex != noteIndex) {
+            activeNoteIndex = noteIndex;
+            repaint();
+        }
+    }
+
+    /**
+     * Get the active note index (-1 if none)
+     */
+    int getActiveNote() const {
+        return activeNoteIndex;
+    }
+
+    /**
      * Callback when a note is toggled
      */
     std::function<void()> onNoteChanged;
@@ -152,7 +170,7 @@ private:
     /**
      * Draw a single key
      */
-    void drawKey (juce::Graphics& g, const KeyData& key) {
+    void drawKey (juce::Graphics& g, const KeyData& key, int keyIndex) {
         // Fill the key with color (dimmed if not toggled)
         g.setColour (key.isToggled ? key.color : key.color.darker (0.6f));
         g.fillPath (key.path);
@@ -161,26 +179,39 @@ private:
         g.setColour (juce::Colours::black);
         g.strokePath (key.path, juce::PathStrokeType (1.0f));
 
-        // Draw note name
-        g.setColour (juce::Colours::black);
-
-        // Use Inter font at 12px Regular
-        juce::Font font (interFont);
-        font.setHeight (12.0f);
-        g.setFont (font);
-
         // Get the bounds of the path for text positioning
         auto pathBounds = key.path.getBounds();
 
-        if (key.isBlack) {
-            // Black keys: text at the bottom
-            auto textArea = pathBounds.withTrimmedTop (pathBounds.getHeight() * 0.7f);
-            g.drawText (key.name, textArea.toNearestInt(), juce::Justification::centred);
+        // Determine text area based on key type
+        auto textArea = pathBounds.withTrimmedTop (pathBounds.getHeight() * 0.7f);
+
+        // Check if this is the active note
+        bool isActive = (keyIndex == activeNoteIndex);
+
+        if (isActive) {
+            // Draw black circle (26px diameter) behind the text
+            auto circleCentre = textArea.getCentre();
+            const float circleRadius = 13.0f; // 26px diameter = 13px radius
+            g.setColour (juce::Colours::black);
+            g.fillEllipse (circleCentre.x - circleRadius, circleCentre.y - circleRadius,
+                          circleRadius * 2.0f, circleRadius * 2.0f);
+
+            // Draw note name in white, bold Inter font
+            g.setColour (juce::Colours::white);
+            juce::Font font (interFont);
+            font.setHeight (12.0f);
+            font.setBold (true);
+            g.setFont (font);
         } else {
-            // White keys: text in lower portion
-            auto textArea = pathBounds.withTrimmedTop (pathBounds.getHeight() * 0.7f);
-            g.drawText (key.name, textArea.toNearestInt(), juce::Justification::centred);
+            // Draw note name in black, regular Inter font
+            g.setColour (juce::Colours::black);
+            juce::Font font (interFont);
+            font.setHeight (12.0f);
+            g.setFont (font);
         }
+
+        // Draw the text
+        g.drawText (key.name, textArea.toNearestInt(), juce::Justification::centred);
     }
 
     /**
@@ -360,6 +391,7 @@ private:
 
     juce::OwnedArray<KeyData> keys;
     juce::Typeface::Ptr interFont;
+    int activeNoteIndex = -1; // -1 means no active note, 0-11 for chromatic scale
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
 };
