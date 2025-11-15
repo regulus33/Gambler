@@ -5,6 +5,7 @@
 #include "melatonin_inspector/melatonin_inspector.h"
 #include "ui/PianoRollComponent.h"
 #include "ui/SequencerStepsComponent.h"
+#include "ui/SequencerControlsComponent.h"
 
 //==============================================================================
 class PluginEditor : public juce::AudioProcessorEditor,
@@ -32,6 +33,7 @@ private:
     // UI Components
     PianoRollComponent pianoRoll;
     SequencerStepsComponent sequencerSteps;
+    SequencerControlsComponent sequencerControls;
 
     // Inspector
     std::unique_ptr<melatonin::Inspector> inspector;

@@ -25,6 +25,17 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         DBG ("Step clicked: " + juce::String (stepIndex));
     };
 
+    // Add sequencer controls component
+    addAndMakeVisible (sequencerControls);
+
+    // Setup callback for control button clicks
+    sequencerControls.onButtonClicked = [] (int buttonIndex) {
+        // TODO: Handle control button clicks when we wire up the backend
+        const char* buttonNames[] = {"Roll", "Index <-", "Index ->", "Length +",
+                                     "Length -", "Nudge <-", "Nudge ->", "Shift"};
+        DBG ("Control button clicked: " + juce::String (buttonNames[buttonIndex]));
+    };
+
     addAndMakeVisible (inspectButton);
 
     // this chunk of code instantiates and opens the melatonin inspector
@@ -64,6 +75,11 @@ void PluginEditor::resized() {
     // Y = 95 (piano roll Y) + 199 (piano roll height) + 18 (gap) = 312
     // Size: 8 steps × 84px + 7 gaps × 16px = 784px wide, 84px tall
     sequencerSteps.setBounds (50, 312, 784, 84);
+
+    // Position sequencer controls 18px below sequencer steps
+    // Y = 312 (steps Y) + 84 (steps height) + 18 (gap) = 414
+    // Size: Same as steps - 784px wide, 84px tall
+    sequencerControls.setBounds (50, 414, 784, 84);
 
     // Inspector button in bottom right corner
     inspectButton.setBounds (getWidth() - 110, getHeight() - 35, 100, 25);
