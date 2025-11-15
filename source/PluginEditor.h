@@ -4,8 +4,10 @@
 #include "BinaryData.h"
 #include "melatonin_inspector/melatonin_inspector.h"
 #include "ui/PianoRollComponent.h"
+#include "ui/MidiDataPerStepSelectionComponent.h"
 #include "ui/SequencerStepsComponent.h"
 #include "ui/SequencerControlsComponent.h"
+#include "ui/ViewToggleButton.h"
 
 //==============================================================================
 class PluginEditor : public juce::AudioProcessorEditor,
@@ -32,8 +34,10 @@ private:
 
     // UI Components
     PianoRollComponent pianoRoll;
+    MidiDataPerStepSelectionComponent midiDataPerStep;
     SequencerStepsComponent sequencerSteps;
     SequencerControlsComponent sequencerControls;
+    ViewToggleButton viewToggleButton;
 
     // Inspector
     std::unique_ptr<melatonin::Inspector> inspector;

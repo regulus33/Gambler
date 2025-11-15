@@ -7,7 +7,17 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 {
     juce::ignoreUnused (processorRef);
 
-    // Add piano roll component
+    // Add view toggle button
+    addAndMakeVisible (viewToggleButton);
+
+    // Setup callback for view mode changes
+    viewToggleButton.onToggle = [this] (bool showPianoRoll) {
+        pianoRoll.setVisible(showPianoRoll);
+        midiDataPerStep.setVisible(!showPianoRoll);
+        DBG ("View mode changed: " + juce::String(showPianoRoll ? "PianoRoll" : "MIDI Data"));
+    };
+
+    // Add piano roll component (visible by default)
     addAndMakeVisible (pianoRoll);
 
     // Setup callback for scale changes
@@ -15,6 +25,9 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         // TODO: Update backend Scale object when we wire up the backend
         DBG ("Piano roll scale changed");
     };
+
+    // Add MIDI data per step component (hidden by default)
+    addChildComponent (midiDataPerStep);
 
     // Add sequencer steps component
     addAndMakeVisible (sequencerSteps);
@@ -69,7 +82,23 @@ void PluginEditor::paint (juce::Graphics& g) {
 void PluginEditor::resized() {
     // Position piano roll in top-left corner with some padding
     // Based on the design mockup, it's positioned at approximately (50, 95)
-    pianoRoll.setBounds (50, 95, 408, 199);
+    int pianoRollX = 50;
+    int pianoRollY = 95;
+    int pianoRollWidth = 408;
+    int pianoRollHeight = 199;
+
+    pianoRoll.setBounds (pianoRollX, pianoRollY, pianoRollWidth, pianoRollHeight);
+
+    // Position MIDI data per step component at same location as piano roll
+    midiDataPerStep.setBounds (pianoRollX, pianoRollY, pianoRollWidth, pianoRollHeight);
+
+    // Position view toggle button 10px above piano roll, aligned to left edge
+    int buttonWidth = 46;
+    int buttonHeight = 30;
+    int buttonX = pianoRollX;  // Left-aligned with piano roll
+    int buttonY = pianoRollY - buttonHeight - 10;  // 10px above piano roll
+
+    viewToggleButton.setBounds (buttonX, buttonY, buttonWidth, buttonHeight);
 
     // Position sequencer steps 18px below piano roll, left-aligned
     // Y = 95 (piano roll Y) + 199 (piano roll height) + 18 (gap) = 312
