@@ -7,6 +7,7 @@
 #include "ui/MidiDataPerStepSelectionComponent.h"
 #include "ui/SequencerStepsComponent.h"
 #include "ui/SequencerControlsComponent.h"
+#include "ui/MainControlsComponent.h"
 #include "ui/ViewToggleButton.h"
 
 //==============================================================================
@@ -37,6 +38,7 @@ private:
     MidiDataPerStepSelectionComponent midiDataPerStep;
     SequencerStepsComponent sequencerSteps;
     SequencerControlsComponent sequencerControls;
+    MainControlsComponent mainControls;
     ViewToggleButton viewToggleButton;
 
     // Inspector

@@ -29,6 +29,9 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     // Add MIDI data per step component (hidden by default)
     addChildComponent (midiDataPerStep);
 
+    // Add main controls component (note/octave + probability/grid)
+    addAndMakeVisible (mainControls);
+
     // Add sequencer steps component
     addAndMakeVisible (sequencerSteps);
 
@@ -99,6 +102,18 @@ void PluginEditor::resized() {
     int buttonY = pianoRollY - buttonHeight - 10;  // 10px above piano roll
 
     viewToggleButton.setBounds (buttonX, buttonY, buttonWidth, buttonHeight);
+
+    // Position main controls to the right of the piano roll / MIDI data panel
+    // and above the sequencer area.
+    int mainControlsX = pianoRollX + pianoRollWidth + 18; // 18px gap from piano roll
+    int mainControlsY = pianoRollY;
+    int sequencerLeft = 50;
+    int sequencerWidth = 784;
+    int mainControlsRight = sequencerLeft + sequencerWidth;
+    int mainControlsWidth = juce::jmax (0, mainControlsRight - mainControlsX);
+    int mainControlsHeight = pianoRollHeight;
+    mainControls.setBounds (mainControlsX, mainControlsY, mainControlsWidth, mainControlsHeight);
+
 
     // Position sequencer steps 18px below piano roll, left-aligned
     // Y = 95 (piano roll Y) + 199 (piano roll height) + 18 (gap) = 312
