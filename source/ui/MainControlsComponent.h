@@ -34,6 +34,16 @@ public:
         noteNames.add ("Bb");
         noteNames.add ("B");
 
+        juce::Array<juce::String> noteOctaves;
+        for (int i = 1; i < 11; i++) {
+            noteOctaves.add (juce::String(i));
+        }
+
+        juce::Array<juce::Colour> octaveColours;
+        for (int i = 0; i < 10; i++) {
+            octaveColours.add (juce::Colour (0xFFFF6B6B)); // C   - Red
+        }
+
         juce::Array<juce::Colour> noteColours;
         noteColours.add (juce::Colour (0xFFFF6B6B)); // C   - Red
         noteColours.add (juce::Colour (0xFFFF9F6B)); // Db  - Orange
@@ -48,7 +58,7 @@ public:
         noteColours.add (juce::Colour (0xFFD66BFF)); // Bb  - Magenta
         noteColours.add (juce::Colour (0xFFFF6BD6)); // B   - Pink
 
-        noteSlider = std::make_unique<NotchedSlider> ("Note", noteNames, noteColours);
+        noteSlider = std::make_unique<NotchedSlider> ("Oct", noteOctaves, octaveColours);
         addAndMakeVisible (*noteSlider);
 
         noteSlider2 = std::make_unique<NotchedSlider> ("Note", noteNames, noteColours);
@@ -89,7 +99,6 @@ public:
         auto padding = 38;
         noteSlider->setBounds (slider1Area.reduced (padding));
         noteSlider2->setBounds (slider2Area.reduced (padding));
-
     }
 
 private:

@@ -69,7 +69,6 @@ public:
     }
 
     void paint (juce::Graphics& g) override {
-        g.fillAll (juce::Colours::pink);
 
         // Draw label on the left
         if (!labelBounds.isEmpty()) {
@@ -133,7 +132,7 @@ public:
         // and as far left as the width
         const int labelX = sliderBounds.getX() - labelGap;
         // figure out how hight to position the label...
-        const int labelYOffset = 9; // TODO this needs to come in as an option because we need to change for different sliders OR programmatically center this???
+        const int labelYOffset = 7; // TODO this needs to come in as an option because we need to change for different sliders OR programmatically center this???
         // now make the label y be offset
         const int labelY = sliderBounds.getCentreY() - labelYOffset;
         // now that we've calculated the label's  size and coordinates we actually create the bounds..
