@@ -82,28 +82,54 @@ public:
         auto area = getLocalBounds();
         auto titleArea = area.removeFromTop (24);
         g.drawText ("Main Controls", titleArea, juce::Justification::centred, false);
+
+        // Container for note / octave sliders
+        if (! noteContainerBounds.isEmpty()) {
+            auto r = noteContainerBounds.toFloat();
+
+            // Background fill inside the container
+            g.setColour (juce::Colour (0xff2c2c2c));
+            g.fillRoundedRectangle (r, 3.0f);
+
+            // 1px white border with 3px corner radius
+            g.setColour (juce::Colours::white);
+            g.drawRoundedRectangle (r.reduced (0.5f), 3.0f, 1.0f);
+        }
     }
 
     void resized() override {
-        auto area = getLocalBounds();
+        constexpr int titleHeight = 24;
+        constexpr int gapBelowTitle = 12;
+        constexpr int containerWidth = 188;
+        constexpr int containerHeight = 101;
+        constexpr int containerLeftMargin = 4;
+        constexpr int containerInnerPadding = 4;
 
-        // Reserve a strip for the title
-        const int titleHeight = 24;
-        area.removeFromTop (titleHeight);
+        auto bounds = getLocalBounds();
 
-        area = area.reduced (4);
+        // Fixed-size container positioned 12px below the title
+        noteContainerBounds = juce::Rectangle<int> (
+            containerLeftMargin,
+            titleHeight + gapBelowTitle,
+            containerWidth,
+            containerHeight);
 
-        // Split the area horizontally for two sliders
-        auto slider1Area = area.removeFromLeft (area.getWidth() / 2);
-        auto slider2Area = area;
-        auto padding = 38;
-        noteSlider->setBounds (slider1Area.reduced (padding));
-        noteSlider2->setBounds (slider2Area.reduced (padding));
+        // Layout sliders in two equal-width columns inside the container
+        auto slidersArea = noteContainerBounds.reduced (containerInnerPadding);
+        auto leftColumn = slidersArea.removeFromLeft (slidersArea.getWidth() / 2);
+        auto rightColumn = slidersArea;
+
+        if (noteSlider != nullptr)
+            noteSlider->setBounds (leftColumn);
+
+        if (noteSlider2 != nullptr)
+            noteSlider2->setBounds (rightColumn);
     }
 
 private:
     juce::Typeface::Ptr interFont;
     std::unique_ptr<NotchedSlider> noteSlider;
     std::unique_ptr<NotchedSlider> noteSlider2;
+    juce::Rectangle<int> noteContainerBounds;
 };
 
