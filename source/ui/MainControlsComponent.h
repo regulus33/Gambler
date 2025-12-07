@@ -85,8 +85,11 @@ public:
 
         // Split the area horizontally for two sliders
         auto slider1Area = area.removeFromLeft (area.getWidth() / 2);
-        noteSlider->setBounds (slider1Area);
-        noteSlider2->setBounds (area);
+        auto slider2Area = area;
+        auto padding = 38;
+        noteSlider->setBounds (slider1Area.reduced (padding));
+        noteSlider2->setBounds (slider2Area.reduced (padding));
+
     }
 
 private:

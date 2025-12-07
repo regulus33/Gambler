@@ -105,13 +105,14 @@ void PluginEditor::resized() {
 
     // Position main controls to the right of the piano roll / MIDI data panel
     // and above the sequencer area.
+    int mainControlsOverFlowTop = 25; // the title "Main Controls" is on top of same x as piano roll top and logo
     int mainControlsX = pianoRollX + pianoRollWidth + 18; // 18px gap from piano roll
-    int mainControlsY = pianoRollY;
+    int mainControlsY = pianoRollY - mainControlsOverFlowTop;
     int sequencerLeft = 50;
     int sequencerWidth = 784;
     int mainControlsRight = sequencerLeft + sequencerWidth;
     int mainControlsWidth = juce::jmax (0, mainControlsRight - mainControlsX);
-    int mainControlsHeight = pianoRollHeight;
+    int mainControlsHeight = pianoRollHeight + mainControlsOverFlowTop;
     mainControls.setBounds (mainControlsX, mainControlsY, mainControlsWidth, mainControlsHeight);
 
 
