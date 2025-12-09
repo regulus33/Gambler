@@ -16,6 +16,8 @@
  *   NotchedSlider slider ("Note", {"C", "Db", "D", ...}, {red, orange, yellow, ...});
  *   addAndMakeVisible (slider);
  */
+#define SLIDER_Y_OFFSET 6
+
 class NotchedSlider : public juce::Component {
 public:
     /**
@@ -118,9 +120,12 @@ public:
         const int sliderSize = rotarySliderDiameter + 21; // knob diameter + dot ring space
         // create the sliderBounds (remember it's just a rectangle)
         auto sliderBounds = juce::Rectangle<int> (0, 0, sliderSize, sliderSize).withCentre (area.getCentre());
+        // before we set its bounds, we translate it so its pushed upward y = y - 5.
+        // note that the slider bounds are a shrunken version of the main bounds of this whole component so we
+        // don't overflow by translating upward (at least by this small amount we don't)
+        sliderBounds.translate (0, -SLIDER_Y_OFFSET);
         // now we set the bounds of the juce::Slider itself
         slider.setBounds (sliderBounds);
-
         // Position label to the left of the slider, 4px away
         // this is the width of the lable before it is transformed and rotated
         const int labelWidth = 28;
@@ -144,7 +149,7 @@ public:
         // first we find the vertical center of the slider.
         // sliderBounds.getCentreY.
         // figure out where the center on the vertical access is of this slider, then add slider diameter so we are well below it
-        const int sliderVisualBottom = sliderBounds.getCentreY() + (rotarySliderDiameter / 2 + 2);
+        const int sliderVisualBottom = sliderBounds.getCentreY() + (rotarySliderDiameter / 2 + 2) -2;
         // then we create a centered rectangle within this crosshair we paint out with x and y coordinates
         auto gaugeRect = juce::Rectangle<int> (0, 0, gaugeWidth, gaugeHeight);
         // we use that slider visual bottom to calculate the center of the rectangle that makes up the slider

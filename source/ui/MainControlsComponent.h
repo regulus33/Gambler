@@ -2,6 +2,7 @@
 
 #include "BinaryData.h"
 #include "NotchedSlider.h"
+#include "MusicConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /**
@@ -19,44 +20,11 @@ public:
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
 
-        // Create the note notched slider with chromatic scale
-        juce::Array<juce::String> noteNames;
-        noteNames.add ("C");
-        noteNames.add ("Db");
-        noteNames.add ("D");
-        noteNames.add ("Eb");
-        noteNames.add ("E");
-        noteNames.add ("F");
-        noteNames.add ("Gb");
-        noteNames.add ("G");
-        noteNames.add ("Ab");
-        noteNames.add ("A");
-        noteNames.add ("Bb");
-        noteNames.add ("B");
-
-        juce::Array<juce::String> noteOctaves;
-        for (int i = 1; i < 11; i++) {
-            noteOctaves.add (juce::String(i));
-        }
-
-        juce::Array<juce::Colour> octaveColours;
-        for (int i = 0; i < 10; i++) {
-            octaveColours.add (juce::Colour (0xFFFF6B6B)); // C   - Red
-        }
-
-        juce::Array<juce::Colour> noteColours;
-        noteColours.add (juce::Colour (0xFFFF6B6B)); // C   - Red
-        noteColours.add (juce::Colour (0xFFFF9F6B)); // Db  - Orange
-        noteColours.add (juce::Colour (0xFFFFD66B)); // D   - Yellow
-        noteColours.add (juce::Colour (0xFFFFE66B)); // Eb  - Light yellow
-        noteColours.add (juce::Colour (0xFFE6FF6B)); // E   - Yellow-green
-        noteColours.add (juce::Colour (0xFF6BFFB4)); // F   - Light green
-        noteColours.add (juce::Colour (0xFF6BFFD6)); // Gb  - Cyan-green
-        noteColours.add (juce::Colour (0xFF6BD6FF)); // G   - Cyan
-        noteColours.add (juce::Colour (0xFF6BB4FF)); // Ab  - Light blue
-        noteColours.add (juce::Colour (0xFF9F6BFF)); // A   - Purple
-        noteColours.add (juce::Colour (0xFFD66BFF)); // Bb  - Magenta
-        noteColours.add (juce::Colour (0xFFFF6BD6)); // B   - Pink
+        // Create the note notched sliders using shared music/UI constants
+        auto noteNames     = MusicConstants::toJuceArray (MusicConstants::CHROMATIC_NOTE_NAMES);
+        auto noteColours   = MusicConstants::toJuceArray (MusicConstants::NOTE_COLOURS);
+        auto noteOctaves   = MusicConstants::toJuceArray (MusicConstants::OCTAVE_LABELS);
+        auto octaveColours = MusicConstants::toJuceArray (MusicConstants::OCTAVE_COLOURS);
 
         noteSlider = std::make_unique<NotchedSlider> ("Oct", noteOctaves, octaveColours);
         addAndMakeVisible (*noteSlider);
