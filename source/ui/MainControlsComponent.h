@@ -55,10 +55,6 @@ public:
         if (! noteContainerBounds.isEmpty()) {
             auto r = noteContainerBounds.toFloat();
 
-            // Background fill inside the container
-            g.setColour (juce::Colour (0xff2c2c2c));
-            g.fillRoundedRectangle (r, 3.0f);
-
             // 1px white border with 3px corner radius
             g.setColour (juce::Colours::white);
             g.drawRoundedRectangle (r.reduced (0.5f), 3.0f, 1.0f);
@@ -67,8 +63,8 @@ public:
 
     void resized() override {
         constexpr int titleHeight = 24;
-        constexpr int gapBelowTitle = 12;
-        constexpr int containerWidth = 188;
+        constexpr int gapBelowTitle = 6;
+        constexpr int containerWidth = 220;
         constexpr int containerHeight = 101;
         constexpr int containerLeftMargin = 4;
         constexpr int containerInnerPadding = 4;
