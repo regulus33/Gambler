@@ -2,6 +2,7 @@
 
 #include "BinaryData.h"
 #include "NoteControlsComponent.h"
+#include "ProbabilityControlsComponent.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /**
@@ -10,6 +11,7 @@
  * Top-level container for the Main Controls UI.
  * - Title at the top
  * - NoteControlsComponent for note/octave selection
+ * - ProbabilityControlsComponent for probability controls
  */
 class MainControlsComponent : public juce::Component {
 public:
@@ -19,6 +21,7 @@ public:
               BinaryData::InterVariableFont_ttfSize))
     {
         addAndMakeVisible (noteControls);
+        addAndMakeVisible (probabilityControls);
     }
 
     void paint (juce::Graphics& g) override {
@@ -46,10 +49,17 @@ public:
         constexpr int containerWidth = 220;
         constexpr int containerHeight = 101;
         constexpr int containerLeftMargin = 4;
+        constexpr int gapBetweenContainers = 10;
 
         noteControls.setBounds (
             containerLeftMargin,
             titleHeight + gapBelowTitle,
+            containerWidth,
+            containerHeight);
+
+        probabilityControls.setBounds (
+            containerLeftMargin,
+            noteControls.getBottom() + gapBetweenContainers,
             containerWidth,
             containerHeight);
     }
@@ -57,5 +67,6 @@ public:
 private:
     juce::Typeface::Ptr interFont;
     NoteControlsComponent noteControls;
+    ProbabilityControlsComponent probabilityControls;
 };
 
