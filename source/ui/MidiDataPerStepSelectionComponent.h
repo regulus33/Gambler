@@ -6,6 +6,22 @@
 #include <vector>
 #include <functional>
 
+namespace MidiDataPerStepConstants {
+    // Grid spacing
+    constexpr int gridGap = 4;
+    // ComboBox
+    constexpr float comboCornerRadius = 3.0f;
+    constexpr float arrowScale = 0.25f;
+    constexpr float arrowAreaReduction = 4.0f;
+    // Button
+    constexpr juce::uint32 buttonBgOnHex = 0xff484848;
+    constexpr juce::uint32 buttonBgOffHex = 0xff2c2c2c;
+    constexpr float buttonCornerRadius = 3.0f;
+    constexpr float buttonBorderWidth = 2.0f;
+    constexpr float buttonBorderReduction = 1.0f;
+    constexpr float buttonFontSize = 12.0f;
+}
+
 /**
  * MidiDataPerStepSelectionComponent
  *
@@ -182,8 +198,8 @@ public:
         };
 
         // Set spacing
-        grid.columnGap = juce::Grid::Px(4);
-        grid.rowGap = juce::Grid::Px(4);
+        grid.columnGap = juce::Grid::Px(MidiDataPerStepConstants::gridGap);
+        grid.rowGap = juce::Grid::Px(MidiDataPerStepConstants::gridGap);
 
         // Add items to grid
         // Row 0: Spacer spans first 6 columns (9/10 width), Button in last column (1/10 width)
@@ -229,6 +245,7 @@ private:
                           int buttonX, int buttonY, int buttonW, int buttonH,
                           juce::ComboBox& box) override
         {
+            using namespace MidiDataPerStepConstants;
             juce::ignoreUnused(isButtonDown, buttonX, buttonY, buttonW, buttonH, box);
 
             auto bounds = juce::Rectangle<float>(0.0f, 0.0f,
@@ -238,11 +255,10 @@ private:
             // Background comes from the ComboBox's background colour (per-slot colour)
             auto background = box.findColour(juce::ComboBox::backgroundColourId, true);
             g.setColour(background);
-            g.fillRoundedRectangle(bounds, 3.0f);
+            g.fillRoundedRectangle(bounds, comboCornerRadius);
 
-            // Draw a much smaller downward chevron (about 1/3 of previous size)
-            const float arrowScale = 0.25f;
-            auto arrowArea = bounds.removeFromRight(bounds.getHeight()).reduced(4.0f);
+            // Draw a much smaller downward chevron
+            auto arrowArea = bounds.removeFromRight(bounds.getHeight()).reduced(arrowAreaReduction);
 
             auto size = juce::jmin(arrowArea.getWidth(), arrowArea.getHeight()) * 0.5f * arrowScale;
             auto cx   = arrowArea.getCentreX();
@@ -349,18 +365,19 @@ private:
 
         void paint (juce::Graphics& g) override
         {
+            using namespace MidiDataPerStepConstants;
             auto bounds = getLocalBounds().toFloat();
 
-            auto background = isOn ? juce::Colour (0xff484848)
-                                   : juce::Colour (0xff2c2c2c);
+            auto background = isOn ? juce::Colour (buttonBgOnHex)
+                                   : juce::Colour (buttonBgOffHex);
             g.setColour (background);
-            g.fillRoundedRectangle (bounds, 3.0f);
+            g.fillRoundedRectangle (bounds, buttonCornerRadius);
 
             g.setColour (juce::Colours::white.withAlpha (isOn ? 1.0f : 0.6f));
-            g.drawRoundedRectangle (bounds.reduced (1.0f), 3.0f, 2.0f);
+            g.drawRoundedRectangle (bounds.reduced (buttonBorderReduction), buttonCornerRadius, buttonBorderWidth);
 
             g.setColour (juce::Colours::white);
-            g.setFont (juce::Font (12.0f, juce::Font::bold));
+            g.setFont (juce::Font (buttonFontSize, juce::Font::bold));
             g.drawText ("CC lanes", getLocalBounds(), juce::Justification::centred);
         }
 

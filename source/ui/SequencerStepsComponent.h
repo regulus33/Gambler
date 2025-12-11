@@ -4,6 +4,24 @@
 #include "BinaryData.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
+namespace SequencerStepsConstants {
+    // Component size
+    constexpr int componentWidth = 862;
+    constexpr int componentHeight = 92;
+    // Layout
+    constexpr int numVisibleSteps = 8;
+    constexpr float stepSize = 92.0f;
+    constexpr float gap = 18.0f;
+    // Border
+    constexpr float borderWidthInactive = 2.2f;
+    constexpr float borderWidthActive = 7.0f;
+    constexpr float cornerRadius = 4.4f;
+    // Text
+    constexpr float fontSize = 13.0f;
+    // Active circle
+    constexpr float activeCircleRadius = 20.0f;
+}
+
 /**
  * SequencerStepsComponent - Displays 8 steps of the 64-step sequence
  *
@@ -18,26 +36,20 @@
 class SequencerStepsComponent : public juce::Component {
 public:
     SequencerStepsComponent(const Sequence& seq) : sequence(seq) {
+        using namespace SequencerStepsConstants;
+
         // Load Inter font from binary data
         interFont = juce::Typeface::createSystemTypefaceFor (
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
 
-        // Set fixed size based on design:
-        // 8 steps × 92px + 7 gaps × 18px = 736 + 126 = 862px wide
-        // Height: 92px
-        setSize (862, 92);
+        setSize (componentWidth, componentHeight);
     }
 
     ~SequencerStepsComponent() override = default;
 
     void paint (juce::Graphics& g) override {
-        // No background - transparent
-
-        // Step dimensions from design
-        const int numVisibleSteps = 8;
-        const float stepSize = 92.0f; // 92x92 pixels
-        const float gap = 18.0f; // 18px gap between steps
+        using namespace SequencerStepsConstants;
 
         // Draw each visible step
         for (int i = 0; i < numVisibleSteps; i++) {
@@ -95,15 +107,14 @@ private:
     /**
      * Draw a single step
      */
-    void drawStep (juce::Graphics& g, int visibleIndex, int stepIndex, float stepSize, float gap) {
-        // Calculate step bounds
-        // Each step is 92x92, with 18px gap between them
-        float x = visibleIndex * (stepSize + gap);
-        float y = 0.0f;
-        float w = stepSize;
-        float h = stepSize;
+    void drawStep (juce::Graphics& g, int visibleIndex, int stepIndex, float stepSizeParam, float gapParam) {
+        using namespace SequencerStepsConstants;
 
-        juce::Rectangle<float> stepBounds (x, y, w, h);
+        // Calculate step bounds
+        float x = visibleIndex * (stepSizeParam + gapParam);
+        float y = 0.0f;
+
+        juce::Rectangle<float> stepBounds (x, y, stepSizeParam, stepSizeParam);
 
         // Get the note for this step
         const auto& step = sequence.getStep(stepIndex);
@@ -120,38 +131,34 @@ private:
         // Check if this is the active step
         bool isActive = (stepIndex == activeStepIndex);
 
-        // Determine border width (2.2px for inactive, 7px for active)
-        float borderWidth = isActive ? 7.0f : 2.2f;
-        float cornerRadius = 4.4f;
+        // Determine border width
+        float borderWidth = isActive ? borderWidthActive : borderWidthInactive;
 
         // Fill step background with note color
         g.setColour (noteColor);
         g.fillRoundedRectangle (stepBounds, cornerRadius);
 
         // Draw white border INSIDE the bounds
-        // Inset by half the border width so the border draws entirely inside
-        // Also reduce the corner radius proportionally to match the inset
         g.setColour (juce::Colours::white);
         float inset = borderWidth * 0.5f;
         juce::Rectangle<float> borderBounds = stepBounds.reduced (inset);
-        float borderRadius = juce::jmax (0.0f, cornerRadius - inset);
-        g.drawRoundedRectangle (borderBounds, borderRadius, borderWidth);
+        float borderRadiusInner = juce::jmax (0.0f, cornerRadius - inset);
+        g.drawRoundedRectangle (borderBounds, borderRadiusInner, borderWidth);
 
         // Convert MIDI note to note name (e.g., "C4", "Gb3")
         juce::String noteText = midiNoteToNoteName (midiNote);
 
-        // Use Inter font at 13px bold
+        // Use Inter font
         juce::Font font (interFont);
-        font.setHeight (13.0f);
+        font.setHeight (fontSize);
         font.setBold (true);
 
         if (isActive) {
-            // Draw black circle (40px diameter) behind the text
+            // Draw black circle behind the text
             auto circleCentre = stepBounds.getCentre();
-            const float circleRadius = 20.0f; // 40px diameter = 20px radius
             g.setColour (juce::Colours::black);
-            g.fillEllipse (circleCentre.x - circleRadius, circleCentre.y - circleRadius,
-                          circleRadius * 2.0f, circleRadius * 2.0f);
+            g.fillEllipse (circleCentre.x - activeCircleRadius, circleCentre.y - activeCircleRadius,
+                          activeCircleRadius * 2.0f, activeCircleRadius * 2.0f);
 
             // Draw note text in white, bold Inter font
             g.setColour (juce::Colours::white);
@@ -202,10 +209,7 @@ private:
     }
 
     void mouseDown (const juce::MouseEvent& event) override {
-        // Calculate which step was clicked
-        const int numVisibleSteps = 8;
-        const float stepSize = 92.0f;
-        const float gap = 18.0f;
+        using namespace SequencerStepsConstants;
         const float stepPlusGap = stepSize + gap;
 
         int visibleIndex = static_cast<int>(event.position.x / stepPlusGap);

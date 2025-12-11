@@ -2,6 +2,25 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+namespace SequencerControlsConstants {
+    // Layout
+    constexpr float buttonSize = 92.0f;
+    constexpr float gap = 18.0f;
+    // Button appearance
+    constexpr float cornerRadius = 4.4f;
+    constexpr float borderWidth = 2.2f;
+    constexpr juce::uint32 bgColorActive = 0xff4a4a4a;
+    constexpr juce::uint32 bgColorInactive = 0xff2a2a2a;
+    // Icon
+    constexpr float maxIconSize = 26.0f;
+    constexpr float iconVerticalOffset = 13.0f;
+    // Text
+    constexpr float textAreaHeight = 33.0f;
+    constexpr float fontSize = 13.0f;
+    constexpr float textHeight = 13.0f;
+    constexpr float textYOffset = 13.0f;
+}
+
 /**
  * Icon path generators for control buttons
  */
@@ -452,9 +471,6 @@ namespace ControlIcons {
  */
 class SequencerControlsComponent : public juce::Component {
 public:
-    // Compile-time constant for icon vertical offset (adjust as needed)
-    static constexpr float ICON_VERTICAL_OFFSET = 13.0f;
-
     SequencerControlsComponent() {
         // Create 8 buttons
         for (int i = 0; i < 8; i++) {
@@ -501,14 +517,12 @@ public:
     }
     
     void resized() override {
-        // Layout: 8 buttons in a row, each 92×92 with 18px gaps
-        const float buttonSize = 92.0f;
-        const float gap = 18.0f;
-        
+        using namespace SequencerControlsConstants;
+
         for (int i = 0; i < buttons.size(); i++) {
             float x = i * (buttonSize + gap);
-            buttons[i]->setBounds(static_cast<int>(x), 0, 
-                                 static_cast<int>(buttonSize), 
+            buttons[i]->setBounds(static_cast<int>(x), 0,
+                                 static_cast<int>(buttonSize),
                                  static_cast<int>(buttonSize));
         }
     }
@@ -541,28 +555,26 @@ private:
         ControlButton() = default;
         
         void paint (juce::Graphics& g) override {
+            using namespace SequencerControlsConstants;
             auto bounds = getLocalBounds().toFloat();
 
             // Determine colors based on toggle state OR pressed state
             bool isActive = isToggled_ || isPressed_;
-            juce::Colour bgColor = isActive ? juce::Colour(0xff4a4a4a) : juce::Colour(0xff2a2a2a);
+            juce::Colour bgColor = isActive ? juce::Colour(bgColorActive) : juce::Colour(bgColorInactive);
             juce::Colour borderColor = juce::Colours::white;
             juce::Colour textColor = juce::Colours::white;
-            
-            const float cornerRadius = 4.4f;
-            const float borderWidth = 2.2f;
-            
+
             // Fill background
             g.setColour(bgColor);
             g.fillRoundedRectangle(bounds, cornerRadius);
-            
+
             // Draw white border inside the bounds
             g.setColour(borderColor);
             float inset = borderWidth * 0.5f;
             juce::Rectangle<float> borderBounds = bounds.reduced(inset);
-            float borderRadius = juce::jmax(0.0f, cornerRadius - inset);
-            g.drawRoundedRectangle(borderBounds, borderRadius, borderWidth);
-            
+            float borderRadiusInner = juce::jmax(0.0f, cornerRadius - inset);
+            g.drawRoundedRectangle(borderBounds, borderRadiusInner, borderWidth);
+
             // Draw icon and/or label text
             if (iconPath_.has_value()) {
                 // Draw the icon path
@@ -571,24 +583,20 @@ private:
                 // Get the icon's bounding box
                 auto iconBounds = iconPath_->getBounds();
 
-                // Calculate scale to limit icon to 26px on longest side
-                const float maxIconSize = 26.0f;
+                // Calculate scale to limit icon to maxIconSize on longest side
                 float longestSide = juce::jmax(iconBounds.getWidth(), iconBounds.getHeight());
                 float scale = maxIconSize / longestSide;
 
                 // Calculate the space available for the icon (above the text)
-                // Text is 13px from bottom, text height is ~13px, so reserve ~33px for text area
-                float textAreaHeight = 33.0f;
                 float iconAreaHeight = bounds.getHeight() - textAreaHeight;
 
                 // Center the icon in the available space, then apply vertical offset
                 float scaledWidth = iconBounds.getWidth() * scale;
                 float scaledHeight = iconBounds.getHeight() * scale;
                 float offsetX = (bounds.getWidth() - scaledWidth) * 0.5f;
-                float offsetY = (iconAreaHeight - scaledHeight) * 0.5f + ICON_VERTICAL_OFFSET;
+                float offsetY = (iconAreaHeight - scaledHeight) * 0.5f + iconVerticalOffset;
 
                 // Apply transform and draw
-                // Need to account for the icon's original position in its bounding box
                 juce::AffineTransform transform = juce::AffineTransform::scale(scale)
                     .translated(offsetX - iconBounds.getX() * scale,
                                offsetY - iconBounds.getY() * scale);
@@ -599,13 +607,12 @@ private:
             // Draw label text if present (below icon or centered if no icon)
             if (label_.isNotEmpty()) {
                 g.setColour(textColor);
-                juce::Font font(juce::FontOptions(13.0f));
+                juce::Font font{juce::FontOptions(fontSize)};
                 font.setBold(true);
                 g.setFont(font);
 
-                // Position text 13px from bottom
-                float textHeight = 13.0f;
-                float textY = bounds.getHeight() - 13.0f - textHeight;
+                // Position text from bottom
+                float textY = bounds.getHeight() - textYOffset - textHeight;
                 juce::Rectangle<float> textBounds(0, textY, bounds.getWidth(), textHeight);
 
                 g.drawText(label_, textBounds.toNearestInt(), juce::Justification::centredBottom);

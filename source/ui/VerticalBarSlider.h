@@ -3,6 +3,11 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
+namespace VerticalBarSliderConstants {
+    constexpr float padding = 4.0f;
+    constexpr juce::uint32 defaultBarColourHex = 0xffff6b6b;
+}
+
 /**
  * VerticalBarSlider
  *
@@ -24,6 +29,7 @@ public:
     }
 
     void paint (juce::Graphics& g) override {
+        using namespace VerticalBarSliderConstants;
         auto bounds = getLocalBounds().toFloat();
 
         // Fill background (if set)
@@ -33,10 +39,9 @@ public:
         // Colours
         auto sliderBarColorToUse = barColour;
         if (sliderBarColorToUse.isTransparent())
-            sliderBarColorToUse = juce::Colour(0xffff6b6b);  // Default red colour for slider bar
+            sliderBarColorToUse = juce::Colour(defaultBarColourHex);
 
         // Calculate slider bar dimensions
-        float padding = 4.0f;
         auto sliderAreaBounds = bounds.reduced(padding, padding);
 
         // Calculate bar height based on slider value (0.0 to 1.0)
@@ -110,8 +115,8 @@ public:
 
 private:
     void updateSliderValue(float mouseY) {
+        using namespace VerticalBarSliderConstants;
         auto bounds = getLocalBounds().toFloat();
-        float padding = 4.0f;
         auto sliderAreaBounds = bounds.reduced(padding, padding);
 
         // Calculate slider value based on mouse Y position (inverted: top = 1.0, bottom = 0.0)
@@ -131,7 +136,7 @@ private:
     std::function<void()> onToggleLane;
 
     juce::Colour backgroundColour { juce::Colours::transparentBlack };
-    juce::Colour barColour { juce::Colour (0xffff6b6b) };  // Default red bar
+    juce::Colour barColour { juce::Colour (VerticalBarSliderConstants::defaultBarColourHex) };
 
     float sliderValue = 0.5f;  // 0.0 to 1.0
     bool isDragging = false;

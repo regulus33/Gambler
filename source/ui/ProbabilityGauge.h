@@ -6,6 +6,16 @@
 #include <random>
 #include <vector>
 
+namespace ProbabilityGaugeConstants {
+    constexpr int gridSize = 8;
+    constexpr int maxCircles = 64;
+    constexpr int circleDiameter = 4;
+    constexpr int circleSpacing = 3;
+    // Colors
+    constexpr juce::uint32 activeColourHex = 0xFFFF7C7C;
+    constexpr juce::uint32 inactiveColourHex = 0xFF333333;
+}
+
 /**
  * ProbabilityGauge
  *
@@ -21,7 +31,7 @@
 class ProbabilityGauge : public juce::Component {
 public:
     ProbabilityGauge()
-        : circleStates (maxCircles, false)
+        : circleStates (ProbabilityGaugeConstants::maxCircles, false)
         , rng (std::random_device{}())
     {
     }
@@ -29,6 +39,7 @@ public:
     ~ProbabilityGauge() override = default;
 
     void paint (juce::Graphics& g) override {
+        using namespace ProbabilityGaugeConstants;
         const int cellSize = circleDiameter + circleSpacing;
 
         for (int i = 0; i < maxCircles; ++i)
@@ -83,8 +94,8 @@ public:
      * This is not yet wired to the actual sequencer step count.
      */
     void setStepCount (int count) {
-        totalCircles = juce::jlimit (1, maxCircles, count);
-        // Re-randomize to ensure active count is correct for new total
+        totalCircles = juce::jlimit (1, ProbabilityGaugeConstants::maxCircles, count);
+        // Re-randomize to ensure active count is correct  new total
         randomizeActiveCircles();
         repaint();
     }
@@ -100,20 +111,14 @@ public:
     int getStepCount() const { return totalCircles; }
 
 private:
-    static constexpr int gridSize = 8;           // 8x8 grid
-    static constexpr int maxCircles = 64;        // Maximum number of circles
-    static constexpr int circleDiameter = 4;     // Each circle is 5x5 pixels (scaled 2.2x from 4)
-    static constexpr int circleSpacing = 3;      // 2px gap between circles (scaled 2.2x from 1)
-
     // Colors
-    const juce::Colour activeColour { 0xFFFF7C7C };   // Red/active
-    const juce::Colour inactiveColour { 0xFF333333 }; // Dark gray/inactive
+    const juce::Colour activeColour { ProbabilityGaugeConstants::activeColourHex };
+    const juce::Colour inactiveColour { ProbabilityGaugeConstants::inactiveColourHex };
 
     float currentProbability = 0.0f;
 
     // Total visible circles - can be changed for variable step count
-    // NOTE: Change this value to test different step counts
-    int totalCircles = maxCircles;
+    int totalCircles = ProbabilityGaugeConstants::maxCircles;
 
     // Tracks which circles are currently active (true = active/red)
     std::vector<bool> circleStates;

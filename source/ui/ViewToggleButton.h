@@ -4,11 +4,17 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
+namespace ViewToggleButtonConstants {
+    constexpr juce::uint32 bgColourHex = 0xff484848;
+    constexpr float cornerRadius = 3.0f;
+    constexpr float fontSize = 12.0f;
+}
+
 /**
  * ViewToggleButton
- * 
+ *
  * Toggles between PianoRoll view (shows "CC") and MIDI data per step view (shows "Note").
- * 
+ *
  * Size: 46×30px
  * Background: #484848 (medium grey)
  * Corner radius: 3px
@@ -21,26 +27,25 @@ public:
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
     }
-    
+
     void paint (juce::Graphics& g) override {
+        using namespace ViewToggleButtonConstants;
         auto bounds = getLocalBounds().toFloat();
-        
+
         // Colors
-        juce::Colour bgColor = juce::Colour(0xff484848);
+        juce::Colour bgColor = juce::Colour(bgColourHex);
         juce::Colour textColor = juce::Colours::white;
-        
-        const float cornerRadius = 3.0f;
-        
+
         // Fill background
         g.setColour(bgColor);
         g.fillRoundedRectangle(bounds, cornerRadius);
-        
+
         // Draw text
         g.setColour(textColor);
-        juce::Font font(juce::FontOptions(interTypeface).withHeight(12.0f));
+        juce::Font font(juce::FontOptions(interTypeface).withHeight(fontSize));
         font.setBold(true);
         g.setFont(font);
-        
+
         // Show "CC" when viewing PianoRoll, "Note" when viewing MIDI data
         juce::String text = showPianoRoll ? "CC" : "Note";
         g.drawText(text, bounds.toNearestInt(), juce::Justification::centred);

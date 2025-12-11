@@ -19,10 +19,27 @@
  */
 
 namespace NotchedSliderConstants {
-    constexpr float thumbWidth = 3.0f;
+    // Knob
+    constexpr int knobDiameter = 38;
+    constexpr float knobRadius = knobDiameter / 2.0f;
     constexpr float knobStrokeWidth = 3.0f;
+    constexpr float pointerWidth = 3.0f;
+    constexpr int sliderYOffset = 6;
+    // Dots
+    constexpr float dotRingRadius = 27.0f;
+    constexpr float dotDiameter = 3.0f;
+    constexpr float dotSelectedScale = 2.0f;
+    // Label
+    constexpr int labelWidth = 28;
+    constexpr int labelGap = 24;
+    constexpr int labelYOffset = 7;
+    constexpr float labelFontSize = 12.0f;
+    // Gauge
+    constexpr int gaugeWidth = 28;
+    constexpr int gaugeHeight = 16;
+    constexpr int gaugeGap = 10;
+    constexpr float gaugeFontSize = 12.0f;
 }
-#define SLIDER_Y_OFFSET 6
 
 class NotchedSlider : public juce::Component {
 public:
@@ -77,6 +94,7 @@ public:
     }
 
     void paint (juce::Graphics& g) override {
+        using namespace NotchedSliderConstants;
 
         // Draw label on the left
         if (!labelBounds.isEmpty()) {
@@ -84,7 +102,7 @@ public:
             if (interFont != nullptr)
                 labelFont = juce::Font (interFont);
 
-            labelFont.setHeight (12.0f);
+            labelFont.setHeight (labelFontSize);
             labelFont.setBold (true);
 
             g.setFont (labelFont);
@@ -102,7 +120,7 @@ public:
             if (interFont != nullptr)
                 gaugeFont = juce::Font (interFont);
 
-            gaugeFont.setHeight (12.0f);
+            gaugeFont.setHeight (gaugeFontSize);
             gaugeFont.setBold (true);
 
             auto gaugeColour = getSelectedColour();
@@ -119,50 +137,26 @@ public:
     }
 
     void resized() override {
-        // these are the bounds set by the parent
+        using namespace NotchedSliderConstants;
+
         auto area = getLocalBounds();
 
         // Centre the slider in the area
-        const int sliderSize = rotarySliderDiameter + 21; // knob diameter + dot ring space
-        // create the sliderBounds (remember it's just a rectangle)
+        const int sliderSize = knobDiameter + 21; // knob diameter + dot ring space
         auto sliderBounds = juce::Rectangle<int> (0, 0, sliderSize, sliderSize).withCentre (area.getCentre());
-        // before we set its bounds, we translate it so its pushed upward y = y - 5.
-        // note that the slider bounds are a shrunken version of the main bounds of this whole component so we
-        // don't overflow by translating upward (at least by this small amount we don't)
-        sliderBounds.translate (0, -SLIDER_Y_OFFSET);
-        // now we set the bounds of the juce::Slider itself
+        sliderBounds.translate (0, -sliderYOffset);
         slider.setBounds (sliderBounds);
-        // Position label to the left of the slider, 4px away
-        // this is the width of the lable before it is transformed and rotated
-        const int labelWidth = 28;
-        // distance from sliders
-        const int labelGap = 24;
-        // This is how we figure out where to draw the slider label box
-        // rememver all bounds start at x = 0 and y = 0 so subtracting from x moves your box to the left
-        // so we get the bounds of the whole juce::Slider area, then move as far left as the gap
-        // and as far left as the width
+
+        // Position label to the left of the slider
         const int labelX = sliderBounds.getX() - labelGap;
-        // figure out how hight to position the label...
-        const int labelYOffset = 7; // TODO this needs to come in as an option because we need to change for different sliders OR programmatically center this???
-        // now make the label y be offset
         const int labelY = sliderBounds.getCentreY() - labelYOffset;
-        // now that we've calculated the label's  size and coordinates we actually create the bounds..
         labelBounds = juce::Rectangle<int> (labelX, labelY, labelWidth, labelWidth);
-        // GAUGE
-        // all these things start with sizes
-        const int gaugeWidth = 28;
-        const int gaugeHeight = 16;
-        // first we find the vertical center of the slider.
-        // sliderBounds.getCentreY.
-        // figure out where the center on the vertical access is of this slider, then add slider diameter so we are well below it
-        const int sliderVisualBottom = sliderBounds.getCentreY() + (rotarySliderDiameter / 2 + 2) -2;
-        // then we create a centered rectangle within this crosshair we paint out with x and y coordinates
+
+        // Position gauge below the slider
+        const int sliderVisualBottom = sliderBounds.getCentreY() + (knobDiameter / 2 + 2) - 2;
         auto gaugeRect = juce::Rectangle<int> (0, 0, gaugeWidth, gaugeHeight);
-        // we use that slider visual bottom to calculate the center of the rectangle that makes up the slider
-        auto centreY = sliderVisualBottom + 10 + gaugeHeight / 2;
-        gaugeBounds = gaugeRect.withCentre (
-            { sliderBounds.getCentreX(),
-                centreY });
+        auto centreY = sliderVisualBottom + gaugeGap + gaugeHeight / 2;
+        gaugeBounds = gaugeRect.withCentre ({ sliderBounds.getCentreX(), centreY });
     }
 
 private:
@@ -174,17 +168,13 @@ private:
             using namespace NotchedSliderConstants;
             auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat();
             auto centre = bounds.getCentre();
-            auto radius = juce::jmin (bounds.getWidth() / 2.0f, bounds.getHeight() / 2.0f);
 
-            // Draw hollow knob: 38px diameter with 2px white ring
-            const float knobRadius = 19.0f;
+            // Draw hollow knob with white ring
             g.setColour (juce::Colours::white);
             g.drawEllipse (centre.getX() - knobRadius, centre.getY() - knobRadius, knobRadius * 2.0f, knobRadius * 2.0f, knobStrokeWidth);
 
-            // Draw coloured dots around the knob at 27px radius
+            // Draw coloured dots around the knob
             const int dotCount = parent->optionNames.size();
-            const float dotRingRadius = 27.0f;
-            const float dotDiameter = 3.0f;
 
             int currentIndex = (int) std::round (slider.getValue());
             currentIndex = juce::jlimit (0, dotCount - 1, currentIndex);
@@ -197,7 +187,7 @@ private:
 
                 float diameter = dotDiameter;
                 if (i == currentIndex)
-                    diameter = dotDiameter * 2.0f;
+                    diameter = dotDiameter * dotSelectedScale;
 
                 g.setColour (parent->optionColours[i]);
                 g.fillEllipse (point.getX() - diameter * 0.5f,
@@ -216,7 +206,7 @@ private:
             pointer.lineTo (centre.getPointOnCircumference (knobRadius * 0.6f, pointerAngle));
 
             g.setColour (juce::Colours::white);
-            g.strokePath (pointer, juce::PathStrokeType (thumbWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            g.strokePath (pointer, juce::PathStrokeType (pointerWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
 
     private:
@@ -231,5 +221,4 @@ private:
     LookAndFeel lookAndFeel { this };
     juce::Rectangle<int> labelBounds;
     juce::Rectangle<int> gaugeBounds;
-    int rotarySliderDiameter = 38;
 };

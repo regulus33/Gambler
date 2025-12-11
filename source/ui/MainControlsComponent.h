@@ -5,6 +5,18 @@
 #include "ProbabilityControlsComponent.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
+namespace MainControlsConstants {
+    // Title
+    constexpr float titleFontSize = 16.0f;
+    constexpr int titleHeight = 24;
+    constexpr int gapBelowTitle = 6;
+    // Container layout
+    constexpr int containerWidth = 198;
+    constexpr int containerHeight = 101;
+    constexpr int containerLeftMargin = 4;
+    constexpr int gapBetweenContainers = 5;
+}
+
 /**
  * MainControlsComponent
  *
@@ -25,32 +37,26 @@ public:
     }
 
     void paint (juce::Graphics& g) override {
+        using namespace MainControlsConstants;
         g.fillAll (juce::Colours::transparentBlack);
 
-        // Title
         juce::Font titleFont;
         if (interFont != nullptr)
             titleFont = juce::Font (interFont);
 
-        titleFont.setHeight (16.0f);
+        titleFont.setHeight (titleFontSize);
         titleFont.setBold (true);
 
         g.setFont (titleFont);
         g.setColour (juce::Colours::white);
 
         auto area = getLocalBounds();
-        auto titleArea = area.removeFromTop (24);
+        auto titleArea = area.removeFromTop (titleHeight);
         g.drawText ("Main Controls", titleArea, juce::Justification::centred, false);
     }
 
     void resized() override {
-        constexpr int titleHeight = 24;
-        constexpr int gapBelowTitle = 6;
-        // Width matches 2 sequencer steps (2×92) + 1 gap (1×18) = 202px
-        constexpr int containerWidth = 198;
-        constexpr int containerHeight = 101;
-        constexpr int containerLeftMargin = 4;
-        constexpr int gapBetweenContainers = 10;
+        using namespace MainControlsConstants;
 
         noteControls.setBounds (
             containerLeftMargin,

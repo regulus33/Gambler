@@ -1,5 +1,39 @@
 #include "PluginEditor.h"
 
+namespace PluginEditorLayout {
+    // Background
+    constexpr juce::uint32 bgColourHex = 0xFF1E1E1E;
+    // Editor size
+    constexpr int editorWidth = 980;
+    constexpr int editorHeight = 560;
+    // Piano roll / MIDI data panel
+    constexpr int pianoRollX = 50;
+    constexpr int pianoRollY = 95;
+    constexpr int pianoRollWidth = 422;
+    constexpr int pianoRollHeight = 206;
+    // View toggle button
+    constexpr int buttonWidth = 46;
+    constexpr int buttonHeight = 30;
+    constexpr int buttonGapAbovePianoRoll = 10;
+    // Main controls
+    constexpr int mainControlsOverflowTop = 35;
+    constexpr int mainControlsOverflowBottom = 15;
+    constexpr int mainControlsGapFromPianoRoll = 18;
+    constexpr int mainControlsWidth = 226;  // 220 + 6 padding
+    // Sequencer
+    constexpr int sequencerX = 50;
+    constexpr int sequencerStepsY = 312;
+    constexpr int sequencerWidth = 862;
+    constexpr int sequencerStepsHeight = 92;
+    constexpr int sequencerControlsY = 422;
+    constexpr int sequencerControlsHeight = 92;
+    // Inspector button
+    constexpr int inspectorButtonWidth = 100;
+    constexpr int inspectorButtonHeight = 25;
+    constexpr int inspectorButtonMarginRight = 110;
+    constexpr int inspectorButtonMarginBottom = 35;
+}
+
 PluginEditor::PluginEditor (PluginProcessor& p)
     : AudioProcessorEditor (&p),
       processorRef (p),
@@ -69,8 +103,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     addKeyListener (this);
     setWantsKeyboardFocus (true);
 
-    // Set editor size to match the design (approximately 980 x 560 based on the mockup)
-    setSize (980, 560);
+    setSize (PluginEditorLayout::editorWidth, PluginEditorLayout::editorHeight);
 }
 
 PluginEditor::~PluginEditor() {
@@ -78,55 +111,38 @@ PluginEditor::~PluginEditor() {
 }
 
 void PluginEditor::paint (juce::Graphics& g) {
-    // Background - dark grey matching the design
-    g.fillAll (juce::Colour (0xFF1E1E1E));
+    g.fillAll (juce::Colour (PluginEditorLayout::bgColourHex));
 }
 
 void PluginEditor::resized() {
-    // Position piano roll in top-left corner with some padding
-    // Based on the design mockup, it's positioned at approximately (50, 95)
-    // Piano roll scaled 3.1% to match 4 sequencer steps + 3 gaps (422px wide)
-    int pianoRollX = 50;
-    int pianoRollY = 95;
-    int pianoRollWidth = 422;  // Scaled from 408 to match 4 steps (4×92) + 3 gaps (3×18)
-    int pianoRollHeight = 206; // Scaled from 199 by 3.1%
+    using namespace PluginEditorLayout;
 
     pianoRoll.setBounds (pianoRollX, pianoRollY, pianoRollWidth, pianoRollHeight);
 
     // Position MIDI data per step component at same location as piano roll
     midiDataPerStep.setBounds (pianoRollX, pianoRollY, pianoRollWidth, pianoRollHeight);
 
-    // Position view toggle button 10px above piano roll, aligned to left edge
-    int buttonWidth = 46;
-    int buttonHeight = 30;
-    int buttonX = pianoRollX;  // Left-aligned with piano roll
-    int buttonY = pianoRollY - buttonHeight - 10;  // 10px above piano roll
-
+    // Position view toggle button above piano roll, aligned to left edge
+    int buttonX = pianoRollX;
+    int buttonY = pianoRollY - buttonHeight - buttonGapAbovePianoRoll;
     viewToggleButton.setBounds (buttonX, buttonY, buttonWidth, buttonHeight);
 
     // Position main controls to the right of the piano roll / MIDI data panel
-    // and above the sequencer area.
-    int mainControlsOverFlowTop = 35; // the title "Main Controls" is on top of same x as piano roll top and logo
-    int mainControlsOverFlowBottom = 15; // extra space for ProbabilityControlsComponent below piano roll
-    int mainControlsX = pianoRollX + pianoRollWidth + 18; // 18px gap from piano roll
-    int mainControlsY = pianoRollY - mainControlsOverFlowTop;
-    int mainControlsWidth = 220 + 6; // container width (220) + padding
-    int mainControlsHeight = pianoRollHeight + mainControlsOverFlowTop + mainControlsOverFlowBottom;
+    int mainControlsX = pianoRollX + pianoRollWidth + mainControlsGapFromPianoRoll;
+    int mainControlsY = pianoRollY - mainControlsOverflowTop;
+    int mainControlsHeight = pianoRollHeight + mainControlsOverflowTop + mainControlsOverflowBottom;
     mainControls.setBounds (mainControlsX, mainControlsY, mainControlsWidth, mainControlsHeight);
 
+    // Position sequencer steps
+    sequencerSteps.setBounds (sequencerX, sequencerStepsY, sequencerWidth, sequencerStepsHeight);
 
-    // Position sequencer steps 18px below piano roll, left-aligned
-    // Y = 95 (piano roll Y) + 199 (piano roll height) + 18 (gap) = 312
-    // Size: 8 steps × 92px + 7 gaps × 18px = 862px wide, 92px tall
-    sequencerSteps.setBounds (50, 312, 862, 92);
-
-    // Position sequencer controls 18px below sequencer steps
-    // Y = 312 (steps Y) + 92 (steps height) + 18 (gap) = 422
-    // Size: Same as steps - 862px wide, 92px tall
-    sequencerControls.setBounds (50, 422, 862, 92);
+    // Position sequencer controls
+    sequencerControls.setBounds (sequencerX, sequencerControlsY, sequencerWidth, sequencerControlsHeight);
 
     // Inspector button in bottom right corner
-    inspectButton.setBounds (getWidth() - 110, getHeight() - 35, 100, 25);
+    inspectButton.setBounds (getWidth() - inspectorButtonMarginRight,
+                             getHeight() - inspectorButtonMarginBottom,
+                             inspectorButtonWidth, inspectorButtonHeight);
 }
 
 void PluginEditor::setActiveStepAndNote (int stepIndex) {

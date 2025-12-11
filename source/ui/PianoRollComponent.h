@@ -4,6 +4,23 @@
 #include "BinaryData.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
+namespace PianoRollConstants {
+    // Scale factor to match 4 sequencer steps (4×92px) + 3 gaps (3×18px) = 422px
+    constexpr float scaleFactor = 1.031f;
+    // Component size (scaled)
+    constexpr int componentWidth = 422;
+    constexpr int componentHeight = 206;
+    // Font
+    constexpr float fontSize = 12.4f;  // Scaled 3.1% from 12.0f
+    // Active note circle
+    constexpr float activeCircleRadius = 13.4f;  // ~27px diameter (scaled from 13.0f)
+    // Key border
+    constexpr float keyBorderWidth = 1.0f;
+    // Black key positioning
+    constexpr float blackKeyWidth = 40.0f;
+    constexpr float blackKeyShift = 30.0f;
+}
+
 /**
  * KeyData - Data structure for a single piano key
  */
@@ -27,10 +44,9 @@ struct KeyData {
  */
 class PianoRollComponent : public juce::Component {
 public:
-    // Scale factor to match 4 sequencer steps (4×92px) + 3 gaps (3×18px) = 422px
-    static constexpr float scaleFactor = 1.031f;
-
     PianoRollComponent() {
+        using namespace PianoRollConstants;
+
         // Load Inter font from binary data
         interFont = juce::Typeface::createSystemTypefaceFor (
             BinaryData::InterVariableFont_ttf,
@@ -66,9 +82,7 @@ public:
         // Set up paths with proper positioning
         setupKeyPaths();
 
-        // Set fixed size (scaled by 3.1%: 409→422, 200→206)
-        // setSize (409, 200); (used to be this)
-        setSize (422, 206);
+        setSize (componentWidth, componentHeight);
     }
 
     ~PianoRollComponent() override {
@@ -175,13 +189,15 @@ private:
      * Draw a single key
      */
     void drawKey (juce::Graphics& g, const KeyData& key, int keyIndex) {
+        using namespace PianoRollConstants;
+
         // Fill the key with color (dimmed if not toggled)
         g.setColour (key.isToggled ? key.color : key.color.darker (0.6f));
         g.fillPath (key.path);
 
         // Draw border
         g.setColour (juce::Colours::black);
-        g.strokePath (key.path, juce::PathStrokeType (1.0f));
+        g.strokePath (key.path, juce::PathStrokeType (keyBorderWidth));
 
         // Get the bounds of the path for text positioning
         auto pathBounds = key.path.getBounds();
@@ -193,24 +209,23 @@ private:
         bool isActive = (keyIndex == activeNoteIndex);
 
         if (isActive) {
-            // Draw black circle (27px diameter) behind the text - scaled 3.1%
+            // Draw black circle behind the text
             auto circleCentre = textArea.getCentre();
-            const float circleRadius = 13.4f; // ~27px diameter = 13.4px radius (scaled from 13.0f)
             g.setColour (juce::Colours::black);
-            g.fillEllipse (circleCentre.x - circleRadius, circleCentre.y - circleRadius,
-                          circleRadius * 2.0f, circleRadius * 2.0f);
+            g.fillEllipse (circleCentre.x - activeCircleRadius, circleCentre.y - activeCircleRadius,
+                          activeCircleRadius * 2.0f, activeCircleRadius * 2.0f);
 
             // Draw note name in white, bold Inter font
             g.setColour (juce::Colours::white);
             juce::Font font (interFont);
-            font.setHeight (12.4f); // Scaled 3.1% from 12.0f
+            font.setHeight (fontSize);
             font.setBold (true);
             g.setFont (font);
         } else {
             // Draw note name in black, regular Inter font
             g.setColour (juce::Colours::black);
             juce::Font font (interFont);
-            font.setHeight (12.4f); // Scaled 3.1% from 12.0f
+            font.setHeight (fontSize);
             g.setFont (font);
         }
 
@@ -231,14 +246,10 @@ private:
      * Black keys are centered between white keys for proper piano layout
      */
     void setupKeyPaths() {
+        using namespace PianoRollConstants;
+
         // Calculate positions by accumulating the actual widths
         float xPos = 0.0f;
-
-        // Black key width from the SVG path (approximately 40 pixels: 0.5 to 40.5)
-        const float blackKeyWidth = 40.0f;
-
-        // Black key horizontal shift (optimized value)
-        const float shift = 30.0f;
 
         // C key (index 0) - width 57.1
         float cWidth = 57.1f - 0.5f;
@@ -247,7 +258,7 @@ private:
 
         // Db key - centered between C and D
         float dWidth = 60.7f - 0.5f;
-        float dbOffset = xPos - (cWidth / 2.0f) - (blackKeyWidth / 2.0f) + shift;
+        float dbOffset = xPos - (cWidth / 2.0f) - (blackKeyWidth / 2.0f) + blackKeyShift;
         keys[1]->path = createBlackKey (dbOffset);
 
         // D key (index 2) - width 60.7
@@ -256,7 +267,7 @@ private:
 
         // Eb key - centered between D and E
         float eWidth = 57.1f - 0.5f;
-        float ebOffset = xPos - (dWidth / 2.0f) - (blackKeyWidth / 2.0f) + shift;
+        float ebOffset = xPos - (dWidth / 2.0f) - (blackKeyWidth / 2.0f) + blackKeyShift;
         keys[3]->path = createBlackKey (ebOffset);
 
         // E key (index 4) - width 57.1
@@ -270,7 +281,7 @@ private:
 
         // Gb key - centered between F and G
         float gWidth = 60.7f - 0.5f;
-        float gbOffset = xPos - (fWidth / 2.0f) - (blackKeyWidth / 2.0f) + shift;
+        float gbOffset = xPos - (fWidth / 2.0f) - (blackKeyWidth / 2.0f) + blackKeyShift;
         keys[6]->path = createBlackKey (gbOffset);
 
         // G key (index 7) - width 60.7
@@ -279,7 +290,7 @@ private:
 
         // Ab key - centered between G and A
         float aWidth = 60.7f - 0.5f;
-        float abOffset = xPos - (gWidth / 2.0f) - (blackKeyWidth / 2.0f) + shift;
+        float abOffset = xPos - (gWidth / 2.0f) - (blackKeyWidth / 2.0f) + blackKeyShift;
         keys[8]->path = createBlackKey (abOffset);
 
         // A key (index 9) - width 60.7
@@ -288,19 +299,13 @@ private:
 
         // Bb key - centered between A and B
         float bWidth = 57.1f - 0.5f;
-        float bbOffset = xPos - (aWidth / 2.0f) - (blackKeyWidth / 2.0f) + shift;
+        float bbOffset = xPos - (aWidth / 2.0f) - (blackKeyWidth / 2.0f) + blackKeyShift;
         keys[10]->path = createBlackKey (bbOffset);
 
         // B key (index 11) - width 57.1
         keys[11]->path = createWhiteKeyLeftNotch (xPos);
 
-        // IMPORTANT! we needed to scale things up a bit after getting
-        // proportional sizings wrong between steps in the sequencer and other elements
-        // because this roll uses hardcoded juce::Path objects, the only way to change the size of this
-        // within reason is to scale the whole thing with a transform...
-        // So one by one as we construct the keys, we scale them.
-        // Apply 3.1% scale transform to all paths to match sequencer step width
-        // Original total width: ~407.5px, scaled to ~420px
+        // Apply scale transform to all paths to match sequencer step width
         auto scaleTransform = juce::AffineTransform::scale (scaleFactor);
         for (int i = 0; i < 12; i++) {
             keys[i]->path.applyTransform (scaleTransform);

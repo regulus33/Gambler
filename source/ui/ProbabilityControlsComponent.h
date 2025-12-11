@@ -4,6 +4,12 @@
 #include "ProbabilityGauge.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
+namespace ProbabilityControlsConstants {
+    constexpr float borderStrokeWidth = 2.5f;
+    constexpr float cornerRadius = 3.0f;
+    constexpr int gaugeSize = 56;
+}
+
 /**
  * ProbabilityControlsComponent
  *
@@ -27,16 +33,16 @@ public:
     }
 
     void paint (juce::Graphics& g) override {
+        using namespace ProbabilityControlsConstants;
         g.fillAll (juce::Colours::transparentBlack);
 
-        // 1px white border with 3px corner radius
         auto r = getLocalBounds().toFloat();
         g.setColour (juce::Colours::white);
-        g.drawRoundedRectangle (r.reduced (0.5f), 3.0f, 1.0f);
+        g.drawRoundedRectangle (r.reduced (0.5f), cornerRadius, borderStrokeWidth);
     }
 
     void resized() override {
-        constexpr int gaugeSize = 56;  // Size of the gauge grid
+        using namespace ProbabilityControlsConstants;
 
         auto bounds = getLocalBounds();
         const int halfWidth = bounds.getWidth() / 2;

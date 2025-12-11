@@ -4,6 +4,12 @@
 #include "MusicConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
+namespace NoteControlsConstants {
+    constexpr float borderStrokeWidth = 2.5f;
+    constexpr float cornerRadius = 3.0f;
+    constexpr int innerPadding = 4;
+}
+
 /**
  * NoteControlsComponent
  *
@@ -25,16 +31,16 @@ public:
     }
 
     void paint (juce::Graphics& g) override {
+        using namespace NoteControlsConstants;
         g.fillAll (juce::Colours::transparentBlack);
 
-        // 1px white border with 3px corner radius
         auto r = getLocalBounds().toFloat();
         g.setColour (juce::Colours::white);
-        g.drawRoundedRectangle (r.reduced (0.5f), 3.0f, 1.0f);
+        g.drawRoundedRectangle (r.reduced (0.5f), cornerRadius, borderStrokeWidth);
     }
 
     void resized() override {
-        constexpr int innerPadding = 4;
+        using namespace NoteControlsConstants;
 
         // Layout sliders in two equal-width columns inside the container
         auto slidersArea = getLocalBounds().reduced (innerPadding);
