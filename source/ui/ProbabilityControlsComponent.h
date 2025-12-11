@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AnalogueSlider.h"
+#include "ProbabilityGauge.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /**
@@ -8,6 +9,7 @@
  *
  * A bordered container for probability-related controls.
  * Displays a 1px white border with 3px corner radius around the controls.
+ * Contains an AnalogueSlider (left) and ProbabilityGauge (right) in a 2-column layout.
  */
 class ProbabilityControlsComponent : public juce::Component {
 public:
@@ -15,11 +17,12 @@ public:
         : probabilitySlider ("Probability")
     {
         addAndMakeVisible (probabilitySlider);
+        addAndMakeVisible (probabilityGauge);
 
         // Set up callback for inter-component communication
         probabilitySlider.onValueChange = [this] (float newValue) {
-            // TODO: Update other probability-related components when slider value changes
-            juce::ignoreUnused (newValue);
+            // Update the gauge when the slider value changes
+            probabilityGauge.setProbability (newValue);
         };
     }
 
@@ -33,20 +36,32 @@ public:
     }
 
     void resized() override {
-        constexpr int innerPadding = 4;
+        constexpr int gaugeSize = 56;  // Size of the gauge grid
 
-        // Layout area inside the container
-        auto contentArea = getLocalBounds().reduced (innerPadding);
+        auto bounds = getLocalBounds();
+        const int halfWidth = bounds.getWidth() / 2;
 
-        // For now, center the single AnalogueSlider within the container
-        // Leave room in the layout logic for additional components to be added later
-        probabilitySlider.setBounds (contentArea);
+        // Split into two equal halves
+        auto leftHalf = bounds.removeFromLeft (halfWidth);
+        auto rightHalf = bounds;
+
+        // Center the slider within the left half (use full height of left half)
+        auto sliderArea = leftHalf.withSizeKeepingCentre (leftHalf.getWidth(), leftHalf.getHeight());
+        probabilitySlider.setBounds (sliderArea);
+
+        // Center the gauge within the right half
+        auto gaugeArea = rightHalf.withSizeKeepingCentre (gaugeSize, gaugeSize);
+        probabilityGauge.setBounds (gaugeArea);
     }
 
     AnalogueSlider& getProbabilitySlider() { return probabilitySlider; }
     const AnalogueSlider& getProbabilitySlider() const { return probabilitySlider; }
 
+    ProbabilityGauge& getProbabilityGauge() { return probabilityGauge; }
+    const ProbabilityGauge& getProbabilityGauge() const { return probabilityGauge; }
+
 private:
     AnalogueSlider probabilitySlider;
+    ProbabilityGauge probabilityGauge;
 };
 
