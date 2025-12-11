@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AnalogueSlider.h"
 #include "BinaryData.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -16,6 +17,11 @@
  *   NotchedSlider slider ("Note", {"C", "Db", "D", ...}, {red, orange, yellow, ...});
  *   addAndMakeVisible (slider);
  */
+
+namespace NotchedSliderConstants {
+    constexpr float thumbWidth = 3.0f;
+    constexpr float knobStrokeWidth = 3.0f;
+}
 #define SLIDER_Y_OFFSET 6
 
 class NotchedSlider : public juce::Component {
@@ -165,6 +171,7 @@ private:
         LookAndFeel (NotchedSlider* parent) : parent (parent) {}
 
         void drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height, float sliderPosProportional, float rotaryStartAngle, float rotaryEndAngle, juce::Slider& slider) override {
+            using namespace NotchedSliderConstants;
             auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat();
             auto centre = bounds.getCentre();
             auto radius = juce::jmin (bounds.getWidth() / 2.0f, bounds.getHeight() / 2.0f);
@@ -172,7 +179,7 @@ private:
             // Draw hollow knob: 38px diameter with 2px white ring
             const float knobRadius = 19.0f;
             g.setColour (juce::Colours::white);
-            g.drawEllipse (centre.getX() - knobRadius, centre.getY() - knobRadius, knobRadius * 2.0f, knobRadius * 2.0f, 2.0f);
+            g.drawEllipse (centre.getX() - knobRadius, centre.getY() - knobRadius, knobRadius * 2.0f, knobRadius * 2.0f, knobStrokeWidth);
 
             // Draw coloured dots around the knob at 27px radius
             const int dotCount = parent->optionNames.size();
@@ -209,7 +216,7 @@ private:
             pointer.lineTo (centre.getPointOnCircumference (knobRadius * 0.6f, pointerAngle));
 
             g.setColour (juce::Colours::white);
-            g.strokePath (pointer, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            g.strokePath (pointer, juce::PathStrokeType (thumbWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
 
     private:

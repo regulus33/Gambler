@@ -23,10 +23,11 @@
 namespace AnalogueSliderConstants {
     constexpr int knobDiameter = 38;
     constexpr float knobRadius = knobDiameter / 2.0f;
-    constexpr float knobStrokeWidth = 2.0f;
+    constexpr float knobStrokeWidth = 3.0f; // change width of stroke around
+    constexpr float thumbWidth = 3.0f;
     constexpr int sliderYOffset = 6;
     constexpr int labelWidth = 28;
-    constexpr int labelGap = 24;
+    constexpr int labelGap = 18;
     constexpr int labelYOffset = 7;
     constexpr float labelFontSize = 12.0f;
     constexpr int gaugeWidth = 42;
@@ -186,7 +187,7 @@ private:
             pointer.lineTo (centre.getPointOnCircumference (knobRadius * 0.6f, pointerAngle));
 
             g.setColour (juce::Colours::white);
-            g.strokePath (pointer, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved,
+            g.strokePath (pointer, juce::PathStrokeType (thumbWidth, juce::PathStrokeType::curved,
                                                          juce::PathStrokeType::rounded));
         }
 

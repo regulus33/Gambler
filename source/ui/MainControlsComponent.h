@@ -46,7 +46,8 @@ public:
     void resized() override {
         constexpr int titleHeight = 24;
         constexpr int gapBelowTitle = 6;
-        constexpr int containerWidth = 220;
+        // Width matches 2 sequencer steps (2×92) + 1 gap (1×18) = 202px
+        constexpr int containerWidth = 198;
         constexpr int containerHeight = 101;
         constexpr int containerLeftMargin = 4;
         constexpr int gapBetweenContainers = 10;
