@@ -85,10 +85,11 @@ void PluginEditor::paint (juce::Graphics& g) {
 void PluginEditor::resized() {
     // Position piano roll in top-left corner with some padding
     // Based on the design mockup, it's positioned at approximately (50, 95)
+    // Piano roll scaled 3.1% to match 4 sequencer steps + 3 gaps (422px wide)
     int pianoRollX = 50;
     int pianoRollY = 95;
-    int pianoRollWidth = 408;
-    int pianoRollHeight = 199;
+    int pianoRollWidth = 422;  // Scaled from 408 to match 4 steps (4×92) + 3 gaps (3×18)
+    int pianoRollHeight = 206; // Scaled from 199 by 3.1%
 
     pianoRoll.setBounds (pianoRollX, pianoRollY, pianoRollWidth, pianoRollHeight);
 
@@ -116,13 +117,13 @@ void PluginEditor::resized() {
 
     // Position sequencer steps 18px below piano roll, left-aligned
     // Y = 95 (piano roll Y) + 199 (piano roll height) + 18 (gap) = 312
-    // Size: 8 steps × 84px + 7 gaps × 16px = 784px wide, 84px tall
-    sequencerSteps.setBounds (50, 312, 784, 84);
+    // Size: 8 steps × 92px + 7 gaps × 18px = 862px wide, 92px tall
+    sequencerSteps.setBounds (50, 312, 862, 92);
 
     // Position sequencer controls 18px below sequencer steps
-    // Y = 312 (steps Y) + 84 (steps height) + 18 (gap) = 414
-    // Size: Same as steps - 784px wide, 84px tall
-    sequencerControls.setBounds (50, 414, 784, 84);
+    // Y = 312 (steps Y) + 92 (steps height) + 18 (gap) = 422
+    // Size: Same as steps - 862px wide, 92px tall
+    sequencerControls.setBounds (50, 422, 862, 92);
 
     // Inspector button in bottom right corner
     inspectButton.setBounds (getWidth() - 110, getHeight() - 35, 100, 25);

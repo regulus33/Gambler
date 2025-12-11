@@ -23,10 +23,13 @@ struct KeyData {
  *
  * Displays 12 keys representing the chromatic scale using custom SVG paths
  * Users can toggle notes on/off to define the scale
- * Total size: 408.65 x 199 pixels
+ * Total size: 422 x 206 pixels (scaled 3.1% to match 4 sequencer steps + 3 gaps)
  */
 class PianoRollComponent : public juce::Component {
 public:
+    // Scale factor to match 4 sequencer steps (4×92px) + 3 gaps (3×18px) = 422px
+    static constexpr float scaleFactor = 1.031f;
+
     PianoRollComponent() {
         // Load Inter font from binary data
         interFont = juce::Typeface::createSystemTypefaceFor (
@@ -63,8 +66,9 @@ public:
         // Set up paths with proper positioning
         setupKeyPaths();
 
-        // Set fixed size
-        setSize (409, 200);
+        // Set fixed size (scaled by 3.1%: 409→422, 200→206)
+        // setSize (409, 200); (used to be this)
+        setSize (422, 206);
     }
 
     ~PianoRollComponent() override {
@@ -189,9 +193,9 @@ private:
         bool isActive = (keyIndex == activeNoteIndex);
 
         if (isActive) {
-            // Draw black circle (26px diameter) behind the text
+            // Draw black circle (27px diameter) behind the text - scaled 3.1%
             auto circleCentre = textArea.getCentre();
-            const float circleRadius = 13.0f; // 26px diameter = 13px radius
+            const float circleRadius = 13.4f; // ~27px diameter = 13.4px radius (scaled from 13.0f)
             g.setColour (juce::Colours::black);
             g.fillEllipse (circleCentre.x - circleRadius, circleCentre.y - circleRadius,
                           circleRadius * 2.0f, circleRadius * 2.0f);
@@ -199,14 +203,14 @@ private:
             // Draw note name in white, bold Inter font
             g.setColour (juce::Colours::white);
             juce::Font font (interFont);
-            font.setHeight (12.0f);
+            font.setHeight (12.4f); // Scaled 3.1% from 12.0f
             font.setBold (true);
             g.setFont (font);
         } else {
             // Draw note name in black, regular Inter font
             g.setColour (juce::Colours::black);
             juce::Font font (interFont);
-            font.setHeight (12.0f);
+            font.setHeight (12.4f); // Scaled 3.1% from 12.0f
             g.setFont (font);
         }
 
@@ -290,7 +294,17 @@ private:
         // B key (index 11) - width 57.1
         keys[11]->path = createWhiteKeyLeftNotch (xPos);
 
-        // Total width should be: 57.1 + 60.7 + 57.1 + 57.1 + 60.7 + 60.7 + 57.1 - 3.5 = 407.5 pixels
+        // IMPORTANT! we needed to scale things up a bit after getting
+        // proportional sizings wrong between steps in the sequencer and other elements
+        // because this roll uses hardcoded juce::Path objects, the only way to change the size of this
+        // within reason is to scale the whole thing with a transform...
+        // So one by one as we construct the keys, we scale them.
+        // Apply 3.1% scale transform to all paths to match sequencer step width
+        // Original total width: ~407.5px, scaled to ~420px
+        auto scaleTransform = juce::AffineTransform::scale (scaleFactor);
+        for (int i = 0; i < 12; i++) {
+            keys[i]->path.applyTransform (scaleTransform);
+        }
     }
 
     /**

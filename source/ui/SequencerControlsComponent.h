@@ -448,12 +448,12 @@ namespace ControlIcons {
  * - Nudge <- (shift notes left)
  * - Nudge -> (shift notes right)
  *
- * Each button is 84×84 pixels with 16px spacing, matching the SequencerStepsComponent above.
+ * Each button is 92×92 pixels with 18px spacing, matching the SequencerStepsComponent above.
  */
 class SequencerControlsComponent : public juce::Component {
 public:
     // Compile-time constant for icon vertical offset (adjust as needed)
-    static constexpr float ICON_VERTICAL_OFFSET = 12.0f;
+    static constexpr float ICON_VERTICAL_OFFSET = 13.0f;
 
     SequencerControlsComponent() {
         // Create 8 buttons
@@ -501,9 +501,9 @@ public:
     }
     
     void resized() override {
-        // Layout: 8 buttons in a row, each 84×84 with 16px gaps
-        const float buttonSize = 84.0f;
-        const float gap = 16.0f;
+        // Layout: 8 buttons in a row, each 92×92 with 18px gaps
+        const float buttonSize = 92.0f;
+        const float gap = 18.0f;
         
         for (int i = 0; i < buttons.size(); i++) {
             float x = i * (buttonSize + gap);
@@ -549,8 +549,8 @@ private:
             juce::Colour borderColor = juce::Colours::white;
             juce::Colour textColor = juce::Colours::white;
             
-            const float cornerRadius = 4.0f;
-            const float borderWidth = 2.0f;
+            const float cornerRadius = 4.4f;
+            const float borderWidth = 2.2f;
             
             // Fill background
             g.setColour(bgColor);
@@ -571,14 +571,14 @@ private:
                 // Get the icon's bounding box
                 auto iconBounds = iconPath_->getBounds();
 
-                // Calculate scale to limit icon to 24px on longest side
-                const float maxIconSize = 24.0f;
+                // Calculate scale to limit icon to 26px on longest side
+                const float maxIconSize = 26.0f;
                 float longestSide = juce::jmax(iconBounds.getWidth(), iconBounds.getHeight());
                 float scale = maxIconSize / longestSide;
 
                 // Calculate the space available for the icon (above the text)
-                // Text is 12px from bottom, text height is ~12px, so reserve ~30px for text area
-                float textAreaHeight = 30.0f;
+                // Text is 13px from bottom, text height is ~13px, so reserve ~33px for text area
+                float textAreaHeight = 33.0f;
                 float iconAreaHeight = bounds.getHeight() - textAreaHeight;
 
                 // Center the icon in the available space, then apply vertical offset
@@ -599,13 +599,13 @@ private:
             // Draw label text if present (below icon or centered if no icon)
             if (label_.isNotEmpty()) {
                 g.setColour(textColor);
-                juce::Font font(juce::FontOptions(12.0f));
+                juce::Font font(juce::FontOptions(13.0f));
                 font.setBold(true);
                 g.setFont(font);
 
-                // Position text 12px from bottom
-                float textHeight = 12.0f;
-                float textY = bounds.getHeight() - 12.0f - textHeight;
+                // Position text 13px from bottom
+                float textHeight = 13.0f;
+                float textY = bounds.getHeight() - 13.0f - textHeight;
                 juce::Rectangle<float> textBounds(0, textY, bounds.getWidth(), textHeight);
 
                 g.drawText(label_, textBounds.toNearestInt(), juce::Justification::centredBottom);
