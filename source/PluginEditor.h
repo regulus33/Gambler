@@ -9,6 +9,7 @@
 #include "ui/SequencerControlsComponent.h"
 #include "ui/MainControlsComponent.h"
 #include "ui/SequenceOverviewComponent.h"
+#include "ui/SubsequenceControlsComponent.h"
 #include "ui/ViewToggleButton.h"
 
 //==============================================================================
@@ -41,6 +42,7 @@ private:
     SequencerControlsComponent sequencerControls;
     MainControlsComponent mainControls;
     SequenceOverviewComponent sequenceOverview;
+    SubsequenceControlsComponent subsequenceControls;
     ViewToggleButton viewToggleButton;
 
     // Inspector

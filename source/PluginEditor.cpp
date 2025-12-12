@@ -4,7 +4,7 @@ namespace PluginEditorLayout {
     // Background
     constexpr juce::uint32 bgColourHex = 0xFF1E1E1E;
     // Editor size
-    constexpr int editorWidth = 980;
+    constexpr int editorWidth = 1022;
     constexpr int editorHeight = 560;
     // Piano roll / MIDI data panel
     constexpr int pianoRollX = 50;
@@ -24,6 +24,10 @@ namespace PluginEditorLayout {
     constexpr int sequenceOverviewGapFromMainControls = 18;
     constexpr int sequenceOverviewWidth = 198;  // Same width as MainControlsComponent
     constexpr int sequenceOverviewHeight = 260; // Title + grid + buttons
+    // Subsequence controls
+    constexpr int subsequenceControlsGap = 18;  // Same gap as between MainControls and SequenceOverview
+    constexpr int subsequenceControlsWidth = SubsequenceControlsConstants::containerWidth;  // ~62px
+    constexpr int subsequenceControlsHeight = 260;  // Same height as SequenceOverviewComponent
     // Sequencer
     constexpr int sequencerX = 50;
     constexpr int sequencerStepsY = 312;
@@ -82,6 +86,20 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     };
     sequenceOverview.onLoadClicked = []() {
         DBG ("Load button clicked");
+    };
+
+    // Add subsequence controls component
+    addAndMakeVisible (subsequenceControls);
+
+    // Setup callbacks for subsequence controls
+    subsequenceControls.onBarClicked = [] (int index) {
+        DBG ("Subsequence bar clicked: " + juce::String (index));
+    };
+    subsequenceControls.onMinusClicked = []() {
+        DBG ("Subsequence minus button clicked");
+    };
+    subsequenceControls.onPlusClicked = []() {
+        DBG ("Subsequence plus button clicked");
     };
 
     // Add sequencer steps component
@@ -155,6 +173,11 @@ void PluginEditor::resized() {
     int sequenceOverviewX = mainControlsX + mainControlsWidth + sequenceOverviewGapFromMainControls;
     int sequenceOverviewY = mainControlsY;
     sequenceOverview.setBounds (sequenceOverviewX, sequenceOverviewY, sequenceOverviewWidth, sequenceOverviewHeight);
+
+    // Position subsequence controls to the right of sequence overview
+    int subsequenceControlsX = sequenceOverviewX + sequenceOverviewWidth + subsequenceControlsGap;
+    int subsequenceControlsY = mainControlsY;
+    subsequenceControls.setBounds (subsequenceControlsX, subsequenceControlsY, subsequenceControlsWidth, subsequenceControlsHeight);
 
     // Position sequencer steps
     sequencerSteps.setBounds (sequencerX, sequencerStepsY, sequencerWidth, sequencerStepsHeight);
