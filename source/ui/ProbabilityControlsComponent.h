@@ -8,6 +8,7 @@ namespace ProbabilityControlsConstants {
     constexpr float borderStrokeWidth = 2.5f;
     constexpr float cornerRadius = 3.0f;
     constexpr int gaugeSize = 56;
+    constexpr int containerHeight = 94;  // Height of the component
 }
 
 /**

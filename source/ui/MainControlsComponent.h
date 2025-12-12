@@ -9,12 +9,11 @@ namespace MainControlsConstants {
     // Title
     constexpr float titleFontSize = 16.0f;
     constexpr int titleHeight = 24;
-    constexpr int gapBelowTitle = 6;
+    constexpr int gapBelowTitle = 13;
     // Container layout
     constexpr int containerWidth = 198;
-    constexpr int containerHeight = 101;
-    constexpr int containerLeftMargin = 4;
-    constexpr int gapBetweenContainers = 5;
+    constexpr int containerHeight = 100;
+    constexpr int gapBetweenContainers = 8;
 }
 
 /**
@@ -59,16 +58,16 @@ public:
         using namespace MainControlsConstants;
 
         noteControls.setBounds (
-            containerLeftMargin,
+            0,
             titleHeight + gapBelowTitle,
             containerWidth,
             containerHeight);
 
         probabilityControls.setBounds (
-            containerLeftMargin,
+            0,
             noteControls.getBottom() + gapBetweenContainers,
             containerWidth,
-            containerHeight);
+            ProbabilityControlsConstants::containerHeight);
     }
 
 private:

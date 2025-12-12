@@ -17,9 +17,13 @@ namespace PluginEditorLayout {
     constexpr int buttonGapAbovePianoRoll = 10;
     // Main controls
     constexpr int mainControlsOverflowTop = 35;
-    constexpr int mainControlsOverflowBottom = 15;
+    constexpr int mainControlsOverflowBottom = 0; // Not sure why we wanted this to overflow, it means the bottom of MainControls sits under sequencer...
     constexpr int mainControlsGapFromPianoRoll = 18;
-    constexpr int mainControlsWidth = 226;  // 220 + 6 padding
+    constexpr int mainControlsWidth = 198;  // Same width as child components (no horizontal padding)
+    // Sequence overview
+    constexpr int sequenceOverviewGapFromMainControls = 18;
+    constexpr int sequenceOverviewWidth = 198;  // Same width as MainControlsComponent
+    constexpr int sequenceOverviewHeight = 260; // Title + grid + buttons
     // Sequencer
     constexpr int sequencerX = 50;
     constexpr int sequencerStepsY = 312;
@@ -65,6 +69,20 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // Add main controls component (note/octave + probability/grid)
     addAndMakeVisible (mainControls);
+
+    // Add sequence overview component
+    addAndMakeVisible (sequenceOverview);
+
+    // Setup callbacks for sequence overview buttons
+    sequenceOverview.onExportClicked = []() {
+        DBG ("Export button clicked");
+    };
+    sequenceOverview.onSaveClicked = []() {
+        DBG ("Save button clicked");
+    };
+    sequenceOverview.onLoadClicked = []() {
+        DBG ("Load button clicked");
+    };
 
     // Add sequencer steps component
     addAndMakeVisible (sequencerSteps);
@@ -132,6 +150,11 @@ void PluginEditor::resized() {
     int mainControlsY = pianoRollY - mainControlsOverflowTop;
     int mainControlsHeight = pianoRollHeight + mainControlsOverflowTop + mainControlsOverflowBottom;
     mainControls.setBounds (mainControlsX, mainControlsY, mainControlsWidth, mainControlsHeight);
+
+    // Position sequence overview to the right of main controls
+    int sequenceOverviewX = mainControlsX + mainControlsWidth + sequenceOverviewGapFromMainControls;
+    int sequenceOverviewY = mainControlsY;
+    sequenceOverview.setBounds (sequenceOverviewX, sequenceOverviewY, sequenceOverviewWidth, sequenceOverviewHeight);
 
     // Position sequencer steps
     sequencerSteps.setBounds (sequencerX, sequencerStepsY, sequencerWidth, sequencerStepsHeight);
