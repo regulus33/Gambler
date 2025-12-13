@@ -14,14 +14,15 @@ namespace SequenceOverviewConstants {
     constexpr int containerWidth = 198;
     // Grid positioning (centered within container)
     constexpr int gridHorizontalPadding = (containerWidth - SequenceGridConstants::gridWidth) / 2;  // ~20px each side
-    // Buttons
-    constexpr int buttonWidth = 56;
-    constexpr int buttonHeight = 30;
-    constexpr int buttonSpacing = 8;
+    // Buttons - sized to fit within 80% of grid width
+    constexpr int buttonWidth = 38;
+    constexpr int buttonHeight = 20;
+    constexpr int buttonSpacing = 4;
     constexpr int gapAboveButtons = 16;
     constexpr float buttonCornerRadius = 3.0f;
-    constexpr float buttonFontSize = 12.0f;
+    constexpr float buttonFontSize = 10.0f;
     constexpr juce::uint32 buttonBgHex = 0xff484848;
+    // Total buttons width: 3 * 38 + 2 * 4 = 122px (within 80% of 157px = 125.6px)
 }
 
 /**
