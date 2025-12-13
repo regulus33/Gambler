@@ -8,8 +8,12 @@ namespace SettingsWindowConstants {
     constexpr int windowWidth = 400;
     constexpr int windowHeight = 300;
     constexpr int padding = 20;
+    constexpr int controlHeight = 30;
+    constexpr int controlSpacing = 15;
+    constexpr int labelWidth = 120;
     constexpr juce::uint32 bgColourHex = 0xFF2D2D2D;
-    constexpr float titleFontSize = 18.0f;
+    constexpr float labelFontSize = 14.0f;
+    constexpr float sliderTextBoxWidth = 60.0f;
 }
 
 /**
@@ -17,7 +21,7 @@ namespace SettingsWindowConstants {
  *
  * The content component for the settings popup window.
  * Contains controls that update plugin state in real-time.
- * 
+ *
  * This component is displayed inside a DialogWindow which provides
  * the title bar and close button automatically.
  */
@@ -27,31 +31,93 @@ public:
         interTypeface = juce::Typeface::createSystemTypefaceFor (
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
-        
+
+        // Setup internal clock checkbox
+        internalClockToggle.setButtonText("Internal clock");
+        internalClockToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        internalClockToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
+        internalClockToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+        internalClockToggle.onClick = [this] {
+            // Enable/disable tempo slider based on internal clock state
+            tempoSlider.setEnabled(internalClockToggle.getToggleState());
+            if (onInternalClockChanged)
+                onInternalClockChanged(internalClockToggle.getToggleState());
+        };
+        addAndMakeVisible(internalClockToggle);
+
+        // Setup tempo slider
+        tempoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+        tempoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false,
+                                    static_cast<int>(SettingsWindowConstants::sliderTextBoxWidth),
+                                    SettingsWindowConstants::controlHeight);
+        tempoSlider.setRange(1.0, 1000.0, 1.0);
+        tempoSlider.setValue(120.0);
+        tempoSlider.setTextValueSuffix(" BPM");
+        tempoSlider.setColour(juce::Slider::textBoxTextColourId, juce::Colours::white);
+        tempoSlider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+        tempoSlider.setColour(juce::Slider::thumbColourId, juce::Colours::white);
+        tempoSlider.setColour(juce::Slider::trackColourId, juce::Colours::grey);
+        tempoSlider.setEnabled(false); // Disabled by default until internal clock is enabled
+        tempoSlider.onValueChange = [this] {
+            if (onTempoChanged)
+                onTempoChanged(tempoSlider.getValue());
+        };
+        addAndMakeVisible(tempoSlider);
+
+        // Setup tempo label
+        tempoLabel.setText("Tempo", juce::dontSendNotification);
+        tempoLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+        tempoLabel.setJustificationType(juce::Justification::centredLeft);
+        addAndMakeVisible(tempoLabel);
+
         setSize(SettingsWindowConstants::windowWidth, SettingsWindowConstants::windowHeight);
     }
 
     void paint (juce::Graphics& g) override {
         using namespace SettingsWindowConstants;
-        
+
         // Fill background
         g.fillAll(juce::Colour(bgColourHex));
-        
-        // Draw placeholder text (will be replaced with actual controls)
-        g.setColour(juce::Colours::white);
-        juce::Font font(juce::FontOptions(interTypeface).withHeight(14.0f));
-        g.setFont(font);
-        g.drawText("Settings controls will go here...", 
-                   getLocalBounds().reduced(padding), 
-                   juce::Justification::centred);
     }
 
     void resized() override {
-        // Layout for future controls will go here
+        using namespace SettingsWindowConstants;
+
+        auto area = getLocalBounds().reduced(padding);
+
+        // Internal clock checkbox row
+        auto checkboxRow = area.removeFromTop(controlHeight);
+        internalClockToggle.setBounds(checkboxRow);
+
+        area.removeFromTop(controlSpacing);
+
+        // Tempo slider row
+        auto tempoRow = area.removeFromTop(controlHeight);
+        tempoLabel.setBounds(tempoRow.removeFromLeft(labelWidth));
+        tempoSlider.setBounds(tempoRow);
     }
+
+    // Callbacks for state changes
+    std::function<void(bool)> onInternalClockChanged;
+    std::function<void(double)> onTempoChanged;
+
+    // Accessors for current values
+    bool isInternalClockEnabled() const { return internalClockToggle.getToggleState(); }
+    double getTempo() const { return tempoSlider.getValue(); }
+
+    // Setters for external state sync
+    void setInternalClockEnabled(bool enabled) {
+        internalClockToggle.setToggleState(enabled, juce::dontSendNotification);
+        tempoSlider.setEnabled(enabled);
+    }
+    void setTempo(double bpm) { tempoSlider.setValue(bpm, juce::dontSendNotification); }
 
 private:
     juce::Typeface::Ptr interTypeface;
+
+    juce::ToggleButton internalClockToggle;
+    juce::Label tempoLabel;
+    juce::Slider tempoSlider;
 };
 
 /**
