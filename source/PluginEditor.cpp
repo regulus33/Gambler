@@ -25,7 +25,7 @@ namespace PluginEditorLayout {
     constexpr int sequenceOverviewWidth = 198;  // Same width as MainControlsComponent
     constexpr int sequenceOverviewHeight = 260; // Title + grid + buttons
     // Subsequence controls
-    constexpr int subsequenceControlsGap = 18;  // Same gap as between MainControls and SequenceOverview
+    constexpr int subsequenceControlsGap = 40;
     constexpr int subsequenceControlsWidth = SubsequenceControlsConstants::containerWidth;  // ~62px
     constexpr int subsequenceControlsHeight = 260;  // Same height as SequenceOverviewComponent
     // Sequencer
@@ -43,6 +43,9 @@ namespace PluginEditorLayout {
     constexpr int inspectorButtonHeight = 25;
     constexpr int inspectorButtonMarginRight = 110;
     constexpr int inspectorButtonMarginBottom = 35;
+    // Settings button (top right corner)
+    constexpr int settingsButtonSize = SettingsButtonConstants::totalSize;  // 36px
+    constexpr int settingsButtonOffsetRight = 46;  // Offset from right edge (positive = move left)
 }
 
 PluginEditor::PluginEditor (PluginProcessor& p)
@@ -128,6 +131,20 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     // Add note range controls component (right of sequencer)
     addAndMakeVisible (noteRangeControls);
 
+    // Add logo component (above piano roll)
+    addAndMakeVisible (logo);
+
+    // Add settings button (top right corner)
+    addAndMakeVisible (settingsButton);
+    settingsButton.onClick = [this]() {
+        if (!settingsWindow) {
+            settingsWindow = std::make_unique<SettingsWindow>();
+            settingsWindow->onClose = [this]() { settingsWindow.reset(); };
+        }
+        settingsWindow->positionRelativeTo(this);
+        settingsWindow->setVisible(true);
+    };
+
     addAndMakeVisible (inspectButton);
 
     // this chunk of code instantiates and opens the melatonin inspector
@@ -169,6 +186,14 @@ void PluginEditor::resized() {
     int buttonY = pianoRollY - buttonHeight - buttonGapAbovePianoRoll;
     viewToggleButton.setBounds (buttonX, buttonY, buttonWidth, buttonHeight);
 
+    // Position logo centered above piano roll, 6px gap
+    constexpr int logoGapAbovePianoRoll = 6;
+    int logoWidth = logo.getCalculatedWidth();
+    int logoHeight = logo.getCalculatedHeight();
+    int logoX = pianoRollX + (pianoRollWidth - logoWidth) / 2;
+    int logoY = pianoRollY - logoGapAbovePianoRoll - logoHeight;
+    logo.setBounds (logoX, logoY, logoWidth, logoHeight);
+
     // Position main controls to the right of the piano roll / MIDI data panel
     int mainControlsX = pianoRollX + pianoRollWidth + mainControlsGapFromPianoRoll;
     int mainControlsY = pianoRollY - mainControlsOverflowTop;
@@ -197,6 +222,10 @@ void PluginEditor::resized() {
     int noteRangeControlsWidth = editorWidth - noteRangeControlsX - noteRangeControlsRightMargin;
     int noteRangeControlsHeight = (sequencerControlsY - sequencerStepsY) + sequencerControlsHeight;  // 92 + 18 gap + 92 = 202
     noteRangeControls.setBounds (noteRangeControlsX, noteRangeControlsY, noteRangeControlsWidth, noteRangeControlsHeight);
+
+    // Settings button in top right corner
+    settingsButton.setBounds (getWidth() - settingsButtonSize - settingsButtonOffsetRight, 0,
+                              settingsButtonSize, settingsButtonSize);
 
     // Inspector button in bottom right corner
     inspectButton.setBounds (getWidth() - inspectorButtonMarginRight,

@@ -2,6 +2,7 @@
 
 #include "BinaryData.h"
 #include "SequenceGrid.h"
+#include "UIConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
@@ -77,9 +78,9 @@ private:
 class SequenceOverviewComponent : public juce::Component {
 public:
     SequenceOverviewComponent()
-        : interFont (juce::Typeface::createSystemTypefaceFor (
-              BinaryData::InterVariableFont_ttf,
-              BinaryData::InterVariableFont_ttfSize)),
+        : interBoldFont (juce::Typeface::createSystemTypefaceFor (
+              BinaryData::Inter_24ptBold_ttf,
+              BinaryData::Inter_24ptBold_ttfSize)),
           exportButton ("Export"),
           saveButton ("Save"),
           loadButton ("Load")
@@ -111,17 +112,17 @@ public:
         g.fillAll (juce::Colours::transparentBlack);
 
         juce::Font titleFont;
-        if (interFont != nullptr)
-            titleFont = juce::Font (interFont);
+        if (interBoldFont != nullptr)
+            titleFont = juce::Font (interBoldFont);
 
         titleFont.setHeight (titleFontSize);
-        titleFont.setBold (true);
 
         g.setFont (titleFont);
         g.setColour (juce::Colours::white);
 
         auto area = getLocalBounds();
         auto titleArea = area.removeFromTop (titleHeight);
+        titleArea.translate (0, UIConstants::titleYOffset);
         g.drawText ("Sequence", titleArea, juce::Justification::centred, false);
     }
 
@@ -159,7 +160,7 @@ public:
     std::function<void()> onLoadClicked;
 
 private:
-    juce::Typeface::Ptr interFont;
+    juce::Typeface::Ptr interBoldFont;
     SequenceGrid sequenceGrid;
     SequenceButton exportButton;
     SequenceButton saveButton;
