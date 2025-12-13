@@ -11,6 +11,7 @@
 #include "ui/SequenceOverviewComponent.h"
 #include "ui/SubsequenceControlsComponent.h"
 #include "ui/ViewToggleButton.h"
+#include "ui/NoteRangeControlsComponent.h"
 
 //==============================================================================
 class PluginEditor : public juce::AudioProcessorEditor,
@@ -44,6 +45,7 @@ private:
     SequenceOverviewComponent sequenceOverview;
     SubsequenceControlsComponent subsequenceControls;
     ViewToggleButton viewToggleButton;
+    NoteRangeControlsComponent noteRangeControls;
 
     // Inspector
     std::unique_ptr<melatonin::Inspector> inspector;

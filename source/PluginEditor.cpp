@@ -4,10 +4,10 @@ namespace PluginEditorLayout {
     // Background
     constexpr juce::uint32 bgColourHex = 0xFF1E1E1E;
     // Editor size
-    constexpr int editorWidth = 1022;
+    constexpr int editorWidth = 1012;
     constexpr int editorHeight = 560;
     // Piano roll / MIDI data panel
-    constexpr int pianoRollX = 50;
+    constexpr int pianoRollX = 22;
     constexpr int pianoRollY = 95;
     constexpr int pianoRollWidth = 422;
     constexpr int pianoRollHeight = 206;
@@ -29,12 +29,15 @@ namespace PluginEditorLayout {
     constexpr int subsequenceControlsWidth = SubsequenceControlsConstants::containerWidth;  // ~62px
     constexpr int subsequenceControlsHeight = 260;  // Same height as SequenceOverviewComponent
     // Sequencer
-    constexpr int sequencerX = 50;
+    constexpr int sequencerX = 22;
     constexpr int sequencerStepsY = 312;
     constexpr int sequencerWidth = 862;
     constexpr int sequencerStepsHeight = 92;
     constexpr int sequencerControlsY = 422;
     constexpr int sequencerControlsHeight = 92;
+    // Note range controls (right of sequencer)
+    constexpr int noteRangeControlsGap = 18;
+    constexpr int noteRangeControlsRightMargin = 22;  // Matches left margin (sequencerX)
     // Inspector button
     constexpr int inspectorButtonWidth = 100;
     constexpr int inspectorButtonHeight = 25;
@@ -122,6 +125,9 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         DBG ("Control button clicked: " + juce::String (buttonNames[buttonIndex]));
     };
 
+    // Add note range controls component (right of sequencer)
+    addAndMakeVisible (noteRangeControls);
+
     addAndMakeVisible (inspectButton);
 
     // this chunk of code instantiates and opens the melatonin inspector
@@ -184,6 +190,13 @@ void PluginEditor::resized() {
 
     // Position sequencer controls
     sequencerControls.setBounds (sequencerX, sequencerControlsY, sequencerWidth, sequencerControlsHeight);
+
+    // Position note range controls (right of sequencer)
+    int noteRangeControlsX = sequencerX + sequencerWidth + noteRangeControlsGap;
+    int noteRangeControlsY = sequencerStepsY;
+    int noteRangeControlsWidth = editorWidth - noteRangeControlsX - noteRangeControlsRightMargin;
+    int noteRangeControlsHeight = (sequencerControlsY - sequencerStepsY) + sequencerControlsHeight;  // 92 + 18 gap + 92 = 202
+    noteRangeControls.setBounds (noteRangeControlsX, noteRangeControlsY, noteRangeControlsWidth, noteRangeControlsHeight);
 
     // Inspector button in bottom right corner
     inspectButton.setBounds (getWidth() - inspectorButtonMarginRight,
