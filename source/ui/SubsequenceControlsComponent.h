@@ -13,7 +13,7 @@ namespace SubsequenceControlsConstants {
     constexpr int titleHeight = 24;
     constexpr int gapBelowTitle = 13;  // Same as SequenceOverviewComponent
     // Bar dimensions (2.5× SequenceGrid square width)
-    constexpr float barWidth = 42.5f;
+    constexpr float barWidth = 50.f;
     constexpr int barHeight = 17;  // Same as SequenceGrid square height
     constexpr int barSpacing = 3;  // Same as SequenceGrid spacing
     constexpr float barCornerRadius = 2.0f;  // Same as SequenceGrid
@@ -272,7 +272,7 @@ public:
         auto area = getLocalBounds();
         auto titleArea = area.removeFromTop (titleHeight);
         titleArea.translate (0, UIConstants::titleYOffset);
-        g.drawText ("Sub", titleArea, juce::Justification::centred, false);
+        g.drawText ("Subseq", titleArea, juce::Justification::centred, false);
     }
 
     void resized() override {
