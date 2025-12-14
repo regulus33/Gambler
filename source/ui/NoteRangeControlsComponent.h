@@ -168,6 +168,35 @@ public:
         addAndMakeVisible (rangeGauge);
     }
 
+    /**
+     * Callback when range changes (min or max slider moved)
+     * Parameters: minNote, maxNote
+     */
+    std::function<void(int, int)> onRangeChanged;
+
+    /**
+     * Set the current range values (for initialization from backend)
+     */
+    void setRange(int minNote, int maxNote) {
+        minRangeSlider.setValue(static_cast<double>(minNote), juce::dontSendNotification);
+        maxRangeSlider.setValue(static_cast<double>(maxNote), juce::dontSendNotification);
+        rangeGauge.setRange(minNote, maxNote);
+    }
+
+    /**
+     * Get the current min range value
+     */
+    int getMinRange() const {
+        return static_cast<int>(minRangeSlider.getValue());
+    }
+
+    /**
+     * Get the current max range value
+     */
+    int getMaxRange() const {
+        return static_cast<int>(maxRangeSlider.getValue());
+    }
+
     ~NoteRangeControlsComponent() override {
         minRangeSlider.setLookAndFeel (nullptr);
         maxRangeSlider.setLookAndFeel (nullptr);
@@ -242,6 +271,11 @@ private:
         int minNote = static_cast<int>(minRangeSlider.getValue());
         int maxNote = static_cast<int>(maxRangeSlider.getValue());
         rangeGauge.setRange (minNote, maxNote);
+
+        // Notify listener of range change
+        if (onRangeChanged) {
+            onRangeChanged(minNote, maxNote);
+        }
     }
 
 

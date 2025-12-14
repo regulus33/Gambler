@@ -112,10 +112,11 @@ public:
         // Check white keys first (they're on top visually)
         for (int i = 0; i < 12; i++) {
             if (!keys[i]->isBlack && keys[i]->path.contains (event.position)) {
-                keys[i]->isToggled = !keys[i]->isToggled;
-                repaint();
-                if (onNoteChanged)
-                    onNoteChanged();
+                if (tryToggleKey(i)) {
+                    repaint();
+                    if (onNoteChanged)
+                        onNoteChanged();
+                }
                 return;
             }
         }
@@ -123,10 +124,11 @@ public:
         // Then check black keys (only if click wasn't on a white key)
         for (int i = 0; i < 12; i++) {
             if (keys[i]->isBlack && keys[i]->path.contains (event.position)) {
-                keys[i]->isToggled = !keys[i]->isToggled;
-                repaint();
-                if (onNoteChanged)
-                    onNoteChanged();
+                if (tryToggleKey(i)) {
+                    repaint();
+                    if (onNoteChanged)
+                        onNoteChanged();
+                }
                 return;
             }
         }
@@ -185,6 +187,31 @@ public:
     std::function<void()> onNoteChanged;
 
 private:
+    /**
+     * Count how many notes are currently toggled on
+     */
+    int countToggledNotes() const {
+        int count = 0;
+        for (int i = 0; i < 12; i++) {
+            if (keys[i]->isToggled)
+                count++;
+        }
+        return count;
+    }
+
+    /**
+     * Try to toggle a key - returns true if toggle was successful
+     * Prevents toggling off the last remaining note
+     */
+    bool tryToggleKey(int keyIndex) {
+        // If key is currently ON and it's the last one, don't allow toggle off
+        if (keys[keyIndex]->isToggled && countToggledNotes() <= 1) {
+            return false;
+        }
+        keys[keyIndex]->isToggled = !keys[keyIndex]->isToggled;
+        return true;
+    }
+
     /**
      * Draw a single key
      */

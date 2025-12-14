@@ -69,10 +69,18 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     // Add piano roll component (visible by default)
     addAndMakeVisible (pianoRoll);
 
-    // Setup callback for scale changes
-    pianoRoll.onNoteChanged = []() {
-        // TODO: Update backend Scale object when we wire up the backend
-        DBG ("Piano roll scale changed");
+    // Initialize piano roll with the current scale from the sequence
+    pianoRoll.setScale(processorRef.getSequence().getScale());
+
+    // Setup callback for scale changes - update backend Scale when user toggles notes
+    pianoRoll.onNoteChanged = [this]() {
+        // Get the scale from the piano roll and update the sequence's scale
+        Scale newScale = pianoRoll.getScale();
+
+        // Copy the note selection to the sequence's scale
+        processorRef.getSequence().getScale().setScaleNotes(newScale.getScaleNotes());
+
+        DBG("Piano roll scale changed - updated backend Scale");
     };
 
     // Add MIDI data per step component (hidden by default)
@@ -171,6 +179,19 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // Add note range controls component (right of sequencer)
     addAndMakeVisible (noteRangeControls);
+
+    // Initialize note range controls with current scale range
+    noteRangeControls.setRange(
+        processorRef.getSequence().getScale().getRangeMin(),
+        processorRef.getSequence().getScale().getRangeMax());
+
+    // Wire up note range callback to update backend Scale
+    noteRangeControls.onRangeChanged = [this](int minNote, int maxNote) {
+        auto& scale = processorRef.getSequence().getScale();
+        scale.setRangeMin(minNote);
+        scale.setRangeMax(maxNote);
+        DBG("Note range changed: " << minNote << " - " << maxNote);
+    };
 
     // Add logo component (above piano roll)
     addAndMakeVisible (logo);

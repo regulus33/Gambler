@@ -22,8 +22,8 @@ public:
     static const std::array<std::string, NUM_CHROMATIC_NOTES> NOTE_NAMES;
     
     Scale() {
-        // Default: all notes disabled (chromatic scale would be all enabled)
-        scaleNotes.fill(0);
+        // Default: all notes enabled (chromatic scale)
+        scaleNotes.fill(1);
     }
     
     // Getters
