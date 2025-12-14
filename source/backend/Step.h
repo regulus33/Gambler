@@ -50,16 +50,24 @@ public:
     
     /**
      * Randomize the current note in StepNotes
-     * Uses the provided Scale for quantization
+     * Uses the provided Scale for quantization and range
+     *
+     * Generates random note directly within the user-set range,
+     * then quantizes to the scale. This avoids boundary pile-up
+     * that would occur from clamping.
      */
     void randomizeNote(const Scale& scale) {
         static std::random_device rd;
         static std::mt19937 gen(rd());
-        std::uniform_int_distribution<> dis(0, 127);
-        
+
+        // Generate random note directly within the user-set range
+        int rangeMin = scale.getRangeMin();
+        int rangeMax = scale.getRangeMax();
+        std::uniform_int_distribution<> dis(rangeMin, rangeMax);
+
         int randomNote = dis(gen);
-        int quantized = scale.quantizeAndApplyRange(randomNote);
-        
+        int quantized = scale.quantize(randomNote);
+
         // Set the current note (or first note if not yet ticked)
         int idx = stepNotes.getCurrentIndex();
         if (idx == -1) idx = 0;

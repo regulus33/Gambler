@@ -160,29 +160,6 @@ public:
     }
     
     /**
-     * Apply range constraints to a note (clamp to min/max)
-     * 
-     * @param noteNumber MIDI note to constrain
-     * @return Note clamped to range
-     */
-    int applyRange(int noteNumber) const {
-        if (noteNumber < rangeMin) return rangeMin;
-        if (noteNumber > rangeMax) return rangeMax;
-        return noteNumber;
-    }
-    
-    /**
-     * Quantize and apply range in one operation
-     * 
-     * @param noteNumber MIDI note to process
-     * @return Quantized and range-limited note
-     */
-    int quantizeAndApplyRange(int noteNumber) const {
-        int quantized = quantize(noteNumber);
-        return applyRange(quantized);
-    }
-
-    /**
      * Serialize to XML
      */
     std::unique_ptr<juce::XmlElement> toXml() const {
