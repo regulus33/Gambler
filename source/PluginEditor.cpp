@@ -269,6 +269,11 @@ void PluginEditor::handleAsyncUpdate() {
 
     // Repaint the sequencer steps to show updated note values
     sequencerSteps.repaint();
+
+    // Update the note range gauge to highlight the current playing note
+    const auto& step = processorRef.getSequence().getStep(currentStep);
+    int currentNote = step.getStepNotes().getCurrentNote().getNoteNumber();
+    noteRangeControls.setActiveNote(currentNote);
 }
 
 void PluginEditor::paint (juce::Graphics& g) {

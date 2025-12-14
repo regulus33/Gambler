@@ -88,6 +88,7 @@ public:
  *
  * Visual representation of the MIDI note range.
  * Displays 128 rectangles (one per MIDI note), colored based on min/max range.
+ * The currently playing note is highlighted in white.
  */
 class NoteRangeGauge : public juce::Component {
 public:
@@ -97,6 +98,13 @@ public:
         minNote = newMin;
         maxNote = newMax;
         repaint();
+    }
+
+    void setActiveNote (int noteNumber) {
+        if (activeNote != noteNumber) {
+            activeNote = noteNumber;
+            repaint();
+        }
     }
 
     void paint (juce::Graphics& g) override {
@@ -115,8 +123,10 @@ public:
 
             juce::Rectangle<float> noteRect (bounds.getX(), y, noteWidth, noteHeight);
 
-            // Color based on whether note is in range
-            if (noteIndex >= minNote && noteIndex <= maxNote)
+            // Color: white for active note, green for in-range, grey for out-of-range
+            if (noteIndex == activeNote)
+                g.setColour (juce::Colours::white);
+            else if (noteIndex >= minNote && noteIndex <= maxNote)
                 g.setColour (juce::Colour (rangeActiveColourHex));
             else
                 g.setColour (juce::Colour (rangeInactiveColourHex));
@@ -128,6 +138,7 @@ public:
 private:
     int minNote = 0;
     int maxNote = 127;
+    int activeNote = -1;  // -1 means no active note
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NoteRangeGauge)
 };
@@ -195,6 +206,13 @@ public:
      */
     int getMaxRange() const {
         return static_cast<int>(maxRangeSlider.getValue());
+    }
+
+    /**
+     * Set the currently playing note (highlighted in white on the gauge)
+     */
+    void setActiveNote(int noteNumber) {
+        rangeGauge.setActiveNote(noteNumber);
     }
 
     ~NoteRangeControlsComponent() override {
