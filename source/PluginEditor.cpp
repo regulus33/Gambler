@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "backend/ClockMode.h"
 
 namespace PluginEditorLayout {
     // Background
@@ -121,12 +122,52 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     addAndMakeVisible (sequencerControls);
 
     // Setup callback for control button clicks
-    sequencerControls.onButtonClicked = [] (int buttonIndex) {
-        // TODO: Handle control button clicks when we wire up the backend
-        const char* buttonNames[] = {"Roll", "Index <-", "Index ->", "Length +",
-                                     "Length -", "Nudge <-", "Nudge ->", "Shift"};
-        DBG ("Control button clicked: " + juce::String (buttonNames[buttonIndex]));
+    // Button indices: 0=Roll, 1=Index<-, 2=Index->, 3=Length+, 4=Length-, 5=Nudge<-, 6=Nudge->, 7=Shift
+    sequencerControls.onButtonClicked = [this] (int buttonIndex) {
+        auto& seq = processorRef.getSequence();
+
+        switch (buttonIndex) {
+            case 0:  // Roll - toggle random mode
+                seq.setIsRandom(!seq.getIsRandom());
+                sequencerControls.setButtonToggled(0, seq.getIsRandom());
+                DBG("Roll (random mode): " + juce::String(seq.getIsRandom() ? "ON" : "OFF"));
+                break;
+            case 1:  // Index <-
+                seq.indexLeft();
+                DBG("Index left, now at: " + juce::String(seq.getCurrentIndex()));
+                break;
+            case 2:  // Index ->
+                seq.indexRight();
+                DBG("Index right, now at: " + juce::String(seq.getCurrentIndex()));
+                break;
+            case 3:  // Length +
+                seq.increaseLength();
+                DBG("Length increased to: " + juce::String(seq.getLength()));
+                break;
+            case 4:  // Length -
+                seq.decreaseLength();
+                DBG("Length decreased to: " + juce::String(seq.getLength()));
+                break;
+            case 5:  // Nudge <-
+                seq.nudgeLeft();
+                DBG("Nudge left");
+                break;
+            case 6:  // Nudge ->
+                seq.nudgeRight();
+                DBG("Nudge right");
+                break;
+            case 7:  // Shift - toggle shift mode
+                seq.setIsShift(!seq.getIsShift());
+                sequencerControls.setButtonToggled(7, seq.getIsShift());
+                DBG("Shift mode: " + juce::String(seq.getIsShift() ? "ON" : "OFF"));
+                break;
+            default:
+                break;
+        }
     };
+
+    // Initialize Roll button state to match processor's sequence (random is ON by default now)
+    sequencerControls.setButtonToggled(0, processorRef.getSequence().getIsRandom());
 
     // Add note range controls component (right of sequencer)
     addAndMakeVisible (noteRangeControls);
@@ -140,6 +181,29 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         if (!settingsWindow) {
             settingsWindow = std::make_unique<SettingsWindow>();
             settingsWindow->onClose = [this]() { settingsWindow.reset(); };
+
+            // Wire up settings callbacks to processor's clock
+            if (auto* content = dynamic_cast<SettingsWindowComponent*>(settingsWindow->getContentComponent())) {
+                // Sync initial state from processor
+                content->setInternalClockEnabled(processorRef.getClock().getMode() == ClockMode::INTERNAL);
+                content->setTempo(processorRef.getClock().getBpm());
+
+                content->onInternalClockChanged = [this](bool enabled) {
+                    if (enabled) {
+                        processorRef.getClock().setMode(ClockMode::INTERNAL);
+                        processorRef.getClock().start();
+                    } else {
+                        processorRef.getClock().setMode(ClockMode::DAW_SYNC);
+                        processorRef.getClock().stop();
+                    }
+                    DBG("Internal clock " + juce::String(enabled ? "enabled" : "disabled"));
+                };
+
+                content->onTempoChanged = [this](double bpm) {
+                    processorRef.getClock().setBpm(bpm);
+                    DBG("Tempo changed to: " + juce::String(bpm) + " BPM");
+                };
+            }
         }
         settingsWindow->positionRelativeTo(this);
         settingsWindow->setVisible(true);
@@ -162,11 +226,28 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     addKeyListener (this);
     setWantsKeyboardFocus (true);
 
+    // Wire up the processor's tick callback to trigger async UI updates
+    processorRef.onSequenceTick = [this]() {
+        triggerAsyncUpdate();
+    };
+
     setSize (PluginEditorLayout::editorWidth, PluginEditorLayout::editorHeight);
 }
 
 PluginEditor::~PluginEditor() {
+    // Clear the callback before destruction to avoid dangling reference
+    processorRef.onSequenceTick = nullptr;
+    cancelPendingUpdate();
     removeKeyListener (this);
+}
+
+void PluginEditor::handleAsyncUpdate() {
+    // Update the active step indicator to follow the sequence playback
+    int currentStep = processorRef.getSequence().getCurrentIndex();
+    setActiveStepAndNote(currentStep);
+
+    // Repaint the sequencer steps to show updated note values
+    sequencerSteps.repaint();
 }
 
 void PluginEditor::paint (juce::Graphics& g) {

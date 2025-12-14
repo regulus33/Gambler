@@ -504,7 +504,8 @@ public:
         buttons[7]->setIcon(ControlIcons::createShiftIcon());
         buttons[7]->setLabel("Shift");
 
-        // Set toggle state for Shift only
+        // Set toggle state for Roll and Shift
+        buttons[0]->setToggleable(true);  // Roll
         buttons[7]->setToggleable(true);  // Shift
     }
     

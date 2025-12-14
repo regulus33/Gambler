@@ -22,6 +22,29 @@ PluginProcessor::PluginProcessor()
             apvts.addParameterListener (paramWithID->paramID, this);
         }
     }
+
+    // Initialize clock: internal mode at 120 BPM, started by default
+    clock.setMode(ClockMode::INTERNAL);
+    clock.setBpm(120.0);
+    clock.setSubdivision(Subdivision::SIXTEENTH);
+    clock.start();
+
+    // Enable random mode so notes are randomized within the scale
+    sequence.setIsRandom(true);
+
+    // Open first available MIDI output device for standalone mode
+    auto midiOutputs = juce::MidiOutput::getAvailableDevices();
+    if (!midiOutputs.isEmpty()) {
+        for (const auto& device : midiOutputs) {
+            DBG("Found MIDI output device: " << device.name);
+        }
+        midiOutput = juce::MidiOutput::openDevice(midiOutputs[0].identifier);
+        if (midiOutput) {
+            DBG("Opened MIDI output: " << midiOutputs[0].name);
+        }
+    } else {
+        DBG("No MIDI output devices found!");
+    }
 }
 
 APVTS::ParameterLayout PluginProcessor::createParameterLayout() {
@@ -94,9 +117,10 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 
 //==============================================================================
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock) {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
-    juce::ignoreUnused (sampleRate, samplesPerBlock);
+    juce::ignoreUnused (samplesPerBlock);
+
+    // Set sample rate for internal clock timing
+    clock.setSampleRate(sampleRate);
 }
 
 void PluginProcessor::releaseResources() {
@@ -127,31 +151,59 @@ bool PluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const 
 
 void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     juce::MidiBuffer& midiMessages) {
-    juce::ignoreUnused (midiMessages);
-
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
+    // Clear any output channels that didn't contain input data
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel) {
-        auto* channelData = buffer.getWritePointer (channel);
-        juce::ignoreUnused (channelData);
-        // ..do something to the data...
+    // Clear incoming MIDI (we're generating, not processing)
+    midiMessages.clear();
+
+    // Process the internal clock
+    clock.processInternalClock(buffer.getNumSamples());
+
+    // Check if clock triggered a tick
+    if (clock.shouldTick()) {
+        // Send note off for previous note (if any)
+        if (lastPlayedNote >= 0) {
+            auto noteOff = juce::MidiMessage::noteOff(1, lastPlayedNote, (juce::uint8)0);
+            midiMessages.addEvent(noteOff, 0);
+
+            // Send directly to MIDI output device (for standalone mode)
+            if (midiOutput) {
+                midiOutput->sendMessageNow(noteOff);
+            }
+            DBG("MIDI Note OFF: " << lastPlayedNote);
+        }
+
+        // Tick the sequence to get the next note
+        int note = sequence.tick();
+
+        DBG("Clock tick! Step: " << sequence.getCurrentIndex() << ", Note: " << note);
+
+        if (note >= 0) {
+            // Valid note - send note on
+            auto noteOn = juce::MidiMessage::noteOn(1, note, (juce::uint8)100);
+            midiMessages.addEvent(noteOn, 0);
+
+            // Send directly to MIDI output device (for standalone mode)
+            if (midiOutput) {
+                midiOutput->sendMessageNow(noteOn);
+            }
+            DBG("MIDI Note ON: " << note << " (velocity 100, channel 1)");
+            lastPlayedNote = note;
+        } else {
+            // Rest - no note to play
+            lastPlayedNote = -1;
+        }
+
+        // Notify UI that a tick occurred (thread-safe via AsyncUpdater)
+        if (onSequenceTick) {
+            onSequenceTick();
+        }
     }
 }
 

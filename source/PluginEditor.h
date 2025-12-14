@@ -19,7 +19,8 @@
 
 //==============================================================================
 class PluginEditor : public juce::AudioProcessorEditor,
-                     public juce::KeyListener
+                     public juce::KeyListener,
+                     private juce::AsyncUpdater
 {
 public:
     explicit PluginEditor (PluginProcessor&);
@@ -36,6 +37,8 @@ public:
     void setActiveStepAndNote (int stepIndex);
 
 private:
+    // AsyncUpdater callback for UI refresh (called on message thread)
+    void handleAsyncUpdate() override;
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     PluginProcessor& processorRef;

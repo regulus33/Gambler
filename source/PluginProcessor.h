@@ -2,7 +2,9 @@
 
 #include "data/Params.h"
 #include "backend/Sequence.h"
+#include "backend/Clock.h"
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_audio_devices/juce_audio_devices.h>
 
 #if (MSVC)
 #include "ipps.h"
@@ -49,6 +51,12 @@ public:
     Sequence& getSequence() noexcept { return sequence; }
     const Sequence& getSequence() const noexcept { return sequence; }
 
+    Clock& getClock() noexcept { return clock; }
+    const Clock& getClock() const noexcept { return clock; }
+
+    // Callback for UI updates when sequence ticks (called from audio thread)
+    // The callback should be thread-safe (e.g., trigger an AsyncUpdater)
+    std::function<void()> onSequenceTick;
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
@@ -62,6 +70,13 @@ private:
 
     // Domain layer
     Sequence sequence;
+    Clock clock;
+
+    // MIDI state
+    int lastPlayedNote = -1;  // Track last note for note-off
+
+    // Direct MIDI output for standalone mode
+    std::unique_ptr<juce::MidiOutput> midiOutput;
 
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();
