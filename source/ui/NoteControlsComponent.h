@@ -29,13 +29,15 @@ public:
         addAndMakeVisible (octaveSlider);
         addAndMakeVisible (noteSlider);
 
-        // Wire up slider callbacks
+        // Wire up slider callbacks (also repaint the NotchedSlider to update gauge)
         octaveSlider.getSlider().onValueChange = [this] {
+            octaveSlider.repaint();
             if (onOctaveChanged)
                 onOctaveChanged(octaveSlider.getSelectedIndex());
         };
 
         noteSlider.getSlider().onValueChange = [this] {
+            noteSlider.repaint();
             if (onNoteChanged)
                 onNoteChanged(noteSlider.getSelectedIndex());
         };
@@ -59,6 +61,7 @@ public:
     void setNote(int pitchClass) {
         if (pitchClass >= 0 && pitchClass < 12) {
             noteSlider.getSlider().setValue(static_cast<double>(pitchClass), juce::dontSendNotification);
+            noteSlider.repaint();  // Update the gauge display
         }
     }
 
@@ -68,6 +71,7 @@ public:
     void setOctave(int octaveIndex) {
         if (octaveIndex >= 0 && octaveIndex < 10) {
             octaveSlider.getSlider().setValue(static_cast<double>(octaveIndex), juce::dontSendNotification);
+            octaveSlider.repaint();  // Update the gauge display
         }
     }
 

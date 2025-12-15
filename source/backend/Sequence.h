@@ -22,7 +22,7 @@
 class Sequence {
 public:
     static constexpr int MAX_STEPS = 64;
-    static constexpr int DEFAULT_LENGTH = 64;
+    static constexpr int DEFAULT_LENGTH = 8;
     static constexpr int MIN_LENGTH = 1;
     
     Sequence() {
