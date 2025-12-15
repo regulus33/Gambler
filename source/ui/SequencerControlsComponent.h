@@ -9,8 +9,8 @@ namespace SequencerControlsConstants {
     // Button appearance
     constexpr float cornerRadius = 4.4f;
     constexpr float borderWidth = 2.2f;
-    constexpr juce::uint32 bgColorActive = 0xff4a4a4a;
-    constexpr juce::uint32 bgColorInactive = 0xff2a2a2a;
+    constexpr juce::uint32 bgColorActive = 0xff303030;
+    constexpr juce::uint32 bgColorInactive = 0xff303030;
     // Icon
     constexpr float maxIconSize = 26.0f;
     constexpr float iconVerticalOffset = 13.0f;
