@@ -89,6 +89,37 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     // Add main controls component (note/octave + probability/grid)
     addAndMakeVisible (mainControls);
 
+    // Wire up note controls callbacks to update the current step's note
+    mainControls.getNoteControls().onNoteChanged = [this](int pitchClass) {
+        auto& seq = processorRef.getSequence();
+        int currentStep = seq.getCurrentIndex();
+        auto& step = seq.getStep(currentStep);
+
+        // Get current note, preserve octave, change pitch class
+        int currentNote = step.getStepNotes().getCurrentNote().getNoteNumber();
+        int currentOctave = currentNote / 12;
+        int newNote = currentOctave * 12 + pitchClass;
+
+        step.updateCurrentNoteNumber(newNote);
+        sequencerSteps.repaint();
+        DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote);
+    };
+
+    mainControls.getNoteControls().onOctaveChanged = [this](int octaveIndex) {
+        auto& seq = processorRef.getSequence();
+        int currentStep = seq.getCurrentIndex();
+        auto& step = seq.getStep(currentStep);
+
+        // Get current note, preserve pitch class, change octave
+        int currentNote = step.getStepNotes().getCurrentNote().getNoteNumber();
+        int pitchClass = currentNote % 12;
+        int newNote = octaveIndex * 12 + pitchClass;
+
+        step.updateCurrentNoteNumber(newNote);
+        sequencerSteps.repaint();
+        DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote);
+    };
+
     // Add sequence overview component
     addAndMakeVisible (sequenceOverview);
 
@@ -224,6 +255,18 @@ PluginEditor::PluginEditor (PluginProcessor& p)
                     processorRef.getClock().setBpm(bpm);
                     DBG("Tempo changed to: " + juce::String(bpm) + " BPM");
                 };
+
+                content->onPlayClicked = [this]() {
+                    // Reset sequence to beginning and start clock
+                    processorRef.getSequence().reset();
+                    processorRef.getClock().start();
+                    DBG("Play clicked - sequence reset to index 0, clock started");
+                };
+
+                content->onStopClicked = [this]() {
+                    processorRef.getClock().stop();
+                    DBG("Stop clicked - clock stopped");
+                };
             }
         }
         settingsWindow->positionRelativeTo(this);
@@ -274,6 +317,9 @@ void PluginEditor::handleAsyncUpdate() {
     const auto& step = processorRef.getSequence().getStep(currentStep);
     int currentNote = step.getStepNotes().getCurrentNote().getNoteNumber();
     noteRangeControls.setActiveNote(currentNote);
+
+    // Update the note/octave controls to reflect the current step's note
+    mainControls.getNoteControls().setFromMidiNote(currentNote);
 }
 
 void PluginEditor::paint (juce::Graphics& g) {

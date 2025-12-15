@@ -71,6 +71,13 @@ public:
             ProbabilityControlsConstants::containerHeight);
     }
 
+    // Accessors for child components
+    NoteControlsComponent& getNoteControls() { return noteControls; }
+    const NoteControlsComponent& getNoteControls() const { return noteControls; }
+
+    ProbabilityControlsComponent& getProbabilityControls() { return probabilityControls; }
+    const ProbabilityControlsComponent& getProbabilityControls() const { return probabilityControls; }
+
 private:
     juce::Typeface::Ptr interBoldFont;
     NoteControlsComponent noteControls;

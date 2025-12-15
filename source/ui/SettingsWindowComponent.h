@@ -32,6 +32,26 @@ public:
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
 
+        // Setup Play button
+        playButton.setButtonText("Play");
+        playButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF4CAF50)); // Green
+        playButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
+        playButton.onClick = [this] {
+            if (onPlayClicked)
+                onPlayClicked();
+        };
+        addAndMakeVisible(playButton);
+
+        // Setup Stop button
+        stopButton.setButtonText("Stop");
+        stopButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFFF44336)); // Red
+        stopButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
+        stopButton.onClick = [this] {
+            if (onStopClicked)
+                onStopClicked();
+        };
+        addAndMakeVisible(stopButton);
+
         // Setup internal clock checkbox
         internalClockToggle.setButtonText("Internal clock");
         internalClockToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
@@ -85,6 +105,16 @@ public:
 
         auto area = getLocalBounds().reduced(padding);
 
+        // Play/Stop buttons row
+        auto buttonRow = area.removeFromTop(controlHeight);
+        constexpr int buttonWidth = 80;
+        constexpr int buttonGap = 10;
+        playButton.setBounds(buttonRow.removeFromLeft(buttonWidth));
+        buttonRow.removeFromLeft(buttonGap);
+        stopButton.setBounds(buttonRow.removeFromLeft(buttonWidth));
+
+        area.removeFromTop(controlSpacing);
+
         // Internal clock checkbox row
         auto checkboxRow = area.removeFromTop(controlHeight);
         internalClockToggle.setBounds(checkboxRow);
@@ -98,6 +128,8 @@ public:
     }
 
     // Callbacks for state changes
+    std::function<void()> onPlayClicked;
+    std::function<void()> onStopClicked;
     std::function<void(bool)> onInternalClockChanged;
     std::function<void(double)> onTempoChanged;
 
@@ -115,6 +147,8 @@ public:
 private:
     juce::Typeface::Ptr interTypeface;
 
+    juce::TextButton playButton;
+    juce::TextButton stopButton;
     juce::ToggleButton internalClockToggle;
     juce::Label tempoLabel;
     juce::Slider tempoSlider;
