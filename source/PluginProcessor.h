@@ -3,6 +3,7 @@
 #include "data/Params.h"
 #include "backend/Sequence.h"
 #include "backend/Clock.h"
+#include "backend/DawSync.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 
@@ -71,6 +72,7 @@ private:
     // Domain layer
     Sequence sequence;
     Clock clock;
+    DawSync dawSync;  // DAW synchronization utility
 
     // MIDI state
     int lastPlayedNote = -1;  // Track last note for note-off

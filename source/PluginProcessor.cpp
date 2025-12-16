@@ -159,11 +159,21 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    // Clear incoming MIDI (we're generating, not processing)
+    // Clear incoming MIDI (we're generating, not processing MIDI through)
     midiMessages.clear();
 
-    // Process the internal clock
-    clock.processInternalClock(buffer.getNumSamples());
+    // Process clock based on current mode
+    if (clock.getMode() == ClockMode::DAW_SYNC) {
+        // DAW sync mode: get timing from host transport
+        if (auto* playHead = getPlayHead()) {
+            auto position = playHead->getPosition();
+            int pulseCount = dawSync.update(position);
+            clock.updateDawSync(pulseCount);
+        }
+    } else {
+        // Internal clock mode: process samples for timing
+        clock.processInternalClock(buffer.getNumSamples());
+    }
 
     // Check if clock triggered a tick
     if (clock.shouldTick()) {
@@ -246,8 +256,20 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
 //==============================================================================
 
 void PluginProcessor::parameterChanged (const juce::String& parameterID, float newValue) {
-    // TODO: Implement APVTS → Sequence sync when UI is ready
-    juce::ignoreUnused (parameterID, newValue);
+    // Handle clock mode changes
+    if (parameterID == Params::Keys::ID::USE_INTERNAL_CLOCK) {
+        bool useInternalClock = newValue > 0.5f;
+        clock.setMode(useInternalClock ? ClockMode::INTERNAL : ClockMode::DAW_SYNC);
+
+        // Start internal clock if switching to internal mode
+        if (useInternalClock) {
+            clock.start();
+        }
+
+        DBG("Clock mode changed to: " << (useInternalClock ? "INTERNAL" : "DAW_SYNC"));
+    }
+
+    // TODO: Implement other APVTS → Sequence sync when UI is ready
 }
 
 void PluginProcessor::syncStateToApvts() {
@@ -255,7 +277,16 @@ void PluginProcessor::syncStateToApvts() {
 }
 
 void PluginProcessor::syncApvtsToState() {
-    // TODO: Implement APVTS → Sequence sync for preset loading
+    // Sync clock mode from APVTS
+    if (auto* param = apvts.getRawParameterValue(Params::Keys::ID::USE_INTERNAL_CLOCK)) {
+        bool useInternalClock = param->load() > 0.5f;
+        clock.setMode(useInternalClock ? ClockMode::INTERNAL : ClockMode::DAW_SYNC);
+        if (useInternalClock) {
+            clock.start();
+        }
+    }
+
+    // TODO: Implement other APVTS → Sequence sync for preset loading
 }
 
 //==============================================================================

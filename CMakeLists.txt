@@ -83,6 +83,11 @@ juce_add_plugin("${PROJECT_NAME}"
     PLUGIN_CODE P001
     FORMATS "${FORMATS}"
 
+    # MIDI Effect configuration - required for use as MIDI effect in DAWs like Bitwig
+    IS_MIDI_EFFECT TRUE
+    NEEDS_MIDI_INPUT TRUE
+    NEEDS_MIDI_OUTPUT TRUE
+
     # The name of your final executable
     # This is how it's listed in the DAW
     # This can be different from PROJECT_NAME and can have spaces!

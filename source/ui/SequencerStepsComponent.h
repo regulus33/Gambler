@@ -116,61 +116,77 @@ private:
 
         juce::Rectangle<float> stepBounds (x, y, stepSizeParam, stepSizeParam);
 
-        // Get the note for this step
-        const auto& step = sequence.getStep(stepIndex);
-        const auto& stepNotes = step.getStepNotes();
-        const auto& currentNote = stepNotes.getCurrentNote();
+        // Check if this step is within the active sequence length
+        bool isWithinSequence = stepIndex < sequence.getLength();
 
-        // Get the current note to display
-        int midiNote = currentNote.getNoteNumber();
-
-        // Get the note color from the chromatic scale (0-11)
-        int chromaticNote = midiNote % 12;
-        juce::Colour noteColor = getNoteColor (chromaticNote);
-
-        // Check if this is the active step
-        bool isActive = (stepIndex == activeStepIndex);
+        // Check if this is the active step (only if within sequence)
+        bool isActive = isWithinSequence && (stepIndex == activeStepIndex);
 
         // Determine border width
         float borderWidth = isActive ? borderWidthActive : borderWidthInactive;
 
-        // Fill step background with note color
-        g.setColour (noteColor);
-        g.fillRoundedRectangle (stepBounds, cornerRadius);
+        if (isWithinSequence) {
+            // Get the note for this step
+            const auto& step = sequence.getStep(stepIndex);
+            const auto& stepNotes = step.getStepNotes();
+            const auto& currentNote = stepNotes.getCurrentNote();
 
-        // Draw white border INSIDE the bounds
-        g.setColour (juce::Colours::white);
-        float inset = borderWidth * 0.5f;
-        juce::Rectangle<float> borderBounds = stepBounds.reduced (inset);
-        float borderRadiusInner = juce::jmax (0.0f, cornerRadius - inset);
-        g.drawRoundedRectangle (borderBounds, borderRadiusInner, borderWidth);
+            // Get the current note to display
+            int midiNote = currentNote.getNoteNumber();
 
-        // Convert MIDI note to note name (e.g., "C4", "Gb3")
-        juce::String noteText = midiNoteToNoteName (midiNote);
+            // Get the note color from the chromatic scale (0-11)
+            int chromaticNote = midiNote % 12;
+            juce::Colour noteColor = getNoteColor (chromaticNote);
 
-        // Use Inter font
-        juce::Font font (interFont);
-        font.setHeight (fontSize);
-        font.setBold (true);
+            // Fill step background with note color
+            g.setColour (noteColor);
+            g.fillRoundedRectangle (stepBounds, cornerRadius);
 
-        if (isActive) {
-            // Draw black circle behind the text
-            auto circleCentre = stepBounds.getCentre();
-            g.setColour (juce::Colours::black);
-            g.fillEllipse (circleCentre.x - activeCircleRadius, circleCentre.y - activeCircleRadius,
-                          activeCircleRadius * 2.0f, activeCircleRadius * 2.0f);
-
-            // Draw note text in white, bold Inter font
+            // Draw white border INSIDE the bounds
             g.setColour (juce::Colours::white);
-            g.setFont (font);
-        } else {
-            // Draw note text in black, bold Inter font
-            g.setColour (juce::Colours::black);
-            g.setFont (font);
-        }
+            float inset = borderWidth * 0.5f;
+            juce::Rectangle<float> borderBounds = stepBounds.reduced (inset);
+            float borderRadiusInner = juce::jmax (0.0f, cornerRadius - inset);
+            g.drawRoundedRectangle (borderBounds, borderRadiusInner, borderWidth);
 
-        // Draw the note text centered in the step
-        g.drawText (noteText, stepBounds.toNearestInt(), juce::Justification::centred);
+            // Convert MIDI note to note name (e.g., "C4", "Gb3")
+            juce::String noteText = midiNoteToNoteName (midiNote);
+
+            // Use Inter font
+            juce::Font font (interFont);
+            font.setHeight (fontSize);
+            font.setBold (true);
+
+            if (isActive) {
+                // Draw black circle behind the text
+                auto circleCentre = stepBounds.getCentre();
+                g.setColour (juce::Colours::black);
+                g.fillEllipse (circleCentre.x - activeCircleRadius, circleCentre.y - activeCircleRadius,
+                              activeCircleRadius * 2.0f, activeCircleRadius * 2.0f);
+
+                // Draw note text in white, bold Inter font
+                g.setColour (juce::Colours::white);
+                g.setFont (font);
+            } else {
+                // Draw note text in black, bold Inter font
+                g.setColour (juce::Colours::black);
+                g.setFont (font);
+            }
+
+            // Draw the note text centered in the step
+            g.drawText (noteText, stepBounds.toNearestInt(), juce::Justification::centred);
+        } else {
+            // Step is outside the active sequence - draw grey with no note text
+            g.setColour (juce::Colour (0xFF484848));
+            g.fillRoundedRectangle (stepBounds, cornerRadius);
+
+            // Draw white border INSIDE the bounds
+            g.setColour (juce::Colours::white);
+            float inset = borderWidth * 0.5f;
+            juce::Rectangle<float> borderBounds = stepBounds.reduced (inset);
+            float borderRadiusInner = juce::jmax (0.0f, cornerRadius - inset);
+            g.drawRoundedRectangle (borderBounds, borderRadiusInner, borderWidth);
+        }
     }
 
     /**

@@ -46,6 +46,9 @@ namespace Params
             // MIDI mode
             inline const String MIDI_MODE = "midi_mode";
 
+            // Clock mode (true = internal clock, false = DAW sync)
+            inline const String USE_INTERNAL_CLOCK = "use_internal_clock";
+
             // Note range
             inline const String NOTE_RANGE_MIN = "note_range_min";
             inline const String NOTE_RANGE_MAX = "note_range_max";
@@ -87,6 +90,9 @@ namespace Params
 
             // MIDI mode
             inline const String MIDI_MODE = "MIDI Mode";
+
+            // Clock mode
+            inline const String USE_INTERNAL_CLOCK = "Use Internal Clock";
 
             // Note range
             inline const String NOTE_RANGE_MIN = "Note Range Min";
@@ -142,6 +148,10 @@ namespace Params
 
         // MIDI mode (0 = CC_TO_NOTE, 1 = NOTE_TO_CC)
         params.push_back(createIntParam(Keys::ID::MIDI_MODE, Keys::LABEL::MIDI_MODE, 0, 1, 0));
+
+        // Clock mode (true = internal clock, false = DAW sync)
+        // Default to internal clock (true) for standalone compatibility
+        params.push_back(createBoolParam(Keys::ID::USE_INTERNAL_CLOCK, Keys::LABEL::USE_INTERNAL_CLOCK, true));
 
         // Note range
         params.push_back(createIntParam(Keys::ID::NOTE_RANGE_MIN, Keys::LABEL::NOTE_RANGE_MIN, 0, 127, 0));
