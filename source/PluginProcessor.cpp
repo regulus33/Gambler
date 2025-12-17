@@ -25,12 +25,19 @@ PluginProcessor::PluginProcessor()
 
     // Initialize clock settings
     // Default to internal clock for standalone, DAW sync for plugin
-#if JucePlugin_Build_Standalone
-    clock.setMode(ClockMode::INTERNAL);
-    clock.start();
-#else
-    clock.setMode(ClockMode::DAW_SYNC);
-#endif
+    // Note: We use runtime detection because the shared code is compiled with
+    // all plugin format flags enabled, so preprocessor checks don't work here.
+    // or at least in development.
+    // it just runs on startup so who cares.
+    juce::PluginHostType hostType;
+    if (hostType.type == juce::PluginHostType::UnknownHost) {
+        // Standalone app - use internal clock
+        clock.setMode(ClockMode::INTERNAL);
+        clock.start();
+    } else {
+        // Running in a DAW - use DAW sync
+        clock.setMode(ClockMode::DAW_SYNC);
+    }
     clock.setBpm(120.0);
     clock.setSubdivision(Subdivision::SIXTEENTH);
 
