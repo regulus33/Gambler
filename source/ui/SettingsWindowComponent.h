@@ -90,6 +90,18 @@ public:
         tempoLabel.setJustificationType(juce::Justification::centredLeft);
         addAndMakeVisible(tempoLabel);
 
+        // Setup preview notes on edit checkbox (enabled by default)
+        previewNotesToggle.setButtonText("Preview notes on edit");
+        previewNotesToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        previewNotesToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
+        previewNotesToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+        previewNotesToggle.setToggleState(true, juce::dontSendNotification); // Enabled by default
+        previewNotesToggle.onClick = [this] {
+            if (onPreviewNotesChanged)
+                onPreviewNotesChanged(previewNotesToggle.getToggleState());
+        };
+        addAndMakeVisible(previewNotesToggle);
+
         setSize(SettingsWindowConstants::windowWidth, SettingsWindowConstants::windowHeight);
     }
 
@@ -125,6 +137,12 @@ public:
         auto tempoRow = area.removeFromTop(controlHeight);
         tempoLabel.setBounds(tempoRow.removeFromLeft(labelWidth));
         tempoSlider.setBounds(tempoRow);
+
+        area.removeFromTop(controlSpacing);
+
+        // Preview notes on edit checkbox row
+        auto previewRow = area.removeFromTop(controlHeight);
+        previewNotesToggle.setBounds(previewRow);
     }
 
     // Callbacks for state changes
@@ -132,10 +150,12 @@ public:
     std::function<void()> onStopClicked;
     std::function<void(bool)> onInternalClockChanged;
     std::function<void(double)> onTempoChanged;
+    std::function<void(bool)> onPreviewNotesChanged;
 
     // Accessors for current values
     bool isInternalClockEnabled() const { return internalClockToggle.getToggleState(); }
     double getTempo() const { return tempoSlider.getValue(); }
+    bool isPreviewNotesEnabled() const { return previewNotesToggle.getToggleState(); }
 
     // Setters for external state sync
     void setInternalClockEnabled(bool enabled) {
@@ -143,6 +163,9 @@ public:
         tempoSlider.setEnabled(enabled);
     }
     void setTempo(double bpm) { tempoSlider.setValue(bpm, juce::dontSendNotification); }
+    void setPreviewNotesEnabled(bool enabled) {
+        previewNotesToggle.setToggleState(enabled, juce::dontSendNotification);
+    }
 
 private:
     juce::Typeface::Ptr interTypeface;
@@ -152,6 +175,7 @@ private:
     juce::ToggleButton internalClockToggle;
     juce::Label tempoLabel;
     juce::Slider tempoSlider;
+    juce::ToggleButton previewNotesToggle;
 };
 
 /**

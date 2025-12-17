@@ -290,6 +290,77 @@ void PluginProcessor::syncApvtsToState() {
 }
 
 //==============================================================================
+// UI Preview Methods
+//==============================================================================
+
+void PluginProcessor::triggerStepMidi(int stepIndex) {
+    if (stepIndex < 0 || stepIndex >= 64) return;
+
+    // Set the sequence's current index to this step
+    sequence.setCurrentIndex(stepIndex);
+
+    // Get the note for this step
+    const auto& step = sequence.getStep(stepIndex);
+    int note = step.getStepNotes().getCurrentNote().getNoteNumber();
+
+    // Send note off for previous note (if any)
+    if (lastPlayedNote >= 0) {
+        auto noteOff = juce::MidiMessage::noteOff(1, lastPlayedNote, (juce::uint8)0);
+        if (midiOutput) {
+            midiOutput->sendMessageNow(noteOff);
+        }
+        DBG("Preview MIDI Note OFF: " << lastPlayedNote);
+    }
+
+    // Send note on for the new note
+    if (note >= 0) {
+        auto noteOn = juce::MidiMessage::noteOn(1, note, (juce::uint8)100);
+        if (midiOutput) {
+            midiOutput->sendMessageNow(noteOn);
+        }
+        DBG("Preview MIDI Note ON: " << note << " (step " << stepIndex << ")");
+        lastPlayedNote = note;
+    } else {
+        lastPlayedNote = -1;
+    }
+
+    // Notify UI that state changed
+    if (onSequenceTick) {
+        onSequenceTick();
+    }
+}
+
+void PluginProcessor::triggerCurrentStepMidi() {
+    int currentStep = sequence.getCurrentIndex();
+    if (currentStep < 0 || currentStep >= 64) return;
+
+    // Get the note for the current step
+    const auto& step = sequence.getStep(currentStep);
+    int note = step.getStepNotes().getCurrentNote().getNoteNumber();
+
+    // Send note off for previous note (if any)
+    if (lastPlayedNote >= 0) {
+        auto noteOff = juce::MidiMessage::noteOff(1, lastPlayedNote, (juce::uint8)0);
+        if (midiOutput) {
+            midiOutput->sendMessageNow(noteOff);
+        }
+        DBG("Preview MIDI Note OFF: " << lastPlayedNote);
+    }
+
+    // Send note on for the new note
+    if (note >= 0) {
+        auto noteOn = juce::MidiMessage::noteOn(1, note, (juce::uint8)100);
+        if (midiOutput) {
+            midiOutput->sendMessageNow(noteOn);
+        }
+        DBG("Preview MIDI Note ON: " << note << " (current step " << currentStep << ")");
+        lastPlayedNote = note;
+    } else {
+        lastPlayedNote = -1;
+    }
+}
+
+//==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
     return new PluginProcessor();

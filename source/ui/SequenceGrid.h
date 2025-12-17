@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../backend/Sequence.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <array>
 
@@ -188,8 +189,66 @@ public:
     static constexpr int getPreferredWidth() { return SequenceGridConstants::gridWidth; }
     static constexpr int getPreferredHeight() { return SequenceGridConstants::gridHeight; }
 
+    /**
+     * Update the grid from a Sequence object
+     * - Each square shows the note color for that step
+     * - Steps outside the sequence length are shown in grey
+     * - The current step has a white border
+     * @param sequence The sequence to display
+     */
+    void updateFromSequence (const Sequence& sequence) {
+        using namespace SequenceGridConstants;
+
+        int sequenceLength = sequence.getLength();
+        int currentIndex = sequence.getCurrentIndex();
+
+        for (int stepIndex = 0; stepIndex < 64; ++stepIndex) {
+            int row = stepIndex / gridCols;  // 0-7
+            int col = stepIndex % gridCols;  // 0-7
+
+            if (stepIndex < sequenceLength) {
+                // Step is within bounds - show note color
+                const auto& step = sequence.getStep (stepIndex);
+                int midiNote = step.getStepNotes().getCurrentNote().getNoteNumber();
+                int chromaticNote = midiNote % 12;
+                squareStates[row][col].color = getNoteColor (chromaticNote);
+            } else {
+                // Step is outside bounds - show grey
+                squareStates[row][col].color = juce::Colour (defaultDarkGreyHex);
+            }
+
+            // Set border for current step only
+            squareStates[row][col].hasBorder = (stepIndex == currentIndex);
+        }
+
+        repaint();
+    }
+
 private:
     std::array<std::array<SquareState, SequenceGridConstants::gridCols>,
                SequenceGridConstants::gridRows> squareStates;
+
+    /**
+     * Get the color for a chromatic note (0-11)
+     * Same color mapping as SequencerStepsComponent
+     */
+    juce::Colour getNoteColor (int chromaticNote) const {
+        const juce::Colour noteColors[12] = {
+            juce::Colour (0xFFFF6B6B), // C - Red
+            juce::Colour (0xFFFF9F6B), // Db - Orange
+            juce::Colour (0xFFFFD66B), // D - Yellow
+            juce::Colour (0xFFFFE66B), // Eb - Light yellow
+            juce::Colour (0xFFE6FF6B), // E - Yellow-green
+            juce::Colour (0xFF6BFFB4), // F - Light green
+            juce::Colour (0xFF6BFFD6), // Gb - Cyan-green
+            juce::Colour (0xFF6BD6FF), // G - Cyan
+            juce::Colour (0xFF6BB4FF), // Ab - Light blue
+            juce::Colour (0xFF9F6BFF), // A - Purple
+            juce::Colour (0xFFD66BFF), // Bb - Magenta
+            juce::Colour (0xFFFF6BD6)  // B - Pink
+        };
+
+        return noteColors[chromaticNote % 12];
+    }
 };
 

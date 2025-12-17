@@ -102,6 +102,12 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
         step.updateCurrentNoteNumber(newNote);
         sequencerSteps.repaint();
+
+        // Trigger MIDI preview if enabled
+        if (previewNotesOnEdit) {
+            processorRef.triggerCurrentStepMidi();
+        }
+
         DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote);
     };
 
@@ -117,6 +123,12 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
         step.updateCurrentNoteNumber(newNote);
         sequencerSteps.repaint();
+
+        // Trigger MIDI preview if enabled
+        if (previewNotesOnEdit) {
+            processorRef.triggerCurrentStepMidi();
+        }
+
         DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote);
     };
 
@@ -151,9 +163,10 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     // Add sequencer steps component
     addAndMakeVisible (sequencerSteps);
 
-    // Setup callback for step clicks
-    sequencerSteps.onStepClicked = [] (int stepIndex) {
-        // TODO: Handle step selection when we wire up the backend
+    // Setup callback for step clicks - set current index and trigger MIDI
+    sequencerSteps.onStepClicked = [this] (int stepIndex) {
+        // Trigger MIDI for this step (also sets current index)
+        processorRef.triggerStepMidi(stepIndex);
         DBG ("Step clicked: " + juce::String (stepIndex));
     };
 
@@ -173,26 +186,34 @@ PluginEditor::PluginEditor (PluginProcessor& p)
                 break;
             case 1:  // Index <-
                 seq.indexLeft();
+                sequenceOverview.getSequenceGrid().updateFromSequence(seq);
                 DBG("Index left, now at: " + juce::String(seq.getCurrentIndex()));
                 break;
             case 2:  // Index ->
                 seq.indexRight();
+                sequenceOverview.getSequenceGrid().updateFromSequence(seq);
                 DBG("Index right, now at: " + juce::String(seq.getCurrentIndex()));
                 break;
             case 3:  // Length +
                 seq.increaseLength();
+                sequencerSteps.repaint();
+                sequenceOverview.getSequenceGrid().updateFromSequence(seq);
                 DBG("Length increased to: " + juce::String(seq.getLength()));
                 break;
             case 4:  // Length -
                 seq.decreaseLength();
+                sequencerSteps.repaint();
+                sequenceOverview.getSequenceGrid().updateFromSequence(seq);
                 DBG("Length decreased to: " + juce::String(seq.getLength()));
                 break;
             case 5:  // Nudge <-
                 seq.nudgeLeft();
+                sequenceOverview.getSequenceGrid().updateFromSequence(seq);
                 DBG("Nudge left");
                 break;
             case 6:  // Nudge ->
                 seq.nudgeRight();
+                sequenceOverview.getSequenceGrid().updateFromSequence(seq);
                 DBG("Nudge right");
                 break;
             case 7:  // Shift - toggle shift mode
@@ -267,6 +288,13 @@ PluginEditor::PluginEditor (PluginProcessor& p)
                     processorRef.getClock().stop();
                     DBG("Stop clicked - clock stopped");
                 };
+
+                // Sync preview notes setting
+                content->setPreviewNotesEnabled(previewNotesOnEdit);
+                content->onPreviewNotesChanged = [this](bool enabled) {
+                    previewNotesOnEdit = enabled;
+                    DBG("Preview notes on edit: " + juce::String(enabled ? "enabled" : "disabled"));
+                };
             }
         }
         settingsWindow->positionRelativeTo(this);
@@ -320,6 +348,9 @@ void PluginEditor::handleAsyncUpdate() {
 
     // Update the note/octave controls to reflect the current step's note
     mainControls.getNoteControls().setFromMidiNote(currentNote);
+
+    // Update the sequence overview grid to show all 64 steps with current step highlighted
+    sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
 }
 
 void PluginEditor::paint (juce::Graphics& g) {

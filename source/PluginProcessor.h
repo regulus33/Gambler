@@ -59,6 +59,21 @@ public:
     // The callback should be thread-safe (e.g., trigger an AsyncUpdater)
     std::function<void()> onSequenceTick;
 
+    /**
+     * Trigger MIDI note for a specific step (for UI preview/audition)
+     * This sets the current index to the given step and sends MIDI note on/off.
+     * Called from UI thread when user clicks a step or edits note controls.
+     * @param stepIndex The step index to trigger (0-63)
+     */
+    void triggerStepMidi(int stepIndex);
+
+    /**
+     * Trigger MIDI note for the current step (for UI preview/audition)
+     * Sends MIDI note on/off for whatever note is at the current step.
+     * Called from UI thread when user edits note/octave sliders.
+     */
+    void triggerCurrentStepMidi();
+
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 

@@ -79,6 +79,16 @@ public:
             length = newLength;
         }
     }
+
+    /**
+     * Set the current index directly (for UI step selection)
+     * @param index The step index to set (0 to length-1)
+     */
+    void setCurrentIndex(int index) {
+        if (index >= 0 && index < length) {
+            currentIndex = index;
+        }
+    }
     
     void setPlayProbability(int index, bool shouldPlay) {
         if (index >= 0 && index < MAX_STEPS) {
