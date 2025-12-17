@@ -150,8 +150,12 @@ namespace Params
         params.push_back(createIntParam(Keys::ID::MIDI_MODE, Keys::LABEL::MIDI_MODE, 0, 1, 0));
 
         // Clock mode (true = internal clock, false = DAW sync)
-        // Default to internal clock (true) for standalone compatibility
+        // Default to internal clock for standalone, DAW sync for plugin
+#if JucePlugin_Build_Standalone
         params.push_back(createBoolParam(Keys::ID::USE_INTERNAL_CLOCK, Keys::LABEL::USE_INTERNAL_CLOCK, true));
+#else
+        params.push_back(createBoolParam(Keys::ID::USE_INTERNAL_CLOCK, Keys::LABEL::USE_INTERNAL_CLOCK, false));
+#endif
 
         // Note range
         params.push_back(createIntParam(Keys::ID::NOTE_RANGE_MIN, Keys::LABEL::NOTE_RANGE_MIN, 0, 127, 0));

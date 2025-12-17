@@ -23,11 +23,9 @@ PluginProcessor::PluginProcessor()
         }
     }
 
-    // Initialize clock: internal mode at 120 BPM, started by default
-    clock.setMode(ClockMode::INTERNAL);
+    // Initialize clock settings (mode is already set by syncApvtsToState above)
     clock.setBpm(120.0);
     clock.setSubdivision(Subdivision::SIXTEENTH);
-    clock.start();
 
     // Enable random mode so notes are randomized within the scale
     sequence.setIsRandom(true);

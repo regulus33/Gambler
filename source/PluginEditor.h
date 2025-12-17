@@ -56,6 +56,7 @@ private:
     SettingsButtonComponent settingsButton;
     std::unique_ptr<SettingsWindow> settingsWindow;
     LogoComponent logo;
+    juce::Label versionLabel;
 
     // Inspector
     std::unique_ptr<melatonin::Inspector> inspector;

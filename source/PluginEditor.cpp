@@ -248,6 +248,16 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     // Add logo component (above piano roll)
     addAndMakeVisible (logo);
 
+    // Add version label (top right, left of settings button)
+    addAndMakeVisible (versionLabel);
+    versionLabel.setText ("v" VERSION, juce::dontSendNotification);
+    auto interBoldFont = juce::Typeface::createSystemTypefaceFor(
+        BinaryData::Inter_28ptBold_ttf,
+        BinaryData::Inter_28ptBold_ttfSize);
+    versionLabel.setFont (juce::FontOptions (interBoldFont).withHeight (11.0f));
+    versionLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.5f));
+    versionLabel.setJustificationType (juce::Justification::centredRight);
+
     // Add settings button (top right corner)
     addAndMakeVisible (settingsButton);
     settingsButton.onClick = [this]() {
@@ -406,6 +416,14 @@ void PluginEditor::resized() {
     int noteRangeControlsWidth = editorWidth - noteRangeControlsX - noteRangeControlsRightMargin;
     int noteRangeControlsHeight = (sequencerControlsY - sequencerStepsY) + sequencerControlsHeight;  // 92 + 18 gap + 92 = 202
     noteRangeControls.setBounds (noteRangeControlsX, noteRangeControlsY, noteRangeControlsWidth, noteRangeControlsHeight);
+
+    // Version label (top right, left of settings button)
+    constexpr int versionLabelWidth = 60;
+    constexpr int versionLabelHeight = 20;
+    constexpr int versionLabelMarginRight = 10;  // Gap between version and settings button
+    int versionLabelX = getWidth() - settingsButtonSize - settingsButtonOffsetRight - versionLabelWidth - versionLabelMarginRight;
+    int versionLabelY = (settingsButtonSize - versionLabelHeight) / 2;  // Vertically center with settings button
+    versionLabel.setBounds (versionLabelX, versionLabelY, versionLabelWidth, versionLabelHeight);
 
     // Settings button in top right corner
     settingsButton.setBounds (getWidth() - settingsButtonSize - settingsButtonOffsetRight, 0,

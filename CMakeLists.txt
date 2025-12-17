@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.25)
 
 # This tells cmake we have goodies in the /cmake folder
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# Enable auto-incrementing patch level based on git commits
+set(PAMPLEJUCE_AUTO_BUMP_PATCH_LEVEL ON)
+
 include (PamplejuceVersion)
 
 # Modern concise way to add dependencies to your project
