@@ -23,7 +23,14 @@ PluginProcessor::PluginProcessor()
         }
     }
 
-    // Initialize clock settings (mode is already set by syncApvtsToState above)
+    // Initialize clock settings
+    // Default to internal clock for standalone, DAW sync for plugin
+#if JucePlugin_Build_Standalone
+    clock.setMode(ClockMode::INTERNAL);
+    clock.start();
+#else
+    clock.setMode(ClockMode::DAW_SYNC);
+#endif
     clock.setBpm(120.0);
     clock.setSubdivision(Subdivision::SIXTEENTH);
 
@@ -254,19 +261,7 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
 //==============================================================================
 
 void PluginProcessor::parameterChanged (const juce::String& parameterID, float newValue) {
-    // Handle clock mode changes
-    if (parameterID == Params::Keys::ID::USE_INTERNAL_CLOCK) {
-        bool useInternalClock = newValue > 0.5f;
-        clock.setMode(useInternalClock ? ClockMode::INTERNAL : ClockMode::DAW_SYNC);
-
-        // Start internal clock if switching to internal mode
-        if (useInternalClock) {
-            clock.start();
-        }
-
-        DBG("Clock mode changed to: " << (useInternalClock ? "INTERNAL" : "DAW_SYNC"));
-    }
-
+    juce::ignoreUnused(parameterID, newValue);
     // TODO: Implement other APVTS → Sequence sync when UI is ready
 }
 
@@ -275,15 +270,6 @@ void PluginProcessor::syncStateToApvts() {
 }
 
 void PluginProcessor::syncApvtsToState() {
-    // Sync clock mode from APVTS
-    if (auto* param = apvts.getRawParameterValue(Params::Keys::ID::USE_INTERNAL_CLOCK)) {
-        bool useInternalClock = param->load() > 0.5f;
-        clock.setMode(useInternalClock ? ClockMode::INTERNAL : ClockMode::DAW_SYNC);
-        if (useInternalClock) {
-            clock.start();
-        }
-    }
-
     // TODO: Implement other APVTS → Sequence sync for preset loading
 }
 
