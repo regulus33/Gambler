@@ -11,7 +11,7 @@ namespace SettingsWindowConstants {
     constexpr int controlHeight = 30;
     constexpr int controlSpacing = 15;
     constexpr int labelWidth = 120;
-    constexpr juce::uint32 bgColourHex = 0xFF2D2D2D;
+    constexpr juce::uint32 bgColourHex = 0xFF1E1E1E;  // Match main app background
     constexpr float labelFontSize = 14.0f;
     constexpr float sliderTextBoxWidth = 60.0f;
 }
@@ -233,11 +233,14 @@ public:
     }
 
     void closeButtonPressed() override {
-        // Notify that window is closing
+        // Hide the window first, then notify parent to clean up
+        setVisible(false);
+
+        // Notify that window is closing (this may delete 'this')
         if (onClose) {
             onClose();
         }
-        setVisible(false);
+        // DO NOT access 'this' after calling onClose() - the object may be deleted
     }
 
     // Callback when window is closed
