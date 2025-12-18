@@ -164,15 +164,22 @@ public:
     
     /**
      * Update DAW sync state
-     * 
+     *
      * This should be called from the audio callback when in DAW_SYNC mode.
      * The pulse count should be calculated by the DawSync utility based on
      * the AudioPlayHead position.
-     * 
+     *
      * @param currentPulseCount Current pulse count from DAW position
      */
     void updateDawSync(int currentPulseCount) {
         if (mode == ClockMode::DAW_SYNC) {
+            // Detect if pulse count went backwards (DAW restarted or looped)
+            // otherwise stopping daw makes seq stop and won't start back.
+            if (currentPulseCount < lastDawPulseCount) {
+                // Reset to allow pulses to trigger from the new position
+                lastDawPulseCount = currentPulseCount - 1;
+            }
+
             // Trigger a pulse if the count has incremented
             if (currentPulseCount > lastDawPulseCount) {
                 shouldTriggerPulse = true;
