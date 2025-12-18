@@ -153,11 +153,23 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     subsequenceControls.onBarClicked = [] (int index) {
         DBG ("Subsequence bar clicked: " + juce::String (index));
     };
-    subsequenceControls.onMinusClicked = []() {
-        DBG ("Subsequence minus button clicked");
+    subsequenceControls.onMinusClicked = [this]() {
+        auto& seq = processorRef.getSequence();
+        int currentStep = seq.getCurrentIndex();
+        if (currentStep < 0) currentStep = 0;
+        auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+        stepNotes.decreaseLength();
+        updateSubsequenceBar();
+        DBG ("Subsequence length decreased to: " + juce::String(stepNotes.getLength()));
     };
-    subsequenceControls.onPlusClicked = []() {
-        DBG ("Subsequence plus button clicked");
+    subsequenceControls.onPlusClicked = [this]() {
+        auto& seq = processorRef.getSequence();
+        int currentStep = seq.getCurrentIndex();
+        if (currentStep < 0) currentStep = 0;
+        auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+        stepNotes.increaseLength();
+        updateSubsequenceBar();
+        DBG ("Subsequence length increased to: " + juce::String(stepNotes.getLength()));
     };
 
     // Add sequencer steps component
@@ -167,6 +179,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     sequencerSteps.onStepClicked = [this] (int stepIndex) {
         // Trigger MIDI for this step (also sets current index)
         processorRef.triggerStepMidi(stepIndex);
+        updateSubsequenceBar();
         DBG ("Step clicked: " + juce::String (stepIndex));
     };
 
@@ -187,11 +200,13 @@ PluginEditor::PluginEditor (PluginProcessor& p)
             case 1:  // Index <-
                 seq.indexLeft();
                 sequenceOverview.getSequenceGrid().updateFromSequence(seq);
+                updateSubsequenceBar();
                 DBG("Index left, now at: " + juce::String(seq.getCurrentIndex()));
                 break;
             case 2:  // Index ->
                 seq.indexRight();
                 sequenceOverview.getSequenceGrid().updateFromSequence(seq);
+                updateSubsequenceBar();
                 DBG("Index right, now at: " + juce::String(seq.getCurrentIndex()));
                 break;
             case 3:  // Length +
@@ -361,6 +376,9 @@ void PluginEditor::handleAsyncUpdate() {
 
     // Update the sequence overview grid to show all 64 steps with current step highlighted
     sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+
+    // Update the subsequence bar to reflect current step's substep state
+    updateSubsequenceBar();
 }
 
 void PluginEditor::paint (juce::Graphics& g) {
@@ -454,6 +472,33 @@ void PluginEditor::setActiveStepAndNote (int stepIndex) {
     } else {
         // Clear both if stepIndex is -1
         pianoRoll.setActiveNote (-1);
+    }
+}
+
+void PluginEditor::updateSubsequenceBar() {
+    auto& seq = processorRef.getSequence();
+    int currentStep = seq.getCurrentIndex();
+    if (currentStep < 0) currentStep = 0;
+
+    const auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+    int length = stepNotes.getLength();
+    int currentSubstepIndex = stepNotes.getCurrentIndex();
+
+    auto& bar = subsequenceControls.getSubsequenceBar();
+
+    // Update all 8 bars based on the current step's StepNotes
+    for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
+        if (i < length) {
+            // Active substep - color based on note value
+            int midiNote = stepNotes.getNote(i).getNoteNumber();
+            int chromaticNote = midiNote % 12;
+            juce::Colour noteColor = MusicConstants::NOTE_COLOURS[chromaticNote];
+            bool isCurrentSubstep = (i == currentSubstepIndex);
+            bar.setBarState(i, BarState(noteColor, isCurrentSubstep));
+        } else {
+            // Inactive substep - show as default grey (darker)
+            bar.setBarState(i, BarState(juce::Colour(SubsequenceControlsConstants::defaultGreyHex), false));
+        }
     }
 }
 

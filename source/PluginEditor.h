@@ -16,6 +16,7 @@
 #include "ui/SettingsWindowComponent.h"
 #include "ui/LogoComponent.h"
 #include "ui/UIConstants.h"
+#include "ui/MusicConstants.h"
 
 //==============================================================================
 class PluginEditor : public juce::AudioProcessorEditor,
@@ -35,6 +36,9 @@ public:
 
     // Helper to set active step and update piano roll
     void setActiveStepAndNote (int stepIndex);
+
+    // Helper to update the subsequence bar UI from current step's StepNotes
+    void updateSubsequenceBar();
 
 private:
     // AsyncUpdater callback for UI refresh (called on message thread)
