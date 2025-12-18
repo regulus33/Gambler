@@ -41,8 +41,8 @@ PluginProcessor::PluginProcessor()
     clock.setBpm(120.0);
     clock.setSubdivision(Subdivision::SIXTEENTH);
 
-    // Enable random mode so notes are randomized within the scale
-    sequence.setIsRandom(true);
+    // Random mode is off by default (enabled when Roll button is held)
+    sequence.setIsRandom(false);
 
     // Open first available MIDI output device for standalone mode
     auto midiOutputs = juce::MidiOutput::getAvailableDevices();

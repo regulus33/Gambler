@@ -504,8 +504,7 @@ public:
         buttons[7]->setIcon(ControlIcons::createShiftIcon());
         buttons[7]->setLabel("Shift");
 
-        // Set toggle state for Roll and Shift
-        buttons[0]->setToggleable(true);  // Roll
+        // Set toggle state for Shift only (Roll is momentary)
         buttons[7]->setToggleable(true);  // Shift
     }
     
@@ -530,6 +529,7 @@ public:
     
     // Callbacks for button clicks
     std::function<void(int buttonIndex)> onButtonClicked;
+    std::function<void(int buttonIndex)> onButtonReleased;
     
     // Get button toggle state (for Roll and Shift)
     bool isButtonToggled(int index) const {
@@ -644,6 +644,14 @@ private:
             if (!isToggleable_ && isPressed_) {
                 isPressed_ = false;
                 repaint();
+
+                // Notify parent of button release
+                if (auto* parent = dynamic_cast<SequencerControlsComponent*>(getParentComponent())) {
+                    if (parent->onButtonReleased) {
+                        int index = parent->buttons.indexOf(this);
+                        parent->onButtonReleased(index);
+                    }
+                }
             }
         }
         

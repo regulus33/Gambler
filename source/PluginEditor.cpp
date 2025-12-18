@@ -214,10 +214,9 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         auto& seq = processorRef.getSequence();
 
         switch (buttonIndex) {
-            case 0:  // Roll - toggle random mode
-                seq.setIsRandom(!seq.getIsRandom());
-                sequencerControls.setButtonToggled(0, seq.getIsRandom());
-                DBG("Roll (random mode): " + juce::String(seq.getIsRandom() ? "ON" : "OFF"));
+            case 0:  // Roll - momentary: enable random mode while held
+                seq.setIsRandom(true);
+                DBG("Roll pressed - random mode ON");
                 break;
             case 1:  // Index <-
                 seq.indexLeft();
@@ -263,8 +262,19 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         }
     };
 
-    // Initialize Roll button state to match processor's sequence (random is ON by default now)
-    sequencerControls.setButtonToggled(0, processorRef.getSequence().getIsRandom());
+    // Setup callback for control button releases (for momentary buttons like Roll)
+    sequencerControls.onButtonReleased = [this] (int buttonIndex) {
+        auto& seq = processorRef.getSequence();
+
+        switch (buttonIndex) {
+            case 0:  // Roll - disable random mode when released
+                seq.setIsRandom(false);
+                DBG("Roll released - random mode OFF");
+                break;
+            default:
+                break;
+        }
+    };
 
     // Add note range controls component (right of sequencer)
     addAndMakeVisible (noteRangeControls);
