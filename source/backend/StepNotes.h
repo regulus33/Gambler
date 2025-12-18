@@ -72,7 +72,22 @@ public:
             notes[index].setSelected(selected);
         }
     }
-    
+
+    /**
+     * Set the current index directly (for UI selection)
+     * Also updates the selection state of all notes
+     * @param index The index to set as current (0 to length-1, or -1 for none)
+     */
+    void setCurrentIndex(int index) {
+        if (index >= -1 && index < length) {
+            currentIndex = index;
+            // Update selection state - only current note is selected
+            for (int i = 0; i < MAX_LENGTH; i++) {
+                notes[i].setSelected(i == currentIndex);
+            }
+        }
+    }
+
     // Operations
     void increaseLength() {
         if (length < MAX_LENGTH) {

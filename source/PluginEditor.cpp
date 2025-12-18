@@ -150,8 +150,30 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     addAndMakeVisible (subsequenceControls);
 
     // Setup callbacks for subsequence controls
-    subsequenceControls.onBarClicked = [] (int index) {
-        DBG ("Subsequence bar clicked: " + juce::String (index));
+    subsequenceControls.onBarClicked = [this] (int index) {
+        auto& seq = processorRef.getSequence();
+        int currentStep = seq.getCurrentIndex();
+        if (currentStep < 0) currentStep = 0;
+
+        auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+
+        // Only allow clicking on active substeps (within length)
+        if (index < stepNotes.getLength()) {
+            stepNotes.setCurrentIndex(index);
+
+            // Update the subsequence bar to show the new selection
+            updateSubsequenceBar();
+
+            // Update the piano roll to highlight the selected substep's note
+            int midiNote = stepNotes.getCurrentNote().getNoteNumber();
+            int chromaticNote = midiNote % 12;
+            pianoRoll.setActiveNote(chromaticNote);
+
+            // Update the note controls to reflect the selected substep's note
+            mainControls.getNoteControls().setFromMidiNote(midiNote);
+
+            DBG ("Substep " + juce::String(index) + " selected, note: " + juce::String(midiNote));
+        }
     };
     subsequenceControls.onMinusClicked = [this]() {
         auto& seq = processorRef.getSequence();
