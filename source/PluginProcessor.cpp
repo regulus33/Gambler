@@ -171,6 +171,12 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // Clear incoming MIDI (we're generating, not processing MIDI through)
     midiMessages.clear();
 
+    // Execute any queued commands from UI thread (thread-safe state modifications)
+    int numCommands = commandQueue.executeAll();
+    if (numCommands > 0) {
+        DBG("Executed " << numCommands << " queued commands");
+    }
+
     // Process any queued preview MIDI messages (from UI thread)
     int start1, size1, start2, size2;
     previewMidiFifo.prepareToRead(previewMidiFifo.getNumReady(), start1, size1, start2, size2);
@@ -358,8 +364,10 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
 void PluginProcessor::triggerStepMidi(int stepIndex) {
     if (stepIndex < 0 || stepIndex >= 64) return;
 
-    // Set the sequence's current index to this step
-    sequence.setCurrentIndex(stepIndex);
+    // Queue command to set the sequence's current index (thread-safe)
+    queueCommand(ProcessorCommand([this, stepIndex]() {
+        sequence.setCurrentIndex(stepIndex);
+    }));
 
     // Get the note for this step
     const auto& step = sequence.getStep(stepIndex);

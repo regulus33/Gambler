@@ -74,13 +74,14 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // Setup callback for scale changes - update backend Scale when user toggles notes
     pianoRoll.onNoteChanged = [this]() {
-        // Get the scale from the piano roll and update the sequence's scale
+        // Get the scale from the piano roll
         Scale newScale = pianoRoll.getScale();
 
-        // Copy the note selection to the sequence's scale
-        processorRef.getSequence().getScale().setScaleNotes(newScale.getScaleNotes());
-
-        DBG("Piano roll scale changed - updated backend Scale");
+        // Queue command to update the sequence's scale on audio thread
+        processorRef.queueCommand(ProcessorCommand([this, newScale]() {
+            processorRef.getSequence().getScale().setScaleNotes(newScale.getScaleNotes());
+            DBG("Piano roll scale changed - updated backend Scale");
+        }));
     };
 
     // Add MIDI data per step component (hidden by default)
@@ -91,49 +92,55 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // Wire up note controls callbacks to update the current step's note
     mainControls.getNoteControls().onNoteChanged = [this](int pitchClass) {
-        auto& seq = processorRef.getSequence();
-        int currentStep = seq.getCurrentIndex();
-        auto& step = seq.getStep(currentStep);
+        // Queue command to modify state on audio thread
+        processorRef.queueCommand(ProcessorCommand([this, pitchClass]() {
+            auto& seq = processorRef.getSequence();
+            int currentStep = seq.getCurrentIndex();
+            auto& step = seq.getStep(currentStep);
 
-        // Get current note, preserve octave, change pitch class
-        int currentNote = step.getStepNotes().getCurrentNote().getNoteNumber();
-        int currentOctave = currentNote / 12;
-        int newNote = currentOctave * 12 + pitchClass;
+            // Get current note, preserve octave, change pitch class
+            int currentNote = step.getStepNotes().getCurrentNote().getNoteNumber();
+            int currentOctave = currentNote / 12;
+            int newNote = currentOctave * 12 + pitchClass;
 
-        step.updateCurrentNoteNumber(newNote);
+            step.updateCurrentNoteNumber(newNote);
+
+            DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote);
+        }));
+
+        // Repaint UI immediately (reading state is safe)
         sequencerSteps.repaint();
 
         // Trigger MIDI preview if enabled
         bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
-        DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote
-            << " | Preview enabled: " << (previewEnabled ? "YES" : "NO"));
-
         if (previewEnabled) {
-            DBG("  -> Calling triggerCurrentStepMidi()");
             processorRef.triggerCurrentStepMidi();
         }
     };
 
     mainControls.getNoteControls().onOctaveChanged = [this](int octaveIndex) {
-        auto& seq = processorRef.getSequence();
-        int currentStep = seq.getCurrentIndex();
-        auto& step = seq.getStep(currentStep);
+        // Queue command to modify state on audio thread
+        processorRef.queueCommand(ProcessorCommand([this, octaveIndex]() {
+            auto& seq = processorRef.getSequence();
+            int currentStep = seq.getCurrentIndex();
+            auto& step = seq.getStep(currentStep);
 
-        // Get current note, preserve pitch class, change octave
-        int currentNote = step.getStepNotes().getCurrentNote().getNoteNumber();
-        int pitchClass = currentNote % 12;
-        int newNote = octaveIndex * 12 + pitchClass;
+            // Get current note, preserve pitch class, change octave
+            int currentNote = step.getStepNotes().getCurrentNote().getNoteNumber();
+            int pitchClass = currentNote % 12;
+            int newNote = octaveIndex * 12 + pitchClass;
 
-        step.updateCurrentNoteNumber(newNote);
+            step.updateCurrentNoteNumber(newNote);
+
+            DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote);
+        }));
+
+        // Repaint UI immediately (reading state is safe)
         sequencerSteps.repaint();
 
         // Trigger MIDI preview if enabled
         bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
-        DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote
-            << " | Preview enabled: " << (previewEnabled ? "YES" : "NO"));
-
         if (previewEnabled) {
-            DBG("  -> Calling triggerCurrentStepMidi()");
             processorRef.triggerCurrentStepMidi();
         }
     };
@@ -157,47 +164,57 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // Setup callbacks for subsequence controls
     subsequenceControls.onBarClicked = [this] (int index) {
+        // Queue command to modify state on audio thread
+        processorRef.queueCommand(ProcessorCommand([this, index]() {
+            auto& seq = processorRef.getSequence();
+            int currentStep = seq.getCurrentIndex();
+            if (currentStep < 0) currentStep = 0;
+
+            auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+
+            // Only allow clicking on active substeps (within length)
+            if (index < stepNotes.getLength()) {
+                stepNotes.setCurrentIndex(index);
+                DBG ("Substep " + juce::String(index) + " selected");
+            }
+        }));
+
+        // Update UI (reading state is safe)
+        updateSubsequenceBar();
+
         auto& seq = processorRef.getSequence();
         int currentStep = seq.getCurrentIndex();
-        if (currentStep < 0) currentStep = 0;
-
-        auto& stepNotes = seq.getStep(currentStep).getStepNotes();
-
-        // Only allow clicking on active substeps (within length)
-        if (index < stepNotes.getLength()) {
-            stepNotes.setCurrentIndex(index);
-
-            // Update the subsequence bar to show the new selection
-            updateSubsequenceBar();
-
-            // Update the piano roll to highlight the selected substep's note
-            int midiNote = stepNotes.getCurrentNote().getNoteNumber();
-            int chromaticNote = midiNote % 12;
-            pianoRoll.setActiveNote(chromaticNote);
-
-            // Update the note controls to reflect the selected substep's note
-            mainControls.getNoteControls().setFromMidiNote(midiNote);
-
-            DBG ("Substep " + juce::String(index) + " selected, note: " + juce::String(midiNote));
+        if (currentStep >= 0) {
+            auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+            if (index < stepNotes.getLength()) {
+                int midiNote = stepNotes.getCurrentNote().getNoteNumber();
+                int chromaticNote = midiNote % 12;
+                pianoRoll.setActiveNote(chromaticNote);
+                mainControls.getNoteControls().setFromMidiNote(midiNote);
+            }
         }
     };
     subsequenceControls.onMinusClicked = [this]() {
-        auto& seq = processorRef.getSequence();
-        int currentStep = seq.getCurrentIndex();
-        if (currentStep < 0) currentStep = 0;
-        auto& stepNotes = seq.getStep(currentStep).getStepNotes();
-        stepNotes.decreaseLength();
+        processorRef.queueCommand(ProcessorCommand([this]() {
+            auto& seq = processorRef.getSequence();
+            int currentStep = seq.getCurrentIndex();
+            if (currentStep < 0) currentStep = 0;
+            auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+            stepNotes.decreaseLength();
+            DBG ("Subsequence length decreased to: " + juce::String(stepNotes.getLength()));
+        }));
         updateSubsequenceBar();
-        DBG ("Subsequence length decreased to: " + juce::String(stepNotes.getLength()));
     };
     subsequenceControls.onPlusClicked = [this]() {
-        auto& seq = processorRef.getSequence();
-        int currentStep = seq.getCurrentIndex();
-        if (currentStep < 0) currentStep = 0;
-        auto& stepNotes = seq.getStep(currentStep).getStepNotes();
-        stepNotes.increaseLength();
+        processorRef.queueCommand(ProcessorCommand([this]() {
+            auto& seq = processorRef.getSequence();
+            int currentStep = seq.getCurrentIndex();
+            if (currentStep < 0) currentStep = 0;
+            auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+            stepNotes.increaseLength();
+            DBG ("Subsequence length increased to: " + juce::String(stepNotes.getLength()));
+        }));
         updateSubsequenceBar();
-        DBG ("Subsequence length increased to: " + juce::String(stepNotes.getLength()));
     };
 
     // Add sequencer steps component
@@ -217,51 +234,67 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     // Setup callback for control button clicks
     // Button indices: 0=Roll, 1=Index<-, 2=Index->, 3=Length+, 4=Length-, 5=Nudge<-, 6=Nudge->, 7=Shift
     sequencerControls.onButtonClicked = [this] (int buttonIndex) {
-        auto& seq = processorRef.getSequence();
-
         switch (buttonIndex) {
             case 0:  // Roll - momentary: enable random mode while held
-                seq.setIsRandom(true);
-                DBG("Roll pressed - random mode ON");
+                processorRef.queueCommand(ProcessorCommand([this]() {
+                    processorRef.getSequence().setIsRandom(true);
+                    DBG("Roll pressed - random mode ON");
+                }));
                 break;
             case 1:  // Index <-
-                seq.indexLeft();
-                sequenceOverview.getSequenceGrid().updateFromSequence(seq);
+                processorRef.queueCommand(ProcessorCommand([this]() {
+                    processorRef.getSequence().indexLeft();
+                    DBG("Index left, now at: " + juce::String(processorRef.getSequence().getCurrentIndex()));
+                }));
+                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
                 updateSubsequenceBar();
-                DBG("Index left, now at: " + juce::String(seq.getCurrentIndex()));
                 break;
             case 2:  // Index ->
-                seq.indexRight();
-                sequenceOverview.getSequenceGrid().updateFromSequence(seq);
+                processorRef.queueCommand(ProcessorCommand([this]() {
+                    processorRef.getSequence().indexRight();
+                    DBG("Index right, now at: " + juce::String(processorRef.getSequence().getCurrentIndex()));
+                }));
+                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
                 updateSubsequenceBar();
-                DBG("Index right, now at: " + juce::String(seq.getCurrentIndex()));
                 break;
             case 3:  // Length +
-                seq.increaseLength();
+                processorRef.queueCommand(ProcessorCommand([this]() {
+                    processorRef.getSequence().increaseLength();
+                    DBG("Length increased to: " + juce::String(processorRef.getSequence().getLength()));
+                }));
                 sequencerSteps.repaint();
-                sequenceOverview.getSequenceGrid().updateFromSequence(seq);
-                DBG("Length increased to: " + juce::String(seq.getLength()));
+                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
                 break;
             case 4:  // Length -
-                seq.decreaseLength();
+                processorRef.queueCommand(ProcessorCommand([this]() {
+                    processorRef.getSequence().decreaseLength();
+                    DBG("Length decreased to: " + juce::String(processorRef.getSequence().getLength()));
+                }));
                 sequencerSteps.repaint();
-                sequenceOverview.getSequenceGrid().updateFromSequence(seq);
-                DBG("Length decreased to: " + juce::String(seq.getLength()));
+                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
                 break;
             case 5:  // Nudge <-
-                seq.nudgeLeft();
-                sequenceOverview.getSequenceGrid().updateFromSequence(seq);
-                DBG("Nudge left");
+                processorRef.queueCommand(ProcessorCommand([this]() {
+                    processorRef.getSequence().nudgeLeft();
+                    DBG("Nudge left");
+                }));
+                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
                 break;
             case 6:  // Nudge ->
-                seq.nudgeRight();
-                sequenceOverview.getSequenceGrid().updateFromSequence(seq);
-                DBG("Nudge right");
+                processorRef.queueCommand(ProcessorCommand([this]() {
+                    processorRef.getSequence().nudgeRight();
+                    DBG("Nudge right");
+                }));
+                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
                 break;
             case 7:  // Shift - toggle shift mode
-                seq.setIsShift(!seq.getIsShift());
-                sequencerControls.setButtonToggled(7, seq.getIsShift());
-                DBG("Shift mode: " + juce::String(seq.getIsShift() ? "ON" : "OFF"));
+                processorRef.queueCommand(ProcessorCommand([this]() {
+                    auto& seq = processorRef.getSequence();
+                    seq.setIsShift(!seq.getIsShift());
+                    DBG("Shift mode: " + juce::String(seq.getIsShift() ? "ON" : "OFF"));
+                }));
+                // Update UI toggle state (reading is safe)
+                sequencerControls.setButtonToggled(7, processorRef.getSequence().getIsShift());
                 break;
             default:
                 break;
@@ -270,12 +303,12 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // Setup callback for control button releases (for momentary buttons like Roll)
     sequencerControls.onButtonReleased = [this] (int buttonIndex) {
-        auto& seq = processorRef.getSequence();
-
         switch (buttonIndex) {
             case 0:  // Roll - disable random mode when released
-                seq.setIsRandom(false);
-                DBG("Roll released - random mode OFF");
+                processorRef.queueCommand(ProcessorCommand([this]() {
+                    processorRef.getSequence().setIsRandom(false);
+                    DBG("Roll released - random mode OFF");
+                }));
                 break;
             default:
                 break;
@@ -292,10 +325,12 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // Wire up note range callback to update backend Scale
     noteRangeControls.onRangeChanged = [this](int minNote, int maxNote) {
-        auto& scale = processorRef.getSequence().getScale();
-        scale.setRangeMin(minNote);
-        scale.setRangeMax(maxNote);
-        DBG("Note range changed: " << minNote << " - " << maxNote);
+        processorRef.queueCommand(ProcessorCommand([this, minNote, maxNote]() {
+            auto& scale = processorRef.getSequence().getScale();
+            scale.setRangeMin(minNote);
+            scale.setRangeMax(maxNote);
+            DBG("Note range changed: " << minNote << " - " << maxNote);
+        }));
     };
 
     // Add logo component (above piano roll)
@@ -325,31 +360,39 @@ PluginEditor::PluginEditor (PluginProcessor& p)
                 content->setTempo(processorRef.getClock().getBpm());
 
                 content->onInternalClockChanged = [this](bool enabled) {
-                    if (enabled) {
-                        processorRef.getClock().setMode(ClockMode::INTERNAL);
-                        processorRef.getClock().start();
-                    } else {
-                        processorRef.getClock().setMode(ClockMode::DAW_SYNC);
-                        processorRef.getClock().stop();
-                    }
-                    DBG("Internal clock " + juce::String(enabled ? "enabled" : "disabled"));
+                    processorRef.queueCommand(ProcessorCommand([this, enabled]() {
+                        if (enabled) {
+                            processorRef.getClock().setMode(ClockMode::INTERNAL);
+                            processorRef.getClock().start();
+                        } else {
+                            processorRef.getClock().setMode(ClockMode::DAW_SYNC);
+                            processorRef.getClock().stop();
+                        }
+                        DBG("Internal clock " + juce::String(enabled ? "enabled" : "disabled"));
+                    }));
                 };
 
                 content->onTempoChanged = [this](double bpm) {
-                    processorRef.getClock().setBpm(bpm);
-                    DBG("Tempo changed to: " + juce::String(bpm) + " BPM");
+                    processorRef.queueCommand(ProcessorCommand([this, bpm]() {
+                        processorRef.getClock().setBpm(bpm);
+                        DBG("Tempo changed to: " + juce::String(bpm) + " BPM");
+                    }));
                 };
 
                 content->onPlayClicked = [this]() {
-                    // Reset sequence to beginning and start clock
-                    processorRef.getSequence().reset();
-                    processorRef.getClock().start();
-                    DBG("Play clicked - sequence reset to index 0, clock started");
+                    processorRef.queueCommand(ProcessorCommand([this]() {
+                        // Reset sequence to beginning and start clock
+                        processorRef.getSequence().reset();
+                        processorRef.getClock().start();
+                        DBG("Play clicked - sequence reset to index 0, clock started");
+                    }));
                 };
 
                 content->onStopClicked = [this]() {
-                    processorRef.getClock().stop();
-                    DBG("Stop clicked - clock stopped");
+                    processorRef.queueCommand(ProcessorCommand([this]() {
+                        processorRef.getClock().stop();
+                        DBG("Stop clicked - clock stopped");
+                    }));
                 };
 
                 // Sync preview notes setting from processor

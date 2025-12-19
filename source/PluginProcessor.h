@@ -5,6 +5,7 @@
 #include "backend/Clock.h"
 #include "backend/DawSync.h"
 #include "backend/UserPreferences.h"
+#include "backend/ProcessorCommand.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 
@@ -79,6 +80,15 @@ public:
     UserPreferences& getUserPreferences() noexcept { return userPreferences; }
     const UserPreferences& getUserPreferences() const noexcept { return userPreferences; }
 
+    /**
+     * Queue a command to be executed on the audio thread
+     * This is the thread-safe way to modify domain state from the UI thread.
+     * Returns false if the queue is full (command was dropped).
+     */
+    bool queueCommand(ProcessorCommand command) {
+        return commandQueue.push(std::move(command));
+    }
+
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 
@@ -112,6 +122,9 @@ private:
     };
     juce::AbstractFifo previewMidiFifo { 32 };  // Ring buffer for up to 32 messages
     std::array<PreviewMidiMessage, 32> previewMidiBuffer;
+
+    // Command queue for thread-safe UI → Audio communication
+    ProcessorCommandQueue commandQueue;
 
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();
