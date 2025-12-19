@@ -12,9 +12,6 @@ PluginProcessor::PluginProcessor()
 #endif
               ),
       apvts (*this, nullptr, "Parameters", createParameterLayout()) {
-    // Initialize State from APVTS (in case we're loading a saved state)
-    syncApvtsToState();
-
     // Register as listener for all parameter changes
     // This ensures State stays in sync when parameters change from UI
     for (auto* param : apvts.processor.getParameters()) {
@@ -240,44 +237,84 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor() {
 
 //==============================================================================
 void PluginProcessor::getStateInformation (juce::MemoryBlock& destData) {
-    // Sync State → APVTS before saving
-    syncStateToApvts();
+    // Create root XML element to hold all state
+    auto rootXml = std::make_unique<juce::XmlElement>("GamblerState");
 
-    // Save APVTS state
-    auto valueTreeState = apvts.copyState();
-    std::unique_ptr<juce::XmlElement> xml (valueTreeState.createXml());
-    copyXmlToBinary (*xml, destData);
+    // Save APVTS parameters (UI control states)
+    auto apvtsXml = apvts.copyState().createXml();
+    rootXml->addChildElement(apvtsXml.release());
+
+    // Save Sequence data (all 64 steps with notes, velocities, gates, modulations, etc.)
+    rootXml->addChildElement(sequence.toXml().release());
+
+    // Save Clock settings (mode, BPM, subdivision)
+    rootXml->addChildElement(clock.toXml().release());
+
+    // Save User Preferences
+    rootXml->addChildElement(userPreferences.toXml().release());
+
+    // Convert to binary and save
+    copyXmlToBinary(*rootXml, destData);
+
+    DBG("State saved: Sequence, Clock, and UserPreferences");
 }
 
 void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
-    // Load APVTS state
-    std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
+    // Load XML from binary data
+    std::unique_ptr<juce::XmlElement> rootXml (getXmlFromBinary (data, sizeInBytes));
 
-    if (xmlState != nullptr) {
-        if (xmlState->hasTagName (apvts.state.getType())) {
-            apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+    if (rootXml != nullptr) {
+        // Check if this is the new format (GamblerState root element)
+        if (rootXml->hasTagName("GamblerState")) {
+            DBG("Loading state: GamblerState format");
 
-            // Sync APVTS → State after loading
-            syncApvtsToState();
+            // Load APVTS parameters
+            if (auto* apvtsXml = rootXml->getChildByName(apvts.state.getType())) {
+                apvts.replaceState(juce::ValueTree::fromXml(*apvtsXml));
+                DBG("  - APVTS loaded");
+            }
+
+            // Load Sequence data
+            if (auto* seqXml = rootXml->getChildByName("Sequence")) {
+                sequence.fromXml(*seqXml);
+                DBG("  - Sequence loaded");
+            }
+
+            // Load Clock settings
+            if (auto* clockXml = rootXml->getChildByName("Clock")) {
+                clock.fromXml(*clockXml);
+                juce::String modeStr = (clock.getMode() == ClockMode::INTERNAL) ? "INTERNAL" : "DAW_SYNC";
+                DBG("  - Clock loaded (mode: " + modeStr + ", BPM: " + juce::String(clock.getBpm()) + ")");
+            }
+
+            // Load User Preferences
+            if (auto* prefsXml = rootXml->getChildByName("UserPreferences")) {
+                userPreferences.fromXml(*prefsXml);
+                DBG("  - UserPreferences loaded (previewNotesOnEdit: " +
+                    juce::String(userPreferences.previewNotesOnEdit ? "true" : "false") + ")");
+            }
+            // Backward compatibility: Load from old "Settings" element
+            else if (auto* settingsXml = rootXml->getChildByName("Settings")) {
+                userPreferences.previewNotesOnEdit = settingsXml->getBoolAttribute("previewNotesOnEdit", true);
+                DBG("  - UserPreferences loaded from legacy Settings format");
+            }
+        }
+        // Fallback: Old format (just APVTS)
+        else if (rootXml->hasTagName(apvts.state.getType())) {
+            DBG("Loading state: Legacy APVTS-only format");
+            apvts.replaceState(juce::ValueTree::fromXml(*rootXml));
         }
     }
 }
 
 //==============================================================================
-// Sync Methods: APVTS ↔ State
+// APVTS Parameter Listener
 //==============================================================================
 
 void PluginProcessor::parameterChanged (const juce::String& parameterID, float newValue) {
     juce::ignoreUnused(parameterID, newValue);
-    // TODO: Implement other APVTS → Sequence sync when UI is ready
-}
-
-void PluginProcessor::syncStateToApvts() {
-    // TODO: Implement Sequence → APVTS sync for preset saving
-}
-
-void PluginProcessor::syncApvtsToState() {
-    // TODO: Implement other APVTS → Sequence sync for preset loading
+    // APVTS parameters are used for UI state only
+    // Sequence data is persisted directly via toXml/fromXml
 }
 
 //==============================================================================

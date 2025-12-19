@@ -104,7 +104,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         sequencerSteps.repaint();
 
         // Trigger MIDI preview if enabled
-        if (previewNotesOnEdit) {
+        if (processorRef.getUserPreferences().previewNotesOnEdit) {
             processorRef.triggerCurrentStepMidi();
         }
 
@@ -125,7 +125,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         sequencerSteps.repaint();
 
         // Trigger MIDI preview if enabled
-        if (previewNotesOnEdit) {
+        if (processorRef.getUserPreferences().previewNotesOnEdit) {
             processorRef.triggerCurrentStepMidi();
         }
 
@@ -346,10 +346,10 @@ PluginEditor::PluginEditor (PluginProcessor& p)
                     DBG("Stop clicked - clock stopped");
                 };
 
-                // Sync preview notes setting
-                content->setPreviewNotesEnabled(previewNotesOnEdit);
+                // Sync preview notes setting from processor
+                content->setPreviewNotesEnabled(processorRef.getUserPreferences().previewNotesOnEdit);
                 content->onPreviewNotesChanged = [this](bool enabled) {
-                    previewNotesOnEdit = enabled;
+                    processorRef.getUserPreferences().previewNotesOnEdit = enabled;
                     DBG("Preview notes on edit: " + juce::String(enabled ? "enabled" : "disabled"));
                 };
             }

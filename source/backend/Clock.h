@@ -2,6 +2,7 @@
 
 #include "ClockMode.h"
 #include "InternalClock.h"
+#include <juce_core/juce_core.h>
 
 /**
  * Clock - Master timing mechanism for Gambler
@@ -215,13 +216,67 @@ public:
     
     /**
      * Get the internal clock (for testing)
-     * 
+     *
      * @return Reference to the internal clock
      */
     const InternalClock& getInternalClock() const {
         return internalClock;
     }
-    
+
+    /**
+     * Serialize clock state to XML
+     * Saves mode, BPM, and subdivision (not transient state like isRunning)
+     */
+    std::unique_ptr<juce::XmlElement> toXml() const {
+        auto xml = std::make_unique<juce::XmlElement>("Clock");
+
+        // Save clock mode
+        xml->setAttribute("mode", mode == ClockMode::INTERNAL ? "internal" : "daw_sync");
+
+        // Save BPM (for internal mode)
+        xml->setAttribute("bpm", getBpm());
+
+        // Save subdivision
+        int subdivisionValue = 0;
+        switch (subdivision) {
+            case Subdivision::QUARTER:        subdivisionValue = 0; break;
+            case Subdivision::EIGHTH:         subdivisionValue = 1; break;
+            case Subdivision::SIXTEENTH:      subdivisionValue = 2; break;
+            case Subdivision::THIRTY_SECOND:  subdivisionValue = 3; break;
+        }
+        xml->setAttribute("subdivision", subdivisionValue);
+
+        return xml;
+    }
+
+    /**
+     * Deserialize clock state from XML
+     * Restores mode, BPM, and subdivision
+     */
+    void fromXml(const juce::XmlElement& xml) {
+        if (xml.getTagName() != "Clock") return;
+
+        // Restore clock mode
+        juce::String modeStr = xml.getStringAttribute("mode", "daw_sync");
+        ClockMode restoredMode = (modeStr == "internal") ? ClockMode::INTERNAL : ClockMode::DAW_SYNC;
+        setMode(restoredMode);
+
+        // Restore BPM
+        double restoredBpm = xml.getDoubleAttribute("bpm", 120.0);
+        setBpm(restoredBpm);
+
+        // Restore subdivision
+        int subdivisionValue = xml.getIntAttribute("subdivision", 2); // Default to SIXTEENTH
+        Subdivision restoredSubdivision = Subdivision::SIXTEENTH;
+        switch (subdivisionValue) {
+            case 0: restoredSubdivision = Subdivision::QUARTER; break;
+            case 1: restoredSubdivision = Subdivision::EIGHTH; break;
+            case 2: restoredSubdivision = Subdivision::SIXTEENTH; break;
+            case 3: restoredSubdivision = Subdivision::THIRTY_SECOND; break;
+        }
+        setSubdivision(restoredSubdivision);
+    }
+
 private:
     ClockMode mode;                // Current clock mode
     Subdivision subdivision;       // Note subdivision

@@ -137,3 +137,12 @@ All domain logic is fully tested using **Catch2** with the `--reporter rspec` op
 4. **Implement MIDI output** in AudioProcessor
 5. **Add clock/tempo synchronization**
 6. **Implement probability controls** for generative behavior
+
+# State recall and persistence (basic not counting presets yet)
+Basically we get callbacks sent to `PluginProcessor`
+The main things to look at are what bitwig calls in save and load of projects
+`PluginProcessor::getStateInformation`
+`PluginProcessor::setStateInformation`
+
+All we are doing is loading and saving state as xml.
+... 

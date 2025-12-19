@@ -4,6 +4,7 @@
 #include "backend/Sequence.h"
 #include "backend/Clock.h"
 #include "backend/DawSync.h"
+#include "backend/UserPreferences.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 
@@ -74,6 +75,10 @@ public:
      */
     void triggerCurrentStepMidi();
 
+    // User preferences (persisted with project)
+    UserPreferences& getUserPreferences() noexcept { return userPreferences; }
+    const UserPreferences& getUserPreferences() const noexcept { return userPreferences; }
+
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 
@@ -89,6 +94,9 @@ private:
     Clock clock;
     DawSync dawSync;  // DAW synchronization utility
 
+    // User preferences (persisted with project)
+    UserPreferences userPreferences;
+
     // MIDI state
     int lastPlayedNote = -1;  // Track last note for note-off
 
@@ -98,16 +106,6 @@ private:
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();
 
-    // ========================================
-    // Sync Methods: APVTS ↔ State
-    // ========================================
-
     // Called when APVTS parameter changes (from UI or preset load)
     void parameterChanged(const juce::String& parameterID, float newValue) override;
-
-    // Sync all State → APVTS (for saving presets)
-    void syncStateToApvts();
-
-    // Sync all APVTS → State (for loading presets)
-    void syncApvtsToState();
 };
