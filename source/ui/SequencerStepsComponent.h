@@ -12,9 +12,8 @@ namespace SequencerStepsConstants {
     constexpr int numVisibleSteps = 8;
     constexpr float stepSize = 92.0f;
     constexpr float gap = 18.0f;
-    // Border
-    constexpr float borderWidthInactive = 2.2f;
-    constexpr float borderWidthActive = 7.0f;
+    // Border (only for active step)
+    constexpr float borderWidthActive = 3.0f;
     constexpr float cornerRadius = 4.4f;
     // Text
     constexpr float fontSize = 13.0f;
@@ -122,9 +121,6 @@ private:
         // Check if this is the active step (only if within sequence)
         bool isActive = isWithinSequence && (stepIndex == activeStepIndex);
 
-        // Determine border width
-        float borderWidth = isActive ? borderWidthActive : borderWidthInactive;
-
         if (isWithinSequence) {
             // Get the note for this step
             const auto& step = sequence.getStep(stepIndex);
@@ -142,12 +138,14 @@ private:
             g.setColour (noteColor);
             g.fillRoundedRectangle (stepBounds, cornerRadius);
 
-            // Draw white border INSIDE the bounds
-            g.setColour (juce::Colours::white);
-            float inset = borderWidth * 0.5f;
-            juce::Rectangle<float> borderBounds = stepBounds.reduced (inset);
-            float borderRadiusInner = juce::jmax (0.0f, cornerRadius - inset);
-            g.drawRoundedRectangle (borderBounds, borderRadiusInner, borderWidth);
+            // Draw white border ONLY on active step
+            if (isActive) {
+                g.setColour (juce::Colours::white);
+                float inset = borderWidthActive * 0.5f;
+                juce::Rectangle<float> borderBounds = stepBounds.reduced (inset);
+                float borderRadiusInner = juce::jmax (0.0f, cornerRadius - inset);
+                g.drawRoundedRectangle (borderBounds, borderRadiusInner, borderWidthActive);
+            }
 
             // Convert MIDI note to note name (e.g., "C4", "Gb3")
             juce::String noteText = midiNoteToNoteName (midiNote);
@@ -180,12 +178,7 @@ private:
             g.setColour (juce::Colour (0xFF484848));
             g.fillRoundedRectangle (stepBounds, cornerRadius);
 
-            // Draw white border INSIDE the bounds
-            g.setColour (juce::Colours::white);
-            float inset = borderWidth * 0.5f;
-            juce::Rectangle<float> borderBounds = stepBounds.reduced (inset);
-            float borderRadiusInner = juce::jmax (0.0f, cornerRadius - inset);
-            g.drawRoundedRectangle (borderBounds, borderRadiusInner, borderWidth);
+            // No border for inactive steps outside sequence
         }
     }
 
