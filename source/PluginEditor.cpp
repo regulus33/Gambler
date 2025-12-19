@@ -104,11 +104,14 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         sequencerSteps.repaint();
 
         // Trigger MIDI preview if enabled
-        if (processorRef.getUserPreferences().previewNotesOnEdit) {
+        bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
+        DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote
+            << " | Preview enabled: " << (previewEnabled ? "YES" : "NO"));
+
+        if (previewEnabled) {
+            DBG("  -> Calling triggerCurrentStepMidi()");
             processorRef.triggerCurrentStepMidi();
         }
-
-        DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote);
     };
 
     mainControls.getNoteControls().onOctaveChanged = [this](int octaveIndex) {
@@ -125,11 +128,14 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         sequencerSteps.repaint();
 
         // Trigger MIDI preview if enabled
-        if (processorRef.getUserPreferences().previewNotesOnEdit) {
+        bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
+        DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote
+            << " | Preview enabled: " << (previewEnabled ? "YES" : "NO"));
+
+        if (previewEnabled) {
+            DBG("  -> Calling triggerCurrentStepMidi()");
             processorRef.triggerCurrentStepMidi();
         }
-
-        DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote);
     };
 
     // Add sequence overview component

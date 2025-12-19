@@ -103,6 +103,16 @@ private:
     // Direct MIDI output for standalone mode
     std::unique_ptr<juce::MidiOutput> midiOutput;
 
+    // Preview MIDI queue (for UI-triggered notes in DAW mode)
+    // Thread-safe queue to pass MIDI from UI thread to audio thread
+    struct PreviewMidiMessage {
+        int noteNumber;
+        bool isNoteOn;
+        juce::uint8 velocity;
+    };
+    juce::AbstractFifo previewMidiFifo { 32 };  // Ring buffer for up to 32 messages
+    std::array<PreviewMidiMessage, 32> previewMidiBuffer;
+
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();
 

@@ -171,6 +171,40 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // Clear incoming MIDI (we're generating, not processing MIDI through)
     midiMessages.clear();
 
+    // Process any queued preview MIDI messages (from UI thread)
+    int start1, size1, start2, size2;
+    previewMidiFifo.prepareToRead(previewMidiFifo.getNumReady(), start1, size1, start2, size2);
+
+    for (int i = 0; i < size1; ++i) {
+        const auto& msg = previewMidiBuffer[start1 + i];
+        if (msg.isNoteOn) {
+            auto noteOn = juce::MidiMessage::noteOn(1, msg.noteNumber, msg.velocity);
+            midiMessages.addEvent(noteOn, 0);
+            DBG("Preview MIDI Note ON added to buffer: " << msg.noteNumber);
+        } else {
+            auto noteOff = juce::MidiMessage::noteOff(1, msg.noteNumber, msg.velocity);
+            midiMessages.addEvent(noteOff, 0);
+            DBG("Preview MIDI Note OFF added to buffer: " << msg.noteNumber);
+        }
+    }
+
+    for (int i = 0; i < size2; ++i) {
+        const auto& msg = previewMidiBuffer[start2 + i];
+        if (msg.isNoteOn) {
+            auto noteOn = juce::MidiMessage::noteOn(1, msg.noteNumber, msg.velocity);
+            midiMessages.addEvent(noteOn, 0);
+            DBG("Preview MIDI Note ON added to buffer: " << msg.noteNumber);
+        } else {
+            auto noteOff = juce::MidiMessage::noteOff(1, msg.noteNumber, msg.velocity);
+            midiMessages.addEvent(noteOff, 0);
+            DBG("Preview MIDI Note OFF added to buffer: " << msg.noteNumber);
+        }
+    }
+
+    if (size1 + size2 > 0) {
+        previewMidiFifo.finishedRead(size1 + size2);
+    }
+
     // Process clock based on current mode
     if (clock.getMode() == ClockMode::DAW_SYNC) {
         // DAW sync mode: get timing from host transport
@@ -333,20 +367,40 @@ void PluginProcessor::triggerStepMidi(int stepIndex) {
 
     // Send note off for previous note (if any)
     if (lastPlayedNote >= 0) {
-        auto noteOff = juce::MidiMessage::noteOff(1, lastPlayedNote, (juce::uint8)0);
         if (midiOutput) {
+            // Standalone mode: send directly to MIDI device
+            auto noteOff = juce::MidiMessage::noteOff(1, lastPlayedNote, (juce::uint8)0);
             midiOutput->sendMessageNow(noteOff);
+            DBG("Preview MIDI Note OFF (standalone): " << lastPlayedNote);
+        } else {
+            // DAW mode: queue for audio thread
+            int start1, size1, start2, size2;
+            previewMidiFifo.prepareToWrite(1, start1, size1, start2, size2);
+            if (size1 > 0) {
+                previewMidiBuffer[start1] = { lastPlayedNote, false, 0 };
+                previewMidiFifo.finishedWrite(1);
+                DBG("Preview MIDI Note OFF queued (DAW): " << lastPlayedNote);
+            }
         }
-        DBG("Preview MIDI Note OFF: " << lastPlayedNote);
     }
 
     // Send note on for the new note
     if (note >= 0) {
-        auto noteOn = juce::MidiMessage::noteOn(1, note, (juce::uint8)100);
         if (midiOutput) {
+            // Standalone mode: send directly to MIDI device
+            auto noteOn = juce::MidiMessage::noteOn(1, note, (juce::uint8)100);
             midiOutput->sendMessageNow(noteOn);
+            DBG("Preview MIDI Note ON (standalone): " << note << " (step " << stepIndex << ")");
+        } else {
+            // DAW mode: queue for audio thread
+            int start1, size1, start2, size2;
+            previewMidiFifo.prepareToWrite(1, start1, size1, start2, size2);
+            if (size1 > 0) {
+                previewMidiBuffer[start1] = { note, true, 100 };
+                previewMidiFifo.finishedWrite(1);
+                DBG("Preview MIDI Note ON queued (DAW): " << note << " (step " << stepIndex << ")");
+            }
         }
-        DBG("Preview MIDI Note ON: " << note << " (step " << stepIndex << ")");
         lastPlayedNote = note;
     } else {
         lastPlayedNote = -1;
@@ -359,33 +413,66 @@ void PluginProcessor::triggerStepMidi(int stepIndex) {
 }
 
 void PluginProcessor::triggerCurrentStepMidi() {
+    DBG("=== triggerCurrentStepMidi() called ===");
+    DBG("  midiOutput is " << (midiOutput ? "VALID" : "NULL"));
+
     int currentStep = sequence.getCurrentIndex();
-    if (currentStep < 0 || currentStep >= 64) return;
+    if (currentStep < 0 || currentStep >= 64) {
+        DBG("  ERROR: Invalid current step: " << currentStep);
+        return;
+    }
 
     // Get the note for the current step
     const auto& step = sequence.getStep(currentStep);
     int note = step.getStepNotes().getCurrentNote().getNoteNumber();
+    DBG("  Current step: " << currentStep << ", Note: " << note);
 
     // Send note off for previous note (if any)
     if (lastPlayedNote >= 0) {
-        auto noteOff = juce::MidiMessage::noteOff(1, lastPlayedNote, (juce::uint8)0);
         if (midiOutput) {
+            // Standalone mode: send directly to MIDI device
+            auto noteOff = juce::MidiMessage::noteOff(1, lastPlayedNote, (juce::uint8)0);
             midiOutput->sendMessageNow(noteOff);
+            DBG("  Preview MIDI Note OFF sent (standalone): " << lastPlayedNote);
+        } else {
+            // DAW mode: queue for audio thread
+            int start1, size1, start2, size2;
+            previewMidiFifo.prepareToWrite(1, start1, size1, start2, size2);
+            if (size1 > 0) {
+                previewMidiBuffer[start1] = { lastPlayedNote, false, 0 };
+                previewMidiFifo.finishedWrite(1);
+                DBG("  Preview MIDI Note OFF queued (DAW): " << lastPlayedNote);
+            } else {
+                DBG("  Preview MIDI queue full, Note OFF dropped: " << lastPlayedNote);
+            }
         }
-        DBG("Preview MIDI Note OFF: " << lastPlayedNote);
     }
 
     // Send note on for the new note
     if (note >= 0) {
-        auto noteOn = juce::MidiMessage::noteOn(1, note, (juce::uint8)100);
         if (midiOutput) {
+            // Standalone mode: send directly to MIDI device
+            auto noteOn = juce::MidiMessage::noteOn(1, note, (juce::uint8)100);
             midiOutput->sendMessageNow(noteOn);
+            DBG("  Preview MIDI Note ON sent (standalone): " << note);
+        } else {
+            // DAW mode: queue for audio thread
+            int start1, size1, start2, size2;
+            previewMidiFifo.prepareToWrite(1, start1, size1, start2, size2);
+            if (size1 > 0) {
+                previewMidiBuffer[start1] = { note, true, 100 };
+                previewMidiFifo.finishedWrite(1);
+                DBG("  Preview MIDI Note ON queued (DAW): " << note);
+            } else {
+                DBG("  Preview MIDI queue full, Note ON dropped: " << note);
+            }
         }
-        DBG("Preview MIDI Note ON: " << note << " (current step " << currentStep << ")");
         lastPlayedNote = note;
     } else {
         lastPlayedNote = -1;
+        DBG("  No note to play (note < 0)");
     }
+    DBG("=== triggerCurrentStepMidi() complete ===");
 }
 
 //==============================================================================
