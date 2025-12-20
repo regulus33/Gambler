@@ -175,6 +175,11 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     int numCommands = commandQueue.executeAll();
     if (numCommands > 0) {
         DBG("Executed " << numCommands << " queued commands");
+
+        // If any commands had completion callbacks, notify the UI to execute them
+        if (commandQueue.hasCompletionCallbacks() && onCompletionCallbacksPending) {
+            onCompletionCallbacksPending();
+        }
     }
 
     // Process any queued preview MIDI messages (from UI thread)

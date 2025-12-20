@@ -113,8 +113,10 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     }
 
     // Wire up note controls callbacks to update the current step's note
+    // TODO: Use command queue completion callback instead of calculating expected state.
+    //       This uses optimistic UI updates because MIDI preview needs the new note immediately.
     mainControls.getNoteControls().onNoteChanged = [this](int pitchClass) {
-        // Calculate the new note BEFORE queuing the command (to avoid race condition)
+        // Calculate the new note BEFORE queuing the command (to avoid race condition with MIDI preview)
         auto& seq = processorRef.getSequence();
         int currentStep = seq.getCurrentIndex();
         if (currentStep < 0) currentStep = 0;
@@ -147,8 +149,10 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         }
     };
 
+    // TODO: Use command queue completion callback instead of calculating expected state.
+    //       This uses optimistic UI updates because MIDI preview needs the new note immediately.
     mainControls.getNoteControls().onOctaveChanged = [this](int octaveIndex) {
-        // Calculate the new note BEFORE queuing the command (to avoid race condition)
+        // Calculate the new note BEFORE queuing the command (to avoid race condition with MIDI preview)
         auto& seq = processorRef.getSequence();
         int currentStep = seq.getCurrentIndex();
         if (currentStep < 0) currentStep = 0;
@@ -200,57 +204,71 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // Setup callbacks for subsequence controls
     subsequenceControls.onBarClicked = [this] (int index) {
-        // Queue command to modify state on audio thread
-        processorRef.queueCommand(ProcessorCommand([this, index]() {
-            auto& seq = processorRef.getSequence();
-            int currentStep = seq.getCurrentIndex();
-            if (currentStep < 0) currentStep = 0;
+        // Queue command to modify state on audio thread, with completion callback for UI update
+        processorRef.queueCommand(ProcessorCommand(
+            // Command: runs on audio thread
+            [this, index]() {
+                auto& seq = processorRef.getSequence();
+                int currentStep = seq.getCurrentIndex();
+                if (currentStep < 0) currentStep = 0;
 
-            auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+                auto& stepNotes = seq.getStep(currentStep).getStepNotes();
 
-            // Only allow clicking on active substeps (within length)
-            if (index < stepNotes.getLength()) {
-                stepNotes.setCurrentIndex(index);
-                DBG ("Substep " + juce::String(index) + " selected");
+                // Only allow clicking on active substeps (within length)
+                if (index < stepNotes.getLength()) {
+                    stepNotes.setCurrentIndex(index);
+                    DBG ("Substep " + juce::String(index) + " selected");
+                }
+            },
+            // Completion callback: runs on message thread after command executes
+            [this]() {
+                updateSubsequenceBar();
+
+                auto& seq = processorRef.getSequence();
+                int currentStep = seq.getCurrentIndex();
+                if (currentStep >= 0) {
+                    auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+                    int midiNote = stepNotes.getCurrentNote().getNoteNumber();
+                    int chromaticNote = midiNote % 12;
+                    pianoRoll.setActiveNote(chromaticNote);
+                    mainControls.getNoteControls().setFromMidiNote(midiNote);
+                }
             }
-        }));
-
-        // Update UI (reading state is safe)
-        updateSubsequenceBar();
-
-        auto& seq = processorRef.getSequence();
-        int currentStep = seq.getCurrentIndex();
-        if (currentStep >= 0) {
-            auto& stepNotes = seq.getStep(currentStep).getStepNotes();
-            if (index < stepNotes.getLength()) {
-                int midiNote = stepNotes.getCurrentNote().getNoteNumber();
-                int chromaticNote = midiNote % 12;
-                pianoRoll.setActiveNote(chromaticNote);
-                mainControls.getNoteControls().setFromMidiNote(midiNote);
-            }
-        }
+        ));
     };
     subsequenceControls.onMinusClicked = [this]() {
-        processorRef.queueCommand(ProcessorCommand([this]() {
-            auto& seq = processorRef.getSequence();
-            int currentStep = seq.getCurrentIndex();
-            if (currentStep < 0) currentStep = 0;
-            auto& stepNotes = seq.getStep(currentStep).getStepNotes();
-            stepNotes.decreaseLength();
-            DBG ("Subsequence length decreased to: " + juce::String(stepNotes.getLength()));
-        }));
-        updateSubsequenceBar();
+        processorRef.queueCommand(ProcessorCommand(
+            // Command: runs on audio thread
+            [this]() {
+                auto& seq = processorRef.getSequence();
+                int currentStep = seq.getCurrentIndex();
+                if (currentStep < 0) currentStep = 0;
+                auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+                stepNotes.decreaseLength();
+                DBG ("Subsequence length decreased to: " + juce::String(stepNotes.getLength()));
+            },
+            // Completion callback: runs on message thread after command executes
+            [this]() {
+                updateSubsequenceBar();
+            }
+        ));
     };
     subsequenceControls.onPlusClicked = [this]() {
-        processorRef.queueCommand(ProcessorCommand([this]() {
-            auto& seq = processorRef.getSequence();
-            int currentStep = seq.getCurrentIndex();
-            if (currentStep < 0) currentStep = 0;
-            auto& stepNotes = seq.getStep(currentStep).getStepNotes();
-            stepNotes.increaseLength();
-            DBG ("Subsequence length increased to: " + juce::String(stepNotes.getLength()));
-        }));
-        updateSubsequenceBar();
+        processorRef.queueCommand(ProcessorCommand(
+            // Command: runs on audio thread
+            [this]() {
+                auto& seq = processorRef.getSequence();
+                int currentStep = seq.getCurrentIndex();
+                if (currentStep < 0) currentStep = 0;
+                auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+                stepNotes.increaseLength();
+                DBG ("Subsequence length increased to: " + juce::String(stepNotes.getLength()));
+            },
+            // Completion callback: runs on message thread after command executes
+            [this]() {
+                updateSubsequenceBar();
+            }
+        ));
     };
 
     // Add sequencer steps component
@@ -258,9 +276,17 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // Setup callback for step clicks - set current index and trigger MIDI
     sequencerSteps.onStepClicked = [this] (int stepIndex) {
-        // Trigger MIDI for this step (also sets current index)
+        // Trigger MIDI for this step (also sets current index via queued command)
         processorRef.triggerStepMidi(stepIndex);
-        updateSubsequenceBar();
+
+        // Queue a separate command with completion callback for UI update
+        // This ensures updateSubsequenceBar runs after the current index is set
+        processorRef.queueCommand(ProcessorCommand(
+            []() {}, // No-op command (index already set by triggerStepMidi)
+            [this]() {
+                updateSubsequenceBar();
+            }
+        ));
         DBG ("Step clicked: " + juce::String (stepIndex));
     };
 
@@ -271,66 +297,93 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     // Button indices: 0=Roll, 1=Index<-, 2=Index->, 3=Length+, 4=Length-, 5=Nudge<-, 6=Nudge->, 7=Shift
     sequencerControls.onButtonClicked = [this] (int buttonIndex) {
         switch (buttonIndex) {
-            case 0:  // Roll - momentary: enable random mode while held
+            case 0:  // Roll - momentary: enable random mode while held (no UI update needed)
                 processorRef.queueCommand(ProcessorCommand([this]() {
                     processorRef.getSequence().setIsRandom(true);
                     DBG("Roll pressed - random mode ON");
                 }));
                 break;
             case 1:  // Index <-
-                processorRef.queueCommand(ProcessorCommand([this]() {
-                    processorRef.getSequence().indexLeft();
-                    DBG("Index left, now at: " + juce::String(processorRef.getSequence().getCurrentIndex()));
-                }));
-                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
-                updateSubsequenceBar();
+                processorRef.queueCommand(ProcessorCommand(
+                    [this]() {
+                        processorRef.getSequence().indexLeft();
+                        DBG("Index left, now at: " + juce::String(processorRef.getSequence().getCurrentIndex()));
+                    },
+                    [this]() {
+                        sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                        updateSubsequenceBar();
+                    }
+                ));
                 break;
             case 2:  // Index ->
-                processorRef.queueCommand(ProcessorCommand([this]() {
-                    processorRef.getSequence().indexRight();
-                    DBG("Index right, now at: " + juce::String(processorRef.getSequence().getCurrentIndex()));
-                }));
-                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
-                updateSubsequenceBar();
+                processorRef.queueCommand(ProcessorCommand(
+                    [this]() {
+                        processorRef.getSequence().indexRight();
+                        DBG("Index right, now at: " + juce::String(processorRef.getSequence().getCurrentIndex()));
+                    },
+                    [this]() {
+                        sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                        updateSubsequenceBar();
+                    }
+                ));
                 break;
             case 3:  // Length +
-                processorRef.queueCommand(ProcessorCommand([this]() {
-                    processorRef.getSequence().increaseLength();
-                    DBG("Length increased to: " + juce::String(processorRef.getSequence().getLength()));
-                }));
-                sequencerSteps.repaint();
-                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                processorRef.queueCommand(ProcessorCommand(
+                    [this]() {
+                        processorRef.getSequence().increaseLength();
+                        DBG("Length increased to: " + juce::String(processorRef.getSequence().getLength()));
+                    },
+                    [this]() {
+                        sequencerSteps.repaint();
+                        sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                    }
+                ));
                 break;
             case 4:  // Length -
-                processorRef.queueCommand(ProcessorCommand([this]() {
-                    processorRef.getSequence().decreaseLength();
-                    DBG("Length decreased to: " + juce::String(processorRef.getSequence().getLength()));
-                }));
-                sequencerSteps.repaint();
-                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                processorRef.queueCommand(ProcessorCommand(
+                    [this]() {
+                        processorRef.getSequence().decreaseLength();
+                        DBG("Length decreased to: " + juce::String(processorRef.getSequence().getLength()));
+                    },
+                    [this]() {
+                        sequencerSteps.repaint();
+                        sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                    }
+                ));
                 break;
             case 5:  // Nudge <-
-                processorRef.queueCommand(ProcessorCommand([this]() {
-                    processorRef.getSequence().nudgeLeft();
-                    DBG("Nudge left");
-                }));
-                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                processorRef.queueCommand(ProcessorCommand(
+                    [this]() {
+                        processorRef.getSequence().nudgeLeft();
+                        DBG("Nudge left");
+                    },
+                    [this]() {
+                        sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                    }
+                ));
                 break;
             case 6:  // Nudge ->
-                processorRef.queueCommand(ProcessorCommand([this]() {
-                    processorRef.getSequence().nudgeRight();
-                    DBG("Nudge right");
-                }));
-                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                processorRef.queueCommand(ProcessorCommand(
+                    [this]() {
+                        processorRef.getSequence().nudgeRight();
+                        DBG("Nudge right");
+                    },
+                    [this]() {
+                        sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                    }
+                ));
                 break;
             case 7:  // Shift - toggle shift mode
-                processorRef.queueCommand(ProcessorCommand([this]() {
-                    auto& seq = processorRef.getSequence();
-                    seq.setIsShift(!seq.getIsShift());
-                    DBG("Shift mode: " + juce::String(seq.getIsShift() ? "ON" : "OFF"));
-                }));
-                // Update UI toggle state (reading is safe)
-                sequencerControls.setButtonToggled(7, processorRef.getSequence().getIsShift());
+                processorRef.queueCommand(ProcessorCommand(
+                    [this]() {
+                        auto& seq = processorRef.getSequence();
+                        seq.setIsShift(!seq.getIsShift());
+                        DBG("Shift mode: " + juce::String(seq.getIsShift() ? "ON" : "OFF"));
+                    },
+                    [this]() {
+                        sequencerControls.setButtonToggled(7, processorRef.getSequence().getIsShift());
+                    }
+                ));
                 break;
             default:
                 break;
@@ -465,17 +518,31 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         triggerAsyncUpdate();
     };
 
+    // Wire up the completion callbacks notification to trigger async UI updates
+    // This ensures UI updates happen after queued commands have executed
+    processorRef.onCompletionCallbacksPending = [this]() {
+        triggerAsyncUpdate();
+    };
+
     setSize (PluginEditorLayout::editorWidth, PluginEditorLayout::editorHeight);
 }
 
 PluginEditor::~PluginEditor() {
-    // Clear the callback before destruction to avoid dangling reference
+    // Clear the callbacks before destruction to avoid dangling reference
     processorRef.onSequenceTick = nullptr;
+    processorRef.onCompletionCallbacksPending = nullptr;
     cancelPendingUpdate();
     removeKeyListener (this);
 }
 
 void PluginEditor::handleAsyncUpdate() {
+    // Execute any pending completion callbacks from queued commands
+    // These callbacks contain UI update logic that should run after domain state changes
+    int numCallbacks = processorRef.executeCompletionCallbacks();
+    if (numCallbacks > 0) {
+        DBG("Executed " << numCallbacks << " completion callbacks");
+    }
+
     // Update the active step indicator to follow the sequence playback
     int currentStep = processorRef.getSequence().getCurrentIndex();
     setActiveStepAndNote(currentStep);

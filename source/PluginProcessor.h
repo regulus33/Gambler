@@ -61,6 +61,11 @@ public:
     // The callback should be thread-safe (e.g., trigger an AsyncUpdater)
     std::function<void()> onSequenceTick;
 
+    // Callback for notifying when command completion callbacks are pending
+    // Called from audio thread - should trigger an AsyncUpdater to execute
+    // completion callbacks on the message thread
+    std::function<void()> onCompletionCallbacksPending;
+
     /**
      * Trigger MIDI note for a specific step (for UI preview/audition)
      * This sets the current index to the given step and sends MIDI note on/off.
@@ -91,6 +96,15 @@ public:
      */
     bool queueCommand(ProcessorCommand command) {
         return commandQueue.push(std::move(command));
+    }
+
+    /**
+     * Execute any pending completion callbacks (called from message thread)
+     * This should be called from handleAsyncUpdate() after onCompletionCallbacksPending triggers.
+     * Returns the number of callbacks executed.
+     */
+    int executeCompletionCallbacks() {
+        return commandQueue.executeCompletionCallbacks();
     }
 
 private:
