@@ -111,6 +111,12 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         // Repaint UI immediately (reading state is safe)
         sequencerSteps.repaint();
 
+        // Update sequence overview grid to reflect the note color change
+        sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+
+        // Update subsequence bar to reflect the note color change
+        updateSubsequenceBar();
+
         // Trigger MIDI preview if enabled
         bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
         if (previewEnabled) {
@@ -137,6 +143,12 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
         // Repaint UI immediately (reading state is safe)
         sequencerSteps.repaint();
+
+        // Update sequence overview grid to reflect the note color change
+        sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+
+        // Update subsequence bar to reflect the note color change
+        updateSubsequenceBar();
 
         // Trigger MIDI preview if enabled
         bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
