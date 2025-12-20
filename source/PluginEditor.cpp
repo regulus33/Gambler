@@ -113,10 +113,8 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     }
 
     // Wire up note controls callbacks to update the current step's note
-    // TODO: Use command queue completion callback instead of calculating expected state.
-    //       This uses optimistic UI updates because MIDI preview needs the new note immediately.
     mainControls.getNoteControls().onNoteChanged = [this](int pitchClass) {
-        // Calculate the new note BEFORE queuing the command (to avoid race condition with MIDI preview)
+        // Calculate the new note for MIDI preview (before command executes)
         auto& seq = processorRef.getSequence();
         int currentStep = seq.getCurrentIndex();
         if (currentStep < 0) currentStep = 0;
@@ -124,23 +122,28 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         int currentOctave = currentNote / 12;
         int newNote = currentOctave * 12 + pitchClass;
 
-        // Queue command to modify state on audio thread
-        processorRef.queueCommand(ProcessorCommand([this, pitchClass, newNote]() {
-            auto& seq = processorRef.getSequence();
-            int currentStep = seq.getCurrentIndex();
-            auto& step = seq.getStep(currentStep);
-            step.updateCurrentNoteNumber(newNote);
-            DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote);
-        }));
+        // Queue command to modify state on audio thread, with completion callback for UI updates
+        processorRef.queueCommand(ProcessorCommand(
+            // Command: runs on audio thread
+            [this, pitchClass, newNote]() {
+                auto& seq = processorRef.getSequence();
+                int currentStep = seq.getCurrentIndex();
+                auto& step = seq.getStep(currentStep);
+                step.updateCurrentNoteNumber(newNote);
+                DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote);
+            },
+            // Completion callback: runs on message thread after command executes
+            [this]() {
+                // Repaint UI after state has been updated
+                sequencerSteps.repaint();
 
-        // Repaint UI immediately (reading state is safe)
-        sequencerSteps.repaint();
+                // Update sequence overview grid to reflect the note color change
+                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
 
-        // Update sequence overview grid to reflect the note color change
-        sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
-
-        // Update subsequence bar to reflect the note color change
-        updateSubsequenceBar();
+                // Update subsequence bar to reflect the note color change
+                updateSubsequenceBar();
+            }
+        ));
 
         // Trigger MIDI preview if enabled - pass the new note directly to avoid race condition
         bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
@@ -149,10 +152,8 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         }
     };
 
-    // TODO: Use command queue completion callback instead of calculating expected state.
-    //       This uses optimistic UI updates because MIDI preview needs the new note immediately.
     mainControls.getNoteControls().onOctaveChanged = [this](int octaveIndex) {
-        // Calculate the new note BEFORE queuing the command (to avoid race condition with MIDI preview)
+        // Calculate the new note for MIDI preview (before command executes)
         auto& seq = processorRef.getSequence();
         int currentStep = seq.getCurrentIndex();
         if (currentStep < 0) currentStep = 0;
@@ -160,23 +161,28 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         int pitchClass = currentNote % 12;
         int newNote = octaveIndex * 12 + pitchClass;
 
-        // Queue command to modify state on audio thread
-        processorRef.queueCommand(ProcessorCommand([this, octaveIndex, newNote]() {
-            auto& seq = processorRef.getSequence();
-            int currentStep = seq.getCurrentIndex();
-            auto& step = seq.getStep(currentStep);
-            step.updateCurrentNoteNumber(newNote);
-            DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote);
-        }));
+        // Queue command to modify state on audio thread, with completion callback for UI updates
+        processorRef.queueCommand(ProcessorCommand(
+            // Command: runs on audio thread
+            [this, octaveIndex, newNote]() {
+                auto& seq = processorRef.getSequence();
+                int currentStep = seq.getCurrentIndex();
+                auto& step = seq.getStep(currentStep);
+                step.updateCurrentNoteNumber(newNote);
+                DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote);
+            },
+            // Completion callback: runs on message thread after command executes
+            [this]() {
+                // Repaint UI after state has been updated
+                sequencerSteps.repaint();
 
-        // Repaint UI immediately (reading state is safe)
-        sequencerSteps.repaint();
+                // Update sequence overview grid to reflect the note color change
+                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
 
-        // Update sequence overview grid to reflect the note color change
-        sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
-
-        // Update subsequence bar to reflect the note color change
-        updateSubsequenceBar();
+                // Update subsequence bar to reflect the note color change
+                updateSubsequenceBar();
+            }
+        ));
 
         // Trigger MIDI preview if enabled - pass the new note directly to avoid race condition
         bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
