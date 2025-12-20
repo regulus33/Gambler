@@ -77,11 +77,25 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         // Get the scale from the piano roll
         Scale newScale = pianoRoll.getScale();
 
-        // Queue command to update the sequence's scale on audio thread
+        // Queue command to update the sequence's scale and quantize all notes
         processorRef.queueCommand(ProcessorCommand([this, newScale]() {
-            processorRef.getSequence().getScale().setScaleNotes(newScale.getScaleNotes());
-            DBG("Piano roll scale changed - updated backend Scale");
+            auto& seq = processorRef.getSequence();
+            seq.getScale().setScaleNotes(newScale.getScaleNotes());
+            // Quantize all existing notes to the new scale
+            seq.quantizeAllNotesToScale();
+            DBG("Piano roll scale changed - updated backend Scale and quantized all notes");
         }));
+
+        // Update the note controls to only show selected scale notes
+        auto selectedIndices = pianoRoll.getSelectedNoteIndices();
+        auto selectedNames = pianoRoll.getSelectedNoteNames();
+        auto selectedColours = pianoRoll.getSelectedNoteColours();
+
+        // Update the note slider options
+        mainControls.getNoteControls().updateNoteOptions(selectedNames, selectedColours, selectedIndices);
+
+        // Trigger async update to refresh all UI components after quantization
+        triggerAsyncUpdate();
     };
 
     // Add MIDI data per step component (hidden by default)
@@ -90,21 +104,30 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     // Add main controls component (note/octave + probability/grid)
     addAndMakeVisible (mainControls);
 
+    // Initialize note controls with the current scale
+    {
+        auto selectedIndices = pianoRoll.getSelectedNoteIndices();
+        auto selectedNames = pianoRoll.getSelectedNoteNames();
+        auto selectedColours = pianoRoll.getSelectedNoteColours();
+        mainControls.getNoteControls().updateNoteOptions(selectedNames, selectedColours, selectedIndices);
+    }
+
     // Wire up note controls callbacks to update the current step's note
     mainControls.getNoteControls().onNoteChanged = [this](int pitchClass) {
+        // Calculate the new note BEFORE queuing the command (to avoid race condition)
+        auto& seq = processorRef.getSequence();
+        int currentStep = seq.getCurrentIndex();
+        if (currentStep < 0) currentStep = 0;
+        int currentNote = seq.getStep(currentStep).getStepNotes().getCurrentNote().getNoteNumber();
+        int currentOctave = currentNote / 12;
+        int newNote = currentOctave * 12 + pitchClass;
+
         // Queue command to modify state on audio thread
-        processorRef.queueCommand(ProcessorCommand([this, pitchClass]() {
+        processorRef.queueCommand(ProcessorCommand([this, pitchClass, newNote]() {
             auto& seq = processorRef.getSequence();
             int currentStep = seq.getCurrentIndex();
             auto& step = seq.getStep(currentStep);
-
-            // Get current note, preserve octave, change pitch class
-            int currentNote = step.getStepNotes().getCurrentNote().getNoteNumber();
-            int currentOctave = currentNote / 12;
-            int newNote = currentOctave * 12 + pitchClass;
-
             step.updateCurrentNoteNumber(newNote);
-
             DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote);
         }));
 
@@ -117,27 +140,28 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         // Update subsequence bar to reflect the note color change
         updateSubsequenceBar();
 
-        // Trigger MIDI preview if enabled
+        // Trigger MIDI preview if enabled - pass the new note directly to avoid race condition
         bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
         if (previewEnabled) {
-            processorRef.triggerCurrentStepMidi();
+            processorRef.triggerCurrentStepMidi(newNote);
         }
     };
 
     mainControls.getNoteControls().onOctaveChanged = [this](int octaveIndex) {
+        // Calculate the new note BEFORE queuing the command (to avoid race condition)
+        auto& seq = processorRef.getSequence();
+        int currentStep = seq.getCurrentIndex();
+        if (currentStep < 0) currentStep = 0;
+        int currentNote = seq.getStep(currentStep).getStepNotes().getCurrentNote().getNoteNumber();
+        int pitchClass = currentNote % 12;
+        int newNote = octaveIndex * 12 + pitchClass;
+
         // Queue command to modify state on audio thread
-        processorRef.queueCommand(ProcessorCommand([this, octaveIndex]() {
+        processorRef.queueCommand(ProcessorCommand([this, octaveIndex, newNote]() {
             auto& seq = processorRef.getSequence();
             int currentStep = seq.getCurrentIndex();
             auto& step = seq.getStep(currentStep);
-
-            // Get current note, preserve pitch class, change octave
-            int currentNote = step.getStepNotes().getCurrentNote().getNoteNumber();
-            int pitchClass = currentNote % 12;
-            int newNote = octaveIndex * 12 + pitchClass;
-
             step.updateCurrentNoteNumber(newNote);
-
             DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote);
         }));
 
@@ -150,10 +174,10 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         // Update subsequence bar to reflect the note color change
         updateSubsequenceBar();
 
-        // Trigger MIDI preview if enabled
+        // Trigger MIDI preview if enabled - pass the new note directly to avoid race condition
         bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
         if (previewEnabled) {
-            processorRef.triggerCurrentStepMidi();
+            processorRef.triggerCurrentStepMidi(newNote);
         }
     };
 

@@ -420,9 +420,10 @@ void PluginProcessor::triggerStepMidi(int stepIndex) {
     }
 }
 
-void PluginProcessor::triggerCurrentStepMidi() {
+void PluginProcessor::triggerCurrentStepMidi(int noteOverride) {
     DBG("=== triggerCurrentStepMidi() called ===");
     DBG("  midiOutput is " << (midiOutput ? "VALID" : "NULL"));
+    DBG("  noteOverride: " << noteOverride);
 
     int currentStep = sequence.getCurrentIndex();
     if (currentStep < 0 || currentStep >= 64) {
@@ -430,10 +431,16 @@ void PluginProcessor::triggerCurrentStepMidi() {
         return;
     }
 
-    // Get the note for the current step
-    const auto& step = sequence.getStep(currentStep);
-    int note = step.getStepNotes().getCurrentNote().getNoteNumber();
-    DBG("  Current step: " << currentStep << ", Note: " << note);
+    // Use override note if provided, otherwise read from step
+    int note;
+    if (noteOverride >= 0) {
+        note = noteOverride;
+        DBG("  Using override note: " << note);
+    } else {
+        const auto& step = sequence.getStep(currentStep);
+        note = step.getStepNotes().getCurrentNote().getNoteNumber();
+        DBG("  Current step: " << currentStep << ", Note from step: " << note);
+    }
 
     // Send note off for previous note (if any)
     if (lastPlayedNote >= 0) {

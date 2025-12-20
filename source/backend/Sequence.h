@@ -253,6 +253,26 @@ public:
     }
 
     /**
+     * Quantize all notes in the entire sequence to the current scale.
+     *
+     * This iterates through all 64 steps and all 8 substeps within each step,
+     * quantizing each note to the nearest note in the current scale.
+     *
+     * Use this when the scale changes to ensure all existing notes
+     * are valid within the new scale constraints.
+     */
+    void quantizeAllNotesToScale() {
+        for (int stepIdx = 0; stepIdx < MAX_STEPS; stepIdx++) {
+            auto& stepNotes = steps[stepIdx].getStepNotes();
+            for (int noteIdx = 0; noteIdx < StepNotes::MAX_LENGTH; noteIdx++) {
+                int currentNote = stepNotes.getNote(noteIdx).getNoteNumber();
+                int quantizedNote = scale.quantize(currentNote);
+                stepNotes.setNote(noteIdx, quantizedNote);
+            }
+        }
+    }
+
+    /**
      * Serialize entire sequence state to XML
      * This is the main entry point for saving plugin state
      */

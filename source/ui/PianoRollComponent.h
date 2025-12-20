@@ -182,6 +182,48 @@ public:
     }
 
     /**
+     * Get the indices of all currently selected (toggled) notes
+     * @return Array of note indices (0-11) that are currently toggled on
+     */
+    juce::Array<int> getSelectedNoteIndices() const {
+        juce::Array<int> selectedIndices;
+        for (int i = 0; i < 12; i++) {
+            if (keys[i]->isToggled) {
+                selectedIndices.add(i);
+            }
+        }
+        return selectedIndices;
+    }
+
+    /**
+     * Get the names of all currently selected (toggled) notes
+     * @return Array of note names (e.g., "C", "D", "E") that are currently toggled on
+     */
+    juce::Array<juce::String> getSelectedNoteNames() const {
+        juce::Array<juce::String> selectedNames;
+        for (int i = 0; i < 12; i++) {
+            if (keys[i]->isToggled) {
+                selectedNames.add(keys[i]->name);
+            }
+        }
+        return selectedNames;
+    }
+
+    /**
+     * Get the colors of all currently selected (toggled) notes
+     * @return Array of colors corresponding to the selected notes
+     */
+    juce::Array<juce::Colour> getSelectedNoteColours() const {
+        juce::Array<juce::Colour> selectedColours;
+        for (int i = 0; i < 12; i++) {
+            if (keys[i]->isToggled) {
+                selectedColours.add(keys[i]->color);
+            }
+        }
+        return selectedColours;
+    }
+
+    /**
      * Callback when a note is toggled
      */
     std::function<void()> onNoteChanged;

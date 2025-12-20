@@ -73,8 +73,12 @@ public:
      * Trigger MIDI note for the current step (for UI preview/audition)
      * Sends MIDI note on/off for whatever note is at the current step.
      * Called from UI thread when user edits note/octave sliders.
+     *
+     * @param noteOverride If >= 0, plays this note instead of reading from the step.
+     *                     This avoids race conditions when the note was just changed
+     *                     via a queued command that hasn't executed yet.
      */
-    void triggerCurrentStepMidi();
+    void triggerCurrentStepMidi(int noteOverride = -1);
 
     // User preferences (persisted with project)
     UserPreferences& getUserPreferences() noexcept { return userPreferences; }

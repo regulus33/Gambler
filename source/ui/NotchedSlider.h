@@ -93,6 +93,33 @@ public:
         return juce::Colours::white;
     }
 
+    /**
+     * Update the options (names and colours) dynamically
+     * This allows changing the available options after construction
+     * @param newNames Array of new option names
+     * @param newColours Array of new option colours (must match newNames size)
+     */
+    void updateOptions(const juce::Array<juce::String>& newNames,
+                      const juce::Array<juce::Colour>& newColours) {
+        if (newNames.isEmpty() || newNames.size() != newColours.size()) {
+            return; // Invalid input
+        }
+
+        optionNames = newNames;
+        optionColours = newColours;
+
+        // Update slider range
+        slider.setRange(0.0, (double)(optionNames.size() - 1), 1.0);
+
+        // Clamp current value to new range
+        double currentValue = slider.getValue();
+        if (currentValue >= optionNames.size()) {
+            slider.setValue(optionNames.size() - 1, juce::dontSendNotification);
+        }
+
+        repaint();
+    }
+
     void paint (juce::Graphics& g) override {
         using namespace NotchedSliderConstants;
 

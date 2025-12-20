@@ -26,6 +26,11 @@ public:
                       MusicConstants::toJuceArray (MusicConstants::CHROMATIC_NOTE_NAMES),
                       MusicConstants::toJuceArray (MusicConstants::NOTE_COLOURS))
     {
+        // Initialize with full chromatic scale (0-11)
+        for (int i = 0; i < 12; i++) {
+            scaleNoteIndices.add(i);
+        }
+
         addAndMakeVisible (octaveSlider);
         addAndMakeVisible (noteSlider);
 
@@ -39,7 +44,7 @@ public:
         noteSlider.getSlider().onValueChange = [this] {
             noteSlider.repaint();
             if (onNoteChanged)
-                onNoteChanged(noteSlider.getSelectedIndex());
+                onNoteChanged(getChromaticPitchClass());
         };
     }
 
@@ -96,6 +101,60 @@ public:
         return octave * 12 + pitchClass;
     }
 
+    /**
+     * Update the note slider to only show notes from the selected scale
+     * @param noteNames Array of note names to display (e.g., {"C", "D", "E"})
+     * @param noteColours Array of colours for each note (must match noteNames size)
+     * @param noteIndices Array of chromatic indices (0-11) for each note, used for mapping
+     */
+    void updateNoteOptions(const juce::Array<juce::String>& noteNames,
+                          const juce::Array<juce::Colour>& noteColours,
+                          const juce::Array<int>& noteIndices) {
+        if (noteNames.isEmpty() || noteNames.size() != noteColours.size() ||
+            noteNames.size() != noteIndices.size()) {
+            return; // Invalid input
+        }
+
+        // Store the mapping from slider index to chromatic pitch class
+        scaleNoteIndices = noteIndices;
+
+        // Update the note slider with the new options
+        noteSlider.updateOptions(noteNames, noteColours);
+    }
+
+    /**
+     * Get the chromatic pitch class (0-11) for the currently selected note
+     * This accounts for the scale filtering
+     */
+    int getChromaticPitchClass() const {
+        int sliderIndex = noteSlider.getSelectedIndex();
+        if (sliderIndex >= 0 && sliderIndex < scaleNoteIndices.size()) {
+            return scaleNoteIndices[sliderIndex];
+        }
+        // Fallback to direct index if no scale mapping exists
+        return sliderIndex;
+    }
+
+    /**
+     * Set the note by chromatic pitch class (0-11)
+     * This will find the corresponding slider index based on the current scale
+     */
+    void setNoteByChromaticPitchClass(int chromaticPitchClass) {
+        // Find the slider index that corresponds to this chromatic pitch class
+        for (int i = 0; i < scaleNoteIndices.size(); i++) {
+            if (scaleNoteIndices[i] == chromaticPitchClass) {
+                noteSlider.getSlider().setValue(static_cast<double>(i), juce::dontSendNotification);
+                noteSlider.repaint();
+                return;
+            }
+        }
+        // If not found, default to first note in scale
+        if (!scaleNoteIndices.isEmpty()) {
+            noteSlider.getSlider().setValue(0.0, juce::dontSendNotification);
+            noteSlider.repaint();
+        }
+    }
+
     void paint (juce::Graphics& g) override {
         using namespace NoteControlsConstants;
         g.fillAll (juce::Colours::transparentBlack);
@@ -120,5 +179,9 @@ public:
 private:
     NotchedSlider octaveSlider;
     NotchedSlider noteSlider;
+
+    // Mapping from note slider index to chromatic pitch class (0-11)
+    // This allows the slider to show only scale notes while maintaining correct pitch mapping
+    juce::Array<int> scaleNoteIndices;
 };
 
