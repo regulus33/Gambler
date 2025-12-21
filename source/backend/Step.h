@@ -19,14 +19,14 @@
 class Step {
 public:
     Step() = default;
-    
+
     // Getters
     StepNotes& getStepNotes() { return stepNotes; }
     const StepNotes& getStepNotes() const { return stepNotes; }
-    
+
     StepModulations& getStepModulations() { return stepModulations; }
     const StepModulations& getStepModulations() const { return stepModulations; }
-    
+
     /**
      * Tick this step - advances the StepNotes sub-sequence
      * and returns the current note number

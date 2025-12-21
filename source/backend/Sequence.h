@@ -135,10 +135,12 @@ public:
      *
      * This is the main sequencer tick function that:
      * 1. Advances currentIndex
-     * 2. Randomly samples from the entire playProbability array to determine play/rest
-     * 3. Checks if isRandom is enabled and randomizes if so
-     * 4. Ticks the current Step's StepNotes
-     * 5. Returns the MIDI note number (or -1 if rest)
+     * 2. If isRandom (roll) is enabled:
+     *    - Randomly samples from the entire playProbability array to determine play/rest
+     *    - If probability check fails, returns -1 (rest)
+     *    - If probability check passes, randomizes the current step's note
+     * 3. Ticks the current Step's StepNotes
+     * 4. Returns the MIDI note number (or -1 if rest)
      *
      * @return MIDI note number to play, or -1 for rest
      */
@@ -146,20 +148,21 @@ public:
         // Advance index (wraps at length boundary)
         currentIndex = (currentIndex + 1) % length;
 
-        // Randomly sample from the entire playProbability array (0-63)
-        // to determine if this step should play or rest
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        std::uniform_int_distribution<> dis(0, MAX_STEPS - 1);
-        int probabilityIndex = dis(gen);
-
-        // Check play probability - if false, return -1 (rest)
-        if (!playProbability[probabilityIndex]) {
-            return -1;  // Rest
-        }
-
-        // If random mode is enabled, randomize the current step's note
+        // If random mode (roll) is enabled, check play probability
         if (isRandom) {
+            // Randomly sample from the entire playProbability array (0-63)
+            // to determine if this step should play or rest
+            static std::random_device rd;
+            static std::mt19937 gen(rd());
+            std::uniform_int_distribution<> dis(0, MAX_STEPS - 1);
+            int probabilityIndex = dis(gen);
+
+            // Check play probability - if false, return -1 (rest)
+            if (!playProbability[probabilityIndex]) {
+                return -1;  // Rest
+            }
+
+            // Probability check passed - randomize the current step's note
             steps[currentIndex].randomizeNote(scale);
         }
 

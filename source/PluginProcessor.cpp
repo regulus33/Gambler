@@ -248,6 +248,9 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
         DBG("Clock tick! Step: " << sequence.getCurrentIndex() << ", Note: " << note);
 
+        // Get current step to record rest if roll is engaged
+        auto& currentStep = sequence.getCurrentStep();
+
         if (note >= 0) {
             // Valid note - send note on
             auto noteOn = juce::MidiMessage::noteOn(1, note, (juce::uint8)100);
@@ -262,6 +265,14 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         } else {
             // Rest - no note to play
             lastPlayedNote = -1;
+
+            // If roll is engaged, record this step as a rest (note number = -1)
+            if (sequence.getIsRandom()) {
+                int idx = currentStep.getStepNotes().getCurrentIndex();
+                if (idx == -1) idx = 0;
+                currentStep.getStepNotes().setNote(idx, -1);
+                DBG("Rest recorded at step: " << sequence.getCurrentIndex());
+            }
         }
 
         // Notify UI that a tick occurred (thread-safe via AsyncUpdater)

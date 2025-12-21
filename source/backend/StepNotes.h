@@ -53,7 +53,20 @@ public:
         int idx = (currentIndex == -1) ? 0 : currentIndex;
         return notes[idx];
     }
-    
+
+    // Check if there's a rest at a specific index
+    bool hasRestAt(int index) const {
+        if (index >= 0 && index < MAX_LENGTH) {
+            return notes[index].isRest();
+        }
+        return false;
+    }
+
+    // Check if the current note is a rest
+    bool hasRest() const {
+        return getCurrentNote().isRest();
+    }
+
     // Setters
     void setNote(int index, int noteNumber) {
         if (index >= 0 && index < MAX_LENGTH) {

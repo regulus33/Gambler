@@ -207,11 +207,19 @@ public:
             int col = stepIndex % gridCols;  // 0-7
 
             if (stepIndex < sequenceLength) {
-                // Step is within bounds - show note color
+                // Step is within bounds
                 const auto& step = sequence.getStep (stepIndex);
-                int midiNote = step.getStepNotes().getCurrentNote().getNoteNumber();
-                int chromaticNote = midiNote % 12;
-                squareStates[row][col].color = getNoteColor (chromaticNote);
+
+                // Check if this step's current note is a rest (-1)
+                if (step.getStepNotes().hasRest()) {
+                    // Step is a rest - show grey
+                    squareStates[row][col].color = juce::Colour (defaultDarkGreyHex);
+                } else {
+                    // Normal step - show note color
+                    int midiNote = step.getStepNotes().getCurrentNote().getNoteNumber();
+                    int chromaticNote = midiNote % 12;
+                    squareStates[row][col].color = getNoteColor (chromaticNote);
+                }
             } else {
                 // Step is outside bounds - show grey
                 squareStates[row][col].color = juce::Colour (defaultDarkGreyHex);

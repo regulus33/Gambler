@@ -24,10 +24,16 @@ struct StepNote {
     bool isSelected() const { return selected; }
     
     // Setters with validation
+    // Note: -1 is a valid value representing a rest
     void setNoteNumber(int note) {
-        if (note >= 0 && note <= 127) {
+        if (note >= -1 && note <= 127) {
             noteNumber = note;
         }
+    }
+
+    // Check if this note is a rest
+    bool isRest() const {
+        return noteNumber == -1;
     }
     
     void setSelected(bool isSelected) {
