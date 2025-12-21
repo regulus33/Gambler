@@ -6,6 +6,9 @@
 #include "UIConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
+// Forward declaration
+class PluginProcessor;
+
 namespace MainControlsConstants {
     // Title
     constexpr float titleFontSize = 16.0f;
@@ -27,10 +30,11 @@ namespace MainControlsConstants {
  */
 class MainControlsComponent : public juce::Component {
 public:
-    MainControlsComponent()
+    explicit MainControlsComponent(PluginProcessor& processor)
         : interBoldFont (juce::Typeface::createSystemTypefaceFor (
               BinaryData::Inter_24ptBold_ttf,
               BinaryData::Inter_24ptBold_ttfSize))
+        , probabilityControls(processor)
     {
         addAndMakeVisible (noteControls);
         addAndMakeVisible (probabilityControls);

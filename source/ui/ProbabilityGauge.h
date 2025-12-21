@@ -2,8 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <algorithm>
-#include <numeric>
-#include <random>
+#include <array>
 #include <vector>
 
 namespace ProbabilityGaugeConstants {
@@ -32,7 +31,6 @@ class ProbabilityGauge : public juce::Component {
 public:
     ProbabilityGauge()
         : circleStates (ProbabilityGaugeConstants::maxCircles, false)
-        , rng (std::random_device{}())
     {
     }
 
@@ -74,14 +72,15 @@ public:
     }
 
     /**
-     * Update the gauge display based on a probability value.
-     * @param probability Value between 0.0 and 1.0
-     * Randomly selects which circles are active based on the probability.
+     * Update the gauge display from a boolean array (from backend).
+     * This is the primary way to update the gauge - it receives data from the audio thread
+     * via a completion callback after the backend has randomized the probability array.
+     *
+     * @param probabilityArray Array of 64 booleans (true = red/active, false = grey/inactive)
      */
-    void setProbability (float probability) {
-        // Clamp probability to valid range
-        currentProbability = juce::jlimit (0.0f, 1.0f, probability);
-        randomizeActiveCircles();
+    void updateFromProbabilityArray(const std::array<bool, ProbabilityGaugeConstants::maxCircles>& probabilityArray) {
+        // Copy the array to our local state
+        std::copy(probabilityArray.begin(), probabilityArray.end(), circleStates.begin());
         repaint();
     }
 
@@ -95,15 +94,8 @@ public:
      */
     void setStepCount (int count) {
         totalCircles = juce::jlimit (1, ProbabilityGaugeConstants::maxCircles, count);
-        // Re-randomize to ensure active count is correct  new total
-        randomizeActiveCircles();
         repaint();
     }
-
-    /**
-     * Get the current probability value.
-     */
-    float getProbability() const { return currentProbability; }
 
     /**
      * Get the current step count (visible circles).
@@ -115,43 +107,12 @@ private:
     const juce::Colour activeColour { ProbabilityGaugeConstants::activeColourHex };
     const juce::Colour inactiveColour { ProbabilityGaugeConstants::inactiveColourHex };
 
-    float currentProbability = 0.0f;
-
     // Total visible circles - can be changed for variable step count
     int totalCircles = ProbabilityGaugeConstants::maxCircles;
 
     // Tracks which circles are currently active (true = active/red)
+    // This is updated from the backend via updateFromProbabilityArray()
     std::vector<bool> circleStates;
-
-    // Random number generator for shuffling
-    std::mt19937 rng;
-
-    /**
-     * Randomly select which circles should be active based on the current probability.
-     */
-    void randomizeActiveCircles() {
-        // Reset all circles to inactive
-        std::fill (circleStates.begin(), circleStates.end(), false);
-
-        // Calculate how many circles should be active
-        const int activeCount = static_cast<int> (std::round (currentProbability * static_cast<float> (totalCircles)));
-
-        if (activeCount <= 0)
-            return;
-
-        // Create a list of indices for visible circles only
-        std::vector<int> indices (static_cast<size_t> (totalCircles));
-        std::iota (indices.begin(), indices.end(), 0);
-
-        // Shuffle the indices
-        std::shuffle (indices.begin(), indices.end(), rng);
-
-        // Mark the first 'activeCount' shuffled indices as active
-        for (int i = 0; i < activeCount && i < totalCircles; ++i)
-        {
-            circleStates[static_cast<size_t> (indices[static_cast<size_t> (i)])] = true;
-        }
-    }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ProbabilityGauge)
 };

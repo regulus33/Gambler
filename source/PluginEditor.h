@@ -52,7 +52,7 @@ private:
     MidiDataPerStepSelectionComponent midiDataPerStep;
     SequencerStepsComponent sequencerSteps;
     SequencerControlsComponent sequencerControls;
-    MainControlsComponent mainControls;
+    MainControlsComponent mainControls { processorRef };  // Initialize with processor reference
     SequenceOverviewComponent sequenceOverview;
     SubsequenceControlsComponent subsequenceControls;
     ViewToggleButton viewToggleButton;
