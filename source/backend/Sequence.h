@@ -69,6 +69,13 @@ public:
         }
         return true;
     }
+
+    /**
+     * Get the last randomly selected probability index.
+     * Returns -1 if no probability check has been performed yet, or if roll is not engaged.
+     * This is used by the UI to highlight which circle was selected on the last tick.
+     */
+    int getLastProbabilityIndex() const { return lastProbabilityIndex; }
     
     // Setters
     void setIsRandom(bool random) { isRandom = random; }
@@ -157,6 +164,9 @@ public:
             std::uniform_int_distribution<> dis(0, MAX_STEPS - 1);
             int probabilityIndex = dis(gen);
 
+            // Store the selected index for UI visualization
+            lastProbabilityIndex = probabilityIndex;
+
             // Check play probability - if false, return -1 (rest)
             if (!playProbability[probabilityIndex]) {
                 return -1;  // Rest
@@ -164,6 +174,10 @@ public:
 
             // Probability check passed - randomize the current step's note
             steps[currentIndex].randomizeNote(scale);
+        }
+        else {
+            // Not in random mode - clear the last probability index
+            lastProbabilityIndex = -1;
         }
 
         // Tick the current step and return its note
@@ -367,5 +381,9 @@ private:
     int length = DEFAULT_LENGTH;
     bool isRandom = false;
     bool isShift = false;  // Unused for now, reserved for future features
+
+    // Track the last randomly selected probability index for UI visualization
+    // -1 means no probability check has been performed yet or roll is not engaged
+    int lastProbabilityIndex = -1;
 };
 

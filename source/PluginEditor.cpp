@@ -569,6 +569,11 @@ void PluginEditor::handleAsyncUpdate() {
 
     // Update the subsequence bar to reflect current step's substep state
     updateSubsequenceBar();
+
+    // Update the probability gauge to highlight the randomly selected circle (if roll is engaged)
+    int lastProbabilityIndex = processorRef.getSequence().getLastProbabilityIndex();
+    auto& probabilityGauge = mainControls.getProbabilityControls().getProbabilityGauge();
+    probabilityGauge.highlightCircle(lastProbabilityIndex);
 }
 
 void PluginEditor::paint (juce::Graphics& g) {

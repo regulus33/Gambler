@@ -11,8 +11,10 @@ namespace ProbabilityGaugeConstants {
     constexpr int circleDiameter = 4;
     constexpr int circleSpacing = 3;
     // Colors
-    constexpr juce::uint32 activeColourHex = 0xFFFF7C7C;
-    constexpr juce::uint32 inactiveColourHex = 0xFF333333;
+    constexpr juce::uint32 activeColourHex = 0xFFFF7C7C;      // Red - will play if selected
+    constexpr juce::uint32 inactiveColourHex = 0xFF333333;    // Grey - will rest if selected
+    constexpr juce::uint32 highlightPlayColourHex = 0xFFFFFF00;  // Yellow - selected and playing
+    constexpr juce::uint32 highlightRestColourHex = 0xFFFFFFFF;  // White - selected but resting
 }
 
 /**
@@ -21,16 +23,20 @@ namespace ProbabilityGaugeConstants {
  * A visual component that displays probability as a grid of colored circles.
  * - 8x8 grid (64 circles total)
  * - Each circle is 4x4 pixels
- * - Active circles: #FF7C7C (red)
- * - Inactive circles: #333333 (dark gray)
+ * - Active circles: #FF7C7C (red) - will play if selected
+ * - Inactive circles: #333333 (dark gray) - will rest if selected
+ * - Highlighted play: #FFFF00 (yellow) - currently selected and playing
+ * - Highlighted rest: #FFFFFF (white) - currently selected but resting
  * - Grid reads left-to-right, top-to-bottom (position 1 = top-left, position 64 = bottom-right)
  *
  * When probability changes, randomly selects which circles are active.
+ * When roll is engaged, highlights the randomly selected circle on each tick.
  */
 class ProbabilityGauge : public juce::Component {
 public:
     ProbabilityGauge()
         : circleStates (ProbabilityGaugeConstants::maxCircles, false)
+        , highlightedCircleIndex(-1)
     {
     }
 
@@ -54,9 +60,22 @@ public:
 
             if (isVisible)
             {
-                // Determine color based on active state
-                const bool isActive = circleStates[static_cast<size_t> (i)];
-                g.setColour (isActive ? activeColour : inactiveColour);
+                // Check if this circle is currently highlighted
+                const bool isHighlighted = (i == highlightedCircleIndex);
+
+                if (isHighlighted)
+                {
+                    // Highlighted circle: yellow if active (playing), white if inactive (resting)
+                    const bool isActive = circleStates[static_cast<size_t> (i)];
+                    g.setColour (isActive ? highlightPlayColour : highlightRestColour);
+                }
+                else
+                {
+                    // Normal state: red if active, grey if inactive
+                    const bool isActive = circleStates[static_cast<size_t> (i)];
+                    g.setColour (isActive ? activeColour : inactiveColour);
+                }
+
                 g.fillEllipse (static_cast<float> (x),
                                static_cast<float> (y),
                                static_cast<float> (circleDiameter),
@@ -102,10 +121,32 @@ public:
      */
     int getStepCount() const { return totalCircles; }
 
+    /**
+     * Highlight a specific circle to show it was randomly selected.
+     * The circle will be shown in yellow if it's active (playing) or white if inactive (resting).
+     * Call with index = -1 to clear the highlight.
+     *
+     * @param index The circle index to highlight (0-63), or -1 to clear
+     */
+    void highlightCircle(int index) {
+        highlightedCircleIndex = index;
+        repaint();
+    }
+
+    /**
+     * Clear the highlighted circle.
+     */
+    void clearHighlight() {
+        highlightedCircleIndex = -1;
+        repaint();
+    }
+
 private:
     // Colors
     const juce::Colour activeColour { ProbabilityGaugeConstants::activeColourHex };
     const juce::Colour inactiveColour { ProbabilityGaugeConstants::inactiveColourHex };
+    const juce::Colour highlightPlayColour { ProbabilityGaugeConstants::highlightPlayColourHex };
+    const juce::Colour highlightRestColour { ProbabilityGaugeConstants::highlightRestColourHex };
 
     // Total visible circles - can be changed for variable step count
     int totalCircles = ProbabilityGaugeConstants::maxCircles;
@@ -113,6 +154,10 @@ private:
     // Tracks which circles are currently active (true = active/red)
     // This is updated from the backend via updateFromProbabilityArray()
     std::vector<bool> circleStates;
+
+    // Tracks which circle is currently highlighted (-1 = none)
+    // When roll is engaged, this shows which circle was randomly selected on the last tick
+    int highlightedCircleIndex;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ProbabilityGauge)
 };
