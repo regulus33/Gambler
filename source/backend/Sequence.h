@@ -98,30 +98,31 @@ public:
     
     /**
      * Set play probability based on percentage (0-100)
-     * Randomly distributes true/false values across the sequence
-     * 
+     * Randomly distributes true/false values across the entire 64-element probability array
+     *
      * @param percentage 0-100, where 100 = all steps play, 0 = all steps rest
      */
     void setProbabilityPercentage(int percentage) {
         if (percentage < 0) percentage = 0;
         if (percentage > 100) percentage = 100;
-        
-        int numToPlay = (length * percentage) / 100;
-        
+
+        // Calculate how many of the 64 slots should be true
+        int numToPlay = (MAX_STEPS * percentage) / 100;
+
         // Reset all to false
         playProbability.fill(false);
-        
-        // Randomly set numToPlay indices to true
+
+        // Randomly set numToPlay indices to true across all 64 slots
         static std::random_device rd;
         static std::mt19937 gen(rd());
-        
+
         std::vector<int> indices;
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < MAX_STEPS; i++) {
             indices.push_back(i);
         }
-        
+
         std::shuffle(indices.begin(), indices.end(), gen);
-        
+
         for (int i = 0; i < numToPlay && i < static_cast<int>(indices.size()); i++) {
             playProbability[indices[i]] = true;
         }
@@ -131,29 +132,37 @@ public:
     
     /**
      * Advance the sequencer to the next step and return the note to play
-     * 
+     *
      * This is the main sequencer tick function that:
      * 1. Advances currentIndex
-     * 2. Checks if isRandom is enabled and randomizes if so
-     * 3. Ticks the current Step's StepNotes
-     * 4. Returns the MIDI note number (or -1 if rest)
-     * 
+     * 2. Randomly samples from the entire playProbability array to determine play/rest
+     * 3. Checks if isRandom is enabled and randomizes if so
+     * 4. Ticks the current Step's StepNotes
+     * 5. Returns the MIDI note number (or -1 if rest)
+     *
      * @return MIDI note number to play, or -1 for rest
      */
     int tick() {
         // Advance index (wraps at length boundary)
         currentIndex = (currentIndex + 1) % length;
-        
+
+        // Randomly sample from the entire playProbability array (0-63)
+        // to determine if this step should play or rest
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(0, MAX_STEPS - 1);
+        int probabilityIndex = dis(gen);
+
         // Check play probability - if false, return -1 (rest)
-        if (!playProbability[currentIndex]) {
+        if (!playProbability[probabilityIndex]) {
             return -1;  // Rest
         }
-        
+
         // If random mode is enabled, randomize the current step's note
         if (isRandom) {
             steps[currentIndex].randomizeNote(scale);
         }
-        
+
         // Tick the current step and return its note
         return steps[currentIndex].tick();
     }
