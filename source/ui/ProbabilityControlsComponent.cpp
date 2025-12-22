@@ -9,6 +9,26 @@ ProbabilityControlsComponent::ProbabilityControlsComponent(PluginProcessor& proc
     addAndMakeVisible(probabilitySlider);
     addAndMakeVisible(probabilityGauge);
 
+    // TODO: is this threadsafe? probably not. But if just done once not a huge problem.
+    // Initialize UI from backend state
+    // Count how many true values are in the playProbability array to determine the percentage
+    auto& sequence = processorRef.getSequence();
+    int trueCount = 0;
+    std::array<bool, 64> probabilityArray;
+    for (int i = 0; i < 64; ++i) {
+        probabilityArray[i] = sequence.getPlayProbability(i);
+        if (probabilityArray[i]) {
+            trueCount++;
+        }
+    }
+
+    // Calculate percentage and set slider (without triggering callback)
+    float percentage = static_cast<float>(trueCount) / 64.0f;
+    probabilitySlider.setValue(percentage, juce::dontSendNotification);
+
+    // Update gauge to show initial state
+    probabilityGauge.updateFromProbabilityArray(probabilityArray);
+
     // Set up callback for slider changes
     // This triggers randomization in the audio thread and updates the gauge via completion callback
     probabilitySlider.onValueChange = [this](float newValue) {

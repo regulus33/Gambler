@@ -349,9 +349,14 @@ public:
 
         // Deserialize play probability
         juce::String playProbStr = xml.getStringAttribute("playProbability");
-        juce::StringArray tokens = juce::StringArray::fromTokens(playProbStr, ",", "");
-        for (int i = 0; i < MAX_STEPS && i < tokens.size(); i++) {
-            playProbability[i] = (tokens[i].getIntValue() != 0);
+        if (playProbStr.isEmpty()) {
+            // No saved state - default to 100% probability (all true)
+            playProbability.fill(true);
+        } else {
+            juce::StringArray tokens = juce::StringArray::fromTokens(playProbStr, ",", "");
+            for (int i = 0; i < MAX_STEPS && i < tokens.size(); i++) {
+                playProbability[i] = (tokens[i].getIntValue() != 0);
+            }
         }
 
         // Deserialize scale
