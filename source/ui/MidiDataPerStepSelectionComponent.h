@@ -2,6 +2,8 @@
 
 #include "VerticalBarSlider.h"
 #include "BinaryData.h"
+#include "../PluginProcessor.h"
+#include "../backend/ProcessorCommand.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <vector>
 #include <functional>
@@ -33,11 +35,18 @@ namespace MidiDataPerStepConstants {
  * - Row 1 (2/10 height): 7 columns (dropdowns / ComboBoxes)
  * - Row 2 (6/10 height): 7 columns (vertical bar sliders)
  * - 4px spacing between all grid items
+ *
+ * Thread-safe communication:
+ * - ComboBox changes trigger ProcessorCommand to update CC numbers in audio thread
+ * - Slider changes trigger ProcessorCommand to update modulation values in audio thread
+ * - Lane enable/disable triggers ProcessorCommand to update selected state in audio thread
+ * - updateFromSequence() reads current step's StepModulations and updates UI
  */
 class MidiDataPerStepSelectionComponent : public juce::Component {
 public:
-    MidiDataPerStepSelectionComponent()
-        : interFont (juce::Typeface::createSystemTypefaceFor (BinaryData::InterVariableFont_ttf,
+    explicit MidiDataPerStepSelectionComponent(PluginProcessor& processor)
+        : processorRef(processor),
+          interFont (juce::Typeface::createSystemTypefaceFor (BinaryData::InterVariableFont_ttf,
                                                               BinaryData::InterVariableFont_ttfSize)),
           comboLookAndFeel (interFont)
     {
@@ -82,6 +91,25 @@ public:
                 [this]() { return isInLaneToggleMode; },
                 [this, laneIndex]() { toggleLaneEnabled (laneIndex); });
 
+            // Wire up ComboBox selection changes to update backend
+            dummy->onChange = [this, laneIndex]() {
+                int selectedId = dummyDropdowns[laneIndex]->getSelectedId();
+                if (selectedId > 0) {
+                    int ccNumber = selectedId - 1; // ID is 1-based, CC is 0-based
+
+                    // Queue command to update CC number in audio thread
+                    processorRef.queueCommand(ProcessorCommand([this, laneIndex, ccNumber]() {
+                        auto& seq = processorRef.getSequence();
+                        int currentStep = seq.getCurrentIndex();
+                        if (currentStep < 0) currentStep = 0;
+
+                        auto& stepMods = seq.getStep(currentStep).getStepModulations();
+                        stepMods.setModulationCCNumber(laneIndex, ccNumber);
+                        DBG("Lane " + juce::String(laneIndex) + " CC changed to: " + juce::String(ccNumber));
+                    }));
+                }
+            };
+
             dummyDropdowns.push_back(std::move(dummy));
             addAndMakeVisible(*dummyDropdowns.back());
         }
@@ -111,8 +139,21 @@ public:
             sliders.push_back(std::move(slider));
             addAndMakeVisible(*sliders.back());
 
-            sliders.back()->onValueChanged = [i](float value) {
-                DBG("Slider " + juce::String(i) + " value: " + juce::String(value));
+            // Wire up slider value changes to update backend
+            sliders.back()->onValueChanged = [this, laneIndex](float value) {
+                // Convert 0.0-1.0 to 0-127 MIDI range
+                int midiValue = static_cast<int>(value * 127.0f);
+
+                // Queue command to update modulation value in audio thread
+                processorRef.queueCommand(ProcessorCommand([this, laneIndex, midiValue]() {
+                    auto& seq = processorRef.getSequence();
+                    int currentStep = seq.getCurrentIndex();
+                    if (currentStep < 0) currentStep = 0;
+
+                    auto& stepMods = seq.getStep(currentStep).getStepModulations();
+                    stepMods.setModulationValue(laneIndex, midiValue);
+                    DBG("Lane " + juce::String(laneIndex) + " value changed to: " + juce::String(midiValue));
+                }));
             };
 
         }
@@ -121,7 +162,7 @@ public:
     }
 
 
-    // Enable/disable individual CC lanes visually
+    // Enable/disable individual CC lanes visually and update backend
     void setLaneEnabled (int laneIndex, bool shouldBeEnabled)
     {
         if (laneIndex < 0 || laneIndex >= static_cast<int> (laneEnabled.size()))
@@ -134,6 +175,17 @@ public:
             dummyDropdowns[static_cast<size_t> (laneIndex)]->setAlpha (alpha);
         if (laneIndex < static_cast<int> (sliders.size()))
             sliders[static_cast<size_t> (laneIndex)]->setAlpha (alpha);
+
+        // Queue command to update selected state in audio thread
+        processorRef.queueCommand(ProcessorCommand([this, laneIndex, shouldBeEnabled]() {
+            auto& seq = processorRef.getSequence();
+            int currentStep = seq.getCurrentIndex();
+            if (currentStep < 0) currentStep = 0;
+
+            auto& stepMods = seq.getStep(currentStep).getStepModulations();
+            stepMods.setModulationSelected(laneIndex, shouldBeEnabled);
+            // DBG("Lane " + juce::String(laneIndex) + " selected state: " + juce::String(shouldBeEnabled));
+        }));
     }
 
     void toggleLaneEnabled (int laneIndex)
@@ -166,6 +218,38 @@ public:
             setLaneEnabled ((int) i, static_cast<bool> (states[i]));
     }
 
+    /**
+     * Update UI from the current step's StepModulations in the backend
+     * Should be called when the current step changes
+     */
+    void updateFromSequence()
+    {
+        auto& seq = processorRef.getSequence();
+        int currentStep = seq.getCurrentIndex();
+        if (currentStep < 0) currentStep = 0;
+
+        const auto& stepMods = seq.getStep(currentStep).getStepModulations();
+
+        // Update all 7 lanes
+        for (int i = 0; i < 7; ++i) {
+            const auto& mod = stepMods.getModulation(i);
+
+            // Update ComboBox selection (CC number)
+            int ccNumber = mod.getCCNumber();
+            dummyDropdowns[i]->setSelectedId(ccNumber + 1, juce::dontSendNotification);
+
+            // Update slider value (0-127 to 0.0-1.0)
+            float normalizedValue = mod.getValue() / 127.0f;
+            sliders[i]->setValue(normalizedValue);
+
+            // Update lane enabled state (selected)
+            bool isSelected = mod.isSelected();
+            laneEnabled[i] = isSelected;
+            const float alpha = isSelected ? 1.0f : 0.3f;
+            dummyDropdowns[i]->setAlpha(alpha);
+            sliders[i]->setAlpha(alpha);
+        }
+    }
 
     void paint (juce::Graphics& g) override {
         juce::ignoreUnused (g);
@@ -385,6 +469,8 @@ private:
         bool isOn { false };
         std::function<void (bool)> onToggleChanged;
     };
+
+    PluginProcessor& processorRef;
 
     juce::Typeface::Ptr interFont;
     SmallComboBoxLookAndFeel comboLookAndFeel;

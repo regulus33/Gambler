@@ -49,7 +49,7 @@ private:
 
     // UI Components
     PianoRollComponent pianoRoll;
-    MidiDataPerStepSelectionComponent midiDataPerStep;
+    MidiDataPerStepSelectionComponent midiDataPerStep { processorRef };  // Initialize with processor reference
     SequencerStepsComponent sequencerSteps;
     SequencerControlsComponent sequencerControls;
     MainControlsComponent mainControls { processorRef };  // Initialize with processor reference

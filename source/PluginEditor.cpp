@@ -656,6 +656,9 @@ void PluginEditor::setActiveStepAndNote (int stepIndex) {
 
         // Update the piano roll active note
         pianoRoll.setActiveNote (chromaticNote);
+
+        // Update MIDI data per step component with current step's modulations
+        midiDataPerStep.updateFromSequence();
     } else {
         // Clear both if stepIndex is -1
         pianoRoll.setActiveNote (-1);
