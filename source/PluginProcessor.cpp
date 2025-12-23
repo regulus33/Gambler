@@ -252,15 +252,40 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         auto& currentStep = sequence.getCurrentStep();
 
         if (note >= 0) {
-            // Valid note - send note on
-            auto noteOn = juce::MidiMessage::noteOn(1, note, (juce::uint8)100);
+            // Get step modulations for this step
+            const auto& stepMods = currentStep.getStepModulations();
+            auto selectedMods = stepMods.getSelectedModulations();
+
+            // Determine velocity (default to 100 if no velocity modulation is selected)
+            juce::uint8 velocity = 100;
+
+            // Send CC messages and check for velocity modulation
+            for (const auto& mod : selectedMods) {
+                if (mod.getType() == ModulationType::Velocity) {
+                    // Use this as the note velocity
+                    velocity = static_cast<juce::uint8>(mod.getValue());
+                } else if (mod.getType() == ModulationType::CC) {
+                    // Send CC message
+                    auto ccMsg = juce::MidiMessage::controllerEvent(1, mod.getCCNumber(), mod.getValue());
+                    midiMessages.addEvent(ccMsg, 0);
+
+                    // Send directly to MIDI output device (for standalone mode)
+                    if (midiOutput) {
+                        midiOutput->sendMessageNow(ccMsg);
+                    }
+                    DBG("MIDI CC: " << mod.getCCNumber() << " = " << mod.getValue());
+                }
+            }
+
+            // Valid note - send note on with velocity
+            auto noteOn = juce::MidiMessage::noteOn(1, note, velocity);
             midiMessages.addEvent(noteOn, 0);
 
             // Send directly to MIDI output device (for standalone mode)
             if (midiOutput) {
                 midiOutput->sendMessageNow(noteOn);
             }
-            DBG("MIDI Note ON: " << note << " (velocity 100, channel 1)");
+            DBG("MIDI Note ON: " << note << " (velocity " << (int)velocity << ", channel 1)");
             lastPlayedNote = note;
         } else {
             // Rest - no note to play
@@ -389,6 +414,19 @@ void PluginProcessor::triggerStepMidi(int stepIndex) {
     const auto& step = sequence.getStep(stepIndex);
     int note = step.getStepNotes().getCurrentNote().getNoteNumber();
 
+    // Get step modulations
+    const auto& stepMods = step.getStepModulations();
+    auto selectedMods = stepMods.getSelectedModulations();
+
+    // Determine velocity (default to 100 if no velocity modulation is selected)
+    juce::uint8 velocity = 100;
+    for (const auto& mod : selectedMods) {
+        if (mod.getType() == ModulationType::Velocity) {
+            velocity = static_cast<juce::uint8>(mod.getValue());
+            break;
+        }
+    }
+
     // Send note off for previous note (if any)
     if (lastPlayedNote >= 0) {
         if (midiOutput) {
@@ -410,19 +448,31 @@ void PluginProcessor::triggerStepMidi(int stepIndex) {
 
     // Send note on for the new note
     if (note >= 0) {
+        // Send CC messages first (only in standalone mode for now)
+        // In DAW mode, CC messages would need to be queued via the audio thread
+        if (midiOutput) {
+            for (const auto& mod : selectedMods) {
+                if (mod.getType() == ModulationType::CC) {
+                    auto ccMsg = juce::MidiMessage::controllerEvent(1, mod.getCCNumber(), mod.getValue());
+                    midiOutput->sendMessageNow(ccMsg);
+                    DBG("Preview MIDI CC (standalone): " << mod.getCCNumber() << " = " << mod.getValue());
+                }
+            }
+        }
+
         if (midiOutput) {
             // Standalone mode: send directly to MIDI device
-            auto noteOn = juce::MidiMessage::noteOn(1, note, (juce::uint8)100);
+            auto noteOn = juce::MidiMessage::noteOn(1, note, velocity);
             midiOutput->sendMessageNow(noteOn);
-            DBG("Preview MIDI Note ON (standalone): " << note << " (step " << stepIndex << ")");
+            DBG("Preview MIDI Note ON (standalone): " << note << " (velocity " << (int)velocity << ", step " << stepIndex << ")");
         } else {
             // DAW mode: queue for audio thread
             int start1, size1, start2, size2;
             previewMidiFifo.prepareToWrite(1, start1, size1, start2, size2);
             if (size1 > 0) {
-                previewMidiBuffer[start1] = { note, true, 100 };
+                previewMidiBuffer[start1] = { note, true, velocity };
                 previewMidiFifo.finishedWrite(1);
-                DBG("Preview MIDI Note ON queued (DAW): " << note << " (step " << stepIndex << ")");
+                DBG("Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int)velocity << ", step " << stepIndex << ")");
             }
         }
         lastPlayedNote = note;
@@ -447,13 +497,26 @@ void PluginProcessor::triggerCurrentStepMidi(int noteOverride) {
         return;
     }
 
+    // Get step modulations
+    const auto& step = sequence.getStep(currentStep);
+    const auto& stepMods = step.getStepModulations();
+    auto selectedMods = stepMods.getSelectedModulations();
+
+    // Determine velocity (default to 100 if no velocity modulation is selected)
+    juce::uint8 velocity = 100;
+    for (const auto& mod : selectedMods) {
+        if (mod.getType() == ModulationType::Velocity) {
+            velocity = static_cast<juce::uint8>(mod.getValue());
+            break;
+        }
+    }
+
     // Use override note if provided, otherwise read from step
     int note;
     if (noteOverride >= 0) {
         note = noteOverride;
         DBG("  Using override note: " << note);
     } else {
-        const auto& step = sequence.getStep(currentStep);
         note = step.getStepNotes().getCurrentNote().getNoteNumber();
         DBG("  Current step: " << currentStep << ", Note from step: " << note);
     }
@@ -481,19 +544,31 @@ void PluginProcessor::triggerCurrentStepMidi(int noteOverride) {
 
     // Send note on for the new note
     if (note >= 0) {
+        // Send CC messages first (only in standalone mode for now)
+        // In DAW mode, CC messages would need to be queued via the audio thread
+        if (midiOutput) {
+            for (const auto& mod : selectedMods) {
+                if (mod.getType() == ModulationType::CC) {
+                    auto ccMsg = juce::MidiMessage::controllerEvent(1, mod.getCCNumber(), mod.getValue());
+                    midiOutput->sendMessageNow(ccMsg);
+                    DBG("  Preview MIDI CC (standalone): " << mod.getCCNumber() << " = " << mod.getValue());
+                }
+            }
+        }
+
         if (midiOutput) {
             // Standalone mode: send directly to MIDI device
-            auto noteOn = juce::MidiMessage::noteOn(1, note, (juce::uint8)100);
+            auto noteOn = juce::MidiMessage::noteOn(1, note, velocity);
             midiOutput->sendMessageNow(noteOn);
-            DBG("  Preview MIDI Note ON sent (standalone): " << note);
+            DBG("  Preview MIDI Note ON sent (standalone): " << note << " (velocity " << (int)velocity << ")");
         } else {
             // DAW mode: queue for audio thread
             int start1, size1, start2, size2;
             previewMidiFifo.prepareToWrite(1, start1, size1, start2, size2);
             if (size1 > 0) {
-                previewMidiBuffer[start1] = { note, true, 100 };
+                previewMidiBuffer[start1] = { note, true, velocity };
                 previewMidiFifo.finishedWrite(1);
-                DBG("  Preview MIDI Note ON queued (DAW): " << note);
+                DBG("  Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int)velocity << ")");
             } else {
                 DBG("  Preview MIDI queue full, Note ON dropped: " << note);
             }

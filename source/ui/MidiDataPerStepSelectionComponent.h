@@ -50,9 +50,17 @@ public:
                                                               BinaryData::InterVariableFont_ttfSize)),
           comboLookAndFeel (interFont)
     {
-        // Row 0: Empty space + dummy button
+        // Row 0: Empty space + randomize button + CC lanes button
         spacer = std::make_unique<juce::Component>();
         addAndMakeVisible(*spacer);
+
+        randomizeButton = std::make_unique<RandomizeButton>();
+        addAndMakeVisible(*randomizeButton);
+
+        // Wire up randomize button to randomize all CC selections
+        randomizeButton->onClick = [this]() {
+            randomizeAllCCSelections();
+        };
 
         dummyButton = std::make_unique<DummyButton>();
         addAndMakeVisible(*dummyButton);
@@ -251,6 +259,34 @@ public:
         }
     }
 
+    /**
+     * Randomize all CC selections in all 7 lanes
+     * Picks a random CC number (0-127) for each lane
+     */
+    void randomizeAllCCSelections()
+    {
+        juce::Random random;
+
+        for (int i = 0; i < 7; ++i) {
+            // Pick a random CC number (0-127)
+            int randomCC = random.nextInt(128);
+
+            // Update the ComboBox UI
+            dummyDropdowns[i]->setSelectedId(randomCC + 1, juce::dontSendNotification);
+
+            // Update the backend
+            processorRef.queueCommand(ProcessorCommand([this, i, randomCC]() {
+                auto& seq = processorRef.getSequence();
+                int currentStep = seq.getCurrentIndex();
+                if (currentStep < 0) currentStep = 0;
+
+                auto& stepMods = seq.getStep(currentStep).getStepModulations();
+                stepMods.setModulationCCNumber(i, randomCC);
+                DBG("Lane " + juce::String(i) + " randomized to CC: " + juce::String(randomCC));
+            }));
+        }
+    }
+
     void paint (juce::Graphics& g) override {
         juce::ignoreUnused (g);
         // Transparent background so the parent component shows through.
@@ -286,8 +322,9 @@ public:
         grid.rowGap = juce::Grid::Px(MidiDataPerStepConstants::gridGap);
 
         // Add items to grid
-        // Row 0: Spacer spans first 6 columns (9/10 width), Button in last column (1/10 width)
-        grid.items.add(juce::GridItem(*spacer).withArea(1, 1, 2, 7));      // Row 1, Col 1-6 (span 6 cols)
+        // Row 0: Spacer spans first 5 columns, Randomize button in col 6, CC lanes button in col 7
+        grid.items.add(juce::GridItem(*spacer).withArea(1, 1, 2, 6));      // Row 1, Col 1-5 (span 5 cols)
+        grid.items.add(juce::GridItem(*randomizeButton).withArea(1, 6));   // Row 1, Col 6
         grid.items.add(juce::GridItem(*dummyButton).withArea(1, 7));       // Row 1, Col 7
 
         // Row 1: 7 dummy dropdowns
@@ -411,6 +448,89 @@ private:
     };
 
     /**
+     * RandomizeButton - button with dice icon to randomize all CC selections
+     */
+    class RandomizeButton : public juce::Component {
+    public:
+        RandomizeButton() = default;
+
+        void mouseUp (const juce::MouseEvent& e) override
+        {
+            if (e.mouseWasDraggedSinceMouseDown())
+                return;
+
+            if (onClick)
+                onClick();
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            using namespace MidiDataPerStepConstants;
+            auto bounds = getLocalBounds().toFloat();
+
+            // Background
+            auto background = juce::Colour (buttonBgOffHex);
+            g.setColour (background);
+            g.fillRoundedRectangle (bounds, buttonCornerRadius);
+
+            // Border
+            g.setColour (juce::Colours::white.withAlpha (0.6f));
+            g.drawRoundedRectangle (bounds.reduced (buttonBorderReduction), buttonCornerRadius, buttonBorderWidth);
+
+            // Draw dice icon (same as Roll button)
+            auto iconBounds = bounds.reduced(bounds.getWidth() * 0.25f, bounds.getHeight() * 0.25f);
+            auto iconPath = createDiceIcon();
+
+            // Scale and position the icon
+            auto pathBounds = iconPath.getBounds();
+            auto scale = juce::jmin(iconBounds.getWidth() / pathBounds.getWidth(),
+                                   iconBounds.getHeight() / pathBounds.getHeight());
+
+            auto transform = juce::AffineTransform::scale(scale)
+                .followedBy(juce::AffineTransform::translation(
+                    iconBounds.getCentreX() - pathBounds.getCentreX() * scale,
+                    iconBounds.getCentreY() - pathBounds.getCentreY() * scale));
+
+            g.setColour (juce::Colours::white);
+            g.fillPath(iconPath, transform);
+        }
+
+        std::function<void()> onClick;
+
+    private:
+        /**
+         * Creates the dice/roll icon path (same as ControlIcons::createRollIcon)
+         * Original SVG viewBox: 0 0 22.3 22.8
+         */
+        juce::Path createDiceIcon() {
+            juce::Path path;
+            path.startNewSubPath(18.6f, 0.0f);
+            path.lineTo(3.7f, 0.0f);
+            path.cubicTo(2.7f, 0.0f, 1.8f, 0.4f, 1.1f, 1.1f);
+            path.cubicTo(0.4f, 1.8f, 0.0f, 2.8f, 0.0f, 3.8f);
+            path.lineTo(0.0f, 18.9f);
+            path.cubicTo(0.0f, 19.9f, 0.4f, 20.9f, 1.1f, 21.6f);
+            path.cubicTo(1.8f, 22.3f, 2.8f, 22.8f, 3.7f, 22.8f);
+            path.lineTo(18.6f, 22.8f);
+            path.cubicTo(19.6f, 22.8f, 20.5f, 22.3f, 21.2f, 21.6f);
+            path.cubicTo(21.9f, 20.9f, 22.3f, 19.9f, 22.3f, 18.9f);
+            path.lineTo(22.3f, 3.8f);
+            path.cubicTo(22.3f, 2.8f, 21.9f, 1.8f, 21.2f, 1.1f);
+            path.cubicTo(20.5f, 0.4f, 19.6f, 0.0f, 18.6f, 0.0f);
+            path.closeSubPath();
+
+            // Dots
+            path.addEllipse(5.6f, 5.7f, 2.3f, 2.3f);
+            path.addEllipse(14.4f, 5.7f, 2.3f, 2.3f);
+            path.addEllipse(10.0f, 10.3f, 2.3f, 2.3f);
+            path.addEllipse(5.6f, 14.8f, 2.3f, 2.3f);
+            path.addEllipse(14.4f, 14.8f, 2.3f, 2.3f);
+
+            return path;
+        }
+    };
+
+    /**
      * DummyButton - now a toggle button for "lane disable" edit mode
      */
     class DummyButton : public juce::Component {
@@ -476,6 +596,7 @@ private:
     SmallComboBoxLookAndFeel comboLookAndFeel;
 
     std::unique_ptr<juce::Component> spacer;
+    std::unique_ptr<RandomizeButton> randomizeButton;
     std::unique_ptr<DummyButton> dummyButton;
     std::vector<std::unique_ptr<DummyComponent>> dummyDropdowns;
     std::vector<std::unique_ptr<VerticalBarSlider>> sliders;
