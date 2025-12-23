@@ -466,6 +466,15 @@ PluginEditor::PluginEditor (PluginProcessor& p)
                     }));
                 };
 
+                // Sync note length setting from processor
+                content->setNoteLength(processorRef.getUserPreferences().defaultNoteLength);
+                content->onNoteLengthChanged = [this](double length) {
+                    processorRef.queueCommand(ProcessorCommand([this, length]() {
+                        processorRef.getUserPreferences().defaultNoteLength = length;
+                        DBG("Note length changed to: " + juce::String(length * 100.0) + "%");
+                    }));
+                };
+
                 content->onPlayClicked = [this]() {
                     processorRef.queueCommand(ProcessorCommand([this]() {
                         // Reset sequence to beginning and start clock

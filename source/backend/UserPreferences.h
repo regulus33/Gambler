@@ -14,7 +14,11 @@
 struct UserPreferences {
     // UI/Editor preferences
     bool previewNotesOnEdit = true;  // Whether to trigger MIDI preview when editing notes
-    
+
+    // MIDI output preferences
+    double defaultNoteLength = 0.9;  // Note length as percentage of step duration (0.0-1.0)
+                                     // Default 0.9 = 90% of step length (leaves small gap)
+
     // Future preferences can be added here:
     // - UI theme/color scheme
     // - Grid snap settings
@@ -27,12 +31,13 @@ struct UserPreferences {
      */
     std::unique_ptr<juce::XmlElement> toXml() const {
         auto xml = std::make_unique<juce::XmlElement>("UserPreferences");
-        
+
         xml->setAttribute("previewNotesOnEdit", previewNotesOnEdit);
-        
+        xml->setAttribute("defaultNoteLength", defaultNoteLength);
+
         return xml;
     }
-    
+
     /**
      * Deserialize preferences from XML
      */
@@ -40,8 +45,9 @@ struct UserPreferences {
         if (xml.getTagName() != "UserPreferences") {
             return;
         }
-        
+
         previewNotesOnEdit = xml.getBoolAttribute("previewNotesOnEdit", true);
+        defaultNoteLength = xml.getDoubleAttribute("defaultNoteLength", 0.9);
     }
 };
 

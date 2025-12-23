@@ -102,6 +102,38 @@ public:
         };
         addAndMakeVisible(previewNotesToggle);
 
+        // Setup note length slider
+        noteLengthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+        noteLengthSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false,
+                                         static_cast<int>(SettingsWindowConstants::sliderTextBoxWidth),
+                                         SettingsWindowConstants::controlHeight);
+        noteLengthSlider.setRange(0.1, 1.0, 0.01);  // 10% to 100% in 1% increments
+        noteLengthSlider.setValue(0.9);  // Default 90%
+        noteLengthSlider.setTextValueSuffix(" %");
+        noteLengthSlider.setColour(juce::Slider::textBoxTextColourId, juce::Colours::white);
+        noteLengthSlider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+        noteLengthSlider.setColour(juce::Slider::thumbColourId, juce::Colours::white);
+        noteLengthSlider.setColour(juce::Slider::trackColourId, juce::Colours::grey);
+        noteLengthSlider.onValueChange = [this] {
+            if (onNoteLengthChanged)
+                onNoteLengthChanged(noteLengthSlider.getValue());
+        };
+        // Custom text from value to show percentage
+        noteLengthSlider.textFromValueFunction = [](double value) {
+            return juce::String(static_cast<int>(value * 100.0));
+        };
+        // Custom value from text to parse percentage
+        noteLengthSlider.valueFromTextFunction = [](const juce::String& text) {
+            return text.getDoubleValue() / 100.0;
+        };
+        addAndMakeVisible(noteLengthSlider);
+
+        // Setup note length label
+        noteLengthLabel.setText("Note Length", juce::dontSendNotification);
+        noteLengthLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+        noteLengthLabel.setJustificationType(juce::Justification::centredLeft);
+        addAndMakeVisible(noteLengthLabel);
+
         setSize(SettingsWindowConstants::windowWidth, SettingsWindowConstants::windowHeight);
     }
 
@@ -140,6 +172,13 @@ public:
 
         area.removeFromTop(controlSpacing);
 
+        // Note length slider row
+        auto noteLengthRow = area.removeFromTop(controlHeight);
+        noteLengthLabel.setBounds(noteLengthRow.removeFromLeft(labelWidth));
+        noteLengthSlider.setBounds(noteLengthRow);
+
+        area.removeFromTop(controlSpacing);
+
         // Preview notes on edit checkbox row
         auto previewRow = area.removeFromTop(controlHeight);
         previewNotesToggle.setBounds(previewRow);
@@ -150,11 +189,13 @@ public:
     std::function<void()> onStopClicked;
     std::function<void(bool)> onInternalClockChanged;
     std::function<void(double)> onTempoChanged;
+    std::function<void(double)> onNoteLengthChanged;
     std::function<void(bool)> onPreviewNotesChanged;
 
     // Accessors for current values
     bool isInternalClockEnabled() const { return internalClockToggle.getToggleState(); }
     double getTempo() const { return tempoSlider.getValue(); }
+    double getNoteLength() const { return noteLengthSlider.getValue(); }
     bool isPreviewNotesEnabled() const { return previewNotesToggle.getToggleState(); }
 
     // Setters for external state sync
@@ -163,6 +204,7 @@ public:
         tempoSlider.setEnabled(enabled);
     }
     void setTempo(double bpm) { tempoSlider.setValue(bpm, juce::dontSendNotification); }
+    void setNoteLength(double length) { noteLengthSlider.setValue(length, juce::dontSendNotification); }
     void setPreviewNotesEnabled(bool enabled) {
         previewNotesToggle.setToggleState(enabled, juce::dontSendNotification);
     }
@@ -175,6 +217,8 @@ private:
     juce::ToggleButton internalClockToggle;
     juce::Label tempoLabel;
     juce::Slider tempoSlider;
+    juce::Label noteLengthLabel;
+    juce::Slider noteLengthSlider;
     juce::ToggleButton previewNotesToggle;
 };
 

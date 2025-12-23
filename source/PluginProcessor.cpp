@@ -216,6 +216,25 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         previewMidiFifo.finishedRead(size1 + size2);
     }
 
+    // Check if scheduled note-off should be sent
+    if (scheduledNoteOffSample >= 0 && currentSamplePosition >= scheduledNoteOffSample) {
+        auto noteOff = juce::MidiMessage::noteOff(1, scheduledNoteOffNote, scheduledNoteOffVelocity);
+        midiMessages.addEvent(noteOff, 0);
+
+        // Send directly to MIDI output device (for standalone mode)
+        if (midiOutput) {
+            midiOutput->sendMessageNow(noteOff);
+        }
+        DBG("Scheduled MIDI Note OFF: " << scheduledNoteOffNote << " at sample " << currentSamplePosition);
+
+        // Clear scheduled note-off
+        scheduledNoteOffSample = -1;
+        scheduledNoteOffNote = -1;
+    }
+
+    // Update current sample position
+    currentSamplePosition += buffer.getNumSamples();
+
     // Process clock based on current mode
     if (clock.getMode() == ClockMode::DAW_SYNC) {
         // DAW sync mode: get timing from host transport
@@ -231,7 +250,11 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     // Check if clock triggered a tick
     if (clock.shouldTick()) {
-        // Send note off for previous note (if any)
+        // Cancel any scheduled note-off (we're starting a new step)
+        scheduledNoteOffSample = -1;
+        scheduledNoteOffNote = -1;
+
+        // Send note off for previous note immediately (if any)
         if (lastPlayedNote >= 0) {
             auto noteOff = juce::MidiMessage::noteOff(1, lastPlayedNote, (juce::uint8)0);
             midiMessages.addEvent(noteOff, 0);
@@ -287,6 +310,38 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             }
             DBG("MIDI Note ON: " << note << " (velocity " << (int)velocity << ", channel 1)");
             lastPlayedNote = note;
+
+            // Schedule note-off based on note length setting
+            // Calculate samples per step based on current clock settings
+            double samplesPerStep = 0.0;
+            if (clock.getMode() == ClockMode::INTERNAL) {
+                samplesPerStep = clock.getInternalClock().calculateSamplesPerPulse();
+            } else {
+                // For DAW sync, we need to calculate based on DAW tempo
+                // Get tempo from play head if available
+                if (auto* playHead = getPlayHead()) {
+                    auto position = playHead->getPosition();
+                    if (position.hasValue() && position->getBpm().hasValue()) {
+                        double bpm = *position->getBpm();
+                        double sampleRate = getSampleRate();
+                        int pulsesPerQuarterNote = getPulsesPerQuarterNote(clock.getSubdivision());
+                        double pulsesPerSecond = (bpm * pulsesPerQuarterNote) / 60.0;
+                        samplesPerStep = sampleRate / pulsesPerSecond;
+                    }
+                }
+            }
+
+            if (samplesPerStep > 0.0) {
+                // Calculate note-off time based on note length percentage
+                double noteLengthPercent = userPreferences.defaultNoteLength;
+                juce::int64 noteOffDelay = static_cast<juce::int64>(samplesPerStep * noteLengthPercent);
+                scheduledNoteOffSample = currentSamplePosition + noteOffDelay;
+                scheduledNoteOffNote = note;
+                scheduledNoteOffVelocity = 0;  // Standard note-off velocity
+
+                DBG("Scheduled note-off for note " << note << " at sample " << scheduledNoteOffSample
+                    << " (delay: " << noteOffDelay << " samples, " << (noteLengthPercent * 100.0) << "% of step)");
+            }
         } else {
             // Rest - no note to play
             lastPlayedNote = -1;
