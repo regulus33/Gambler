@@ -460,8 +460,8 @@ namespace ControlIcons {
  * Displays 8 control buttons below the sequencer steps:
  * - Roll (toggle random mode)
  * - Shift (modifier key)
- * - Index <- (move window left)
- * - Index -> (move window right)
+ * - Page <- (page view window left by 8 steps)
+ * - Page -> (page view window right by 8 steps)
  * - Length + (increase sequence length)
  * - Length - (decrease sequence length)
  * - Nudge <- (shift notes left)
@@ -484,10 +484,10 @@ public:
         buttons[0]->setLabel("Roll");
 
         buttons[1]->setIcon(ControlIcons::createIndexLeftIcon());
-        buttons[1]->setLabel("Index");
+        buttons[1]->setLabel("Page");
 
         buttons[2]->setIcon(ControlIcons::createIndexRightIcon());
-        buttons[2]->setLabel("Index");
+        buttons[2]->setLabel("Page");
 
         buttons[3]->setIcon(ControlIcons::createLengthPlusIcon());
         buttons[3]->setLabel("Length");

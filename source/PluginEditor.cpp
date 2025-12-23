@@ -300,7 +300,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     addAndMakeVisible (sequencerControls);
 
     // Setup callback for control button clicks
-    // Button indices: 0=Roll, 1=Index<-, 2=Index->, 3=Length+, 4=Length-, 5=Nudge<-, 6=Nudge->, 7=Shift
+    // Button indices: 0=Roll, 1=Page<-, 2=Page->, 3=Length+, 4=Length-, 5=Nudge<-, 6=Nudge->, 7=Shift
     sequencerControls.onButtonClicked = [this] (int buttonIndex) {
         switch (buttonIndex) {
             case 0:  // Roll - momentary: enable random mode while held (no UI update needed)
@@ -309,29 +309,21 @@ PluginEditor::PluginEditor (PluginProcessor& p)
                     DBG("Roll pressed - random mode ON");
                 }));
                 break;
-            case 1:  // Index <-
-                processorRef.queueCommand(ProcessorCommand(
-                    [this]() {
-                        processorRef.getSequence().indexLeft();
-                        DBG("Index left, now at: " + juce::String(processorRef.getSequence().getCurrentIndex()));
-                    },
-                    [this]() {
-                        sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
-                        updateSubsequenceBar();
-                    }
-                ));
+            case 1:  // Page <- (page view window left by 8 steps)
+                {
+                    int currentWindow = sequencerSteps.getWindowStart();
+                    int newWindow = juce::jmax(0, currentWindow - 8);
+                    sequencerSteps.setWindowStart(newWindow);
+                    DBG("Page left, window now at: " + juce::String(newWindow));
+                }
                 break;
-            case 2:  // Index ->
-                processorRef.queueCommand(ProcessorCommand(
-                    [this]() {
-                        processorRef.getSequence().indexRight();
-                        DBG("Index right, now at: " + juce::String(processorRef.getSequence().getCurrentIndex()));
-                    },
-                    [this]() {
-                        sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
-                        updateSubsequenceBar();
-                    }
-                ));
+            case 2:  // Page -> (page view window right by 8 steps)
+                {
+                    int currentWindow = sequencerSteps.getWindowStart();
+                    int newWindow = juce::jmin(56, currentWindow + 8);
+                    sequencerSteps.setWindowStart(newWindow);
+                    DBG("Page right, window now at: " + juce::String(newWindow));
+                }
                 break;
             case 3:  // Length +
                 processorRef.queueCommand(ProcessorCommand(
