@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Icons.h"
 #include "VerticalBarSlider.h"
 #include "BinaryData.h"
 #include "../PluginProcessor.h"
@@ -479,7 +480,7 @@ private:
 
             // Draw dice icon (same as Roll button)
             auto iconBounds = bounds.reduced(bounds.getWidth() * 0.25f, bounds.getHeight() * 0.25f);
-            auto iconPath = createDiceIcon();
+            auto iconPath = Icons::createDiceIcon();
 
             // Scale and position the icon
             auto pathBounds = iconPath.getBounds();
@@ -497,37 +498,6 @@ private:
 
         std::function<void()> onClick;
 
-    private:
-        /**
-         * Creates the dice/roll icon path (same as ControlIcons::createRollIcon)
-         * Original SVG viewBox: 0 0 22.3 22.8
-         */
-        juce::Path createDiceIcon() {
-            juce::Path path;
-            path.startNewSubPath(18.6f, 0.0f);
-            path.lineTo(3.7f, 0.0f);
-            path.cubicTo(2.7f, 0.0f, 1.8f, 0.4f, 1.1f, 1.1f);
-            path.cubicTo(0.4f, 1.8f, 0.0f, 2.8f, 0.0f, 3.8f);
-            path.lineTo(0.0f, 18.9f);
-            path.cubicTo(0.0f, 19.9f, 0.4f, 20.9f, 1.1f, 21.6f);
-            path.cubicTo(1.8f, 22.3f, 2.8f, 22.8f, 3.7f, 22.8f);
-            path.lineTo(18.6f, 22.8f);
-            path.cubicTo(19.6f, 22.8f, 20.5f, 22.3f, 21.2f, 21.6f);
-            path.cubicTo(21.9f, 20.9f, 22.3f, 19.9f, 22.3f, 18.9f);
-            path.lineTo(22.3f, 3.8f);
-            path.cubicTo(22.3f, 2.8f, 21.9f, 1.8f, 21.2f, 1.1f);
-            path.cubicTo(20.5f, 0.4f, 19.6f, 0.0f, 18.6f, 0.0f);
-            path.closeSubPath();
-
-            // Dots
-            path.addEllipse(5.6f, 5.7f, 2.3f, 2.3f);
-            path.addEllipse(14.4f, 5.7f, 2.3f, 2.3f);
-            path.addEllipse(10.0f, 10.3f, 2.3f, 2.3f);
-            path.addEllipse(5.6f, 14.8f, 2.3f, 2.3f);
-            path.addEllipse(14.4f, 14.8f, 2.3f, 2.3f);
-
-            return path;
-        }
     };
 
     /**
