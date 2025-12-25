@@ -3,25 +3,11 @@
 #include "PluginProcessor.h"
 #include "BinaryData.h"
 #include "melatonin_inspector/melatonin_inspector.h"
-#include "ui/PianoRollComponent.h"
-#include "ui/MidiDataPerStepSelectionComponent.h"
-#include "ui/SequencerStepsComponent.h"
-#include "ui/SequencerControlsComponent.h"
-#include "ui/MainControlsComponent.h"
-#include "ui/SequenceOverviewComponent.h"
-#include "ui/SubsequenceControlsComponent.h"
-#include "ui/ViewToggleButton.h"
-#include "ui/NoteRangeControlsComponent.h"
-#include "ui/SettingsButtonComponent.h"
-#include "ui/SettingsWindowComponent.h"
-#include "ui/LogoComponent.h"
-#include "ui/UIConstants.h"
-#include "ui/MusicConstants.h"
+#include "ui/ApplicationComponent.h"
 
 //==============================================================================
 class PluginEditor : public juce::AudioProcessorEditor,
-                     public juce::KeyListener,
-                     private juce::AsyncUpdater
+                     public juce::KeyListener
 {
 public:
     explicit PluginEditor (PluginProcessor&);
@@ -34,33 +20,13 @@ public:
     // KeyListener override
     bool keyPressed (const juce::KeyPress& key, juce::Component* originatingComponent) override;
 
-    // Helper to set active step and update piano roll
-    void setActiveStepAndNote (int stepIndex);
-
-    // Helper to update the subsequence bar UI from current step's StepNotes
-    void updateSubsequenceBar();
-
 private:
-    // AsyncUpdater callback for UI refresh (called on message thread)
-    void handleAsyncUpdate() override;
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     PluginProcessor& processorRef;
 
     // UI Components
-    PianoRollComponent pianoRoll;
-    MidiDataPerStepSelectionComponent midiDataPerStep { processorRef };  // Initialize with processor reference
-    SequencerStepsComponent sequencerSteps;
-    SequencerControlsComponent sequencerControls;
-    MainControlsComponent mainControls { processorRef };  // Initialize with processor reference
-    SequenceOverviewComponent sequenceOverview;
-    SubsequenceControlsComponent subsequenceControls;
-    ViewToggleButton viewToggleButton;
-    NoteRangeControlsComponent noteRangeControls;
-    SettingsButtonComponent settingsButton;
-    std::unique_ptr<SettingsWindow> settingsWindow;
-    LogoComponent logo;
-    juce::Label versionLabel;
+    ApplicationComponent applicationComponent;
 
     // Inspector
     std::unique_ptr<melatonin::Inspector> inspector;
