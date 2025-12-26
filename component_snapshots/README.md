@@ -1,0 +1,1 @@
+This directory is for componenet snapshots, see CmakeLists.txt for the flags

@@ -21,6 +21,9 @@ public:
     bool keyPressed (const juce::KeyPress& key, juce::Component* originatingComponent) override;
 
 private:
+    // Recursive snapshot utility
+    void snapshotAllComponents(juce::Component* root, const juce::String& basePath, int& count);
+
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     PluginProcessor& processorRef;

@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "./utility/ComponentSnapshotUtility.h"
 
 namespace PluginEditorLayout {
     // Background
@@ -64,10 +65,74 @@ void PluginEditor::resized() {
                              inspectorButtonWidth, inspectorButtonHeight);
 }
 
+void PluginEditor::snapshotAllComponents(juce::Component* root, const juce::String& basePath, int& count) {
+#if defined(TAKE_SNAPSHOTS_OF_COMPONENTS) && TAKE_SNAPSHOTS_OF_COMPONENTS == 1
+    if (!root || root->getWidth() <= 0 || root->getHeight() <= 0) {
+        return;
+    }
+
+    // Get component type name
+    juce::String componentType = juce::String(typeid(*root).name());
+
+    // Clean up the typename
+    componentType = componentType.fromLastOccurrenceOf("::", false, false);  // Remove namespace
+    componentType = componentType.replaceCharacter(' ', '_');
+    componentType = componentType.replaceCharacter('<', '_');
+    componentType = componentType.replaceCharacter('>', '_');
+
+    // width and height
+    auto width = root->getWidth();
+    auto height = root->getHeight();
+    juce::String widthHeightString = "__" + juce::String(width) + "X" + juce::String(height);
+
+    // Create filename with count for uniqueness
+    juce::String filename = juce::String(count).paddedLeft('0', 3) + "_" + componentType + widthHeightString;
+
+    // Take the snapshot
+    ComponentSnapshotUtility::saveSnapshot(*root, basePath, filename, 2.0f);
+
+    count++;
+
+    // Recursively snapshot all children
+    for (int i = 0; i < root->getNumChildComponents(); ++i) {
+        snapshotAllComponents(root->getChildComponent(i), basePath, count);
+    }
+#else
+    juce::ignoreUnused(root, basePath, count);
+#endif
+}
+
 bool PluginEditor::keyPressed (const juce::KeyPress& key, juce::Component* originatingComponent) {
     juce::ignoreUnused (originatingComponent);
 
     // TODO: Remove these dev hotkeys after moving on from dev phase
+
+    // Hotkey 's' - Snapshot all components recursively
+    if (key.getKeyCode() == 's' || key.getKeyCode() == 'S') {
+#if defined(TAKE_SNAPSHOTS_OF_COMPONENTS) && TAKE_SNAPSHOTS_OF_COMPONENTS == 1 && defined(SNAPSHOT_DESTINATION)
+        // Use compile-time snapshot destination
+        auto snapshotsDir = juce::File(SNAPSHOT_DESTINATION);
+        snapshotsDir.createDirectory();
+
+        juce::String basePath = snapshotsDir.getFullPathName();
+
+        // Start recursive snapshot
+        int count = 0;
+        snapshotAllComponents(this, basePath, count);
+
+        DBG("Saved " + juce::String(count) + " component snapshots to: " + basePath);
+
+        juce::AlertWindow::showMessageBoxAsync(
+            juce::AlertWindow::InfoIcon,
+            "Snapshots Saved",
+            "Saved " + juce::String(count) + " component snapshots to:\n" + basePath,
+            "OK");
+#else
+        DBG("Component snapshots disabled - set TAKE_SNAPSHOTS_OF_COMPONENTS=1 and define SNAPSHOT_DESTINATION");
+#endif
+
+        return true;
+    }
 
     // Hotkey 'x' - Save XML snapshot of Sequencer state to state.xml
     if (key.getKeyCode() == 'x' || key.getKeyCode() == 'X') {
@@ -166,4 +231,3 @@ bool PluginEditor::keyPressed (const juce::KeyPress& key, juce::Component* origi
 
     return false;
 }
-
