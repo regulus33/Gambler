@@ -216,17 +216,6 @@ public:
         // Add sequence overview component
         addAndMakeVisible(sequenceOverview);
 
-        // Setup callbacks for sequence overview buttons
-        sequenceOverview.onExportClicked = []() {
-            DBG("Export button clicked");
-        };
-        sequenceOverview.onSaveClicked = []() {
-            DBG("Save button clicked");
-        };
-        sequenceOverview.onLoadClicked = []() {
-            DBG("Load button clicked");
-        };
-
         // Add subsequence controls component
         addAndMakeVisible(subsequenceControls);
 

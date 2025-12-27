@@ -7,16 +7,16 @@
 namespace SequenceGridConstants {
     constexpr int gridRows = 8;
     constexpr int gridCols = 8;
-    constexpr int squareSize = 17;
-    constexpr int squareSpacing = 3;
-    constexpr float squareCornerRadius = 2.0f;
-    constexpr float borderWidth = 2.0f;
+    constexpr int squareSize = 21;  // 17 * 1.24 ≈ 21
+    constexpr int squareSpacing = 4;  // 3 * 1.24 ≈ 3.72, rounded to 4
+    constexpr float squareCornerRadius = 2.48f;  // 2.0 * 1.24
+    constexpr float borderWidth = 2.48f;  // 2.0 * 1.24
     // Default colors
     constexpr juce::uint32 defaultGreyHex = 0xff808080;      // Grey for default squares
     constexpr juce::uint32 defaultDarkGreyHex = 0xff3a3a3a;  // Dark grey for inactive rows
     // Calculated dimensions
-    constexpr int gridWidth = gridCols * squareSize + (gridCols - 1) * squareSpacing;   // 157px
-    constexpr int gridHeight = gridRows * squareSize + (gridRows - 1) * squareSpacing;  // 157px
+    constexpr int gridWidth = gridCols * squareSize + (gridCols - 1) * squareSpacing;   // 196px (was 157px)
+    constexpr int gridHeight = gridRows * squareSize + (gridRows - 1) * squareSpacing;  // 196px (was 157px)
 }
 
 /**

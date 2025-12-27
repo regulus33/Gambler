@@ -59,13 +59,13 @@ public:
         juce::Font font(interBoldFont);
         font.setHeight(fontSize);
         g.setFont(font);
-
+        
         // Text is drawn at left edge, vertically centered
         float textY = (getHeight() - fontSize) / 2.0f;
-        g.drawText("Gambler", 0, static_cast<int>(textY),
+        g.drawText("Gambler", 0, static_cast<int>(textY), 
                    static_cast<int>(textWidth), static_cast<int>(fontSize),
                    juce::Justification::centredLeft, false);
-
+        
         // Draw dice icon to the right of text
         float diceX = textWidth + gapBetweenTextAndDice;
         float diceY = (getHeight() - diceSize) / 2.0f + diceYOffset;
@@ -77,17 +77,11 @@ public:
             .translated(diceX, diceY);
 
         g.fillPath(diceIcon, transform);
-
-        // Take snapshot after first paint when component is fully rendered
-        if (!snapshotTaken) {
-            snapshotTaken = true;
-            takeSnapshot();
-        }
     }
-
+    
     // Returns the calculated width of the component
     int getCalculatedWidth() const { return static_cast<int>(totalWidth); }
-
+    
     // Returns the calculated height of the component
     int getCalculatedHeight() const { return static_cast<int>(totalHeight); }
 
@@ -104,22 +98,10 @@ private:
         totalHeight = juce::jmax(fontSize, diceSize);
     }
 
-    void takeSnapshot() {
-        #if JUCE_DEBUG
-        // Take a high-resolution snapshot (2x scale for crisp output)
-        ComponentSnapshotUtility::saveSnapshot(
-            *this,
-            "/Users/you/Workspace/learning/Gambler",
-            "LogoComponent",
-            2.0f
-        );
-        #endif
-    }
-
     juce::Typeface::Ptr interBoldFont;
     juce::Path diceIcon;
     float textWidth = 0.0f;
     float totalWidth = 0.0f;
     float totalHeight = 0.0f;
-    bool snapshotTaken = false;
 };
+
