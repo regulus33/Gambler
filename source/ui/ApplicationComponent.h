@@ -153,6 +153,13 @@ private:
                 DBG("Preview notes on edit: " + juce::String(enabled ? "enabled" : "disabled"));
             };
 
+            // Sync follow step setting from processor
+            settingsScreen->setFollowStepEnabled(processorRef.getUserPreferences().followStep);
+            settingsScreen->onFollowStepChanged = [this](bool enabled) {
+                processorRef.getUserPreferences().followStep = enabled;
+                DBG("Follow step: " + juce::String(enabled ? "enabled" : "disabled"));
+            };
+
             addAndMakeVisible(*settingsScreen);
             settingsScreen->setBounds(getLocalBounds());
         }

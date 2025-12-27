@@ -337,6 +337,18 @@ public:
         int currentStep = processorRef.getSequence().getCurrentIndex();
         setActiveStepAndNote(currentStep);
 
+        // Auto-scroll the sequencer window to follow the active step (if enabled)
+        if (processorRef.getUserPreferences().followStep && currentStep >= 0) {
+            // Calculate which "row" (0-7) the current step is in (8 steps per row)
+            int rowIndex = currentStep / 8;
+            int windowStart = rowIndex * 8;
+
+            // Only update if the window needs to change
+            if (sequencerSteps.getWindowStart() != windowStart) {
+                sequencerSteps.setWindowStart(windowStart);
+            }
+        }
+
         // Repaint the sequencer steps to show updated note values
         sequencerSteps.repaint();
 

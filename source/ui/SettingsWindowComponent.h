@@ -102,6 +102,18 @@ public:
         };
         addAndMakeVisible(previewNotesToggle);
 
+        // Setup follow step checkbox (enabled by default)
+        followStepToggle.setButtonText("Follow step");
+        followStepToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        followStepToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
+        followStepToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+        followStepToggle.setToggleState(true, juce::dontSendNotification); // Enabled by default
+        followStepToggle.onClick = [this] {
+            if (onFollowStepChanged)
+                onFollowStepChanged(followStepToggle.getToggleState());
+        };
+        addAndMakeVisible(followStepToggle);
+
         // Setup note length slider
         noteLengthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
         noteLengthSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false,
@@ -182,6 +194,12 @@ public:
         // Preview notes on edit checkbox row
         auto previewRow = area.removeFromTop(controlHeight);
         previewNotesToggle.setBounds(previewRow);
+
+        area.removeFromTop(controlSpacing);
+
+        // Follow step checkbox row
+        auto followStepRow = area.removeFromTop(controlHeight);
+        followStepToggle.setBounds(followStepRow);
     }
 
     // Callbacks for state changes
@@ -191,12 +209,14 @@ public:
     std::function<void(double)> onTempoChanged;
     std::function<void(double)> onNoteLengthChanged;
     std::function<void(bool)> onPreviewNotesChanged;
+    std::function<void(bool)> onFollowStepChanged;
 
     // Accessors for current values
     bool isInternalClockEnabled() const { return internalClockToggle.getToggleState(); }
     double getTempo() const { return tempoSlider.getValue(); }
     double getNoteLength() const { return noteLengthSlider.getValue(); }
     bool isPreviewNotesEnabled() const { return previewNotesToggle.getToggleState(); }
+    bool isFollowStepEnabled() const { return followStepToggle.getToggleState(); }
 
     // Setters for external state sync
     void setInternalClockEnabled(bool enabled) {
@@ -207,6 +227,9 @@ public:
     void setNoteLength(double length) { noteLengthSlider.setValue(length, juce::dontSendNotification); }
     void setPreviewNotesEnabled(bool enabled) {
         previewNotesToggle.setToggleState(enabled, juce::dontSendNotification);
+    }
+    void setFollowStepEnabled(bool enabled) {
+        followStepToggle.setToggleState(enabled, juce::dontSendNotification);
     }
 
 private:
@@ -220,6 +243,7 @@ private:
     juce::Label noteLengthLabel;
     juce::Slider noteLengthSlider;
     juce::ToggleButton previewNotesToggle;
+    juce::ToggleButton followStepToggle;
 };
 
 /**
