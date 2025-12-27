@@ -64,10 +64,7 @@ public:
      * Set the current note display (pitch class 0-11)
      */
     void setNote(int pitchClass) {
-        if (pitchClass >= 0 && pitchClass < 12) {
-            noteSlider.getSlider().setValue(static_cast<double>(pitchClass), juce::dontSendNotification);
-            noteSlider.repaint();  // Update the gauge display
-        }
+        setNoteByChromaticPitchClass(pitchClass);
     }
 
     /**
