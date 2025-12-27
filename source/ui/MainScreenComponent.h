@@ -342,11 +342,7 @@ public:
             // Calculate which "row" (0-7) the current step is in (8 steps per row)
             int rowIndex = currentStep / 8;
             int windowStart = rowIndex * 8;
-
-            // Only update if the window needs to change
-            if (sequencerSteps.getWindowStart() != windowStart) {
-                sequencerSteps.setWindowStart(windowStart);
-            }
+            setSequencerWindow(windowStart);
         }
 
         // Repaint the sequencer steps to show updated note values
@@ -486,17 +482,17 @@ private:
                 case 1:  // Page <- (page view window left by 8 steps)
                     {
                         int currentWindow = sequencerSteps.getWindowStart();
-                        int newWindow = juce::jmax(0, currentWindow - 8);
-                        sequencerSteps.setWindowStart(newWindow);
-                        DBG("Page left, window now at: " + juce::String(newWindow));
+                        int newWindow = currentWindow - 8;
+                        setSequencerWindow(newWindow);
+                        DBG("Page left, window now at: " + juce::String(sequencerSteps.getWindowStart()));
                     }
                     break;
                 case 2:  // Page -> (page view window right by 8 steps)
                     {
                         int currentWindow = sequencerSteps.getWindowStart();
-                        int newWindow = juce::jmin(56, currentWindow + 8);
-                        sequencerSteps.setWindowStart(newWindow);
-                        DBG("Page right, window now at: " + juce::String(newWindow));
+                        int newWindow = currentWindow + 8;
+                        setSequencerWindow(newWindow);
+                        DBG("Page right, window now at: " + juce::String(sequencerSteps.getWindowStart()));
                     }
                     break;
                 case 3:  // Length +
@@ -595,6 +591,22 @@ private:
                 DBG("Note range changed: " << minNote << " - " << maxNote);
             }));
         };
+    }
+
+    /**
+     * Set the sequencer window position (which 8 steps are visible)
+     * Clamps the window to valid range [0, 56] and only updates if changed.
+     *
+     * @param windowStart The starting step index (0-56, in increments of 8)
+     */
+    void setSequencerWindow(int windowStart) {
+        // Clamp to valid range (0-56, showing steps 0-7 through 56-63)
+        int clampedWindow = juce::jlimit(0, 56, windowStart);
+
+        // Only update if the window needs to change
+        if (sequencerSteps.getWindowStart() != clampedWindow) {
+            sequencerSteps.setWindowStart(clampedWindow);
+        }
     }
 
     PluginProcessor& processorRef;
