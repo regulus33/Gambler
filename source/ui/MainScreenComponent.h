@@ -216,6 +216,9 @@ public:
         // Add sequence overview component
         addAndMakeVisible(sequenceOverview);
 
+        // Initialize the sequence grid to show the first window row (0)
+        sequenceOverview.getSequenceGrid().setCurrentWindowRow(0);
+
         // Add subsequence controls component
         addAndMakeVisible(subsequenceControls);
 
@@ -596,6 +599,7 @@ private:
     /**
      * Set the sequencer window position (which 8 steps are visible)
      * Clamps the window to valid range [0, 56] and only updates if changed.
+     * Also updates the SequenceGrid to highlight the current window row.
      *
      * @param windowStart The starting step index (0-56, in increments of 8)
      */
@@ -606,6 +610,10 @@ private:
         // Only update if the window needs to change
         if (sequencerSteps.getWindowStart() != clampedWindow) {
             sequencerSteps.setWindowStart(clampedWindow);
+
+            // Update the sequence grid to highlight the current window row
+            int windowRow = clampedWindow / 8;  // Convert window start (0, 8, 16, ..., 56) to row (0-7)
+            sequenceOverview.getSequenceGrid().setCurrentWindowRow(windowRow);
         }
     }
 

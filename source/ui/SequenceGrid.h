@@ -14,6 +14,8 @@ namespace SequenceGridConstants {
     // Default colors
     constexpr juce::uint32 defaultGreyHex = 0xff808080;      // Grey for default squares
     constexpr juce::uint32 defaultDarkGreyHex = 0xff3a3a3a;  // Dark grey for inactive rows
+    // Window row darkening (for non-visible rows)
+    constexpr float nonVisibleRowDarkeningFactor = 0.4f;  // Darken non-visible rows to 40% brightness
     // Calculated dimensions
     constexpr int gridWidth = gridCols * squareSize + (gridCols - 1) * squareSpacing;   // 196px (was 157px)
     constexpr int gridHeight = gridRows * squareSize + (gridRows - 1) * squareSpacing;  // 196px (was 157px)
@@ -43,7 +45,7 @@ struct SquareState {
  */
 class SequenceGrid : public juce::Component {
 public:
-    SequenceGrid() {
+    SequenceGrid() : currentWindowRow(-1) {
         // Initialize all squares to default grey
         for (int row = 0; row < SequenceGridConstants::gridRows; ++row) {
             for (int col = 0; col < SequenceGridConstants::gridCols; ++col) {
@@ -68,8 +70,15 @@ public:
                     static_cast<float> (squareSize),
                     static_cast<float> (squareSize));
 
+                // Determine the color to use (darken if outside current window row)
+                juce::Colour displayColor = state.color;
+                if (currentWindowRow >= 0 && row != currentWindowRow) {
+                    // Darken squares outside the current window row
+                    displayColor = state.color.darker(nonVisibleRowDarkeningFactor);
+                }
+
                 // Fill square with color
-                g.setColour (state.color);
+                g.setColour (displayColor);
                 g.fillRoundedRectangle (squareBounds, squareCornerRadius);
 
                 // Draw white border if enabled
@@ -232,9 +241,30 @@ public:
         repaint();
     }
 
+    /**
+     * Set the current window row (0-7) to highlight which row is visible in the sequencer
+     * Rows outside this window will be darkened
+     * @param row The row index (0-7), or -1 to disable window highlighting
+     */
+    void setCurrentWindowRow(int row) {
+        if (row >= -1 && row < SequenceGridConstants::gridRows && currentWindowRow != row) {
+            currentWindowRow = row;
+            repaint();
+        }
+    }
+
+    /**
+     * Get the current window row
+     */
+    int getCurrentWindowRow() const {
+        return currentWindowRow;
+    }
+
 private:
     std::array<std::array<SquareState, SequenceGridConstants::gridCols>,
                SequenceGridConstants::gridRows> squareStates;
+
+    int currentWindowRow;  // Current visible window row (0-7), or -1 if disabled
 
     /**
      * Get the color for a chromatic note (0-11)
