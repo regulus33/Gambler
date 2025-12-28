@@ -222,9 +222,19 @@ public:
             // Navigate to that row
             setSequencerWindow(windowStart);
 
+            // Set the clicked step as the selected step for editing
+            processorRef.getSequence().setSelectedStepForEditing(stepIndex);
+            sequencerSteps.setSelectedStep(stepIndex);
+
+            // Update the sequence grid to show the new selection
+            sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+
+            // Update the MIDI data per step component to show the selected step's data
+            midiDataPerStep.updateFromSequence();
+
             DBG("Sequence grid clicked: step " + juce::String(stepIndex) +
                 " -> navigating to row " + juce::String(rowIndex) +
-                " (window " + juce::String(windowStart) + ")");
+                " (window " + juce::String(windowStart) + "), selected for editing");
         };
 
         // Add subsequence controls component
