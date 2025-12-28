@@ -129,8 +129,8 @@ private:
             bool isRest = step.getStepNotes().hasRest();
 
             if (isRest) {
-                // Step is a rest - draw grey like steps outside sequence
-                g.setColour (juce::Colour (0xFF484848));
+                // Step is a rest - draw dark grey
+                g.setColour (juce::Colour (0xff808080));
                 g.fillRoundedRectangle (stepBounds, cornerRadius);
 
                 // Draw white border ONLY on active step
@@ -194,8 +194,8 @@ private:
                 g.drawText (noteText, stepBounds.toNearestInt(), juce::Justification::centred);
             }
         } else {
-            // Step is outside the active sequence - draw grey with no note text
-            g.setColour (juce::Colour (0xFF484848));
+            // Step is outside the active sequence - draw even darker grey with no note text
+            g.setColour (juce::Colour (0xff252525));
             g.fillRoundedRectangle (stepBounds, cornerRadius);
 
             // No border for inactive steps outside sequence
