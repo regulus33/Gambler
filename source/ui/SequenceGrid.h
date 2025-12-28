@@ -260,6 +260,39 @@ public:
         return currentWindowRow;
     }
 
+    /**
+     * Mouse click handler - detects which square was clicked
+     */
+    void mouseDown(const juce::MouseEvent& event) override {
+        using namespace SequenceGridConstants;
+
+        auto pos = event.getPosition();
+
+        // Calculate which square was clicked
+        for (int row = 0; row < gridRows; ++row) {
+            for (int col = 0; col < gridCols; ++col) {
+                int x = col * (squareSize + squareSpacing);
+                int y = row * (squareSize + squareSpacing);
+
+                auto squareBounds = juce::Rectangle<int>(x, y, squareSize, squareSize);
+
+                if (squareBounds.contains(pos)) {
+                    // Calculate step index (0-63)
+                    int stepIndex = row * gridCols + col;
+
+                    // Trigger callback if set
+                    if (onSquareClicked) {
+                        onSquareClicked(stepIndex);
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    // Callback for when a square is clicked
+    std::function<void(int)> onSquareClicked;
+
 private:
     std::array<std::array<SquareState, SequenceGridConstants::gridCols>,
                SequenceGridConstants::gridRows> squareStates;

@@ -219,6 +219,20 @@ public:
         // Initialize the sequence grid to show the first window row (0)
         sequenceOverview.getSequenceGrid().setCurrentWindowRow(0);
 
+        // Setup callback for sequence grid clicks - navigate to the clicked row
+        sequenceOverview.getSequenceGrid().onSquareClicked = [this](int stepIndex) {
+            // Calculate which row (0-7) the clicked step belongs to
+            int rowIndex = stepIndex / 8;
+            int windowStart = rowIndex * 8;
+
+            // Navigate to that row
+            setSequencerWindow(windowStart);
+
+            DBG("Sequence grid clicked: step " + juce::String(stepIndex) +
+                " -> navigating to row " + juce::String(rowIndex) +
+                " (window " + juce::String(windowStart) + ")");
+        };
+
         // Add subsequence controls component
         addAndMakeVisible(subsequenceControls);
 
