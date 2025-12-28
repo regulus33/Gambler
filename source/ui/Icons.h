@@ -760,6 +760,34 @@ public:
     {
         return createSaveIcon();
     }
+
+    /**
+     * Creates a chevron down icon for dropdowns
+     * Original SVG viewBox: 0 0 12 8
+     * Simple downward pointing chevron/arrow
+     */
+    static juce::Path createChevronDownIcon()
+    {
+        juce::Path path;
+        path.startNewSubPath(1.0f, 1.0f);
+        path.lineTo(6.0f, 6.0f);
+        path.lineTo(11.0f, 1.0f);
+        return path;
+    }
+
+    /**
+     * Creates a checkmark icon for selection indicators
+     * Original SVG viewBox: 0 0 12 10
+     * Simple checkmark shape
+     */
+    static juce::Path createCheckmarkIcon()
+    {
+        juce::Path path;
+        path.startNewSubPath(1.0f, 5.0f);
+        path.lineTo(4.5f, 8.5f);
+        path.lineTo(11.0f, 1.5f);
+        return path;
+    }
 };
 
 

@@ -2,6 +2,7 @@
 
 #include "BinaryData.h"
 #include "LogoComponent.h"
+#include "PresetSelectorComponent.h"
 #include "ToggleIconButton.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
@@ -9,6 +10,7 @@
 namespace NavBarConstants {
     constexpr int height = 60;  // Height of the navbar
     constexpr int logoGapFromTop = 10;  // Gap between top and logo
+    constexpr int presetSelectorGapFromLogo = 20;  // Gap between logo and preset selector
     constexpr int versionLabelWidth = 60;
     constexpr int versionLabelHeight = 20;
     constexpr int versionLabelMarginRight = 10;  // Gap between version and view toggle button
@@ -22,6 +24,7 @@ namespace NavBarConstants {
  *
  * A navigation bar component that displays:
  * - Logo (left side, centered vertically)
+ * - Preset selector (right of logo)
  * - Version label (right side, left of view toggle button)
  * - View toggle button (right side, left of settings button)
  * - Settings button (right side)
@@ -36,6 +39,9 @@ public:
     {
         // Add logo component
         addAndMakeVisible(logo);
+
+        // Add preset selector
+        addAndMakeVisible(presetSelector);
 
         // Add version label
         addAndMakeVisible(versionLabel);
@@ -80,6 +86,13 @@ public:
         int logoY = (height - logoHeight) / 2;
         logo.setBounds(logoX, logoY, logoWidth, logoHeight);
 
+        // Position preset selector to the right of logo
+        int presetSelectorWidth = presetSelector.getCalculatedWidth();
+        int presetSelectorHeight = presetSelector.getCalculatedHeight();
+        int presetSelectorX = logoX + logoWidth + presetSelectorGapFromLogo;
+        int presetSelectorY = (height - presetSelectorHeight) / 2;
+        presetSelector.setBounds(presetSelectorX, presetSelectorY, presetSelectorWidth, presetSelectorHeight);
+
         // Position settings button in top right corner
         int settingsButtonX = getWidth() - buttonSize - settingsButtonOffsetRight;
         int settingsButtonY = (height - buttonSize) / 2;  // Vertically center
@@ -108,8 +121,12 @@ public:
         settingsButton.setToggled(toggled);
     }
 
+    // Access to preset selector for wiring up callbacks
+    PresetSelectorComponent& getPresetSelector() { return presetSelector; }
+
 private:
     LogoComponent logo;
+    PresetSelectorComponent presetSelector;
     juce::Label versionLabel;
     ToggleIconButton viewToggleButton;
     ToggleIconButton settingsButton;

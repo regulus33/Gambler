@@ -17,6 +17,7 @@
  * - Screen navigation
  * - Processor callbacks and async updates
  * - Settings state management
+ * - Preset management
  */
 class ApplicationComponent : public juce::Component,
                              private juce::AsyncUpdater {
@@ -32,6 +33,9 @@ public:
         mainScreen.getNavBar().onSettingsClicked = [this]() {
             showSettingsScreen();
         };
+
+        // Setup preset selector callbacks
+        setupPresetSelector();
 
         // Setup async update callback for main screen
         mainScreen.onAsyncUpdateNeeded = [this]() {
@@ -191,6 +195,112 @@ private:
 
         // Toggle the main screen's settings button back to gear icon
         mainScreen.getNavBar().setSettingsToggled(false);
+    }
+
+    void setupPresetSelector() {
+        auto& presetSelector = mainScreen.getNavBar().getPresetSelector();
+
+        // Set this component as the dialog parent for proper centering
+        presetSelector.setDialogParent(this);
+
+        // Refresh preset list from disk
+        refreshPresetList();
+
+        // Wire up preset selection callback
+        presetSelector.onPresetSelected = [this](int index) {
+            loadPreset(index);
+        };
+
+        // Wire up save preset callback
+        presetSelector.onSavePreset = [this](const juce::String& name) {
+            savePreset(name);
+        };
+
+        // Wire up delete preset callback
+        presetSelector.onDeletePreset = [this](int index) {
+            deletePreset(index);
+        };
+    }
+
+    void refreshPresetList() {
+        auto& presetManager = processorRef.getPresetManager();
+        presetManager.refreshPresetList();
+
+        auto& presetSelector = mainScreen.getNavBar().getPresetSelector();
+        presetSelector.setPresets(presetManager.getPresetNames());
+
+        // Select current preset if one is loaded
+        const auto& currentName = presetManager.getCurrentPresetName();
+        if (!currentName.isEmpty()) {
+            presetSelector.selectPresetByName(currentName, false);
+        }
+    }
+
+    void loadPreset(int index) {
+        auto& presetManager = processorRef.getPresetManager();
+        auto xml = presetManager.loadPresetByIndex(index);
+
+        if (xml) {
+            // Load the state
+            processorRef.loadStateFromXml(*xml);
+
+            // Update current preset name
+            const auto& presets = presetManager.getPresets();
+            if (index >= 0 && index < static_cast<int>(presets.size())) {
+                presetManager.setCurrentPresetName(presets[static_cast<size_t>(index)].name);
+            }
+
+            // Trigger UI update
+            triggerAsyncUpdate();
+
+            DBG("Loaded preset at index " + juce::String(index));
+        }
+    }
+
+    void savePreset(const juce::String& name) {
+        auto& presetManager = processorRef.getPresetManager();
+
+        // Get current state as XML
+        auto xml = processorRef.getStateAsXml();
+
+        if (xml && presetManager.savePreset(name, *xml)) {
+            // Update current preset name
+            presetManager.setCurrentPresetName(name);
+
+            // Refresh the preset list
+            refreshPresetList();
+
+            // Select the newly saved preset
+            auto& presetSelector = mainScreen.getNavBar().getPresetSelector();
+            presetSelector.selectPresetByName(name, false);
+
+            DBG("Saved preset: " + name);
+        }
+    }
+
+    void deletePreset(int index) {
+        auto& presetManager = processorRef.getPresetManager();
+        auto& presetSelector = mainScreen.getNavBar().getPresetSelector();
+
+        // Get the preset name before deleting (for checking if it's current)
+        const auto& presets = presetManager.getPresets();
+        juce::String deletedName;
+        if (index >= 0 && index < static_cast<int>(presets.size())) {
+            deletedName = presets[static_cast<size_t>(index)].name;
+        }
+
+        if (presetManager.deletePresetByIndex(index)) {
+            // Refresh the preset list
+            refreshPresetList();
+
+            // If we deleted the current preset, clear the selection
+            if (deletedName == presetManager.getCurrentPresetName()) {
+                presetManager.setCurrentPresetName("");
+                presetSelector.clearSelection();
+            }
+
+            DBG("Deleted preset at index " + juce::String(index));
+        }
     }
 
     PluginProcessor& processorRef;

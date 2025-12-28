@@ -637,6 +637,72 @@ void PluginProcessor::triggerCurrentStepMidi(int noteOverride) {
 }
 
 //==============================================================================
+// Preset State Methods
+//==============================================================================
+
+std::unique_ptr<juce::XmlElement> PluginProcessor::getStateAsXml() {
+    // Create root XML element to hold all state (same format as getStateInformation)
+    auto rootXml = std::make_unique<juce::XmlElement>("GamblerState");
+
+    // Save APVTS parameters (UI control states)
+    auto apvtsXml = apvts.copyState().createXml();
+    rootXml->addChildElement(apvtsXml.release());
+
+    // Save Sequence data (all 64 steps with notes, velocities, gates, modulations, etc.)
+    rootXml->addChildElement(sequence.toXml().release());
+
+    // Save Clock settings (mode, BPM, subdivision)
+    rootXml->addChildElement(clock.toXml().release());
+
+    // Save User Preferences
+    rootXml->addChildElement(userPreferences.toXml().release());
+
+    return rootXml;
+}
+
+void PluginProcessor::loadStateFromXml(const juce::XmlElement& xml) {
+    if (!xml.hasTagName("GamblerState")) {
+        DBG("PluginProcessor::loadStateFromXml - Invalid XML format (expected GamblerState root)");
+        return;
+    }
+
+    DBG("Loading preset state from XML");
+
+    // Load APVTS parameters
+    if (auto* apvtsXml = xml.getChildByName(apvts.state.getType())) {
+        apvts.replaceState(juce::ValueTree::fromXml(*apvtsXml));
+        DBG("  - APVTS loaded");
+    }
+
+    // Queue command to load domain state on audio thread
+    // We need to copy the XML data since the original may be destroyed
+    auto xmlCopy = std::make_shared<juce::XmlElement>(xml);
+
+    queueCommand(ProcessorCommand(
+        [this, xmlCopy]() {
+            // Load Sequence data
+            if (auto* seqXml = xmlCopy->getChildByName("Sequence")) {
+                sequence.fromXml(*seqXml);
+                DBG("  - Sequence loaded");
+            }
+
+            // Load Clock settings
+            if (auto* clockXml = xmlCopy->getChildByName("Clock")) {
+                clock.fromXml(*clockXml);
+                juce::String modeStr = (clock.getMode() == ClockMode::INTERNAL) ? "INTERNAL" : "DAW_SYNC";
+                DBG("  - Clock loaded (mode: " + modeStr + ", BPM: " + juce::String(clock.getBpm()) + ")");
+            }
+
+            // Load User Preferences
+            if (auto* prefsXml = xmlCopy->getChildByName("UserPreferences")) {
+                userPreferences.fromXml(*prefsXml);
+                DBG("  - UserPreferences loaded");
+            }
+        }
+    ));
+}
+
+//==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
     return new PluginProcessor();

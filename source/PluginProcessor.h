@@ -5,6 +5,7 @@
 #include "backend/Clock.h"
 #include "backend/DawSync.h"
 #include "backend/UserPreferences.h"
+#include "backend/PresetManager.h"
 #include "backend/ProcessorCommand.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_devices/juce_audio_devices.h>
@@ -89,6 +90,23 @@ public:
     UserPreferences& getUserPreferences() noexcept { return userPreferences; }
     const UserPreferences& getUserPreferences() const noexcept { return userPreferences; }
 
+    // Preset manager
+    PresetManager& getPresetManager() noexcept { return presetManager; }
+    const PresetManager& getPresetManager() const noexcept { return presetManager; }
+
+    /**
+     * Get the current plugin state as XML (for preset saving)
+     * This creates a complete snapshot of all state that should be saved.
+     */
+    std::unique_ptr<juce::XmlElement> getStateAsXml();
+
+    /**
+     * Load plugin state from XML (for preset loading)
+     * This restores all state from a previously saved snapshot.
+     * Should be called from the message thread - will queue commands for audio thread.
+     */
+    void loadStateFromXml(const juce::XmlElement& xml);
+
     /**
      * Queue a command to be executed on the audio thread
      * This is the thread-safe way to modify domain state from the UI thread.
@@ -124,6 +142,9 @@ private:
 
     // User preferences (persisted with project)
     UserPreferences userPreferences;
+
+    // Preset manager
+    PresetManager presetManager;
 
     // MIDI state
     int lastPlayedNote = -1;  // Track last note for note-off
