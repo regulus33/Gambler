@@ -492,6 +492,8 @@ private:
         // Setup callback for control button clicks
         // Button indices: 0=Roll, 1=Page<-, 2=Page->, 3=Length+, 4=Length-, 5=Nudge<-, 6=Nudge->, 7=Shift
         sequencerControls.onButtonClicked = [this](int buttonIndex) {
+            bool isShifted = sequencerControls.isShiftActive();
+
             switch (buttonIndex) {
                 case 0:  // Roll - momentary: enable random mode while held (no UI update needed)
                     processorRef.queueCommand(ProcessorCommand([this]() {
@@ -499,67 +501,221 @@ private:
                         DBG("Roll pressed - random mode ON");
                     }));
                     break;
-                case 1:  // Page <- (page view window left by 8 steps)
-                    {
+                case 1:  // Page <- OR Duplicate (when shifted)
+                    if (isShifted) {
+                        // Duplicate: copy entire sequence content, doubling length (capped at 64)
+                        processorRef.queueCommand(ProcessorCommand(
+                            [this]() {
+                                auto& seq = processorRef.getSequence();
+                                int currentLength = seq.getLength();
+                                int newLength = juce::jmin(currentLength * 2, Sequence::MAX_STEPS);
+                                int stepsToCopy = newLength - currentLength;  // How many steps we can actually copy
+
+                                // Copy steps from beginning to after current end
+                                for (int i = 0; i < stepsToCopy; i++) {
+                                    int srcIdx = i;
+                                    int dstIdx = currentLength + i;
+                                    auto& srcStep = seq.getStep(srcIdx);
+                                    auto& dstStep = seq.getStep(dstIdx);
+                                    auto& srcNotes = srcStep.getStepNotes();
+                                    auto& dstNotes = dstStep.getStepNotes();
+                                    dstNotes.setLength(srcNotes.getLength());
+                                    for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
+                                        dstNotes.setNote(n, srcNotes.getNote(n).getNoteNumber());
+                                    }
+                                }
+                                // Update sequence length
+                                seq.setLength(newLength);
+                                DBG("Duplicated sequence: " + juce::String(currentLength) + " -> " + juce::String(newLength) + " steps");
+                            },
+                            [this]() {
+                                sequencerSteps.repaint();
+                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                subsequenceControls.repaint();
+                            }
+                        ));
+                    } else {
+                        // Normal: Page left
                         int currentWindow = sequencerSteps.getWindowStart();
                         int newWindow = currentWindow - 8;
                         setSequencerWindow(newWindow);
                         DBG("Page left, window now at: " + juce::String(sequencerSteps.getWindowStart()));
                     }
                     break;
-                case 2:  // Page -> (page view window right by 8 steps)
-                    {
+                case 2:  // Page -> OR Clear (when shifted)
+                    if (isShifted) {
+                        // Clear: set all steps in current window to rest
+                        int windowStart = sequencerSteps.getWindowStart();
+                        processorRef.queueCommand(ProcessorCommand(
+                            [this, windowStart]() {
+                                auto& seq = processorRef.getSequence();
+                                for (int i = 0; i < 8; i++) {
+                                    int stepIdx = windowStart + i;
+                                    auto& stepNotes = seq.getStep(stepIdx).getStepNotes();
+                                    // Set all substeps to rest (-1)
+                                    for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
+                                        stepNotes.setNote(n, -1);
+                                    }
+                                }
+                                DBG("Cleared window starting at " + juce::String(windowStart));
+                            },
+                            [this]() {
+                                sequencerSteps.repaint();
+                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                updateSubsequenceBar();
+                            }
+                        ));
+                    } else {
+                        // Normal: Page right
                         int currentWindow = sequencerSteps.getWindowStart();
                         int newWindow = currentWindow + 8;
                         setSequencerWindow(newWindow);
                         DBG("Page right, window now at: " + juce::String(sequencerSteps.getWindowStart()));
                     }
                     break;
-                case 3:  // Length +
-                    processorRef.queueCommand(ProcessorCommand(
-                        [this]() {
-                            processorRef.getSequence().increaseLength();
-                            DBG("Length increased to: " + juce::String(processorRef.getSequence().getLength()));
-                        },
-                        [this]() {
-                            sequencerSteps.repaint();
-                            sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
-                        }
-                    ));
+                case 3:  // Length + OR Clear Step (when shifted)
+                    if (isShifted) {
+                        // Clear Step: set current step to rest
+                        processorRef.queueCommand(ProcessorCommand(
+                            [this]() {
+                                auto& seq = processorRef.getSequence();
+                                int selectedStep = seq.getSelectedStepForEditing();
+                                auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
+                                // Set all substeps to rest (-1)
+                                for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
+                                    stepNotes.setNote(n, -1);
+                                }
+                                DBG("Cleared step " + juce::String(selectedStep));
+                            },
+                            [this]() {
+                                sequencerSteps.repaint();
+                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                updateSubsequenceBar();
+                            }
+                        ));
+                    } else {
+                        // Normal: Length +
+                        processorRef.queueCommand(ProcessorCommand(
+                            [this]() {
+                                processorRef.getSequence().increaseLength();
+                                DBG("Length increased to: " + juce::String(processorRef.getSequence().getLength()));
+                            },
+                            [this]() {
+                                sequencerSteps.repaint();
+                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                            }
+                        ));
+                    }
                     break;
-                case 4:  // Length -
-                    processorRef.queueCommand(ProcessorCommand(
-                        [this]() {
-                            processorRef.getSequence().decreaseLength();
-                            DBG("Length decreased to: " + juce::String(processorRef.getSequence().getLength()));
-                        },
-                        [this]() {
-                            sequencerSteps.repaint();
-                            sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
-                        }
-                    ));
+                case 4:  // Length - OR Step Randomize (when shifted)
+                    if (isShifted) {
+                        // Step: randomize current step's note
+                        processorRef.queueCommand(ProcessorCommand(
+                            [this]() {
+                                auto& seq = processorRef.getSequence();
+                                int selectedStep = seq.getSelectedStepForEditing();
+                                seq.getStep(selectedStep).randomizeNote(seq.getScale());
+                                DBG("Randomized step " + juce::String(selectedStep));
+                            },
+                            [this]() {
+                                sequencerSteps.repaint();
+                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                updateSubsequenceBar();
+                            }
+                        ));
+                    } else {
+                        // Normal: Length -
+                        processorRef.queueCommand(ProcessorCommand(
+                            [this]() {
+                                processorRef.getSequence().decreaseLength();
+                                DBG("Length decreased to: " + juce::String(processorRef.getSequence().getLength()));
+                            },
+                            [this]() {
+                                sequencerSteps.repaint();
+                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                            }
+                        ));
+                    }
                     break;
-                case 5:  // Nudge <-
-                    processorRef.queueCommand(ProcessorCommand(
-                        [this]() {
-                            processorRef.getSequence().nudgeLeft();
-                            DBG("Nudge left");
-                        },
-                        [this]() {
-                            sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
-                        }
-                    ));
+                case 5:  // Nudge <- OR All Randomize (when shifted)
+                    if (isShifted) {
+                        // All: randomize all steps everywhere
+                        processorRef.queueCommand(ProcessorCommand(
+                            [this]() {
+                                auto& seq = processorRef.getSequence();
+                                for (int i = 0; i < Sequence::MAX_STEPS; i++) {
+                                    seq.getStep(i).randomizeNote(seq.getScale());
+                                }
+                                DBG("Randomized all steps");
+                            },
+                            [this]() {
+                                sequencerSteps.repaint();
+                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                updateSubsequenceBar();
+                            }
+                        ));
+                    } else {
+                        // Normal: Nudge left
+                        processorRef.queueCommand(ProcessorCommand(
+                            [this]() {
+                                processorRef.getSequence().nudgeLeft();
+                                DBG("Nudge left");
+                            },
+                            [this]() {
+                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                            }
+                        ));
+                    }
                     break;
-                case 6:  // Nudge ->
-                    processorRef.queueCommand(ProcessorCommand(
-                        [this]() {
-                            processorRef.getSequence().nudgeRight();
-                            DBG("Nudge right");
-                        },
-                        [this]() {
-                            sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
-                        }
-                    ));
+                case 6:  // Nudge -> OR Shuffle (when shifted)
+                    if (isShifted) {
+                        // Shuffle: randomly rearrange all steps in the sequence
+                        processorRef.queueCommand(ProcessorCommand(
+                            [this]() {
+                                auto& seq = processorRef.getSequence();
+                                int len = seq.getLength();
+                                // Fisher-Yates shuffle on the step notes
+                                static std::random_device rd;
+                                static std::mt19937 gen(rd());
+                                for (int i = len - 1; i > 0; i--) {
+                                    std::uniform_int_distribution<> dis(0, i);
+                                    int j = dis(gen);
+                                    // Swap steps i and j by swapping their note data
+                                    auto& stepI = seq.getStep(i).getStepNotes();
+                                    auto& stepJ = seq.getStep(j).getStepNotes();
+                                    // Swap lengths
+                                    int lenI = stepI.getLength();
+                                    int lenJ = stepJ.getLength();
+                                    stepI.setLength(lenJ);
+                                    stepJ.setLength(lenI);
+                                    // Swap all notes
+                                    for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
+                                        int noteI = stepI.getNote(n).getNoteNumber();
+                                        int noteJ = stepJ.getNote(n).getNoteNumber();
+                                        stepI.setNote(n, noteJ);
+                                        stepJ.setNote(n, noteI);
+                                    }
+                                }
+                                DBG("Shuffled all steps");
+                            },
+                            [this]() {
+                                sequencerSteps.repaint();
+                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                updateSubsequenceBar();
+                            }
+                        ));
+                    } else {
+                        // Normal: Nudge right
+                        processorRef.queueCommand(ProcessorCommand(
+                            [this]() {
+                                processorRef.getSequence().nudgeRight();
+                                DBG("Nudge right");
+                            },
+                            [this]() {
+                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                            }
+                        ));
+                    }
                     break;
                 case 7:  // Shift - toggle shift mode
                     processorRef.queueCommand(ProcessorCommand(

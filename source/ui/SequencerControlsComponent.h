@@ -39,6 +39,16 @@ namespace SequencerControlsConstants {
  */
 class SequencerControlsComponent : public juce::Component {
 public:
+    // Button indices for clarity
+    static constexpr int kRollButton = 0;
+    static constexpr int kPageLeftButton = 1;
+    static constexpr int kPageRightButton = 2;
+    static constexpr int kLengthPlusButton = 3;
+    static constexpr int kLengthMinusButton = 4;
+    static constexpr int kNudgeLeftButton = 5;
+    static constexpr int kNudgeRightButton = 6;
+    static constexpr int kShiftButton = 7;
+
     SequencerControlsComponent() {
         // Create 8 buttons
         for (int i = 0; i < 8; i++) {
@@ -46,34 +56,34 @@ public:
             buttons.add(button);
             addAndMakeVisible(button);
         }
-        
-        // Set button icons and labels
-        buttons[0]->setIcon(Icons::createDiceIcon());
-        buttons[0]->setLabel("Roll");
 
-        buttons[1]->setIcon(Icons::createIndexLeftIcon());
-        buttons[1]->setLabel("Page");
+        // Set button icons and labels (normal mode)
+        buttons[kRollButton]->setIcon(Icons::createDiceIcon());
+        buttons[kRollButton]->setLabel("Roll");
 
-        buttons[2]->setIcon(Icons::createIndexRightIcon());
-        buttons[2]->setLabel("Page");
+        buttons[kPageLeftButton]->setIcon(Icons::createIndexLeftIcon());
+        buttons[kPageLeftButton]->setLabel("Page");
 
-        buttons[3]->setIcon(Icons::createLengthPlusIcon());
-        buttons[3]->setLabel("Length");
+        buttons[kPageRightButton]->setIcon(Icons::createIndexRightIcon());
+        buttons[kPageRightButton]->setLabel("Page");
 
-        buttons[4]->setIcon(Icons::createLengthMinusIcon());
-        buttons[4]->setLabel("Length");
+        buttons[kLengthPlusButton]->setIcon(Icons::createLengthPlusIcon());
+        buttons[kLengthPlusButton]->setLabel("Length");
 
-        buttons[5]->setIcon(Icons::createNudgeLeftIcon());
-        buttons[5]->setLabel("Nudge");
+        buttons[kLengthMinusButton]->setIcon(Icons::createLengthMinusIcon());
+        buttons[kLengthMinusButton]->setLabel("Length");
 
-        buttons[6]->setIcon(Icons::createNudgeRightIcon());
-        buttons[6]->setLabel("Nudge");
+        buttons[kNudgeLeftButton]->setIcon(Icons::createNudgeLeftIcon());
+        buttons[kNudgeLeftButton]->setLabel("Nudge");
 
-        buttons[7]->setIcon(Icons::createShiftIcon());
-        buttons[7]->setLabel("Shift");
+        buttons[kNudgeRightButton]->setIcon(Icons::createNudgeRightIcon());
+        buttons[kNudgeRightButton]->setLabel("Nudge");
+
+        buttons[kShiftButton]->setIcon(Icons::createShiftIcon());
+        buttons[kShiftButton]->setLabel("Shift");
 
         // Set toggle state for Shift only (Roll is momentary)
-        buttons[7]->setToggleable(true);  // Shift
+        buttons[kShiftButton]->setToggleable(true);
     }
     
     ~SequencerControlsComponent() override {
@@ -113,7 +123,64 @@ public:
             buttons[index]->setToggled(toggled);
         }
     }
-    
+
+    // Check if Shift mode is active
+    bool isShiftActive() const {
+        return isButtonToggled(kShiftButton);
+    }
+
+    // Update button appearances based on Shift state
+    // Called when Shift is toggled to change icons/labels of affected buttons
+    void updateShiftedButtonAppearances() {
+        bool shifted = isShiftActive();
+
+        if (shifted) {
+            // Shifted mode: change affected buttons
+            // Page Left -> Duplicate
+            buttons[kPageLeftButton]->setIcon(Icons::createLengthPlusIcon());  // Placeholder
+            buttons[kPageLeftButton]->setLabel("Duplicate");
+
+            // Page Right -> Clear (clears current sequence window)
+            buttons[kPageRightButton]->setIcon(Icons::createCloseIcon());  // Placeholder
+            buttons[kPageRightButton]->setLabel("Clear");
+
+            // Length+ -> Clear Step (clears current step to rest)
+            buttons[kLengthPlusButton]->setIcon(Icons::createCloseIcon());  // Placeholder
+            buttons[kLengthPlusButton]->setLabel("Clear Step");
+
+            // Length- -> Step (randomize current step - will use dice icon)
+            buttons[kLengthMinusButton]->setIcon(Icons::createDiceIcon());
+            buttons[kLengthMinusButton]->setLabel("Step");
+
+            // Nudge Left -> All (randomize everything everywhere - dice icon)
+            buttons[kNudgeLeftButton]->setIcon(Icons::createDiceIcon());
+            buttons[kNudgeLeftButton]->setLabel("All");
+
+            // Nudge Right -> Shuffle (randomly move around all steps)
+            buttons[kNudgeRightButton]->setIcon(Icons::createDiceIcon());  // Placeholder
+            buttons[kNudgeRightButton]->setLabel("Shuffle");
+        } else {
+            // Normal mode: restore original icons/labels
+            buttons[kPageLeftButton]->setIcon(Icons::createIndexLeftIcon());
+            buttons[kPageLeftButton]->setLabel("Page");
+
+            buttons[kPageRightButton]->setIcon(Icons::createIndexRightIcon());
+            buttons[kPageRightButton]->setLabel("Page");
+
+            buttons[kLengthPlusButton]->setIcon(Icons::createLengthPlusIcon());
+            buttons[kLengthPlusButton]->setLabel("Length");
+
+            buttons[kLengthMinusButton]->setIcon(Icons::createLengthMinusIcon());
+            buttons[kLengthMinusButton]->setLabel("Length");
+
+            buttons[kNudgeLeftButton]->setIcon(Icons::createNudgeLeftIcon());
+            buttons[kNudgeLeftButton]->setLabel("Nudge");
+
+            buttons[kNudgeRightButton]->setIcon(Icons::createNudgeRightIcon());
+            buttons[kNudgeRightButton]->setLabel("Nudge");
+        }
+    }
+
 private:
     /**
      * Individual control button
@@ -199,9 +266,15 @@ private:
 
             // Notify parent
             if (auto* parent = dynamic_cast<SequencerControlsComponent*>(getParentComponent())) {
+                // Find our index
+                int index = parent->buttons.indexOf(this);
+
+                // If Shift button was toggled, update button appearances
+                if (index == kShiftButton) {
+                    parent->updateShiftedButtonAppearances();
+                }
+
                 if (parent->onButtonClicked) {
-                    // Find our index
-                    int index = parent->buttons.indexOf(this);
                     parent->onButtonClicked(index);
                 }
             }
