@@ -3,6 +3,7 @@
 #include "../backend/Sequence.h"
 #include "BinaryData.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "SequenceGrid.h"
 
 namespace SequencerStepsConstants {
     // Component size
@@ -130,7 +131,7 @@ private:
 
             if (isRest) {
                 // Step is a rest - draw dark grey
-                g.setColour (juce::Colour (0xff808080));
+                g.setColour (juce::Colour (SequenceGridConstants::defaultGreyHex));
                 g.fillRoundedRectangle (stepBounds, cornerRadius);
 
                 // Draw white border ONLY on active step
@@ -195,7 +196,7 @@ private:
             }
         } else {
             // Step is outside the active sequence - draw even darker grey with no note text
-            g.setColour (juce::Colour (0xff252525));
+            g.setColour (juce::Colour (SequenceGridConstants::outOfBoundsGreyHex));
             g.fillRoundedRectangle (stepBounds, cornerRadius);
 
             // No border for inactive steps outside sequence

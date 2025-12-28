@@ -13,10 +13,10 @@ namespace SequenceGridConstants {
     constexpr float borderWidth = 2.48f;  // 2.0 * 1.24
     // Default colors
     constexpr juce::uint32 defaultGreyHex = 0xff808080;      // Grey for default squares
-    constexpr juce::uint32 defaultDarkGreyHex = 0xff3a3a3a;  // Dark grey for rest steps
+    constexpr juce::uint32 defaultDarkGreyHex = 0xff808080;  // Dark grey for rest steps
     constexpr juce::uint32 outOfBoundsGreyHex = 0xff252525;  // Even darker grey for out-of-bounds steps
     // Window row darkening (for non-visible rows)
-    constexpr float nonVisibleRowDarkeningFactor = 0.4f;  // Darken non-visible rows to 40% brightness
+    constexpr float nonVisibleRowDarkeningFactor = 0.3f;  // Darken non-visible rows to 40% brightness
     // Calculated dimensions
     constexpr int gridWidth = gridCols * squareSize + (gridCols - 1) * squareSpacing;   // 196px (was 157px)
     constexpr int gridHeight = gridRows * squareSize + (gridRows - 1) * squareSpacing;  // 196px (was 157px)
@@ -223,7 +223,7 @@ public:
                 // Check if this step's current note is a rest (-1)
                 if (step.getStepNotes().hasRest()) {
                     // Step is a rest - show grey
-                    squareStates[row][col].color = juce::Colour (defaultDarkGreyHex);
+                    squareStates[row][col].color = juce::Colour (defaultGreyHex);
                 } else {
                     // Normal step - show note color
                     int midiNote = step.getStepNotes().getCurrentNote().getNoteNumber();
