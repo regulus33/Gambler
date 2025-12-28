@@ -14,9 +14,9 @@ namespace SequenceGridConstants {
     // Default colors
     constexpr juce::uint32 defaultGreyHex = 0xff808080;      // Grey for default squares
     constexpr juce::uint32 defaultDarkGreyHex = 0xff808080;  // Dark grey for rest steps
-    constexpr juce::uint32 outOfBoundsGreyHex = 0xff252525;  // Even darker grey for out-of-bounds steps
-    // Window row darkening (for non-visible rows)
-    constexpr float nonVisibleRowDarkeningFactor = 0.3f;  // Darken non-visible rows to 40% brightness
+    constexpr juce::uint32 outOfBoundsGreyHex = 0xff3B3B3B;
+    // Window row opacity (for non-visible rows)
+    constexpr float nonVisibleRowOpacity = 0.3f;  // Non-visible rows at 30% opacity
     // Calculated dimensions
     constexpr int gridWidth = gridCols * squareSize + (gridCols - 1) * squareSpacing;   // 196px (was 157px)
     constexpr int gridHeight = gridRows * squareSize + (gridRows - 1) * squareSpacing;  // 196px (was 157px)
@@ -71,11 +71,11 @@ public:
                     static_cast<float> (squareSize),
                     static_cast<float> (squareSize));
 
-                // Determine the color to use (darken if outside current window row)
+                // Determine the color to use (reduce opacity if outside current window row)
                 juce::Colour displayColor = state.color;
                 if (currentWindowRow >= 0 && row != currentWindowRow) {
-                    // Darken squares outside the current window row
-                    displayColor = state.color.darker(nonVisibleRowDarkeningFactor);
+                    // Reduce opacity for squares outside the current window row
+                    displayColor = state.color.withAlpha(nonVisibleRowOpacity);
                 }
 
                 // Fill square with color
