@@ -153,7 +153,8 @@ public:
                     sequencerSteps.repaint();
 
                     // Update sequence overview grid to reflect the note color change
-                    sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                    auto& seq = processorRef.getSequence();
+                    sequenceOverview.getSequenceGrid().updateFromSequence(seq, seq.getCurrentIndex());
 
                     // Update subsequence bar to reflect the note color change
                     updateSubsequenceBar();
@@ -191,7 +192,8 @@ public:
                     sequencerSteps.repaint();
 
                     // Update sequence overview grid to reflect the note color change
-                    sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                    auto& seq = processorRef.getSequence();
+                    sequenceOverview.getSequenceGrid().updateFromSequence(seq, seq.getCurrentIndex());
 
                     // Update subsequence bar to reflect the note color change
                     updateSubsequenceBar();
@@ -377,8 +379,10 @@ public:
         // Update the note/octave controls to reflect the selected step's note
         mainControls.getNoteControls().setFromMidiNote(selectedNote);
 
-        // Update the sequence overview grid to show all 64 steps with current step highlighted
-        sequenceOverview.getSequenceGrid().updateFromSequence(seq);
+        // Update the sequence overview grid to show all 64 steps
+        // - Border indicates playback position (currentStep)
+        // - White fill indicates selected step for editing (selectedStep)
+        sequenceOverview.getSequenceGrid().updateFromSequence(seq, currentStep);
 
         // Update the subsequence bar to reflect selected step's substep state
         updateSubsequenceBar();

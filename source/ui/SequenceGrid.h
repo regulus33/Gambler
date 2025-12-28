@@ -27,10 +27,12 @@ namespace SequenceGridConstants {
  */
 struct SquareState {
     juce::Colour color { juce::Colour (SequenceGridConstants::defaultGreyHex) };
-    bool hasBorder { false };
+    bool hasBorder { false };      // Border indicates playback position
+    bool isSelected { false };     // Selected step for editing (white fill)
 
     SquareState() = default;
-    SquareState (juce::Colour c, bool border = false) : color (c), hasBorder (border) {}
+    SquareState (juce::Colour c, bool border = false, bool selected = false)
+        : color (c), hasBorder (border), isSelected (selected) {}
 };
 
 /**
@@ -71,18 +73,25 @@ public:
                     static_cast<float> (squareSize),
                     static_cast<float> (squareSize));
 
-                // Determine the color to use (reduce opacity if outside current window row)
-                juce::Colour displayColor = state.color;
+                // Determine the fill color
+                juce::Colour displayColor;
+                if (state.isSelected) {
+                    // Selected step for editing - white fill
+                    displayColor = juce::Colours::white;
+                } else {
+                    displayColor = state.color;
+                }
+
+                // Reduce opacity if outside current window row
                 if (currentWindowRow >= 0 && row != currentWindowRow) {
-                    // Reduce opacity for squares outside the current window row
-                    displayColor = state.color.withAlpha(nonVisibleRowOpacity);
+                    displayColor = displayColor.withAlpha(nonVisibleRowOpacity);
                 }
 
                 // Fill square with color
                 g.setColour (displayColor);
                 g.fillRoundedRectangle (squareBounds, squareCornerRadius);
 
-                // Draw white border if enabled
+                // Draw white border if enabled (playback position)
                 if (state.hasBorder) {
                     g.setColour (juce::Colours::white);
                     g.drawRoundedRectangle (squareBounds.reduced (0.5f), squareCornerRadius, borderWidth);
@@ -203,10 +212,12 @@ public:
      * Update the grid from a Sequence object
      * - Each square shows the note color for that step
      * - Steps outside the sequence length are shown in grey
-     * - The selected step for editing has a white border
+     * - The current playback step has a white border
+     * - The selected step for editing has a white fill
      * @param sequence The sequence to display
+     * @param playbackStep The current playback position (-1 if not playing)
      */
-    void updateFromSequence (const Sequence& sequence) {
+    void updateFromSequence (const Sequence& sequence, int playbackStep = -1) {
         using namespace SequenceGridConstants;
 
         int sequenceLength = sequence.getLength();
@@ -235,8 +246,11 @@ public:
                 squareStates[row][col].color = juce::Colour (outOfBoundsGreyHex);
             }
 
-            // Set border for selected step for editing
-            squareStates[row][col].hasBorder = (stepIndex == selectedStep);
+            // Set border for playback position
+            squareStates[row][col].hasBorder = (stepIndex == playbackStep);
+
+            // Set selected state for editing position (white fill)
+            squareStates[row][col].isSelected = (stepIndex == selectedStep);
         }
 
         repaint();

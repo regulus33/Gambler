@@ -149,43 +149,41 @@ private:
             // Check if this step's current note is a rest (-1)
             bool isRest = step.getStepNotes().hasRest();
 
-            if (isRest) {
-                // Step is a rest - draw dark grey
-                g.setColour (juce::Colour (SequenceGridConstants::defaultGreyHex));
-                g.fillRoundedRectangle (stepBounds, cornerRadius);
-
-                // Draw white border on selected step for editing
-                if (isSelected) {
-                    g.setColour (juce::Colours::white);
-                    float inset = borderWidthActive * 0.5f;
-                    juce::Rectangle<float> borderBounds = stepBounds.reduced (inset);
-                    float borderRadiusInner = juce::jmax (0.0f, cornerRadius - inset);
-                    g.drawRoundedRectangle (borderBounds, borderRadiusInner, borderWidthActive);
-                }
+            // Determine the fill color
+            juce::Colour fillColor;
+            if (isSelected) {
+                // Selected step for editing - white fill
+                fillColor = juce::Colours::white;
+            } else if (isRest) {
+                // Rest step - grey fill
+                fillColor = juce::Colour (SequenceGridConstants::defaultGreyHex);
             } else {
-                // Normal step with note
+                // Normal step - note color fill
                 const auto& stepNotes = step.getStepNotes();
                 const auto& currentNote = stepNotes.getCurrentNote();
-
-                // Get the current note to display
                 int midiNote = currentNote.getNoteNumber();
-
-                // Get the note color from the chromatic scale (0-11)
                 int chromaticNote = midiNote % 12;
-                juce::Colour noteColor = getNoteColor (chromaticNote);
+                fillColor = getNoteColor (chromaticNote);
+            }
 
-                // Fill step background with note color
-                g.setColour (noteColor);
-                g.fillRoundedRectangle (stepBounds, cornerRadius);
+            // Fill step background
+            g.setColour (fillColor);
+            g.fillRoundedRectangle (stepBounds, cornerRadius);
 
-                // Draw white border on selected step for editing
-                if (isSelected) {
-                    g.setColour (juce::Colours::white);
-                    float inset = borderWidthActive * 0.5f;
-                    juce::Rectangle<float> borderBounds = stepBounds.reduced (inset);
-                    float borderRadiusInner = juce::jmax (0.0f, cornerRadius - inset);
-                    g.drawRoundedRectangle (borderBounds, borderRadiusInner, borderWidthActive);
-                }
+            // Draw white border on active step (playback position)
+            if (isActive) {
+                g.setColour (juce::Colours::white);
+                float inset = borderWidthActive * 0.5f;
+                juce::Rectangle<float> borderBounds = stepBounds.reduced (inset);
+                float borderRadiusInner = juce::jmax (0.0f, cornerRadius - inset);
+                g.drawRoundedRectangle (borderBounds, borderRadiusInner, borderWidthActive);
+            }
+
+            // Draw note text (only for non-rest steps)
+            if (!isRest) {
+                const auto& stepNotes = step.getStepNotes();
+                const auto& currentNote = stepNotes.getCurrentNote();
+                int midiNote = currentNote.getNoteNumber();
 
                 // Convert MIDI note to note name (e.g., "C4", "Gb3")
                 juce::String noteText = midiNoteToNoteName (midiNote);
@@ -195,23 +193,33 @@ private:
                 font.setHeight (fontSize);
                 font.setBold (true);
 
-                if (isActive) {
+                // Determine text color based on selection and active state
+                if (isSelected) {
+                    // Selected step has white fill, so use black text
+                    // But if also active, draw the black circle with white text
+                    if (isActive) {
+                        // Draw black circle behind the text
+                        auto circleCentre = stepBounds.getCentre();
+                        g.setColour (juce::Colours::black);
+                        g.fillEllipse (circleCentre.x - activeCircleRadius, circleCentre.y - activeCircleRadius,
+                                      activeCircleRadius * 2.0f, activeCircleRadius * 2.0f);
+                        g.setColour (juce::Colours::white);
+                    } else {
+                        g.setColour (juce::Colours::black);
+                    }
+                } else if (isActive) {
                     // Draw black circle behind the text
                     auto circleCentre = stepBounds.getCentre();
                     g.setColour (juce::Colours::black);
                     g.fillEllipse (circleCentre.x - activeCircleRadius, circleCentre.y - activeCircleRadius,
                                   activeCircleRadius * 2.0f, activeCircleRadius * 2.0f);
-
-                    // Draw note text in white, bold Inter font
                     g.setColour (juce::Colours::white);
-                    g.setFont (font);
                 } else {
-                    // Draw note text in black, bold Inter font
+                    // Normal step - black text
                     g.setColour (juce::Colours::black);
-                    g.setFont (font);
                 }
 
-                // Draw the note text centered in the step
+                g.setFont (font);
                 g.drawText (noteText, stepBounds.toNearestInt(), juce::Justification::centred);
             }
         } else {
