@@ -31,8 +31,8 @@ namespace NavBarConstants {
 class NavBarComponent : public juce::Component {
 public:
     NavBarComponent()
-        : viewToggleButton(Icons::createViewToggleIcon1, Icons::createViewToggleIcon2, false),
-          settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true)
+        : viewToggleButton(Icons::createViewToggleIcon1, Icons::createViewToggleIcon2, false, true),
+          settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false)
     {
         // Add logo component
         addAndMakeVisible(logo);

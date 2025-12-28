@@ -27,13 +27,16 @@ public:
      * @param iconPathFunc1 Function that returns the path for state 1 (not toggled)
      * @param iconPathFunc2 Function that returns the path for state 2 (toggled)
      * @param useStroke If true, draws icons with stroke; if false, fills icons
+     * @param autoToggle If true, button toggles itself on click; if false, external code must control state
      */
     ToggleIconButton(std::function<juce::Path()> iconPathFunc1,
                      std::function<juce::Path()> iconPathFunc2,
-                     bool useStroke = true)
+                     bool useStroke = true,
+                     bool autoToggle = true)
         : iconPath1(iconPathFunc1),
           iconPath2(iconPathFunc2),
           drawWithStroke(useStroke),
+          autoToggleEnabled(autoToggle),
           isToggled(false)
     {
     }
@@ -68,10 +71,12 @@ public:
     }
 
     void mouseDown (const juce::MouseEvent& /*event*/) override {
-        // Toggle state
-        isToggled = !isToggled;
-        repaint();
-        
+        // Only auto-toggle if enabled
+        if (autoToggleEnabled) {
+            isToggled = !isToggled;
+            repaint();
+        }
+
         if (onClick) {
             onClick(isToggled);
         }
@@ -104,6 +109,7 @@ private:
     std::function<juce::Path()> iconPath1;  // Icon for state 1 (not toggled)
     std::function<juce::Path()> iconPath2;  // Icon for state 2 (toggled)
     bool drawWithStroke;
+    bool autoToggleEnabled;
     bool isToggled;
 };
 
