@@ -203,14 +203,14 @@ public:
      * Update the grid from a Sequence object
      * - Each square shows the note color for that step
      * - Steps outside the sequence length are shown in grey
-     * - The current step has a white border
+     * - The selected step for editing has a white border
      * @param sequence The sequence to display
      */
     void updateFromSequence (const Sequence& sequence) {
         using namespace SequenceGridConstants;
 
         int sequenceLength = sequence.getLength();
-        int currentIndex = sequence.getCurrentIndex();
+        int selectedStep = sequence.getSelectedStepForEditing();
 
         for (int stepIndex = 0; stepIndex < 64; ++stepIndex) {
             int row = stepIndex / gridCols;  // 0-7
@@ -235,8 +235,8 @@ public:
                 squareStates[row][col].color = juce::Colour (outOfBoundsGreyHex);
             }
 
-            // Set border for current step only
-            squareStates[row][col].hasBorder = (stepIndex == currentIndex);
+            // Set border for selected step for editing
+            squareStates[row][col].hasBorder = (stepIndex == selectedStep);
         }
 
         repaint();

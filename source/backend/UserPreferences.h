@@ -15,6 +15,7 @@ struct UserPreferences {
     // UI/Editor preferences
     bool previewNotesOnEdit = true;  // Whether to trigger MIDI preview when editing notes
     bool followStep = true;          // Whether to auto-scroll the sequencer window to follow the active step
+    bool followPlayback = true;      // Whether the selected step for editing follows the playback position
 
     // MIDI output preferences
     double defaultNoteLength = 0.9;  // Note length as percentage of step duration (0.0-1.0)
@@ -35,6 +36,7 @@ struct UserPreferences {
 
         xml->setAttribute("previewNotesOnEdit", previewNotesOnEdit);
         xml->setAttribute("followStep", followStep);
+        xml->setAttribute("followPlayback", followPlayback);
         xml->setAttribute("defaultNoteLength", defaultNoteLength);
 
         return xml;
@@ -50,6 +52,7 @@ struct UserPreferences {
 
         previewNotesOnEdit = xml.getBoolAttribute("previewNotesOnEdit", true);
         followStep = xml.getBoolAttribute("followStep", true);
+        followPlayback = xml.getBoolAttribute("followPlayback", true);
         defaultNoteLength = xml.getDoubleAttribute("defaultNoteLength", 0.9);
     }
 };

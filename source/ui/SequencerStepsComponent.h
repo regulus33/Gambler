@@ -82,6 +82,23 @@ public:
     }
 
     /**
+     * Set which step is currently selected for editing (0-63, or -1 for none)
+     */
+    void setSelectedStep (int stepIndex) {
+        if (selectedStepIndex != stepIndex) {
+            selectedStepIndex = stepIndex;
+            repaint();
+        }
+    }
+
+    /**
+     * Get the selected step index (-1 if none)
+     */
+    int getSelectedStep() const {
+        return selectedStepIndex;
+    }
+
+    /**
      * Set the window start position (0-56, to show steps 0-7 through 56-63)
      */
     void setWindowStart (int startIndex) {
@@ -119,8 +136,11 @@ private:
         // Check if this step is within the active sequence length
         bool isWithinSequence = stepIndex < sequence.getLength();
 
-        // Check if this is the active step (only if within sequence)
+        // Check if this is the active step (playback position, only if within sequence)
         bool isActive = isWithinSequence && (stepIndex == activeStepIndex);
+
+        // Check if this is the selected step for editing
+        bool isSelected = (stepIndex == selectedStepIndex);
 
         if (isWithinSequence) {
             // Get the note for this step
@@ -134,8 +154,8 @@ private:
                 g.setColour (juce::Colour (SequenceGridConstants::defaultGreyHex));
                 g.fillRoundedRectangle (stepBounds, cornerRadius);
 
-                // Draw white border ONLY on active step
-                if (isActive) {
+                // Draw white border on selected step for editing
+                if (isSelected) {
                     g.setColour (juce::Colours::white);
                     float inset = borderWidthActive * 0.5f;
                     juce::Rectangle<float> borderBounds = stepBounds.reduced (inset);
@@ -158,8 +178,8 @@ private:
                 g.setColour (noteColor);
                 g.fillRoundedRectangle (stepBounds, cornerRadius);
 
-                // Draw white border ONLY on active step
-                if (isActive) {
+                // Draw white border on selected step for editing
+                if (isSelected) {
                     g.setColour (juce::Colours::white);
                     float inset = borderWidthActive * 0.5f;
                     juce::Rectangle<float> borderBounds = stepBounds.reduced (inset);
@@ -253,7 +273,8 @@ private:
 
     juce::Typeface::Ptr interFont;
     const Sequence& sequence; // Reference to the processor's sequence (always live data)
-    int activeStepIndex = -1; // -1 means no active step, 0-63 for sequence steps
+    int activeStepIndex = -1; // -1 means no active step (playback position), 0-63 for sequence steps
+    int selectedStepIndex = 0; // Which step is selected for editing (0-63)
     int windowStartIndex = 0; // Which step is at the left edge of the window (0-56)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SequencerStepsComponent)

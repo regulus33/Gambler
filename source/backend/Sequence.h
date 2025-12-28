@@ -32,6 +32,7 @@ public:
     
     // Getters
     int getCurrentIndex() const { return currentIndex; }
+    int getSelectedStepForEditing() const { return selectedStepForEditing; }
     int getLength() const { return length; }
     bool getIsRandom() const { return isRandom; }
     bool getIsShift() const { return isShift; }
@@ -54,9 +55,19 @@ public:
         int idx = (currentIndex == -1) ? 0 : currentIndex;
         return steps[idx];
     }
-    
+
     const Step& getCurrentStep() const {
         int idx = (currentIndex == -1) ? 0 : currentIndex;
+        return steps[idx];
+    }
+
+    Step& getSelectedStep() {
+        int idx = (selectedStepForEditing == -1) ? 0 : selectedStepForEditing;
+        return steps[idx];
+    }
+
+    const Step& getSelectedStep() const {
+        int idx = (selectedStepForEditing == -1) ? 0 : selectedStepForEditing;
         return steps[idx];
     }
     
@@ -94,6 +105,16 @@ public:
     void setCurrentIndex(int index) {
         if (index >= 0 && index < length) {
             currentIndex = index;
+        }
+    }
+
+    /**
+     * Set the selected step for editing (independent of playback position)
+     * @param index The step index to select for editing (0 to MAX_STEPS-1)
+     */
+    void setSelectedStepForEditing(int index) {
+        if (index >= 0 && index < MAX_STEPS) {
+            selectedStepForEditing = index;
         }
     }
     
@@ -307,6 +328,7 @@ public:
 
         // Serialize basic properties
         xml->setAttribute("currentIndex", currentIndex);
+        xml->setAttribute("selectedStepForEditing", selectedStepForEditing);
         xml->setAttribute("length", length);
         xml->setAttribute("isRandom", isRandom);
         xml->setAttribute("isShift", isShift);
@@ -343,6 +365,7 @@ public:
 
         // Deserialize basic properties
         currentIndex = xml.getIntAttribute("currentIndex", -1);
+        selectedStepForEditing = xml.getIntAttribute("selectedStepForEditing", 0);
         length = xml.getIntAttribute("length", DEFAULT_LENGTH);
         isRandom = xml.getBoolAttribute("isRandom", false);
         isShift = xml.getBoolAttribute("isShift", false);
@@ -383,6 +406,7 @@ private:
     std::array<bool, MAX_STEPS> playProbability;
 
     int currentIndex = -1;  // Start at -1 so first tick() advances to 0
+    int selectedStepForEditing = 0;  // Which step is currently selected for editing (independent of playback)
     int length = DEFAULT_LENGTH;
     bool isRandom = false;
     bool isShift = false;  // Unused for now, reserved for future features

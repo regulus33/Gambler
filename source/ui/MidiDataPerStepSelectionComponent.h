@@ -109,10 +109,9 @@ public:
                     // Queue command to update CC number in audio thread
                     processorRef.queueCommand(ProcessorCommand([this, laneIndex, ccNumber]() {
                         auto& seq = processorRef.getSequence();
-                        int currentStep = seq.getCurrentIndex();
-                        if (currentStep < 0) currentStep = 0;
+                        int selectedStep = seq.getSelectedStepForEditing();
 
-                        auto& stepMods = seq.getStep(currentStep).getStepModulations();
+                        auto& stepMods = seq.getStep(selectedStep).getStepModulations();
                         stepMods.setModulationCCNumber(laneIndex, ccNumber);
                         DBG("Lane " + juce::String(laneIndex) + " CC changed to: " + juce::String(ccNumber));
                     }));
@@ -156,10 +155,9 @@ public:
                 // Queue command to update modulation value in audio thread
                 processorRef.queueCommand(ProcessorCommand([this, laneIndex, midiValue]() {
                     auto& seq = processorRef.getSequence();
-                    int currentStep = seq.getCurrentIndex();
-                    if (currentStep < 0) currentStep = 0;
+                    int selectedStep = seq.getSelectedStepForEditing();
 
-                    auto& stepMods = seq.getStep(currentStep).getStepModulations();
+                    auto& stepMods = seq.getStep(selectedStep).getStepModulations();
                     stepMods.setModulationValue(laneIndex, midiValue);
                     DBG("Lane " + juce::String(laneIndex) + " value changed to: " + juce::String(midiValue));
                 }));
@@ -188,10 +186,9 @@ public:
         // Queue command to update selected state in audio thread
         processorRef.queueCommand(ProcessorCommand([this, laneIndex, shouldBeEnabled]() {
             auto& seq = processorRef.getSequence();
-            int currentStep = seq.getCurrentIndex();
-            if (currentStep < 0) currentStep = 0;
+            int selectedStep = seq.getSelectedStepForEditing();
 
-            auto& stepMods = seq.getStep(currentStep).getStepModulations();
+            auto& stepMods = seq.getStep(selectedStep).getStepModulations();
             stepMods.setModulationSelected(laneIndex, shouldBeEnabled);
             // DBG("Lane " + juce::String(laneIndex) + " selected state: " + juce::String(shouldBeEnabled));
         }));
@@ -228,16 +225,15 @@ public:
     }
 
     /**
-     * Update UI from the current step's StepModulations in the backend
-     * Should be called when the current step changes
+     * Update UI from the selected step's StepModulations in the backend
+     * Should be called when the selected step changes
      */
     void updateFromSequence()
     {
         auto& seq = processorRef.getSequence();
-        int currentStep = seq.getCurrentIndex();
-        if (currentStep < 0) currentStep = 0;
+        int selectedStep = seq.getSelectedStepForEditing();
 
-        const auto& stepMods = seq.getStep(currentStep).getStepModulations();
+        const auto& stepMods = seq.getStep(selectedStep).getStepModulations();
 
         // Update all 7 lanes
         for (int i = 0; i < 7; ++i) {
@@ -278,10 +274,9 @@ public:
             // Update the backend
             processorRef.queueCommand(ProcessorCommand([this, i, randomCC]() {
                 auto& seq = processorRef.getSequence();
-                int currentStep = seq.getCurrentIndex();
-                if (currentStep < 0) currentStep = 0;
+                int selectedStep = seq.getSelectedStepForEditing();
 
-                auto& stepMods = seq.getStep(currentStep).getStepModulations();
+                auto& stepMods = seq.getStep(selectedStep).getStepModulations();
                 stepMods.setModulationCCNumber(i, randomCC);
                 DBG("Lane " + juce::String(i) + " randomized to CC: " + juce::String(randomCC));
             }));

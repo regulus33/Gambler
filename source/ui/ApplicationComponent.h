@@ -163,6 +163,13 @@ private:
                 DBG("Follow step: " + juce::String(enabled ? "enabled" : "disabled"));
             };
 
+            // Sync follow playback setting from processor
+            settingsScreen->setFollowPlaybackEnabled(processorRef.getUserPreferences().followPlayback);
+            settingsScreen->onFollowPlaybackChanged = [this](bool enabled) {
+                processorRef.getUserPreferences().followPlayback = enabled;
+                DBG("Follow playback: " + juce::String(enabled ? "enabled" : "disabled"));
+            };
+
             addAndMakeVisible(*settingsScreen);
             settingsScreen->setBounds(getLocalBounds());
         }

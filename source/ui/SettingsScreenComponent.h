@@ -116,6 +116,18 @@ public:
         };
         addAndMakeVisible(followStepToggle);
 
+        // Setup follow playback checkbox (enabled by default)
+        followPlaybackToggle.setButtonText("Follow playback");
+        followPlaybackToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        followPlaybackToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
+        followPlaybackToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+        followPlaybackToggle.setToggleState(true, juce::dontSendNotification); // Enabled by default
+        followPlaybackToggle.onClick = [this] {
+            if (onFollowPlaybackChanged)
+                onFollowPlaybackChanged(followPlaybackToggle.getToggleState());
+        };
+        addAndMakeVisible(followPlaybackToggle);
+
         // Setup note length slider
         noteLengthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
         noteLengthSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false,
@@ -211,6 +223,12 @@ public:
         // Follow step checkbox row
         auto followStepRow = contentArea.removeFromTop(controlHeight);
         followStepToggle.setBounds(followStepRow);
+
+        contentArea.removeFromTop(controlSpacing);
+
+        // Follow playback checkbox row
+        auto followPlaybackRow = contentArea.removeFromTop(controlHeight);
+        followPlaybackToggle.setBounds(followPlaybackRow);
     }
 
     // Accessors for navbar
@@ -224,6 +242,7 @@ public:
     std::function<void(double)> onNoteLengthChanged;
     std::function<void(bool)> onPreviewNotesChanged;
     std::function<void(bool)> onFollowStepChanged;
+    std::function<void(bool)> onFollowPlaybackChanged;
 
     // Accessors for current values
     bool isInternalClockEnabled() const { return internalClockToggle.getToggleState(); }
@@ -231,6 +250,7 @@ public:
     double getNoteLength() const { return noteLengthSlider.getValue(); }
     bool isPreviewNotesEnabled() const { return previewNotesToggle.getToggleState(); }
     bool isFollowStepEnabled() const { return followStepToggle.getToggleState(); }
+    bool isFollowPlaybackEnabled() const { return followPlaybackToggle.getToggleState(); }
 
     // Setters for external state sync
     void setInternalClockEnabled(bool enabled) {
@@ -244,6 +264,9 @@ public:
     }
     void setFollowStepEnabled(bool enabled) {
         followStepToggle.setToggleState(enabled, juce::dontSendNotification);
+    }
+    void setFollowPlaybackEnabled(bool enabled) {
+        followPlaybackToggle.setToggleState(enabled, juce::dontSendNotification);
     }
 
 private:
@@ -259,5 +282,6 @@ private:
     juce::Slider noteLengthSlider;
     juce::ToggleButton previewNotesToggle;
     juce::ToggleButton followStepToggle;
+    juce::ToggleButton followPlaybackToggle;
 };
 

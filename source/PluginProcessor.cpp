@@ -460,9 +460,9 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
 void PluginProcessor::triggerStepMidi(int stepIndex) {
     if (stepIndex < 0 || stepIndex >= 64) return;
 
-    // Queue command to set the sequence's current index (thread-safe)
+    // Queue command to set the selected step for editing (thread-safe)
     queueCommand(ProcessorCommand([this, stepIndex]() {
-        sequence.setCurrentIndex(stepIndex);
+        sequence.setSelectedStepForEditing(stepIndex);
     }));
 
     // Get the note for this step
@@ -546,14 +546,14 @@ void PluginProcessor::triggerCurrentStepMidi(int noteOverride) {
     DBG("  midiOutput is " << (midiOutput ? "VALID" : "NULL"));
     DBG("  noteOverride: " << noteOverride);
 
-    int currentStep = sequence.getCurrentIndex();
-    if (currentStep < 0 || currentStep >= 64) {
-        DBG("  ERROR: Invalid current step: " << currentStep);
+    int selectedStep = sequence.getSelectedStepForEditing();
+    if (selectedStep < 0 || selectedStep >= 64) {
+        DBG("  ERROR: Invalid selected step: " << selectedStep);
         return;
     }
 
     // Get step modulations
-    const auto& step = sequence.getStep(currentStep);
+    const auto& step = sequence.getStep(selectedStep);
     const auto& stepMods = step.getStepModulations();
     auto selectedMods = stepMods.getSelectedModulations();
 
@@ -573,7 +573,7 @@ void PluginProcessor::triggerCurrentStepMidi(int noteOverride) {
         DBG("  Using override note: " << note);
     } else {
         note = step.getStepNotes().getCurrentNote().getNoteNumber();
-        DBG("  Current step: " << currentStep << ", Note from step: " << note);
+        DBG("  Selected step: " << selectedStep << ", Note from step: " << note);
     }
 
     // Send note off for previous note (if any)

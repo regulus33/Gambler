@@ -128,13 +128,12 @@ public:
             mainControls.getNoteControls().updateNoteOptions(selectedNames, selectedColours, selectedIndices);
         }
 
-        // Wire up note controls callbacks to update the current step's note
+        // Wire up note controls callbacks to update the selected step's note
         mainControls.getNoteControls().onNoteChanged = [this](int pitchClass) {
             // Calculate the new note for MIDI preview (before command executes)
             auto& seq = processorRef.getSequence();
-            int currentStep = seq.getCurrentIndex();
-            if (currentStep < 0) currentStep = 0;
-            int currentNote = seq.getStep(currentStep).getStepNotes().getCurrentNote().getNoteNumber();
+            int selectedStep = seq.getSelectedStepForEditing();
+            int currentNote = seq.getStep(selectedStep).getStepNotes().getCurrentNote().getNoteNumber();
             int currentOctave = currentNote / 12;
             int newNote = currentOctave * 12 + pitchClass;
 
@@ -143,8 +142,8 @@ public:
                 // Command: runs on audio thread
                 [this, pitchClass, newNote]() {
                     auto& seq = processorRef.getSequence();
-                    int currentStep = seq.getCurrentIndex();
-                    auto& step = seq.getStep(currentStep);
+                    int selectedStep = seq.getSelectedStepForEditing();
+                    auto& step = seq.getStep(selectedStep);
                     step.updateCurrentNoteNumber(newNote);
                     DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote);
                 },
@@ -171,9 +170,8 @@ public:
         mainControls.getNoteControls().onOctaveChanged = [this](int octaveIndex) {
             // Calculate the new note for MIDI preview (before command executes)
             auto& seq = processorRef.getSequence();
-            int currentStep = seq.getCurrentIndex();
-            if (currentStep < 0) currentStep = 0;
-            int currentNote = seq.getStep(currentStep).getStepNotes().getCurrentNote().getNoteNumber();
+            int selectedStep = seq.getSelectedStepForEditing();
+            int currentNote = seq.getStep(selectedStep).getStepNotes().getCurrentNote().getNoteNumber();
             int pitchClass = currentNote % 12;
             int newNote = octaveIndex * 12 + pitchClass;
 
@@ -182,8 +180,8 @@ public:
                 // Command: runs on audio thread
                 [this, octaveIndex, newNote]() {
                     auto& seq = processorRef.getSequence();
-                    int currentStep = seq.getCurrentIndex();
-                    auto& step = seq.getStep(currentStep);
+                    int selectedStep = seq.getSelectedStepForEditing();
+                    auto& step = seq.getStep(selectedStep);
                     step.updateCurrentNoteNumber(newNote);
                     DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote);
                 },
@@ -309,13 +307,12 @@ public:
         }
     }
 
-    // Helper to update the subsequence bar UI from current step's StepNotes
+    // Helper to update the subsequence bar UI from selected step's StepNotes
     void updateSubsequenceBar() {
         auto& seq = processorRef.getSequence();
-        int currentStep = seq.getCurrentIndex();
-        if (currentStep < 0) currentStep = 0;
+        int selectedStep = seq.getSelectedStepForEditing();
 
-        const auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+        const auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
         int length = stepNotes.getLength();
         int currentSubstepIndex = stepNotes.getCurrentIndex();
 
@@ -339,9 +336,23 @@ public:
 
     // Update UI from sequence state (called from async update)
     void updateFromSequence() {
+        auto& seq = processorRef.getSequence();
+        int currentStep = seq.getCurrentIndex();
+        int selectedStep = seq.getSelectedStepForEditing();
+
+        // If followPlayback is enabled, update the selected step to match playback position
+        if (processorRef.getUserPreferences().followPlayback && currentStep >= 0) {
+            processorRef.queueCommand(ProcessorCommand([this, currentStep]() {
+                processorRef.getSequence().setSelectedStepForEditing(currentStep);
+            }));
+            selectedStep = currentStep; // Update local copy for UI rendering
+        }
+
         // Update the active step indicator to follow the sequence playback
-        int currentStep = processorRef.getSequence().getCurrentIndex();
         setActiveStepAndNote(currentStep);
+
+        // Update the selected step indicator for editing
+        sequencerSteps.setSelectedStep(selectedStep);
 
         // Auto-scroll the sequencer window to follow the active step (if enabled)
         if (processorRef.getUserPreferences().followStep && currentStep >= 0) {
@@ -355,21 +366,25 @@ public:
         sequencerSteps.repaint();
 
         // Update the note range gauge to highlight the current playing note
-        const auto& step = processorRef.getSequence().getStep(currentStep);
+        const auto& step = seq.getStep(currentStep);
         int currentNote = step.getStepNotes().getCurrentNote().getNoteNumber();
         noteRangeControls.setActiveNote(currentNote);
 
-        // Update the note/octave controls to reflect the current step's note
-        mainControls.getNoteControls().setFromMidiNote(currentNote);
+        // Get the selected step's note for editing controls (may be different from playback position)
+        const auto& selectedStepObj = seq.getStep(selectedStep);
+        int selectedNote = selectedStepObj.getStepNotes().getCurrentNote().getNoteNumber();
+
+        // Update the note/octave controls to reflect the selected step's note
+        mainControls.getNoteControls().setFromMidiNote(selectedNote);
 
         // Update the sequence overview grid to show all 64 steps with current step highlighted
-        sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+        sequenceOverview.getSequenceGrid().updateFromSequence(seq);
 
-        // Update the subsequence bar to reflect current step's substep state
+        // Update the subsequence bar to reflect selected step's substep state
         updateSubsequenceBar();
 
         // Update the probability gauge to highlight the randomly selected circle (if roll is engaged)
-        int lastProbabilityIndex = processorRef.getSequence().getLastProbabilityIndex();
+        int lastProbabilityIndex = seq.getLastProbabilityIndex();
         auto& probabilityGauge = mainControls.getProbabilityControls().getProbabilityGauge();
         probabilityGauge.highlightCircle(lastProbabilityIndex);
     }
@@ -389,10 +404,9 @@ private:
                 // Command: runs on audio thread
                 [this, index]() {
                     auto& seq = processorRef.getSequence();
-                    int currentStep = seq.getCurrentIndex();
-                    if (currentStep < 0) currentStep = 0;
+                    int selectedStep = seq.getSelectedStepForEditing();
 
-                    auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+                    auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
 
                     // Only allow clicking on active substeps (within length)
                     if (index < stepNotes.getLength()) {
@@ -405,14 +419,12 @@ private:
                     updateSubsequenceBar();
 
                     auto& seq = processorRef.getSequence();
-                    int currentStep = seq.getCurrentIndex();
-                    if (currentStep >= 0) {
-                        auto& stepNotes = seq.getStep(currentStep).getStepNotes();
-                        int midiNote = stepNotes.getCurrentNote().getNoteNumber();
-                        int chromaticNote = midiNote % 12;
-                        pianoRoll.setActiveNote(chromaticNote);
-                        mainControls.getNoteControls().setFromMidiNote(midiNote);
-                    }
+                    int selectedStep = seq.getSelectedStepForEditing();
+                    auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
+                    int midiNote = stepNotes.getCurrentNote().getNoteNumber();
+                    int chromaticNote = midiNote % 12;
+                    pianoRoll.setActiveNote(chromaticNote);
+                    mainControls.getNoteControls().setFromMidiNote(midiNote);
                 }
             ));
         };
@@ -421,9 +433,8 @@ private:
                 // Command: runs on audio thread
                 [this]() {
                     auto& seq = processorRef.getSequence();
-                    int currentStep = seq.getCurrentIndex();
-                    if (currentStep < 0) currentStep = 0;
-                    auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+                    int selectedStep = seq.getSelectedStepForEditing();
+                    auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
                     stepNotes.decreaseLength();
                     DBG("Subsequence length decreased to: " + juce::String(stepNotes.getLength()));
                 },
@@ -438,9 +449,8 @@ private:
                 // Command: runs on audio thread
                 [this]() {
                     auto& seq = processorRef.getSequence();
-                    int currentStep = seq.getCurrentIndex();
-                    if (currentStep < 0) currentStep = 0;
-                    auto& stepNotes = seq.getStep(currentStep).getStepNotes();
+                    int selectedStep = seq.getSelectedStepForEditing();
+                    auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
                     stepNotes.increaseLength();
                     DBG("Subsequence length increased to: " + juce::String(stepNotes.getLength()));
                 },
