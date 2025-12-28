@@ -10,7 +10,6 @@
 #include "MainControlsComponent.h"
 #include "SequenceOverviewComponent.h"
 #include "SubsequenceControlsComponent.h"
-#include "ViewToggleButton.h"
 #include "NoteRangeControlsComponent.h"
 #include "MusicConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -23,10 +22,6 @@ namespace MainScreenLayout {
     constexpr int pianoRollY = 95;
     constexpr int pianoRollWidth = 422;
     constexpr int pianoRollHeight = 206;
-    // View toggle button
-    constexpr int buttonWidth = 46;
-    constexpr int buttonHeight = 30;
-    constexpr int buttonGapAbovePianoRoll = 10;
     // Main controls
     constexpr int mainControlsOverflowTop = 35;
     constexpr int mainControlsOverflowBottom = 0;
@@ -77,11 +72,10 @@ public:
         // Add navbar
         addAndMakeVisible(navBar);
 
-        // Add view toggle button
-        addAndMakeVisible(viewToggleButton);
-
-        // Setup callback for view mode changes
-        viewToggleButton.onToggle = [this](bool showPianoRoll) {
+        // Setup callback for view toggle button in navbar
+        navBar.onViewToggleClicked = [this](bool toggled) {
+            // toggled = true means icon 2 (MIDI data view), false means icon 1 (piano roll view)
+            bool showPianoRoll = !toggled;
             pianoRoll.setVisible(showPianoRoll);
             midiDataPerStep.setVisible(!showPianoRoll);
             DBG("View mode changed: " + juce::String(showPianoRoll ? "PianoRoll" : "MIDI Data"));
@@ -258,11 +252,6 @@ public:
 
         // Position MIDI data per step component at same location as piano roll
         midiDataPerStep.setBounds(pianoRollX, pianoRollY, pianoRollWidth, pianoRollHeight);
-
-        // Position view toggle button above piano roll, aligned to left edge
-        int buttonX = pianoRollX;
-        int buttonY = pianoRollY - buttonHeight - buttonGapAbovePianoRoll;
-        viewToggleButton.setBounds(buttonX, buttonY, buttonWidth, buttonHeight);
 
         // Position main controls to the right of the piano roll / MIDI data panel
         int mainControlsX = pianoRollX + pianoRollWidth + mainControlsGapFromPianoRoll;
@@ -641,7 +630,6 @@ private:
     MainControlsComponent mainControls;
     SequenceOverviewComponent sequenceOverview;
     SubsequenceControlsComponent subsequenceControls;
-    ViewToggleButton viewToggleButton;
     NoteRangeControlsComponent noteRangeControls;
 };
 

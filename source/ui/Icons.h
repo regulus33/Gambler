@@ -725,6 +725,41 @@ public:
         path.closeSubPath();
         return path;
     }
+
+    /**
+     * Creates the close (X) icon path
+     * Original SVG viewBox: 0 0 18 18
+     * Simple X shape for close/cancel actions
+     */
+    static juce::Path createCloseIcon()
+    {
+        juce::Path path;
+        // Top-left to bottom-right diagonal
+        path.startNewSubPath(2.0f, 2.0f);
+        path.lineTo(16.0f, 16.0f);
+        // Top-right to bottom-left diagonal
+        path.startNewSubPath(16.0f, 2.0f);
+        path.lineTo(2.0f, 16.0f);
+        return path;
+    }
+
+    /**
+     * Creates a placeholder icon 1 for view toggle (temporary - using keyboard icon)
+     * TODO: Replace with proper piano roll icon
+     */
+    static juce::Path createViewToggleIcon1()
+    {
+        return createKeyboardIcon();
+    }
+
+    /**
+     * Creates a placeholder icon 2 for view toggle (temporary - using save icon)
+     * TODO: Replace with proper MIDI data icon
+     */
+    static juce::Path createViewToggleIcon2()
+    {
+        return createSaveIcon();
+    }
 };
 
 

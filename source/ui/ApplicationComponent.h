@@ -96,6 +96,9 @@ private:
                 showMainScreen();
             };
 
+            // Set the settings button to toggled state (showing X icon)
+            settingsScreen->getNavBar().setSettingsToggled(true);
+
             // Wire up settings callbacks to processor's clock
             // Sync initial state from processor
             settingsScreen->setInternalClockEnabled(processorRef.getClock().getMode() == ClockMode::INTERNAL);
@@ -167,6 +170,9 @@ private:
         // Show settings screen, hide main screen
         mainScreen.setVisible(false);
         settingsScreen->setVisible(true);
+
+        // Toggle the main screen's settings button to show X icon
+        mainScreen.getNavBar().setSettingsToggled(true);
     }
 
     void showMainScreen() {
@@ -175,6 +181,9 @@ private:
             settingsScreen->setVisible(false);
         }
         mainScreen.setVisible(true);
+
+        // Toggle the main screen's settings button back to gear icon
+        mainScreen.getNavBar().setSettingsToggled(false);
     }
 
     PluginProcessor& processorRef;
