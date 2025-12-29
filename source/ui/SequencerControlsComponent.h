@@ -137,7 +137,7 @@ public:
         if (shifted) {
             // Shifted mode: change affected buttons
             // Page Left -> Duplicate
-            buttons[kPageLeftButton]->setIcon(Icons::createLengthPlusIcon());  // Placeholder
+            buttons[kPageLeftButton]->setIcon(Icons::createDupIcon());
             buttons[kPageLeftButton]->setLabel("Duplicate");
 
             // Page Right -> Clear (clears current sequence window)

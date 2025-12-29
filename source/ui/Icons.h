@@ -788,6 +788,55 @@ public:
         path.lineTo(11.0f, 1.5f);
         return path;
     }
+
+    /**
+     * Creates the duplicate icon (two overlapping rectangles)
+     * Original SVG viewBox: 0 0 21 21
+     * Represents duplication/copy action
+     */
+    static juce::Path createDupIcon()
+    {
+        juce::Path path;
+        path.startNewSubPath(20.1f, 0.0f);
+        path.lineTo(6.1f, 0.0f);
+        path.cubicTo(5.9f, 0.0f, 5.7f, 0.1f, 5.5f, 0.3f);
+        path.cubicTo(5.3f, 0.4f, 5.2f, 0.6f, 5.2f, 0.9f);
+        path.lineTo(5.2f, 5.2f);
+        path.lineTo(0.9f, 5.2f);
+        path.cubicTo(0.6f, 5.2f, 0.4f, 5.3f, 0.3f, 5.5f);
+        path.cubicTo(0.1f, 5.7f, 0.0f, 5.9f, 0.0f, 6.1f);
+        path.lineTo(0.0f, 20.1f);
+        path.cubicTo(0.0f, 20.4f, 0.1f, 20.6f, 0.3f, 20.7f);
+        path.cubicTo(0.4f, 20.9f, 0.6f, 21.0f, 0.9f, 21.0f);
+        path.lineTo(14.9f, 21.0f);
+        path.cubicTo(15.1f, 21.0f, 15.3f, 20.9f, 15.5f, 20.7f);
+        path.cubicTo(15.7f, 20.6f, 15.8f, 20.4f, 15.8f, 20.1f);
+        path.lineTo(15.8f, 15.8f);
+        path.lineTo(20.1f, 15.8f);
+        path.cubicTo(20.4f, 15.8f, 20.6f, 15.7f, 20.7f, 15.5f);
+        path.cubicTo(20.9f, 15.3f, 21.0f, 15.1f, 21.0f, 14.9f);
+        path.lineTo(21.0f, 0.9f);
+        path.cubicTo(21.0f, 0.6f, 20.9f, 0.4f, 20.7f, 0.3f);
+        path.cubicTo(20.6f, 0.1f, 20.4f, 0.0f, 20.1f, 0.0f);
+        path.closeSubPath();
+        path.startNewSubPath(14.0f, 19.2f);
+        path.lineTo(1.8f, 19.2f);
+        path.lineTo(1.8f, 7.0f);
+        path.lineTo(14.0f, 7.0f);
+        path.lineTo(14.0f, 19.2f);
+        path.closeSubPath();
+        path.startNewSubPath(19.2f, 14.0f);
+        path.lineTo(15.8f, 14.0f);
+        path.lineTo(15.8f, 6.1f);
+        path.cubicTo(15.8f, 5.9f, 15.7f, 5.7f, 15.5f, 5.5f);
+        path.cubicTo(15.3f, 5.3f, 15.1f, 5.2f, 14.9f, 5.2f);
+        path.lineTo(7.0f, 5.2f);
+        path.lineTo(7.0f, 1.8f);
+        path.lineTo(19.2f, 1.8f);
+        path.lineTo(19.2f, 14.0f);
+        path.closeSubPath();
+        return path;
+    }
 };
 
 
