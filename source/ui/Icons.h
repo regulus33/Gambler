@@ -837,6 +837,85 @@ public:
         path.closeSubPath();
         return path;
     }
+
+    /**
+     * Creates the trash/delete icon (trash can with lid)
+     * Original SVG viewBox: 0 0 21 22.8
+     * Represents delete/clear action
+     */
+    static juce::Path createTrashIcon()
+    {
+        juce::Path path;
+        path.startNewSubPath(20.1f, 3.5f);
+        path.lineTo(15.8f, 3.5f);
+        path.lineTo(15.8f, 2.6f);
+        path.cubicTo(15.8f, 1.9f, 15.5f, 1.3f, 15.0f, 0.8f);
+        path.cubicTo(14.5f, 0.3f, 13.8f, 0.0f, 13.1f, 0.0f);
+        path.lineTo(7.9f, 0.0f);
+        path.cubicTo(7.2f, 0.0f, 6.5f, 0.3f, 6.0f, 0.8f);
+        path.cubicTo(5.5f, 1.3f, 5.2f, 1.9f, 5.2f, 2.6f);
+        path.lineTo(5.2f, 3.5f);
+        path.lineTo(0.9f, 3.5f);
+        path.cubicTo(0.6f, 3.5f, 0.4f, 3.6f, 0.3f, 3.8f);
+        path.cubicTo(0.1f, 3.9f, 0.0f, 4.1f, 0.0f, 4.4f);
+        path.cubicTo(0.0f, 4.6f, 0.1f, 4.8f, 0.3f, 5.0f);
+        path.cubicTo(0.4f, 5.2f, 0.6f, 5.2f, 0.9f, 5.2f);
+        path.lineTo(1.8f, 5.2f);
+        path.lineTo(1.8f, 21.0f);
+        path.cubicTo(1.8f, 21.5f, 1.9f, 21.9f, 2.3f, 22.2f);
+        path.cubicTo(2.6f, 22.6f, 3.0f, 22.8f, 3.5f, 22.8f);
+        path.lineTo(17.5f, 22.8f);
+        path.cubicTo(18.0f, 22.8f, 18.4f, 22.6f, 18.7f, 22.2f);
+        path.cubicTo(19.1f, 21.9f, 19.2f, 21.5f, 19.2f, 21.0f);
+        path.lineTo(19.2f, 5.2f);
+        path.lineTo(20.1f, 5.2f);
+        path.cubicTo(20.4f, 5.2f, 20.6f, 5.2f, 20.7f, 5.0f);
+        path.cubicTo(20.9f, 4.8f, 21.0f, 4.6f, 21.0f, 4.4f);
+        path.cubicTo(21.0f, 4.1f, 20.9f, 3.9f, 20.7f, 3.8f);
+        path.cubicTo(20.6f, 3.6f, 20.4f, 3.5f, 20.1f, 3.5f);
+        path.closeSubPath();
+        path.startNewSubPath(7.0f, 2.6f);
+        path.cubicTo(7.0f, 2.4f, 7.1f, 2.2f, 7.3f, 2.0f);
+        path.cubicTo(7.4f, 1.8f, 7.6f, 1.8f, 7.9f, 1.8f);
+        path.lineTo(13.1f, 1.8f);
+        path.cubicTo(13.4f, 1.8f, 13.6f, 1.8f, 13.7f, 2.0f);
+        path.cubicTo(13.9f, 2.2f, 14.0f, 2.4f, 14.0f, 2.6f);
+        path.lineTo(14.0f, 3.5f);
+        path.lineTo(7.0f, 3.5f);
+        path.lineTo(7.0f, 2.6f);
+        path.closeSubPath();
+        path.startNewSubPath(17.5f, 21.0f);
+        path.lineTo(3.5f, 21.0f);
+        path.lineTo(3.5f, 5.2f);
+        path.lineTo(17.5f, 5.2f);
+        path.lineTo(17.5f, 21.0f);
+        path.closeSubPath();
+        path.startNewSubPath(8.8f, 9.6f);
+        path.lineTo(8.8f, 16.6f);
+        path.cubicTo(8.8f, 16.9f, 8.7f, 17.1f, 8.5f, 17.2f);
+        path.cubicTo(8.3f, 17.4f, 8.1f, 17.5f, 7.9f, 17.5f);
+        path.cubicTo(7.6f, 17.5f, 7.4f, 17.4f, 7.3f, 17.2f);
+        path.cubicTo(7.1f, 17.1f, 7.0f, 16.9f, 7.0f, 16.6f);
+        path.lineTo(7.0f, 9.6f);
+        path.cubicTo(7.0f, 9.4f, 7.1f, 9.2f, 7.3f, 9.0f);
+        path.cubicTo(7.4f, 8.8f, 7.6f, 8.8f, 7.9f, 8.8f);
+        path.cubicTo(8.1f, 8.8f, 8.3f, 8.8f, 8.5f, 9.0f);
+        path.cubicTo(8.7f, 9.2f, 8.8f, 9.4f, 8.8f, 9.6f);
+        path.closeSubPath();
+        path.startNewSubPath(14.0f, 9.6f);
+        path.lineTo(14.0f, 16.6f);
+        path.cubicTo(14.0f, 16.9f, 13.9f, 17.1f, 13.7f, 17.2f);
+        path.cubicTo(13.6f, 17.4f, 13.4f, 17.5f, 13.1f, 17.5f);
+        path.cubicTo(12.9f, 17.5f, 12.7f, 17.4f, 12.5f, 17.2f);
+        path.cubicTo(12.3f, 17.1f, 12.2f, 16.9f, 12.2f, 16.6f);
+        path.lineTo(12.2f, 9.6f);
+        path.cubicTo(12.2f, 9.4f, 12.3f, 9.2f, 12.5f, 9.0f);
+        path.cubicTo(12.7f, 8.8f, 12.9f, 8.8f, 13.1f, 8.8f);
+        path.cubicTo(13.4f, 8.8f, 13.6f, 8.8f, 13.7f, 9.0f);
+        path.cubicTo(13.9f, 9.2f, 14.0f, 9.4f, 14.0f, 9.6f);
+        path.closeSubPath();
+        return path;
+    }
 };
 
 

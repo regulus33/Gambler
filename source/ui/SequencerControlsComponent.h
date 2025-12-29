@@ -141,11 +141,11 @@ public:
             buttons[kPageLeftButton]->setLabel("Duplicate");
 
             // Page Right -> Clear (clears current sequence window)
-            buttons[kPageRightButton]->setIcon(Icons::createCloseIcon());  // Placeholder
+            buttons[kPageRightButton]->setIcon(Icons::createTrashIcon());
             buttons[kPageRightButton]->setLabel("Clear");
 
             // Length+ -> Clear Step (clears current step to rest)
-            buttons[kLengthPlusButton]->setIcon(Icons::createCloseIcon());  // Placeholder
+            buttons[kLengthPlusButton]->setIcon(Icons::createTrashIcon());
             buttons[kLengthPlusButton]->setLabel("Clear Step");
 
             // Length- -> Step (randomize current step - will use dice icon)
