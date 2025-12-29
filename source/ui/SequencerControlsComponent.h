@@ -148,16 +148,16 @@ public:
             buttons[kLengthPlusButton]->setIcon(Icons::createEraserIcon());
             buttons[kLengthPlusButton]->setLabel("Clear Step");
 
-            // Length- -> Step (randomize current step - will use dice icon)
-            buttons[kLengthMinusButton]->setIcon(Icons::createDiceIcon());
+            // Length- -> Step (randomize current step)
+            buttons[kLengthMinusButton]->setIcon(Icons::createDiceOneIcon());
             buttons[kLengthMinusButton]->setLabel("Step");
 
-            // Nudge Left -> All (randomize everything everywhere - dice icon)
-            buttons[kNudgeLeftButton]->setIcon(Icons::createDiceIcon());
+            // Nudge Left -> All (randomize everything everywhere)
+            buttons[kNudgeLeftButton]->setIcon(Icons::createRandomAllIcon());
             buttons[kNudgeLeftButton]->setLabel("All");
 
             // Nudge Right -> Shuffle (randomly move around all steps)
-            buttons[kNudgeRightButton]->setIcon(Icons::createDiceIcon());  // Placeholder
+            buttons[kNudgeRightButton]->setIcon(Icons::createShuffleIcon());
             buttons[kNudgeRightButton]->setLabel("Shuffle");
         } else {
             // Normal mode: restore original icons/labels
