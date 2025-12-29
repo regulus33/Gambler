@@ -916,6 +916,59 @@ public:
         path.closeSubPath();
         return path;
     }
+
+    /**
+     * Creates the eraser icon (tilted eraser shape)
+     * Original SVG viewBox: 0 0 22.8 21
+     * Represents erase/clear single item action
+     */
+    static juce::Path createEraserIcon()
+    {
+        juce::Path path;
+        path.startNewSubPath(22.0f, 5.3f);
+        path.lineTo(17.5f, 0.8f);
+        path.cubicTo(17.0f, 0.3f, 16.3f, 0.0f, 15.6f, 0.0f);
+        path.cubicTo(14.9f, 0.0f, 14.2f, 0.3f, 13.7f, 0.8f);
+        path.lineTo(0.8f, 13.7f);
+        path.cubicTo(0.3f, 14.2f, 0.0f, 14.9f, 0.0f, 15.6f);
+        path.cubicTo(0.0f, 16.3f, 0.3f, 17.0f, 0.8f, 17.5f);
+        path.lineTo(4.1f, 20.7f);
+        path.cubicTo(4.1f, 20.8f, 4.2f, 20.9f, 4.3f, 20.9f);
+        path.cubicTo(4.4f, 21.0f, 4.6f, 21.0f, 4.7f, 21.0f);
+        path.lineTo(21.0f, 21.0f);
+        path.cubicTo(21.2f, 21.0f, 21.5f, 20.9f, 21.6f, 20.7f);
+        path.cubicTo(21.8f, 20.6f, 21.9f, 20.4f, 21.9f, 20.1f);
+        path.cubicTo(21.9f, 19.9f, 21.8f, 19.7f, 21.6f, 19.5f);
+        path.cubicTo(21.5f, 19.3f, 21.2f, 19.3f, 21.0f, 19.3f);
+        path.lineTo(11.7f, 19.3f);
+        path.lineTo(22.0f, 9.0f);
+        path.cubicTo(22.5f, 8.5f, 22.8f, 7.8f, 22.8f, 7.2f);
+        path.cubicTo(22.8f, 6.5f, 22.5f, 5.8f, 22.0f, 5.3f);
+        path.closeSubPath();
+        path.startNewSubPath(9.3f, 19.3f);
+        path.lineTo(5.0f, 19.3f);
+        path.lineTo(2.0f, 16.2f);
+        path.cubicTo(1.8f, 16.1f, 1.8f, 15.8f, 1.8f, 15.6f);
+        path.cubicTo(1.8f, 15.4f, 1.8f, 15.1f, 2.0f, 15.0f);
+        path.lineTo(7.9f, 9.1f);
+        path.lineTo(13.6f, 14.9f);
+        path.lineTo(9.3f, 19.3f);
+        path.closeSubPath();
+        path.startNewSubPath(20.7f, 7.8f);
+        path.lineTo(14.9f, 13.6f);
+        path.lineTo(9.1f, 7.9f);
+        path.lineTo(15.0f, 2.0f);
+        path.cubicTo(15.1f, 1.9f, 15.2f, 1.9f, 15.3f, 1.8f);
+        path.cubicTo(15.4f, 1.8f, 15.5f, 1.8f, 15.6f, 1.8f);
+        path.cubicTo(15.7f, 1.8f, 15.8f, 1.8f, 15.9f, 1.8f);
+        path.cubicTo(16.0f, 1.9f, 16.1f, 1.9f, 16.2f, 2.0f);
+        path.lineTo(20.8f, 6.5f);
+        path.cubicTo(20.9f, 6.7f, 21.0f, 6.9f, 21.0f, 7.2f);
+        path.cubicTo(21.0f, 7.4f, 20.9f, 7.6f, 20.8f, 7.8f);
+        path.lineTo(20.7f, 7.8f);
+        path.closeSubPath();
+        return path;
+    }
 };
 
 

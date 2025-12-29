@@ -145,7 +145,7 @@ public:
             buttons[kPageRightButton]->setLabel("Clear");
 
             // Length+ -> Clear Step (clears current step to rest)
-            buttons[kLengthPlusButton]->setIcon(Icons::createTrashIcon());
+            buttons[kLengthPlusButton]->setIcon(Icons::createEraserIcon());
             buttons[kLengthPlusButton]->setLabel("Clear Step");
 
             // Length- -> Step (randomize current step - will use dice icon)
