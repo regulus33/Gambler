@@ -37,115 +37,131 @@ namespace SubsequenceControlsConstants {
 }
 
 /**
- * BarState - Represents the visual state of a single bar
+ * SingleBar - Individual clickable rectangle component
  */
-struct BarState {
-    juce::Colour color { juce::Colour (SubsequenceControlsConstants::defaultGreyHex) };
-    bool hasBorder { false };
-
-    BarState() = default;
-    BarState (juce::Colour c, bool border = false) : color (c), hasBorder (border) {}
-};
-
-/**
- * SubsequenceBar - A vertical stack of 8 clickable rectangles
- */
-class SubsequenceBar : public juce::Component {
+class SingleBar : public juce::Component {
 public:
-    SubsequenceBar() {
-        // Initialize all bars to default grey
-        for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
-            barStates[i] = BarState();
-        }
+    SingleBar()
+        : color (juce::Colour (SubsequenceControlsConstants::defaultGreyHex)),
+          hasBorder (false)
+    {
     }
 
     void paint (juce::Graphics& g) override {
         using namespace SubsequenceControlsConstants;
+        auto bounds = getLocalBounds().toFloat();
 
-        for (int i = 0; i < numBars; ++i) {
-            const auto& state = barStates[i];
+        // Fill bar with color
+        g.setColour (color);
+        g.fillRoundedRectangle (bounds, barCornerRadius);
 
-            float y = static_cast<float>(i * (barHeight + barSpacing));
-
-            auto barBounds = juce::Rectangle<float> (0.0f, y, barWidth, static_cast<float>(barHeight));
-
-            // Fill bar with color
-            g.setColour (state.color);
-            g.fillRoundedRectangle (barBounds, barCornerRadius);
-
-            // Draw white border if enabled
-            if (state.hasBorder) {
-                g.setColour (juce::Colours::white);
-                g.drawRoundedRectangle (barBounds.reduced (0.5f), barCornerRadius, borderWidth);
-            }
+        // Draw white border if enabled
+        if (hasBorder) {
+            g.setColour (juce::Colours::white);
+            g.drawRoundedRectangle (bounds.reduced (0.5f), barCornerRadius, borderWidth);
         }
     }
 
-    void mouseDown (const juce::MouseEvent& event) override {
+    void mouseDown (const juce::MouseEvent& /*event*/) override {
+        if (onClick)
+            onClick();
+    }
+
+    void setColor (juce::Colour newColor) {
+        color = newColor;
+        repaint();
+    }
+
+    juce::Colour getColor() const {
+        return color;
+    }
+
+    void setBorder (bool shouldHaveBorder) {
+        hasBorder = shouldHaveBorder;
+        repaint();
+    }
+
+    bool getBorder() const {
+        return hasBorder;
+    }
+
+    std::function<void()> onClick;
+
+private:
+    juce::Colour color;
+    bool hasBorder;
+};
+
+/**
+ * SubsequenceBar - A vertical stack of 8 clickable rectangle components
+ */
+class SubsequenceBar : public juce::Component {
+public:
+    SubsequenceBar() {
+        // Create and add all bar components
+        for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
+            bars[i] = std::make_unique<SingleBar>();
+            addAndMakeVisible (bars[i].get());
+
+            // Setup click callback for each bar
+            bars[i]->onClick = [this, i]() {
+                if (onBarClicked)
+                    onBarClicked (i);
+            };
+        }
+    }
+
+    void resized() override {
         using namespace SubsequenceControlsConstants;
 
-        // Determine which bar was clicked
-        int clickedIndex = -1;
-        float y = static_cast<float>(event.y);
-
         for (int i = 0; i < numBars; ++i) {
-            float barY = static_cast<float>(i * (barHeight + barSpacing));
-            float barBottom = barY + static_cast<float>(barHeight);
-
-            if (y >= barY && y < barBottom) {
-                clickedIndex = i;
-                break;
-            }
-        }
-
-        if (clickedIndex >= 0 && onBarClicked) {
-            onBarClicked (clickedIndex);
+            int y = i * (barHeight + barSpacing);
+            bars[i]->setBounds (0, y, static_cast<int>(barWidth), barHeight);
         }
     }
 
     /**
-     * Set the state of a single bar
-     * @param index Bar index (0-7)
-     * @param state The new state for the bar
-     */
-    void setBarState (int index, const BarState& state) {
-        if (index >= 0 && index < SubsequenceControlsConstants::numBars) {
-            barStates[index] = state;
-            repaint();
-        }
-    }
-
-    /**
-     * Set the color of a single bar (without changing border state)
+     * Set the color of a single bar
      * @param index Bar index (0-7)
      * @param color The new color
      */
     void setBarColor (int index, juce::Colour color) {
         if (index >= 0 && index < SubsequenceControlsConstants::numBars) {
-            barStates[index].color = color;
-            repaint();
+            bars[index]->setColor (color);
         }
     }
 
     /**
-     * Set the border visibility of a single bar (without changing color)
+     * Get the color of a single bar
+     * @param index Bar index (0-7)
+     */
+    juce::Colour getBarColor (int index) const {
+        if (index >= 0 && index < SubsequenceControlsConstants::numBars) {
+            return bars[index]->getColor();
+        }
+        return juce::Colour (SubsequenceControlsConstants::defaultGreyHex);
+    }
+
+    /**
+     * Set the border visibility of a single bar
      * @param index Bar index (0-7)
      * @param hasBorder Whether to show the border
      */
     void setBarBorder (int index, bool hasBorder) {
         if (index >= 0 && index < SubsequenceControlsConstants::numBars) {
-            barStates[index].hasBorder = hasBorder;
-            repaint();
+            bars[index]->setBorder (hasBorder);
         }
     }
 
     /**
-     * Set all bar states at once (for efficient batch updates)
-     * @param states Array of 8 BarState
+     * Get the border state of a single bar
+     * @param index Bar index (0-7)
      */
-    void setAllBarStates (const std::array<BarState, SubsequenceControlsConstants::numBars>& states) {
-        barStates = states;
-        repaint();
+    bool getBarBorder (int index) const {
+        if (index >= 0 && index < SubsequenceControlsConstants::numBars) {
+            return bars[index]->getBorder();
+        }
+        return false;
     }
 
     /**
@@ -153,27 +169,26 @@ public:
      */
     void clearAllBorders() {
         for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
-            barStates[i].hasBorder = false;
+            bars[i]->setBorder (false);
         }
-        repaint();
     }
 
     /**
-     * Get the state of a single bar
+     * Get direct access to a bar component
+     * @param index Bar index (0-7)
      */
-    const BarState& getBarState (int index) const {
-        static BarState defaultState;
+    SingleBar* getBar (int index) {
         if (index >= 0 && index < SubsequenceControlsConstants::numBars) {
-            return barStates[index];
+            return bars[index].get();
         }
-        return defaultState;
+        return nullptr;
     }
 
     // Callback for bar clicks
     std::function<void(int)> onBarClicked;
 
 private:
-    std::array<BarState, SubsequenceControlsConstants::numBars> barStates;
+    std::array<std::unique_ptr<SingleBar>, SubsequenceControlsConstants::numBars> bars;
 };
 
 /**
