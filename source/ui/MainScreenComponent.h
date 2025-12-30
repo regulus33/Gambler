@@ -338,10 +338,12 @@ public:
                 int chromaticNote = midiNote % 12;
                 juce::Colour noteColor = MusicConstants::NOTE_COLOURS[chromaticNote];
                 bool isCurrentSubstep = (i == currentSubstepIndex);
-                bar.setBarState(i, BarState(noteColor, isCurrentSubstep));
+                bar.setBarColor(i, noteColor);
+                bar.setBarBorder(i, isCurrentSubstep);
             } else {
                 // Inactive substep - show as default grey (darker)
-                bar.setBarState(i, BarState(juce::Colour(SubsequenceControlsConstants::defaultGreyHex), false));
+                bar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::defaultGreyHex));
+                bar.setBarBorder(i, false);
             }
         }
     }
