@@ -10,8 +10,8 @@ namespace SequencerControlsConstants {
     // Button appearance
     constexpr float cornerRadius = 4.4f;
     constexpr float borderWidth = 2.2f;
-    constexpr juce::uint32 bgColorActive = 0xffdb7c00;
-    constexpr juce::uint32 bgColorInactive = 0xff303030;
+    constexpr juce::uint32 bgColorActive = 0xffffffff;     // White when active
+    constexpr juce::uint32 bgColorInactive = 0xff303030;  // Dark grey when inactive
     // Icon
     constexpr float maxIconSize = 26.0f;
     constexpr float iconVerticalOffset = 13.0f;
@@ -198,7 +198,8 @@ private:
             bool isActive = isToggled_ || isPressed_;
             juce::Colour bgColor = isActive ? juce::Colour(bgColorActive) : juce::Colour(bgColorInactive);
             juce::Colour borderColor = juce::Colours::white;
-            juce::Colour textColor = juce::Colours::white;
+            juce::Colour textColor = isActive ? juce::Colours::black : juce::Colours::white;
+            juce::Colour iconColor = isActive ? juce::Colours::black : juce::Colours::white;
 
             // Fill background
             g.setColour(bgColor);
@@ -214,7 +215,7 @@ private:
             // Draw icon and/or label text
             if (iconPath_.has_value()) {
                 // Draw the icon path
-                g.setColour(textColor);
+                g.setColour(iconColor);
 
                 // Get the icon's bounding box
                 auto iconBounds = iconPath_->getBounds();
