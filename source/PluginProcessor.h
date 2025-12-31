@@ -69,6 +69,10 @@ public:
     // completion callbacks on the message thread
     std::function<void()> onCompletionCallbacksPending;
 
+    // Callback for UI updates when MIDI learn mapping is created (called from audio thread)
+    // The callback should be thread-safe (e.g., trigger an AsyncUpdater)
+    std::function<void()> onMidiLearned;
+
     /**
      * Trigger MIDI note for a specific step (for UI preview/audition)
      * This sets the current index to the given step and sends MIDI note on/off.

@@ -69,12 +69,18 @@ public:
         processorRef.onCompletionCallbacksPending = [this]() {
             triggerAsyncUpdate();
         };
+
+        // Wire up MIDI learn callback to trigger UI updates when mapping is created
+        processorRef.onMidiLearned = [this]() {
+            triggerAsyncUpdate();
+        };
     }
 
     ~ApplicationComponent() override {
         // Clear the callbacks before destruction to avoid dangling reference
         processorRef.onSequenceTick = nullptr;
         processorRef.onCompletionCallbacksPending = nullptr;
+        processorRef.onMidiLearned = nullptr;
         cancelPendingUpdate();
     }
 
