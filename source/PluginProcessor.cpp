@@ -168,6 +168,9 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
+    // Process incoming MIDI for control mapping (before clearing)
+    processMidiInput(midiMessages);
+
     // Clear incoming MIDI (we're generating, not processing MIDI through)
     midiMessages.clear();
 
@@ -700,6 +703,620 @@ void PluginProcessor::loadStateFromXml(const juce::XmlElement& xml) {
             }
         }
     ));
+}
+
+//==============================================================================
+// MIDI Input Processing
+//==============================================================================
+
+void PluginProcessor::processMidiInput(const juce::MidiBuffer& midiMessages) {
+    // Iterate through all incoming MIDI messages
+    for (const auto& metadata : midiMessages) {
+        auto msg = metadata.getMessage();
+
+        // Process CC messages
+        if (msg.isController()) {
+            int ccNumber = msg.getControllerNumber();
+            int ccValue = msg.getControllerValue();
+
+            // Look up mapping (all channels accepted)
+            const MidiMapping* mapping = midiMappingManager.findCCMapping(ccNumber);
+            if (mapping) {
+                DBG("MIDI CC " << ccNumber << " = " << ccValue << " → " <<
+                    getMidiControlName(mapping->controlId));
+                handleMidiMapping(*mapping, ccValue, ccValue >= 64);
+            }
+        }
+        // Process Note On/Off messages
+        else if (msg.isNoteOn() || msg.isNoteOff()) {
+            int noteNumber = msg.getNoteNumber();
+            bool isNoteOn = msg.isNoteOn();
+
+            // Look up mapping (all channels accepted)
+            const MidiMapping* mapping = midiMappingManager.findNoteMapping(noteNumber);
+            if (mapping) {
+                DBG("MIDI Note " << noteNumber << " " << (isNoteOn ? "ON" : "OFF") <<
+                    " → " << getMidiControlName(mapping->controlId));
+                int value = isNoteOn ? 127 : 0;
+                handleMidiMapping(*mapping, value, isNoteOn);
+            }
+        }
+    }
+}
+
+void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValue, bool isNoteOnOrCCPositive) {
+    // Convert MIDI value using the mapping's conversion settings
+    float normalizedValue = MidiValueConverter::midiToScaled(
+        midiValue, mapping.minValue, mapping.maxValue, mapping.invert);
+
+    // Handle each control type
+    switch (mapping.controlId) {
+        // ========== OCTAVE SLIDER ==========
+        case MidiControlId::OCTAVE_SLIDER: {
+            int octaveIndex = MidiValueConverter::midiToDiscreteIndex(midiValue, 9);  // 0-9
+            queueCommand(ProcessorCommand(
+                [this, octaveIndex]() {
+                    auto& seq = getSequence();
+                    int selectedStep = seq.getSelectedStepForEditing();
+                    int currentNote = seq.getStep(selectedStep).getStepNotes().getCurrentNote().getNoteNumber();
+                    int pitchClass = currentNote % 12;
+                    int newNote = octaveIndex * 12 + pitchClass;
+                    seq.getStep(selectedStep).updateCurrentNoteNumber(newNote);
+                    DBG("  → Octave changed to " << octaveIndex << " (MIDI note " << newNote << ")");
+                },
+                [this]() {
+                    // Trigger UI refresh
+                    if (onSequenceTick) onSequenceTick();
+                }
+            ));
+            break;
+        }
+
+        // ========== NOTE SLIDER ==========
+        case MidiControlId::NOTE_SLIDER: {
+            // Note slider is filtered to scale notes, so we need to map MIDI value to scale index
+            // For now, use a simple linear mapping (TODO: respect current scale)
+            int pitchClass = MidiValueConverter::midiToDiscreteIndex(midiValue, 11);  // 0-11
+            queueCommand(ProcessorCommand(
+                [this, pitchClass]() {
+                    auto& seq = getSequence();
+                    int selectedStep = seq.getSelectedStepForEditing();
+                    int currentNote = seq.getStep(selectedStep).getStepNotes().getCurrentNote().getNoteNumber();
+                    int octave = currentNote / 12;
+                    int newNote = octave * 12 + pitchClass;
+                    seq.getStep(selectedStep).updateCurrentNoteNumber(newNote);
+                    DBG("  → Note changed to pitch class " << pitchClass << " (MIDI note " << newNote << ")");
+                },
+                [this]() {
+                    // Trigger UI refresh
+                    if (onSequenceTick) onSequenceTick();
+                }
+            ));
+            break;
+        }
+
+        // ========== PROBABILITY SLIDER ==========
+        case MidiControlId::PROBABILITY_SLIDER: {
+            int percentage = static_cast<int>(normalizedValue * 100.0f);
+            queueCommand(ProcessorCommand(
+                [this, percentage]() {
+                    getSequence().setProbabilityPercentage(percentage);
+                    DBG("  → Probability changed to " << percentage << "%");
+                },
+                [this]() {
+                    // Trigger UI refresh
+                    if (onSequenceTick) onSequenceTick();
+                }
+            ));
+            break;
+        }
+
+        // ========== ROLL BUTTON (Momentary) ==========
+        case MidiControlId::BUTTON_ROLL: {
+            queueCommand(ProcessorCommand([this, isNoteOnOrCCPositive]() {
+                getSequence().setIsRandom(isNoteOnOrCCPositive);
+                DBG("  → Roll " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            }));
+            break;
+        }
+
+        // ========== SEQUENCER CONTROL BUTTONS ==========
+        case MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE: {
+            if (isNoteOnOrCCPositive) {  // Only trigger on button press
+                queueCommand(ProcessorCommand(
+                    [this]() {
+                        bool isShifted = getSequence().getIsShift();
+                        if (isShifted) {
+                            // Shifted: Duplicate sequence
+                            auto& seq = getSequence();
+                            int currentLength = seq.getLength();
+                            int newLength = juce::jmin(currentLength * 2, Sequence::MAX_STEPS);
+                            int stepsToCopy = newLength - currentLength;
+
+                            for (int i = 0; i < stepsToCopy; i++) {
+                                int srcIdx = i;
+                                int dstIdx = currentLength + i;
+                                auto& srcStep = seq.getStep(srcIdx);
+                                auto& dstStep = seq.getStep(dstIdx);
+                                auto& srcNotes = srcStep.getStepNotes();
+                                auto& dstNotes = dstStep.getStepNotes();
+                                dstNotes.setLength(srcNotes.getLength());
+                                for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
+                                    dstNotes.setNote(n, srcNotes.getNote(n).getNoteNumber());
+                                }
+                            }
+                            seq.setLength(newLength);
+                            DBG("  → Duplicated sequence to " << newLength << " steps");
+                        } else {
+                            // Normal: Page left (handled by UI)
+                            DBG("  → Page left (UI only)");
+                        }
+                    },
+                    [this]() {
+                        if (onSequenceTick) onSequenceTick();
+                    }
+                ));
+            }
+            break;
+        }
+
+        case MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP: {
+            if (isNoteOnOrCCPositive) {  // Only trigger on button press
+                queueCommand(ProcessorCommand(
+                    [this]() {
+                        bool isShifted = getSequence().getIsShift();
+                        if (isShifted) {
+                            // Shifted: Clear current step
+                            auto& seq = getSequence();
+                            int selectedStep = seq.getSelectedStepForEditing();
+                            auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
+                            for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
+                                stepNotes.setNote(n, -1);
+                            }
+                            DBG("  → Cleared step " << selectedStep);
+                        } else {
+                            // Normal: Increase length
+                            getSequence().increaseLength();
+                            DBG("  → Length increased to " << getSequence().getLength());
+                        }
+                    },
+                    [this]() {
+                        if (onSequenceTick) onSequenceTick();
+                    }
+                ));
+            }
+            break;
+        }
+
+        case MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP: {
+            if (isNoteOnOrCCPositive) {  // Only trigger on button press
+                queueCommand(ProcessorCommand(
+                    [this]() {
+                        bool isShifted = getSequence().getIsShift();
+                        if (isShifted) {
+                            // Shifted: Randomize current step
+                            auto& seq = getSequence();
+                            int selectedStep = seq.getSelectedStepForEditing();
+                            seq.getStep(selectedStep).randomizeNote(seq.getScale());
+                            DBG("  → Randomized step " << selectedStep);
+                        } else {
+                            // Normal: Decrease length
+                            getSequence().decreaseLength();
+                            DBG("  → Length decreased to " << getSequence().getLength());
+                        }
+                    },
+                    [this]() {
+                        if (onSequenceTick) onSequenceTick();
+                    }
+                ));
+            }
+            break;
+        }
+
+        case MidiControlId::BUTTON_SHIFT: {
+            if (isNoteOnOrCCPositive) {  // Only trigger on button press
+                queueCommand(ProcessorCommand(
+                    [this]() {
+                        auto& seq = getSequence();
+                        bool newShiftState = !seq.getIsShift();
+                        seq.setIsShift(newShiftState);
+                        DBG("  → Shift " << (newShiftState ? "ON" : "OFF"));
+                    },
+                    [this]() {
+                        if (onSequenceTick) onSequenceTick();
+                    }
+                ));
+            }
+            break;
+        }
+
+        // ========== SEQUENCER WINDOW STEPS (0-7) ==========
+        case MidiControlId::STEP_0:
+        case MidiControlId::STEP_1:
+        case MidiControlId::STEP_2:
+        case MidiControlId::STEP_3:
+        case MidiControlId::STEP_4:
+        case MidiControlId::STEP_5:
+        case MidiControlId::STEP_6:
+        case MidiControlId::STEP_7: {
+            if (isNoteOnOrCCPositive) {  // Only trigger on button press
+                // Calculate step index within current window
+                int localStepIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::STEP_0);
+                queueCommand(ProcessorCommand(
+                    [this, localStepIndex]() {
+                        // For now, trigger step 0-7 directly (TODO: respect window position)
+                        DBG("  → Step " << localStepIndex << " clicked");
+                        // This would trigger MIDI preview in the full implementation
+                    }
+                ));
+            }
+            break;
+        }
+
+        // ========== SUBSEQUENCE CONTROLS ==========
+        case MidiControlId::SUBSEQ_MINUS: {
+            if (isNoteOnOrCCPositive) {
+                queueCommand(ProcessorCommand(
+                    [this]() {
+                        auto& seq = getSequence();
+                        int selectedStep = seq.getSelectedStepForEditing();
+                        auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
+                        stepNotes.decreaseLength();
+                        DBG("  → Substep length decreased to " << stepNotes.getLength());
+                    },
+                    [this]() {
+                        if (onSequenceTick) onSequenceTick();
+                    }
+                ));
+            }
+            break;
+        }
+
+        case MidiControlId::SUBSEQ_PLUS: {
+            if (isNoteOnOrCCPositive) {
+                queueCommand(ProcessorCommand(
+                    [this]() {
+                        auto& seq = getSequence();
+                        int selectedStep = seq.getSelectedStepForEditing();
+                        auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
+                        stepNotes.increaseLength();
+                        DBG("  → Substep length increased to " << stepNotes.getLength());
+                    },
+                    [this]() {
+                        if (onSequenceTick) onSequenceTick();
+                    }
+                ));
+            }
+            break;
+        }
+
+        case MidiControlId::SUBSEQ_BAR_0:
+        case MidiControlId::SUBSEQ_BAR_1:
+        case MidiControlId::SUBSEQ_BAR_2:
+        case MidiControlId::SUBSEQ_BAR_3:
+        case MidiControlId::SUBSEQ_BAR_4:
+        case MidiControlId::SUBSEQ_BAR_5:
+        case MidiControlId::SUBSEQ_BAR_6:
+        case MidiControlId::SUBSEQ_BAR_7: {
+            if (isNoteOnOrCCPositive) {
+                int barIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::SUBSEQ_BAR_0);
+                queueCommand(ProcessorCommand(
+                    [this, barIndex]() {
+                        auto& seq = getSequence();
+                        int selectedStep = seq.getSelectedStepForEditing();
+                        auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
+                        if (barIndex < stepNotes.getLength()) {
+                            stepNotes.setCurrentIndex(barIndex);
+                            DBG("  → Substep " << barIndex << " selected");
+                        }
+                    },
+                    [this]() {
+                        if (onSequenceTick) onSequenceTick();
+                    }
+                ));
+            }
+            break;
+        }
+
+        // ========== NOTE RANGE CONTROLS ==========
+        case MidiControlId::NOTE_RANGE_MIN: {
+            int minNote = MidiValueConverter::midiToDiscreteIndex(midiValue, 127);
+            queueCommand(ProcessorCommand(
+                [this, minNote]() {
+                    getSequence().getScale().setRangeMin(minNote);
+                    DBG("  → Note range min set to " << minNote);
+                },
+                [this]() {
+                    if (onSequenceTick) onSequenceTick();
+                }
+            ));
+            break;
+        }
+
+        case MidiControlId::NOTE_RANGE_MAX: {
+            int maxNote = MidiValueConverter::midiToDiscreteIndex(midiValue, 127);
+            queueCommand(ProcessorCommand(
+                [this, maxNote]() {
+                    getSequence().getScale().setRangeMax(maxNote);
+                    DBG("  → Note range max set to " << maxNote);
+                },
+                [this]() {
+                    if (onSequenceTick) onSequenceTick();
+                }
+            ));
+            break;
+        }
+
+        // ========== CC LANE VALUES ==========
+        case MidiControlId::CC_LANE_0_VALUE:
+        case MidiControlId::CC_LANE_1_VALUE:
+        case MidiControlId::CC_LANE_2_VALUE:
+        case MidiControlId::CC_LANE_3_VALUE:
+        case MidiControlId::CC_LANE_4_VALUE:
+        case MidiControlId::CC_LANE_5_VALUE:
+        case MidiControlId::CC_LANE_6_VALUE: {
+            int laneIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::CC_LANE_0_VALUE);
+            int ccValue = static_cast<int>(normalizedValue * 127.0f);
+            queueCommand(ProcessorCommand(
+                [this, laneIndex, ccValue]() {
+                    auto& seq = getSequence();
+                    int selectedStep = seq.getSelectedStepForEditing();
+                    auto& mods = seq.getStep(selectedStep).getStepModulations();
+                    // Only set value if lane index is within bounds
+                    if (laneIndex >= 0 && laneIndex < 7) {
+                        auto& mod = mods.getModulation(laneIndex);
+                        mod.setValue(ccValue);
+                        DBG("  → CC Lane " << laneIndex << " value set to " << ccValue);
+                    }
+                },
+                [this]() {
+                    if (onSequenceTick) onSequenceTick();
+                }
+            ));
+            break;
+        }
+
+        // ========== PIANO ROLL SCALE NOTES ==========
+        case MidiControlId::SCALE_NOTE_C:
+        case MidiControlId::SCALE_NOTE_Db:
+        case MidiControlId::SCALE_NOTE_D:
+        case MidiControlId::SCALE_NOTE_Eb:
+        case MidiControlId::SCALE_NOTE_E:
+        case MidiControlId::SCALE_NOTE_F:
+        case MidiControlId::SCALE_NOTE_Gb:
+        case MidiControlId::SCALE_NOTE_G:
+        case MidiControlId::SCALE_NOTE_Ab:
+        case MidiControlId::SCALE_NOTE_A:
+        case MidiControlId::SCALE_NOTE_Bb:
+        case MidiControlId::SCALE_NOTE_B: {
+            if (isNoteOnOrCCPositive) {  // Only trigger on button press
+                int noteIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::SCALE_NOTE_C);
+                queueCommand(ProcessorCommand(
+                    [this, noteIndex]() {
+                        auto& scale = getSequence().getScale();
+                        // Toggle the scale note
+                        bool currentState = scale.getScaleNotes()[noteIndex];
+
+                        // Only toggle if there's more than one note in the scale
+                        int activeNotes = 0;
+                        for (int i = 0; i < 12; i++) {
+                            if (scale.getScaleNotes()[i]) activeNotes++;
+                        }
+
+                        if (activeNotes > 1 || !currentState) {
+                            scale.setScaleNote(noteIndex, !currentState);
+                            // Quantize all notes to the new scale
+                            getSequence().quantizeAllNotesToScale();
+                            DBG("  → Scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
+                        } else {
+                            DBG("  → Cannot disable last scale note");
+                        }
+                    },
+                    [this]() {
+                        if (onSequenceTick) onSequenceTick();
+                    }
+                ));
+            }
+            break;
+        }
+
+        // ========== REMAINING SEQUENCER CONTROL BUTTONS ==========
+        case MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW: {
+            if (isNoteOnOrCCPositive) {
+                queueCommand(ProcessorCommand(
+                    [this]() {
+                        bool isShifted = getSequence().getIsShift();
+                        if (isShifted) {
+                            // Shifted: Clear window (handled by UI - would need window position)
+                            DBG("  → Clear window (UI only)");
+                        } else {
+                            // Normal: Page right (handled by UI)
+                            DBG("  → Page right (UI only)");
+                        }
+                    }
+                ));
+            }
+            break;
+        }
+
+        case MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL: {
+            if (isNoteOnOrCCPositive) {
+                queueCommand(ProcessorCommand(
+                    [this]() {
+                        bool isShifted = getSequence().getIsShift();
+                        if (isShifted) {
+                            // Shifted: Randomize all steps
+                            auto& seq = getSequence();
+                            for (int i = 0; i < Sequence::MAX_STEPS; i++) {
+                                seq.getStep(i).randomizeNote(seq.getScale());
+                            }
+                            DBG("  → Randomized all steps");
+                        } else {
+                            // Normal: Nudge left
+                            getSequence().nudgeLeft();
+                            DBG("  → Nudged left");
+                        }
+                    },
+                    [this]() {
+                        if (onSequenceTick) onSequenceTick();
+                    }
+                ));
+            }
+            break;
+        }
+
+        case MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE: {
+            if (isNoteOnOrCCPositive) {
+                queueCommand(ProcessorCommand(
+                    [this]() {
+                        bool isShifted = getSequence().getIsShift();
+                        if (isShifted) {
+                            // Shifted: Shuffle all steps
+                            auto& seq = getSequence();
+                            int len = seq.getLength();
+                            // Fisher-Yates shuffle
+                            static std::random_device rd;
+                            static std::mt19937 gen(rd());
+                            for (int i = len - 1; i > 0; i--) {
+                                std::uniform_int_distribution<> dis(0, i);
+                                int j = dis(gen);
+                                // Swap steps i and j
+                                auto& stepI = seq.getStep(i).getStepNotes();
+                                auto& stepJ = seq.getStep(j).getStepNotes();
+                                // Swap lengths
+                                int lenI = stepI.getLength();
+                                int lenJ = stepJ.getLength();
+                                stepI.setLength(lenJ);
+                                stepJ.setLength(lenI);
+                                // Swap all notes
+                                for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
+                                    int noteI = stepI.getNote(n).getNoteNumber();
+                                    int noteJ = stepJ.getNote(n).getNoteNumber();
+                                    stepI.setNote(n, noteJ);
+                                    stepJ.setNote(n, noteI);
+                                }
+                            }
+                            DBG("  → Shuffled all steps");
+                        } else {
+                            // Normal: Nudge right
+                            getSequence().nudgeRight();
+                            DBG("  → Nudged right");
+                        }
+                    },
+                    [this]() {
+                        if (onSequenceTick) onSequenceTick();
+                    }
+                ));
+            }
+            break;
+        }
+
+        // ========== CC LANE TOGGLES ==========
+        case MidiControlId::CC_LANE_0_TOGGLE:
+        case MidiControlId::CC_LANE_1_TOGGLE:
+        case MidiControlId::CC_LANE_2_TOGGLE:
+        case MidiControlId::CC_LANE_3_TOGGLE:
+        case MidiControlId::CC_LANE_4_TOGGLE:
+        case MidiControlId::CC_LANE_5_TOGGLE:
+        case MidiControlId::CC_LANE_6_TOGGLE: {
+            if (isNoteOnOrCCPositive) {
+                int laneIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::CC_LANE_0_TOGGLE);
+                queueCommand(ProcessorCommand(
+                    [this, laneIndex]() {
+                        auto& seq = getSequence();
+                        int selectedStep = seq.getSelectedStepForEditing();
+                        auto& mods = seq.getStep(selectedStep).getStepModulations();
+                        if (laneIndex >= 0 && laneIndex < 7) {
+                            auto& mod = mods.getModulation(laneIndex);
+                            // Toggle selection
+                            mod.setSelected(!mod.isSelected());
+                            DBG("  → CC Lane " << laneIndex << " toggled " << (mod.isSelected() ? "ON" : "OFF"));
+                        }
+                    },
+                    [this]() {
+                        if (onSequenceTick) onSequenceTick();
+                    }
+                ));
+            }
+            break;
+        }
+
+        // ========== SEQUENCE GRID (64 absolute steps) ==========
+        case MidiControlId::GRID_STEP_0:  case MidiControlId::GRID_STEP_1:
+        case MidiControlId::GRID_STEP_2:  case MidiControlId::GRID_STEP_3:
+        case MidiControlId::GRID_STEP_4:  case MidiControlId::GRID_STEP_5:
+        case MidiControlId::GRID_STEP_6:  case MidiControlId::GRID_STEP_7:
+        case MidiControlId::GRID_STEP_8:  case MidiControlId::GRID_STEP_9:
+        case MidiControlId::GRID_STEP_10: case MidiControlId::GRID_STEP_11:
+        case MidiControlId::GRID_STEP_12: case MidiControlId::GRID_STEP_13:
+        case MidiControlId::GRID_STEP_14: case MidiControlId::GRID_STEP_15:
+        case MidiControlId::GRID_STEP_16: case MidiControlId::GRID_STEP_17:
+        case MidiControlId::GRID_STEP_18: case MidiControlId::GRID_STEP_19:
+        case MidiControlId::GRID_STEP_20: case MidiControlId::GRID_STEP_21:
+        case MidiControlId::GRID_STEP_22: case MidiControlId::GRID_STEP_23:
+        case MidiControlId::GRID_STEP_24: case MidiControlId::GRID_STEP_25:
+        case MidiControlId::GRID_STEP_26: case MidiControlId::GRID_STEP_27:
+        case MidiControlId::GRID_STEP_28: case MidiControlId::GRID_STEP_29:
+        case MidiControlId::GRID_STEP_30: case MidiControlId::GRID_STEP_31:
+        case MidiControlId::GRID_STEP_32: case MidiControlId::GRID_STEP_33:
+        case MidiControlId::GRID_STEP_34: case MidiControlId::GRID_STEP_35:
+        case MidiControlId::GRID_STEP_36: case MidiControlId::GRID_STEP_37:
+        case MidiControlId::GRID_STEP_38: case MidiControlId::GRID_STEP_39:
+        case MidiControlId::GRID_STEP_40: case MidiControlId::GRID_STEP_41:
+        case MidiControlId::GRID_STEP_42: case MidiControlId::GRID_STEP_43:
+        case MidiControlId::GRID_STEP_44: case MidiControlId::GRID_STEP_45:
+        case MidiControlId::GRID_STEP_46: case MidiControlId::GRID_STEP_47:
+        case MidiControlId::GRID_STEP_48: case MidiControlId::GRID_STEP_49:
+        case MidiControlId::GRID_STEP_50: case MidiControlId::GRID_STEP_51:
+        case MidiControlId::GRID_STEP_52: case MidiControlId::GRID_STEP_53:
+        case MidiControlId::GRID_STEP_54: case MidiControlId::GRID_STEP_55:
+        case MidiControlId::GRID_STEP_56: case MidiControlId::GRID_STEP_57:
+        case MidiControlId::GRID_STEP_58: case MidiControlId::GRID_STEP_59:
+        case MidiControlId::GRID_STEP_60: case MidiControlId::GRID_STEP_61:
+        case MidiControlId::GRID_STEP_62: case MidiControlId::GRID_STEP_63: {
+            if (isNoteOnOrCCPositive) {
+                int gridStepIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::GRID_STEP_0);
+                queueCommand(ProcessorCommand(
+                    [this, gridStepIndex]() {
+                        // Set this as the selected step for editing
+                        getSequence().setSelectedStepForEditing(gridStepIndex);
+                        DBG("  → Grid step " << gridStepIndex << " selected for editing");
+                        // Note: Window navigation would be handled by UI in full implementation
+                    },
+                    [this]() {
+                        if (onSequenceTick) onSequenceTick();
+                    }
+                ));
+            }
+            break;
+        }
+
+        // ========== NAVIGATION ==========
+        case MidiControlId::VIEW_TOGGLE: {
+            if (isNoteOnOrCCPositive) {
+                // This is purely a UI concern - would need UI callback
+                DBG("  → View toggle (UI only)");
+            }
+            break;
+        }
+
+        case MidiControlId::SETTINGS_TOGGLE: {
+            if (isNoteOnOrCCPositive) {
+                // This is purely a UI concern - would need UI callback
+                DBG("  → Settings toggle (UI only)");
+            }
+            break;
+        }
+
+        case MidiControlId::COUNT:
+            // This is just a sentinel value, not an actual control
+            break;
+
+        default:
+            // Unhandled control - log for debugging
+            DBG("  → Unhandled MIDI control: " << getMidiControlName(mapping.controlId));
+            break;
+    }
 }
 
 //==============================================================================

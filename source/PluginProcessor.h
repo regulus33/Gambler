@@ -7,6 +7,7 @@
 #include "backend/UserPreferences.h"
 #include "backend/PresetManager.h"
 #include "backend/ProcessorCommand.h"
+#include "backend/MidiMappingManager.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 
@@ -171,9 +172,28 @@ private:
     // Command queue for thread-safe UI → Audio communication
     ProcessorCommandQueue commandQueue;
 
+    // MIDI mapping manager for MIDI input control
+    MidiMappingManager midiMappingManager;
+
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();
 
     // Called when APVTS parameter changes (from UI or preset load)
     void parameterChanged(const juce::String& parameterID, float newValue) override;
+
+    // MIDI input processing
+    /**
+     * Process incoming MIDI messages and trigger mapped controls
+     * Called from processBlock() before clearing the MIDI buffer
+     * @param midiMessages Incoming MIDI buffer from DAW/hardware
+     */
+    void processMidiInput(const juce::MidiBuffer& midiMessages);
+
+    /**
+     * Handle a single MIDI mapping by queuing the appropriate command
+     * @param mapping The MIDI mapping configuration
+     * @param midiValue The MIDI value (0-127)
+     * @param isNoteOnOrCCPositive True for Note On or positive CC value
+     */
+    void handleMidiMapping(const MidiMapping& mapping, int midiValue, bool isNoteOnOrCCPositive);
 };
