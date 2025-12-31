@@ -36,7 +36,7 @@ public:
     NavBarComponent()
         : viewToggleButton(Icons::createViewToggleIcon1, Icons::createViewToggleIcon2, false, true),
           settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false),
-          midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, false)
+          midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, true)
     {
         // Add logo component
         addAndMakeVisible(logo);
