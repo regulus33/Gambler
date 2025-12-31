@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # Enable auto-incrementing patch level based on git commits
-set(PAMPLEJUCE_AUTO_BUMP_PATCH_LEVEL ON)
+set(PAMPLEJUCE_AUTO_BUMP_PATCH_LEVEL OFF)
 
 include (PamplejuceVersion)
 
