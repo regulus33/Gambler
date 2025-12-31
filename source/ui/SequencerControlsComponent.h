@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Icons.h"
+#include "../backend/MidiLearnRegistry.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace SequencerControlsConstants {
@@ -57,30 +58,38 @@ public:
             addAndMakeVisible(button);
         }
 
-        // Set button icons and labels (normal mode)
+        // Set button icons, labels, and MIDI control IDs (normal mode)
         buttons[kRollButton]->setIcon(Icons::createDiceIcon());
         buttons[kRollButton]->setLabel("Roll");
+        buttons[kRollButton]->setMidiControlId(MidiControlId::BUTTON_ROLL);
 
         buttons[kPageLeftButton]->setIcon(Icons::createIndexLeftIcon());
         buttons[kPageLeftButton]->setLabel("Page");
+        buttons[kPageLeftButton]->setMidiControlId(MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE);
 
         buttons[kPageRightButton]->setIcon(Icons::createIndexRightIcon());
         buttons[kPageRightButton]->setLabel("Page");
+        buttons[kPageRightButton]->setMidiControlId(MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW);
 
         buttons[kLengthPlusButton]->setIcon(Icons::createLengthPlusIcon());
         buttons[kLengthPlusButton]->setLabel("Length");
+        buttons[kLengthPlusButton]->setMidiControlId(MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP);
 
         buttons[kLengthMinusButton]->setIcon(Icons::createLengthMinusIcon());
         buttons[kLengthMinusButton]->setLabel("Length");
+        buttons[kLengthMinusButton]->setMidiControlId(MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP);
 
         buttons[kNudgeLeftButton]->setIcon(Icons::createNudgeLeftIcon());
         buttons[kNudgeLeftButton]->setLabel("Nudge");
+        buttons[kNudgeLeftButton]->setMidiControlId(MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL);
 
         buttons[kNudgeRightButton]->setIcon(Icons::createNudgeRightIcon());
         buttons[kNudgeRightButton]->setLabel("Nudge");
+        buttons[kNudgeRightButton]->setMidiControlId(MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE);
 
         buttons[kShiftButton]->setIcon(Icons::createShiftIcon());
         buttons[kShiftButton]->setLabel("Shift");
+        buttons[kShiftButton]->setMidiControlId(MidiControlId::BUTTON_SHIFT);
 
         // Set toggle state for Shift only (Roll is momentary)
         buttons[kShiftButton]->setToggleable(true);
@@ -127,6 +136,15 @@ public:
     // Check if Shift mode is active
     bool isShiftActive() const {
         return isButtonToggled(kShiftButton);
+    }
+
+    // Set the MIDI learn registry (called from parent)
+    void setRegistry(MidiLearnRegistry* reg) {
+        registry = reg;
+        // Pass to all buttons
+        for (auto* button : buttons) {
+            button->setRegistry(reg);
+        }
     }
 
     // Update button appearances based on Shift state
@@ -189,6 +207,16 @@ private:
     class ControlButton : public juce::Component {
     public:
         ControlButton() = default;
+
+        void setRegistry(MidiLearnRegistry* reg) {
+            registry = reg;
+            updateRegistration();
+        }
+
+        void setMidiControlId(MidiControlId id) {
+            controlId = id;
+            updateRegistration();
+        }
         
         void paint (juce::Graphics& g) override {
             using namespace SequencerControlsConstants;
@@ -254,9 +282,51 @@ private:
 
                 g.drawText(label_, textBounds.toNearestInt(), juce::Justification::centredBottom);
             }
+
+            // Draw MIDI learn overlay if in learn mode
+            paintMidiLearnOverlay(g);
+        }
+
+        void paintMidiLearnOverlay(juce::Graphics& g) {
+            if (!registry || !registry->isLearning()) return;
+            if (controlId == MidiControlId::COUNT) return;
+
+            auto bounds = getLocalBounds();
+
+            // Determine if this control is currently being learned
+            bool isLearningThisControl = (registry->getLearningControl() == controlId);
+
+            // Semi-transparent blue rectangle
+            auto overlayColor = juce::Colour(0x4080CCFF);  // Blue with ~25% opacity
+            g.setColour(overlayColor);
+            g.fillRoundedRectangle(bounds.toFloat(), SequencerControlsConstants::cornerRadius);
+
+            // White border if actively learning
+            if (isLearningThisControl) {
+                g.setColour(juce::Colours::white);
+                g.drawRoundedRectangle(bounds.toFloat().reduced(1.5f), SequencerControlsConstants::cornerRadius, 3.0f);
+            }
+
+            // Display MIDI mapping info (if mapped)
+            const auto* midiId = registry->getMidiForControl(controlId);
+            if (midiId) {
+                g.setColour(juce::Colours::white);
+                g.setFont(9.0f);
+                g.drawText(midiId->toString(),
+                          bounds,
+                          juce::Justification::centred);
+            }
         }
         
-        void mouseDown (const juce::MouseEvent& /*event*/) override {
+        void mouseDown (const juce::MouseEvent& event) override {
+            // Check if in MIDI learn mode first
+            if (registry && registry->isLearning() && controlId != MidiControlId::COUNT) {
+                // Set this control as the learning target
+                registry->setLearningControl(controlId);
+                repaint();
+                return;  // Don't trigger normal button action
+            }
+
             if (isToggleable_) {
                 setToggled(!isToggled_);
             } else {
@@ -322,14 +392,35 @@ private:
             }
         }
 
+        void resized() override {
+            updateBoundsInRegistry();
+        }
+
     private:
+        void updateRegistration() {
+            if (registry && controlId != MidiControlId::COUNT && isShowing()) {
+                auto screenBounds = getScreenBounds();
+                registry->registerControl(controlId, screenBounds, getMidiControlName(controlId));
+            }
+        }
+
+        void updateBoundsInRegistry() {
+            if (registry && controlId != MidiControlId::COUNT) {
+                auto screenBounds = getScreenBounds();
+                registry->updateControlBounds(controlId, screenBounds);
+            }
+        }
+
         juce::String label_;
         std::optional<juce::Path> iconPath_;
         bool isToggleable_ = false;
         bool isToggled_ = false;
         bool isPressed_ = false;  // Track pressed state for momentary buttons
+        MidiLearnRegistry* registry = nullptr;
+        MidiControlId controlId = MidiControlId::COUNT;
     };
-    
+
     juce::OwnedArray<ControlButton> buttons;
+    MidiLearnRegistry* registry = nullptr;
 };
 

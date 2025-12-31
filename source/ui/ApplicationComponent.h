@@ -34,6 +34,23 @@ public:
             showSettingsScreen();
         };
 
+        // Setup navbar callback for MIDI Learn button
+        mainScreen.getNavBar().onMidiLearnClicked = [this](bool toggled) {
+            if (toggled) {
+                // Enter MIDI learn mode
+                processorRef.getMidiLearnRegistry().enterLearnMode();
+                DBG("MIDI Learn mode ENABLED");
+                // Trigger UI refresh to show overlays
+                mainScreen.repaint();
+            } else {
+                // Exit MIDI learn mode
+                processorRef.getMidiLearnRegistry().exitLearnMode();
+                DBG("MIDI Learn mode DISABLED");
+                // Trigger UI refresh to hide overlays
+                mainScreen.repaint();
+            }
+        };
+
         // Setup preset selector callbacks
         setupPresetSelector();
 
@@ -102,6 +119,19 @@ private:
 
             // Set the settings button to toggled state (showing X icon)
             settingsScreen->getNavBar().setSettingsToggled(true);
+
+            // Setup MIDI Learn button callback for settings screen
+            settingsScreen->getNavBar().onMidiLearnClicked = [this](bool toggled) {
+                if (toggled) {
+                    processorRef.getMidiLearnRegistry().enterLearnMode();
+                    DBG("MIDI Learn mode ENABLED (from settings)");
+                    if (settingsScreen) settingsScreen->repaint();
+                } else {
+                    processorRef.getMidiLearnRegistry().exitLearnMode();
+                    DBG("MIDI Learn mode DISABLED (from settings)");
+                    if (settingsScreen) settingsScreen->repaint();
+                }
+            };
 
             // Wire up settings callbacks to processor's clock
             // Sync initial state from processor
@@ -184,6 +214,10 @@ private:
 
         // Toggle the main screen's settings button to show X icon
         mainScreen.getNavBar().setSettingsToggled(true);
+
+        // Sync MIDI Learn button state from main screen
+        bool midiLearnActive = processorRef.getMidiLearnRegistry().isLearning();
+        settingsScreen->getNavBar().setMidiLearnToggled(midiLearnActive);
     }
 
     void showMainScreen() {
@@ -195,6 +229,10 @@ private:
 
         // Toggle the main screen's settings button back to gear icon
         mainScreen.getNavBar().setSettingsToggled(false);
+
+        // Sync MIDI Learn button state from registry
+        bool midiLearnActive = processorRef.getMidiLearnRegistry().isLearning();
+        mainScreen.getNavBar().setMidiLearnToggled(midiLearnActive);
     }
 
     void setupPresetSelector() {

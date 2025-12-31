@@ -501,6 +501,9 @@ private:
         // Add sequencer controls component
         addAndMakeVisible(sequencerControls);
 
+        // Wire up MIDI learn registry for sequencer controls
+        sequencerControls.setRegistry(&processorRef.getMidiLearnRegistry());
+
         // Setup callback for control button clicks
         // Button indices: 0=Roll, 1=Page<-, 2=Page->, 3=Length+, 4=Length-, 5=Nudge<-, 6=Nudge->, 7=Shift
         sequencerControls.onButtonClicked = [this](int buttonIndex) {

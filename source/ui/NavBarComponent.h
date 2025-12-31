@@ -35,7 +35,8 @@ class NavBarComponent : public juce::Component {
 public:
     NavBarComponent()
         : viewToggleButton(Icons::createViewToggleIcon1, Icons::createViewToggleIcon2, false, true),
-          settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false)
+          settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false),
+          midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, false)
     {
         // Add logo component
         addAndMakeVisible(logo);
@@ -52,6 +53,14 @@ public:
         versionLabel.setFont(juce::FontOptions(interBoldFont).withHeight(11.0f));
         versionLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.5f));
         versionLabel.setJustificationType(juce::Justification::centredRight);
+
+        // Add MIDI learn button
+        addAndMakeVisible(midiLearnButton);
+        midiLearnButton.onClick = [this](bool toggled) {
+            if (onMidiLearnClicked) {
+                onMidiLearnClicked(toggled);
+            }
+        };
 
         // Add view toggle button
         addAndMakeVisible(viewToggleButton);
@@ -103,8 +112,13 @@ public:
         int viewToggleButtonY = (height - buttonSize) / 2;  // Vertically center
         viewToggleButton.setBounds(viewToggleButtonX, viewToggleButtonY, buttonSize, buttonSize);
 
-        // Position version label left of view toggle button
-        int versionLabelX = viewToggleButtonX - versionLabelWidth - versionLabelMarginRight;
+        // Position MIDI learn button left of view toggle button
+        int midiLearnButtonX = viewToggleButtonX - buttonSize - buttonGap;
+        int midiLearnButtonY = (height - buttonSize) / 2;  // Vertically center
+        midiLearnButton.setBounds(midiLearnButtonX, midiLearnButtonY, buttonSize, buttonSize);
+
+        // Position version label left of MIDI learn button
+        int versionLabelX = midiLearnButtonX - versionLabelWidth - versionLabelMarginRight;
         int versionLabelY = (height - versionLabelHeight) / 2;  // Vertically center
         versionLabel.setBounds(versionLabelX, versionLabelY, versionLabelWidth, versionLabelHeight);
     }
@@ -116,9 +130,18 @@ public:
     // Parameter: true = toggled on (icon 2), false = toggled off (icon 1)
     std::function<void(bool)> onViewToggleClicked;
 
+    // Callback when MIDI learn button is clicked
+    // Parameter: true = MIDI learn mode ON, false = MIDI learn mode OFF
+    std::function<void(bool)> onMidiLearnClicked;
+
     // Public method to set settings button toggle state (for ApplicationComponent)
     void setSettingsToggled(bool toggled) {
         settingsButton.setToggled(toggled);
+    }
+
+    // Public method to set MIDI learn button toggle state (for ApplicationComponent)
+    void setMidiLearnToggled(bool toggled) {
+        midiLearnButton.setToggled(toggled);
     }
 
     // Access to preset selector for wiring up callbacks
@@ -128,6 +151,7 @@ private:
     LogoComponent logo;
     PresetSelectorComponent presetSelector;
     juce::Label versionLabel;
+    ToggleIconButton midiLearnButton;
     ToggleIconButton viewToggleButton;
     ToggleIconButton settingsButton;
 };

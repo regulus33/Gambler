@@ -1254,6 +1254,41 @@ public:
         path.closeSubPath();
         return path;
     }
+
+    /**
+     * Create MIDI Learn icon
+     * Design: Musical note with connection/link symbol
+     * Size: ~18x18 coordinate space
+     */
+    static juce::Path createMidiLearnIcon()
+    {
+        juce::Path path;
+
+        // Musical note (eighth note on left side)
+        // Note head (filled circle)
+        path.addEllipse(2.0f, 12.0f, 4.0f, 3.0f);
+
+        // Note stem
+        path.startNewSubPath(6.0f, 13.5f);
+        path.lineTo(6.0f, 3.0f);
+
+        // Note flag
+        path.startNewSubPath(6.0f, 3.0f);
+        path.cubicTo(8.0f, 3.0f, 9.0f, 4.5f, 9.0f, 6.5f);
+        path.cubicTo(9.0f, 7.5f, 8.5f, 8.5f, 7.5f, 9.0f);
+
+        // Connection symbol (lightning bolt / link on right side)
+        // Top part of bolt
+        path.startNewSubPath(12.0f, 2.0f);
+        path.lineTo(14.0f, 8.0f);
+        path.lineTo(11.5f, 8.0f);
+        path.lineTo(14.0f, 16.0f);
+        path.lineTo(11.0f, 10.0f);
+        path.lineTo(13.0f, 10.0f);
+        path.closeSubPath();
+
+        return path;
+    }
 };
 
 

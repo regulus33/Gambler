@@ -660,6 +660,9 @@ std::unique_ptr<juce::XmlElement> PluginProcessor::getStateAsXml() {
     // Save User Preferences
     rootXml->addChildElement(userPreferences.toXml().release());
 
+    // Save MIDI Learn Mappings
+    rootXml->addChildElement(midiLearnRegistry.toXml().release());
+
     return rootXml;
 }
 
@@ -701,6 +704,12 @@ void PluginProcessor::loadStateFromXml(const juce::XmlElement& xml) {
                 userPreferences.fromXml(*prefsXml);
                 DBG("  - UserPreferences loaded");
             }
+
+            // Load MIDI Learn Mappings
+            if (auto* midiLearnXml = xmlCopy->getChildByName("MidiLearnMappings")) {
+                midiLearnRegistry.fromXml(*midiLearnXml);
+                DBG("  - MIDI Learn Mappings loaded");
+            }
         }
     ));
 }
@@ -718,27 +727,90 @@ void PluginProcessor::processMidiInput(const juce::MidiBuffer& midiMessages) {
         if (msg.isController()) {
             int ccNumber = msg.getControllerNumber();
             int ccValue = msg.getControllerValue();
+            int channel = msg.getChannel();
 
-            // Look up mapping (all channels accepted)
-            const MidiMapping* mapping = midiMappingManager.findCCMapping(ccNumber);
-            if (mapping) {
-                DBG("MIDI CC " << ccNumber << " = " << ccValue << " → " <<
-                    getMidiControlName(mapping->controlId));
-                handleMidiMapping(*mapping, ccValue, ccValue >= 64);
+            // Check if we're in MIDI learn mode first
+            if (midiLearnRegistry.isLearning()) {
+                bool learned = midiLearnRegistry.learnMidiMessage(
+                    MidiMessageType::CC, channel, ccNumber);
+                if (learned) {
+                    DBG("Learned: CH" << channel << "-CC" << ccNumber);
+                    continue;  // Don't process as regular mapping
+                }
+            }
+
+            // Check user mappings first (higher priority than defaults)
+            MidiControlId userControlId = midiLearnRegistry.findUserMapping(
+                MidiMessageType::CC, channel, ccNumber);
+
+            if (userControlId != MidiControlId::COUNT) {
+                // User mapping found - create temporary mapping struct
+                MidiMapping userMapping;
+                userMapping.type = MidiMessageType::CC;
+                userMapping.midiNumber = ccNumber;
+                userMapping.controlId = userControlId;
+                userMapping.minValue = 0.0f;
+                userMapping.maxValue = 1.0f;
+                userMapping.invert = false;
+
+                DBG("MIDI CC " << ccNumber << " (user) = " << ccValue << " → " <<
+                    getMidiControlName(userControlId));
+                handleMidiMapping(userMapping, ccValue, ccValue >= 64);
+            }
+            else {
+                // Fall back to hardcoded default mappings
+                const MidiMapping* mapping = midiMappingManager.findCCMapping(ccNumber);
+                if (mapping) {
+                    DBG("MIDI CC " << ccNumber << " (default) = " << ccValue << " → " <<
+                        getMidiControlName(mapping->controlId));
+                    handleMidiMapping(*mapping, ccValue, ccValue >= 64);
+                }
             }
         }
         // Process Note On/Off messages
         else if (msg.isNoteOn() || msg.isNoteOff()) {
             int noteNumber = msg.getNoteNumber();
             bool isNoteOn = msg.isNoteOn();
+            int channel = msg.getChannel();
 
-            // Look up mapping (all channels accepted)
-            const MidiMapping* mapping = midiMappingManager.findNoteMapping(noteNumber);
-            if (mapping) {
-                DBG("MIDI Note " << noteNumber << " " << (isNoteOn ? "ON" : "OFF") <<
-                    " → " << getMidiControlName(mapping->controlId));
+            // Check if we're in MIDI learn mode first
+            if (midiLearnRegistry.isLearning() && isNoteOn) {
+                bool learned = midiLearnRegistry.learnMidiMessage(
+                    MidiMessageType::NOTE, channel, noteNumber);
+                if (learned) {
+                    DBG("Learned: CH" << channel << "-N" << noteNumber);
+                    continue;  // Don't process as regular mapping
+                }
+            }
+
+            // Check user mappings first (higher priority than defaults)
+            MidiControlId userControlId = midiLearnRegistry.findUserMapping(
+                MidiMessageType::NOTE, channel, noteNumber);
+
+            if (userControlId != MidiControlId::COUNT) {
+                // User mapping found
+                MidiMapping userMapping;
+                userMapping.type = MidiMessageType::NOTE;
+                userMapping.midiNumber = noteNumber;
+                userMapping.controlId = userControlId;
+                userMapping.minValue = 0.0f;
+                userMapping.maxValue = 1.0f;
+                userMapping.invert = false;
+
+                DBG("MIDI Note " << noteNumber << " (user) " << (isNoteOn ? "ON" : "OFF") <<
+                    " → " << getMidiControlName(userControlId));
                 int value = isNoteOn ? 127 : 0;
-                handleMidiMapping(*mapping, value, isNoteOn);
+                handleMidiMapping(userMapping, value, isNoteOn);
+            }
+            else {
+                // Fall back to hardcoded default mappings
+                const MidiMapping* mapping = midiMappingManager.findNoteMapping(noteNumber);
+                if (mapping) {
+                    DBG("MIDI Note " << noteNumber << " (default) " << (isNoteOn ? "ON" : "OFF") <<
+                        " → " << getMidiControlName(mapping->controlId));
+                    int value = isNoteOn ? 127 : 0;
+                    handleMidiMapping(*mapping, value, isNoteOn);
+                }
             }
         }
     }
