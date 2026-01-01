@@ -133,6 +133,13 @@ public:
         }
     }
 
+    // Set button pressed state (for momentary buttons like Roll)
+    void setButtonPressed(int index, bool pressed) {
+        if (index >= 0 && index < buttons.size()) {
+            buttons[index]->setPressed(pressed);
+        }
+    }
+
     // Check if Shift mode is active
     bool isShiftActive() const {
         return isButtonToggled(kShiftButton);
@@ -390,6 +397,17 @@ private:
                 isToggled_ = toggled;
                 repaint();
             }
+        }
+
+        void setPressed(bool pressed) {
+            if (isPressed_ != pressed) {
+                isPressed_ = pressed;
+                repaint();
+            }
+        }
+
+        bool isPressed() const {
+            return isPressed_;
         }
 
         void resized() override {

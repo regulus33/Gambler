@@ -15,7 +15,8 @@
  */
 class MidiUIUpdateCallbacks {
 public:
-    using UICallback = std::function<void()>;
+    // Callback signature: receives normalized value (0.0-1.0) or button state (0.0=off, 1.0=on)
+    using UICallback = std::function<void(float value)>;
 
     /**
      * Register a UI update callback for a specific control

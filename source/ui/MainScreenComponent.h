@@ -818,46 +818,43 @@ private:
     void setupMidiUICallbacks() {
         auto& callbacks = processorRef.getMidiUICallbacks();
 
-        // Roll button - repaint to show pressed state
-        callbacks.registerCallback(MidiControlId::BUTTON_ROLL, [this]() {
-            sequencerControls.repaint();
+        // Roll button - set pressed state (momentary button)
+        callbacks.registerCallback(MidiControlId::BUTTON_ROLL, [this](float value) {
+            bool pressed = (value > 0.5f);  // Convert to boolean
+            sequencerControls.setButtonPressed(SequencerControlsComponent::kRollButton, pressed);
         });
 
-        // Other sequencer control buttons - repaint for visual feedback
-        callbacks.registerCallback(MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE, [this]() {
-            sequencerControls.repaint();
-            sequencerSteps.repaint();
-        });
-
-        callbacks.registerCallback(MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW, [this]() {
-            sequencerControls.repaint();
-            sequencerSteps.repaint();
-        });
-
-        callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP, [this]() {
-            sequencerControls.repaint();
+        // Other sequencer control buttons - trigger visual update (momentary actions)
+        callbacks.registerCallback(MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE, [this](float value) {
             sequencerSteps.repaint();
             sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
         });
 
-        callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP, [this]() {
-            sequencerControls.repaint();
+        callbacks.registerCallback(MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW, [this](float value) {
+            sequencerSteps.repaint();
+        });
+
+        callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP, [this](float value) {
             sequencerSteps.repaint();
             sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
         });
 
-        callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL, [this]() {
-            sequencerControls.repaint();
+        callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP, [this](float value) {
+            sequencerSteps.repaint();
+            sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+        });
+
+        callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL, [this](float value) {
             sequencerSteps.repaint();
         });
 
-        callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE, [this]() {
-            sequencerControls.repaint();
+        callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE, [this](float value) {
             sequencerSteps.repaint();
         });
 
-        callbacks.registerCallback(MidiControlId::BUTTON_SHIFT, [this]() {
-            sequencerControls.repaint();
+        callbacks.registerCallback(MidiControlId::BUTTON_SHIFT, [this](float value) {
+            bool toggled = (value > 0.5f);
+            sequencerControls.setButtonToggled(SequencerControlsComponent::kShiftButton, toggled);
         });
     }
 

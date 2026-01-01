@@ -905,7 +905,11 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
                     getSequence().setIsRandom(isNoteOnOrCCPositive);
                     DBG("  → Roll " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
                 },
-                uiCallback  // UI update callback (e.g., button visual feedback)
+                [uiCallback, isNoteOnOrCCPositive]() {
+                    if (uiCallback) {
+                        uiCallback(isNoteOnOrCCPositive ? 1.0f : 0.0f);  // Pass button state
+                    }
+                }
             ));
             break;
         }
