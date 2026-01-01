@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../backend/Sequence.h"
+#include "../backend/SequenceState.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <array>
 
@@ -238,6 +239,52 @@ public:
                 } else {
                     // Normal step - show note color
                     int midiNote = step.getStepNotes().getCurrentNote().getNoteNumber();
+                    int chromaticNote = midiNote % 12;
+                    squareStates[row][col].color = getNoteColor (chromaticNote);
+                }
+            } else {
+                // Step is outside bounds - show darker grey
+                squareStates[row][col].color = juce::Colour (outOfBoundsGreyHex);
+            }
+
+            // Set border for playback position
+            squareStates[row][col].hasBorder = (stepIndex == playbackStep);
+
+            // Set selected state for editing position (white fill)
+            squareStates[row][col].isSelected = (stepIndex == selectedStep);
+        }
+
+        repaint();
+    }
+
+    /**
+     * Update the grid from a SequenceState object (APVTS-backed)
+     * - Each square shows the note color for that step
+     * - Steps outside the sequence length are shown in grey
+     * - The current playback step has a white border
+     * - The selected step for editing has a white fill
+     * @param state The SequenceState to display
+     * @param playbackStep The current playback position (-1 if not playing)
+     */
+    void updateFromState (SequenceState& state, int playbackStep = -1) {
+        using namespace SequenceGridConstants;
+
+        int sequenceLength = state.getLength();
+        int selectedStep = state.getSelectedStepForEditing();
+
+        for (int stepIndex = 0; stepIndex < 64; ++stepIndex) {
+            int row = stepIndex / gridCols;  // 0-7
+            int col = stepIndex % gridCols;  // 0-7
+
+            if (stepIndex < sequenceLength) {
+                // Step is within bounds
+                // Check if this step's current note is a rest (-1)
+                if (state.stepHasRest(stepIndex)) {
+                    // Step is a rest - show grey
+                    squareStates[row][col].color = juce::Colour (defaultGreyHex);
+                } else {
+                    // Normal step - show note color
+                    int midiNote = state.getCurrentNoteForStep(stepIndex);
                     int chromaticNote = midiNote % 12;
                     squareStates[row][col].color = getNoteColor (chromaticNote);
                 }

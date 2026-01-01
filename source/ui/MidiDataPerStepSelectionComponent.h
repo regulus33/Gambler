@@ -230,25 +230,22 @@ public:
      */
     void updateFromSequence()
     {
-        auto& seq = processorRef.getSequence();
-        int selectedStep = seq.getSelectedStepForEditing();
+        auto& state = processorRef.getState();
+        int selectedStep = state.getSelectedStepForEditing();
 
-        const auto& stepMods = seq.getStep(selectedStep).getStepModulations();
-
-        // Update all 7 lanes
+        // Update all 7 lanes from SequenceState
         for (int i = 0; i < 7; ++i) {
-            const auto& mod = stepMods.getModulation(i);
-
             // Update ComboBox selection (CC number)
-            int ccNumber = mod.getCCNumber();
+            int ccNumber = state.getStepModCCNum(selectedStep, i);
             dummyDropdowns[i]->setSelectedId(ccNumber + 1, juce::dontSendNotification);
 
             // Update slider value (0-127 to 0.0-1.0)
-            float normalizedValue = mod.getValue() / 127.0f;
+            int value = state.getStepModValue(selectedStep, i);
+            float normalizedValue = static_cast<float>(value) / 127.0f;
             sliders[i]->setValue(normalizedValue);
 
             // Update lane enabled state (selected)
-            bool isSelected = mod.isSelected();
+            bool isSelected = state.getStepModSelected(selectedStep, i);
             laneEnabled[i] = isSelected;
             const float alpha = isSelected ? 1.0f : 0.3f;
             dummyDropdowns[i]->setAlpha(alpha);

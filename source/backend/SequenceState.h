@@ -174,6 +174,13 @@ public:
         return getStepNote(stepIndex, substepIdx);
     }
 
+    /**
+     * Check if a step's current note is a rest (-1)
+     */
+    bool stepHasRest(int stepIndex) const {
+        return getCurrentNoteForStep(stepIndex) < 0;
+    }
+
     // ========================================
     // STEP MODULATIONS
     // ========================================
@@ -287,6 +294,17 @@ public:
 
     void setScaleRangeMax(int max) {
         setIntParam(Params::Keys::ID::SCALE_RANGE_MAX, juce::jlimit(0, 127, max));
+    }
+
+    /**
+     * Get a Scale object populated from the current state
+     */
+    Scale getScale() const {
+        Scale scale;
+        scale.setScaleNotes(getScaleNotes());
+        scale.setRangeMin(getScaleRangeMin());
+        scale.setRangeMax(getScaleRangeMax());
+        return scale;
     }
 
     /**

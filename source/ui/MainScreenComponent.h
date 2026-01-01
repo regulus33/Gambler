@@ -65,7 +65,7 @@ class MainScreenComponent : public juce::Component {
 public:
     explicit MainScreenComponent(PluginProcessor& processor)
         : processorRef(processor),
-          sequencerSteps(processor.getSequence()),
+          sequencerSteps(processor),
           midiDataPerStep(processor),
           mainControls(processor)
     {
@@ -84,8 +84,8 @@ public:
         // Add piano roll component (visible by default)
         addAndMakeVisible(pianoRoll);
 
-        // Initialize piano roll with the current scale from the sequence
-        pianoRoll.setScale(processorRef.getSequence().getScale());
+        // Initialize piano roll with the current scale from the state
+        pianoRoll.setScale(processorRef.getState().getScale());
 
         // Setup callback for scale changes - update backend Scale when user toggles notes
         pianoRoll.onNoteChanged = [this]() {
@@ -131,9 +131,9 @@ public:
         // Wire up note controls callbacks to update the selected step's note
         mainControls.getNoteControls().onNoteChanged = [this](int pitchClass) {
             // Calculate the new note for MIDI preview (before command executes)
-            auto& seq = processorRef.getSequence();
-            int selectedStep = seq.getSelectedStepForEditing();
-            int currentNote = seq.getStep(selectedStep).getStepNotes().getCurrentNote().getNoteNumber();
+            auto& state = processorRef.getState();
+            int selectedStep = state.getSelectedStepForEditing();
+            int currentNote = state.getCurrentNoteForStep(selectedStep);
             int currentOctave = currentNote / 12;
             int newNote = currentOctave * 12 + pitchClass;
 
@@ -153,8 +153,7 @@ public:
                     sequencerSteps.repaint();
 
                     // Update sequence overview grid to reflect the note color change
-                    auto& seq = processorRef.getSequence();
-                    sequenceOverview.getSequenceGrid().updateFromSequence(seq, seq.getCurrentIndex());
+                    sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
 
                     // Update subsequence bar to reflect the note color change
                     updateSubsequenceBar();
@@ -170,9 +169,9 @@ public:
 
         mainControls.getNoteControls().onOctaveChanged = [this](int octaveIndex) {
             // Calculate the new note for MIDI preview (before command executes)
-            auto& seq = processorRef.getSequence();
-            int selectedStep = seq.getSelectedStepForEditing();
-            int currentNote = seq.getStep(selectedStep).getStepNotes().getCurrentNote().getNoteNumber();
+            auto& state = processorRef.getState();
+            int selectedStep = state.getSelectedStepForEditing();
+            int currentNote = state.getCurrentNoteForStep(selectedStep);
             int pitchClass = currentNote % 12;
             int newNote = octaveIndex * 12 + pitchClass;
 
@@ -192,8 +191,7 @@ public:
                     sequencerSteps.repaint();
 
                     // Update sequence overview grid to reflect the note color change
-                    auto& seq = processorRef.getSequence();
-                    sequenceOverview.getSequenceGrid().updateFromSequence(seq, seq.getCurrentIndex());
+                    sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
 
                     // Update subsequence bar to reflect the note color change
                     updateSubsequenceBar();
@@ -223,11 +221,11 @@ public:
             setSequencerWindow(windowStart);
 
             // Set the clicked step as the selected step for editing
-            processorRef.getSequence().setSelectedStepForEditing(stepIndex);
+            processorRef.getState().setSelectedStepForEditing(stepIndex);
             sequencerSteps.setSelectedStep(stepIndex);
 
             // Update the sequence grid to show the new selection
-            sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
 
             // Update the MIDI data per step component to show the selected step's data
             midiDataPerStep.updateFromSequence();
@@ -299,11 +297,8 @@ public:
         sequencerSteps.setActiveStep(stepIndex);
 
         if (stepIndex >= 0 && stepIndex < 64) {
-            // Get the note from this step in the sequence
-            const auto& step = processorRef.getSequence().getStep(stepIndex);
-            const auto& stepNotes = step.getStepNotes();
-            const auto& currentNote = stepNotes.getCurrentNote();
-            int midiNote = currentNote.getNoteNumber();
+            // Get the note from this step in the sequence state
+            int midiNote = processorRef.getState().getCurrentNoteForStep(stepIndex);
 
             // Calculate chromatic note (0-11) for piano roll
             int chromaticNote = midiNote % 12;
@@ -321,12 +316,11 @@ public:
 
     // Helper to update the subsequence bar UI from selected step's StepNotes
     void updateSubsequenceBar() {
-        auto& seq = processorRef.getSequence();
-        int selectedStep = seq.getSelectedStepForEditing();
+        auto& state = processorRef.getState();
+        int selectedStep = state.getSelectedStepForEditing();
 
-        const auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
-        int length = stepNotes.getLength();
-        int currentSubstepIndex = stepNotes.getCurrentIndex();
+        int length = state.getStepNotesLength(selectedStep);
+        int currentSubstepIndex = state.getStepNotesCurrentIndex(selectedStep);
 
         auto& bar = subsequenceControls.getSubsequenceBar();
 
@@ -334,7 +328,7 @@ public:
         for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
             if (i < length) {
                 // Active substep - color based on note value
-                int midiNote = stepNotes.getNote(i).getNoteNumber();
+                int midiNote = state.getStepNote(selectedStep, i);
                 int chromaticNote = midiNote % 12;
                 juce::Colour noteColor = MusicConstants::NOTE_COLOURS[chromaticNote];
                 bool isCurrentSubstep = (i == currentSubstepIndex);
@@ -350,15 +344,13 @@ public:
 
     // Update UI from sequence state (called from async update)
     void updateFromSequence() {
-        auto& seq = processorRef.getSequence();
-        int currentStep = seq.getCurrentIndex();
-        int selectedStep = seq.getSelectedStepForEditing();
+        auto& state = processorRef.getState();
+        int currentStep = state.getCurrentIndex();
+        int selectedStep = state.getSelectedStepForEditing();
 
         // If followPlayback is enabled, update the selected step to match playback position
         if (processorRef.getUserPreferences().followPlayback && currentStep >= 0) {
-            processorRef.queueCommand(ProcessorCommand([this, currentStep]() {
-                processorRef.getSequence().setSelectedStepForEditing(currentStep);
-            }));
+            state.setSelectedStepForEditing(currentStep);
             selectedStep = currentStep; // Update local copy for UI rendering
         }
 
@@ -383,13 +375,11 @@ public:
         sequencerControls.repaint();
 
         // Update the note range gauge to highlight the current playing note
-        const auto& step = seq.getStep(currentStep);
-        int currentNote = step.getStepNotes().getCurrentNote().getNoteNumber();
+        int currentNote = state.getCurrentNoteForStep(currentStep);
         noteRangeControls.setActiveNote(currentNote);
 
         // Get the selected step's note for editing controls (may be different from playback position)
-        const auto& selectedStepObj = seq.getStep(selectedStep);
-        int selectedNote = selectedStepObj.getStepNotes().getCurrentNote().getNoteNumber();
+        int selectedNote = state.getCurrentNoteForStep(selectedStep);
 
         // Update the note/octave controls to reflect the selected step's note
         mainControls.getNoteControls().setFromMidiNote(selectedNote);
@@ -397,13 +387,13 @@ public:
         // Update the sequence overview grid to show all 64 steps
         // - Border indicates playback position (currentStep)
         // - White fill indicates selected step for editing (selectedStep)
-        sequenceOverview.getSequenceGrid().updateFromSequence(seq, currentStep);
+        sequenceOverview.getSequenceGrid().updateFromState(state, currentStep);
 
         // Update the subsequence bar to reflect selected step's substep state
         updateSubsequenceBar();
 
         // Update the probability gauge to highlight the randomly selected circle (if roll is engaged)
-        int lastProbabilityIndex = seq.getLastProbabilityIndex();
+        int lastProbabilityIndex = state.getLastProbabilityIndex();
         auto& probabilityGauge = mainControls.getProbabilityControls().getProbabilityGauge();
         probabilityGauge.highlightCircle(lastProbabilityIndex);
     }
@@ -551,7 +541,7 @@ private:
                             },
                             [this]() {
                                 sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
                                 subsequenceControls.repaint();
                             }
                         ));
@@ -582,7 +572,7 @@ private:
                             },
                             [this]() {
                                 sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
                                 updateSubsequenceBar();
                             }
                         ));
@@ -610,7 +600,7 @@ private:
                             },
                             [this]() {
                                 sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
                                 updateSubsequenceBar();
                             }
                         ));
@@ -623,7 +613,7 @@ private:
                             },
                             [this]() {
                                 sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
                             }
                         ));
                     }
@@ -640,7 +630,7 @@ private:
                             },
                             [this]() {
                                 sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
                                 updateSubsequenceBar();
                             }
                         ));
@@ -653,7 +643,7 @@ private:
                             },
                             [this]() {
                                 sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
                             }
                         ));
                     }
@@ -671,7 +661,7 @@ private:
                             },
                             [this]() {
                                 sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
                                 updateSubsequenceBar();
                             }
                         ));
@@ -683,7 +673,7 @@ private:
                                 DBG("Nudge left");
                             },
                             [this]() {
-                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
                             }
                         ));
                     }
@@ -721,7 +711,7 @@ private:
                             },
                             [this]() {
                                 sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
                                 updateSubsequenceBar();
                             }
                         ));
@@ -733,7 +723,7 @@ private:
                                 DBG("Nudge right");
                             },
                             [this]() {
-                                sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
                             }
                         ));
                     }
@@ -776,17 +766,15 @@ private:
 
         // Initialize note range controls with current scale range
         noteRangeControls.setRange(
-            processorRef.getSequence().getScale().getRangeMin(),
-            processorRef.getSequence().getScale().getRangeMax());
+            processorRef.getState().getScaleRangeMin(),
+            processorRef.getState().getScaleRangeMax());
 
         // Wire up note range callback to update backend Scale
         noteRangeControls.onRangeChanged = [this](int minNote, int maxNote) {
-            processorRef.queueCommand(ProcessorCommand([this, minNote, maxNote]() {
-                auto& scale = processorRef.getSequence().getScale();
-                scale.setRangeMin(minNote);
-                scale.setRangeMax(maxNote);
-                DBG("Note range changed: " << minNote << " - " << maxNote);
-            }));
+            // Update state directly (thread-safe via APVTS)
+            processorRef.getState().setScaleRangeMin(minNote);
+            processorRef.getState().setScaleRangeMax(maxNote);
+            DBG("Note range changed: " << minNote << " - " << maxNote);
         };
     }
 
@@ -827,7 +815,7 @@ private:
         // Other sequencer control buttons - trigger visual update (momentary actions)
         callbacks.registerCallback(MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE, [this](float value) {
             sequencerSteps.repaint();
-            sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
         });
 
         callbacks.registerCallback(MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW, [this](float value) {
@@ -836,12 +824,12 @@ private:
 
         callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP, [this](float value) {
             sequencerSteps.repaint();
-            sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
         });
 
         callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP, [this](float value) {
             sequencerSteps.repaint();
-            sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
         });
 
         callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL, [this](float value) {

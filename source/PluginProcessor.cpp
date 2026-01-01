@@ -276,6 +276,10 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         int note = state.tick();
         int currentStepIndex = state.getCurrentIndex();
 
+        // Sync legacy Sequence object for UI compatibility (temporary bridge)
+        // The UI still reads from getSequence() so we need to keep it in sync
+        sequence.setCurrentIndex(currentStepIndex);
+
         DBG("Clock tick! Step: " << currentStepIndex << ", Note: " << note);
 
         if (note >= 0) {

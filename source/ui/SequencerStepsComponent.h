@@ -1,9 +1,12 @@
 #pragma once
 
-#include "../backend/Sequence.h"
+#include "../PluginProcessor.h"
 #include "BinaryData.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "SequenceGrid.h"
+
+// Forward declaration
+class PluginProcessor;
 
 namespace SequencerStepsConstants {
     // Component size
@@ -35,7 +38,7 @@ namespace SequencerStepsConstants {
  */
 class SequencerStepsComponent : public juce::Component {
 public:
-    SequencerStepsComponent(const Sequence& seq) : sequence(seq) {
+    explicit SequencerStepsComponent(PluginProcessor& processor) : processorRef(processor) {
         using namespace SequencerStepsConstants;
 
         // Load Inter font from binary data
@@ -127,6 +130,9 @@ private:
     void drawStep (juce::Graphics& g, int visibleIndex, int stepIndex, float stepSizeParam, float gapParam) {
         using namespace SequencerStepsConstants;
 
+        // Get state from APVTS
+        auto& state = processorRef.getState();
+
         // Calculate step bounds
         float x = visibleIndex * (stepSizeParam + gapParam);
         float y = 0.0f;
@@ -134,7 +140,7 @@ private:
         juce::Rectangle<float> stepBounds (x, y, stepSizeParam, stepSizeParam);
 
         // Check if this step is within the active sequence length
-        bool isWithinSequence = stepIndex < sequence.getLength();
+        bool isWithinSequence = stepIndex < state.getLength();
 
         // Check if this is the active step (playback position, only if within sequence)
         bool isActive = isWithinSequence && (stepIndex == activeStepIndex);
@@ -143,11 +149,11 @@ private:
         bool isSelected = (stepIndex == selectedStepIndex);
 
         if (isWithinSequence) {
-            // Get the note for this step
-            const auto& step = sequence.getStep(stepIndex);
-
             // Check if this step's current note is a rest (-1)
-            bool isRest = step.getStepNotes().hasRest();
+            bool isRest = state.stepHasRest(stepIndex);
+
+            // Get the current note for this step
+            int midiNote = state.getCurrentNoteForStep(stepIndex);
 
             // Determine the fill color
             juce::Colour fillColor;
@@ -159,9 +165,6 @@ private:
                 fillColor = juce::Colour (SequenceGridConstants::defaultGreyHex);
             } else {
                 // Normal step - note color fill
-                const auto& stepNotes = step.getStepNotes();
-                const auto& currentNote = stepNotes.getCurrentNote();
-                int midiNote = currentNote.getNoteNumber();
                 int chromaticNote = midiNote % 12;
                 fillColor = getNoteColor (chromaticNote);
             }
@@ -181,10 +184,6 @@ private:
 
             // Draw note text (only for non-rest steps)
             if (!isRest) {
-                const auto& stepNotes = step.getStepNotes();
-                const auto& currentNote = stepNotes.getCurrentNote();
-                int midiNote = currentNote.getNoteNumber();
-
                 // Convert MIDI note to note name (e.g., "C4", "Gb3")
                 juce::String noteText = midiNoteToNoteName (midiNote);
 
@@ -280,7 +279,7 @@ private:
     }
 
     juce::Typeface::Ptr interFont;
-    const Sequence& sequence; // Reference to the processor's sequence (always live data)
+    PluginProcessor& processorRef; // Reference to the processor for state access
     int activeStepIndex = -1; // -1 means no active step (playback position), 0-63 for sequence steps
     int selectedStepIndex = 0; // Which step is selected for editing (0-63)
     int windowStartIndex = 0; // Which step is at the left edge of the window (0-56)
