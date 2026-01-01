@@ -128,6 +128,16 @@ public:
         };
         addAndMakeVisible(followPlaybackToggle);
 
+        // Setup Clear MIDI Mappings button
+        clearMidiMappingsButton.setButtonText("Clear MIDI Mappings");
+        clearMidiMappingsButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFFFF9800)); // Orange
+        clearMidiMappingsButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
+        clearMidiMappingsButton.onClick = [this] {
+            if (onClearMidiMappings)
+                onClearMidiMappings();
+        };
+        addAndMakeVisible(clearMidiMappingsButton);
+
         // Setup note length slider
         noteLengthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
         noteLengthSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false,
@@ -229,6 +239,13 @@ public:
         // Follow playback checkbox row
         auto followPlaybackRow = contentArea.removeFromTop(controlHeight);
         followPlaybackToggle.setBounds(followPlaybackRow);
+
+        contentArea.removeFromTop(controlSpacing * 2);  // Extra spacing before button
+
+        // Clear MIDI Mappings button row
+        auto clearMidiRow = contentArea.removeFromTop(controlHeight);
+        constexpr int clearButtonWidth = 200;
+        clearMidiMappingsButton.setBounds(clearMidiRow.removeFromLeft(clearButtonWidth));
     }
 
     // Accessors for navbar
@@ -243,6 +260,7 @@ public:
     std::function<void(bool)> onPreviewNotesChanged;
     std::function<void(bool)> onFollowStepChanged;
     std::function<void(bool)> onFollowPlaybackChanged;
+    std::function<void()> onClearMidiMappings;
 
     // Accessors for current values
     bool isInternalClockEnabled() const { return internalClockToggle.getToggleState(); }
@@ -283,5 +301,6 @@ private:
     juce::ToggleButton previewNotesToggle;
     juce::ToggleButton followStepToggle;
     juce::ToggleButton followPlaybackToggle;
+    juce::TextButton clearMidiMappingsButton;
 };
 

@@ -210,6 +210,17 @@ private:
                 DBG("Follow playback: " + juce::String(enabled ? "enabled" : "disabled"));
             };
 
+            // Clear MIDI Mappings button callback
+            settingsScreen->onClearMidiMappings = [this]() {
+                processorRef.queueCommand(ProcessorCommand([this]() {
+                    processorRef.getMidiLearnRegistry().clearUserMappings();
+                    DBG("Cleared all user MIDI mappings");
+                }, [this]() {
+                    // Trigger UI update to refresh overlay text
+                    mainScreen.repaint();
+                }));
+            };
+
             addAndMakeVisible(*settingsScreen);
             settingsScreen->setBounds(getLocalBounds());
         }

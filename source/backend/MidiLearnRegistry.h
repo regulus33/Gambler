@@ -227,6 +227,16 @@ public:
     }
 
     /**
+     * Clear all user mappings (debug/reset function)
+     */
+    void clearUserMappings() {
+        int count = static_cast<int>(userMappings.size());
+        userMappings.clear();
+        controlToMidi.clear();
+        DBG("Cleared " << count << " user MIDI mappings");
+    }
+
+    /**
      * Clear all user mappings
      */
     void clearAllMappings() {
