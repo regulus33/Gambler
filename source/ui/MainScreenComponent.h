@@ -65,9 +65,13 @@ class MainScreenComponent : public juce::Component {
 public:
     explicit MainScreenComponent(PluginProcessor& processor)
         : processorRef(processor),
+          pianoRoll(processor),
           sequencerSteps(processor),
           midiDataPerStep(processor),
-          mainControls(processor)
+          mainControls(processor),
+          sequenceOverview(processor),
+          subsequenceControls(processor),
+          noteRangeControls(processor)
     {
         // Add navbar
         addAndMakeVisible(navBar);
@@ -92,14 +96,11 @@ public:
             // Get the scale from the piano roll
             Scale newScale = pianoRoll.getScale();
 
-            // Queue command to update the sequence's scale and quantize all notes
-            processorRef.queueCommand(ProcessorCommand([this, newScale]() {
-                auto& seq = processorRef.getSequence();
-                seq.getScale().setScaleNotes(newScale.getScaleNotes());
-                // Quantize all existing notes to the new scale
-                seq.quantizeAllNotesToScale();
-                DBG("Piano roll scale changed - updated backend Scale and quantized all notes");
-            }));
+            // Update scale via APVTS-backed state (thread-safe, no command queue needed)
+            auto& state = processorRef.getState();
+            state.setScaleNotes(newScale.getScaleNotes());
+            state.quantizeAllNotesToScale();
+            DBG("Piano roll scale changed - updated backend Scale and quantized all notes");
 
             // Update the note controls to only show selected scale notes
             auto selectedIndices = pianoRoll.getSelectedNoteIndices();
@@ -130,37 +131,18 @@ public:
 
         // Wire up note controls callbacks to update the selected step's note
         mainControls.getNoteControls().onNoteChanged = [this](int pitchClass) {
-            // Calculate the new note for MIDI preview (before command executes)
+            // Calculate the new note
             auto& state = processorRef.getState();
             int selectedStep = state.getSelectedStepForEditing();
             int currentNote = state.getCurrentNoteForStep(selectedStep);
             int currentOctave = currentNote / 12;
             int newNote = currentOctave * 12 + pitchClass;
 
-            // Queue command to modify state on audio thread, with completion callback for UI updates
-            processorRef.queueCommand(ProcessorCommand(
-                // Command: runs on audio thread
-                [this, pitchClass, newNote]() {
-                    auto& seq = processorRef.getSequence();
-                    int selectedStep = seq.getSelectedStepForEditing();
-                    auto& step = seq.getStep(selectedStep);
-                    step.updateCurrentNoteNumber(newNote);
-                    DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote);
-                },
-                // Completion callback: runs on message thread after command executes
-                [this]() {
-                    // Repaint UI after state has been updated
-                    sequencerSteps.repaint();
+            // Update via APVTS-backed state (thread-safe)
+            state.updateCurrentNoteForStep(selectedStep, newNote);
+            DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote);
 
-                    // Update sequence overview grid to reflect the note color change
-                    sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-
-                    // Update subsequence bar to reflect the note color change
-                    updateSubsequenceBar();
-                }
-            ));
-
-            // Trigger MIDI preview if enabled - pass the new note directly to avoid race condition
+            // Trigger MIDI preview if enabled
             bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
             if (previewEnabled) {
                 processorRef.triggerCurrentStepMidi(newNote);
@@ -168,37 +150,18 @@ public:
         };
 
         mainControls.getNoteControls().onOctaveChanged = [this](int octaveIndex) {
-            // Calculate the new note for MIDI preview (before command executes)
+            // Calculate the new note
             auto& state = processorRef.getState();
             int selectedStep = state.getSelectedStepForEditing();
             int currentNote = state.getCurrentNoteForStep(selectedStep);
             int pitchClass = currentNote % 12;
             int newNote = octaveIndex * 12 + pitchClass;
 
-            // Queue command to modify state on audio thread, with completion callback for UI updates
-            processorRef.queueCommand(ProcessorCommand(
-                // Command: runs on audio thread
-                [this, octaveIndex, newNote]() {
-                    auto& seq = processorRef.getSequence();
-                    int selectedStep = seq.getSelectedStepForEditing();
-                    auto& step = seq.getStep(selectedStep);
-                    step.updateCurrentNoteNumber(newNote);
-                    DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote);
-                },
-                // Completion callback: runs on message thread after command executes
-                [this]() {
-                    // Repaint UI after state has been updated
-                    sequencerSteps.repaint();
+            // Update via APVTS-backed state (thread-safe)
+            state.updateCurrentNoteForStep(selectedStep, newNote);
+            DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote);
 
-                    // Update sequence overview grid to reflect the note color change
-                    sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-
-                    // Update subsequence bar to reflect the note color change
-                    updateSubsequenceBar();
-                }
-            ));
-
-            // Trigger MIDI preview if enabled - pass the new note directly to avoid race condition
+            // Trigger MIDI preview if enabled
             bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
             if (previewEnabled) {
                 processorRef.triggerCurrentStepMidi(newNote);
@@ -409,65 +372,45 @@ private:
         // Setup callbacks for subsequence controls
         subsequenceControls.onBarClicked = [this](int index) {
             // Queue command to modify state on audio thread, with completion callback for UI update
-            processorRef.queueCommand(ProcessorCommand(
-                // Command: runs on audio thread
-                [this, index]() {
-                    auto& seq = processorRef.getSequence();
-                    int selectedStep = seq.getSelectedStepForEditing();
+            // Update via APVTS-backed state (thread-safe)
+            auto& state = processorRef.getState();
+            int selectedStep = state.getSelectedStepForEditing();
+            int substepLength = state.getStepNotesLength(selectedStep);
 
-                    auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
+            // Only allow clicking on active substeps (within length)
+            if (index < substepLength) {
+                state.setStepNotesCurrentIndex(selectedStep, index);
+                DBG("Substep " + juce::String(index) + " selected");
 
-                    // Only allow clicking on active substeps (within length)
-                    if (index < stepNotes.getLength()) {
-                        stepNotes.setCurrentIndex(index);
-                        DBG("Substep " + juce::String(index) + " selected");
-                    }
-                },
-                // Completion callback: runs on message thread after command executes
-                [this]() {
-                    updateSubsequenceBar();
-
-                    auto& seq = processorRef.getSequence();
-                    int selectedStep = seq.getSelectedStepForEditing();
-                    auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
-                    int midiNote = stepNotes.getCurrentNote().getNoteNumber();
-                    int chromaticNote = midiNote % 12;
-                    pianoRoll.setActiveNote(chromaticNote);
-                    mainControls.getNoteControls().setFromMidiNote(midiNote);
-                }
-            ));
+                // Update UI
+                updateSubsequenceBar();
+                int midiNote = state.getCurrentNoteForStep(selectedStep);
+                int chromaticNote = midiNote % 12;
+                pianoRoll.setActiveNote(chromaticNote);
+                mainControls.getNoteControls().setFromMidiNote(midiNote);
+            }
         };
         subsequenceControls.onMinusClicked = [this]() {
-            processorRef.queueCommand(ProcessorCommand(
-                // Command: runs on audio thread
-                [this]() {
-                    auto& seq = processorRef.getSequence();
-                    int selectedStep = seq.getSelectedStepForEditing();
-                    auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
-                    stepNotes.decreaseLength();
-                    DBG("Subsequence length decreased to: " + juce::String(stepNotes.getLength()));
-                },
-                // Completion callback: runs on message thread after command executes
-                [this]() {
-                    updateSubsequenceBar();
-                }
-            ));
+            // Update via APVTS-backed state (thread-safe)
+            auto& state = processorRef.getState();
+            int selectedStep = state.getSelectedStepForEditing();
+            int currentLength = state.getStepNotesLength(selectedStep);
+            if (currentLength > 1) {
+                state.setStepNotesLength(selectedStep, currentLength - 1);
+                DBG("Subsequence length decreased to: " + juce::String(currentLength - 1));
+                updateSubsequenceBar();
+            }
         };
         subsequenceControls.onPlusClicked = [this]() {
-            processorRef.queueCommand(ProcessorCommand(
-                // Command: runs on audio thread
-                [this]() {
-                    auto& seq = processorRef.getSequence();
-                    int selectedStep = seq.getSelectedStepForEditing();
-                    auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
-                    stepNotes.increaseLength();
-                    DBG("Subsequence length increased to: " + juce::String(stepNotes.getLength()));
-                },
-                // Completion callback: runs on message thread after command executes
-                [this]() {
-                    updateSubsequenceBar();
-                }
-            ));
+            // Update via APVTS-backed state (thread-safe)
+            auto& state = processorRef.getState();
+            int selectedStep = state.getSelectedStepForEditing();
+            int currentLength = state.getStepNotesLength(selectedStep);
+            if (currentLength < ParamConstants::MAX_SUBSTEPS) {
+                state.setStepNotesLength(selectedStep, currentLength + 1);
+                DBG("Subsequence length increased to: " + juce::String(currentLength + 1));
+                updateSubsequenceBar();
+            }
         };
     }
 
@@ -504,47 +447,32 @@ private:
         // Button indices: 0=Roll, 1=Page<-, 2=Page->, 3=Length+, 4=Length-, 5=Nudge<-, 6=Nudge->, 7=Shift
         sequencerControls.onButtonClicked = [this](int buttonIndex) {
             bool isShifted = sequencerControls.isShiftActive();
+            auto& state = processorRef.getState();
 
             switch (buttonIndex) {
                 case 0:  // Roll - momentary: enable random mode while held (no UI update needed)
-                    processorRef.queueCommand(ProcessorCommand([this]() {
-                        processorRef.getSequence().setIsRandom(true);
-                        DBG("Roll pressed - random mode ON");
-                    }));
+                    state.setIsRandom(true);
+                    DBG("Roll pressed - random mode ON");
                     break;
                 case 1:  // Page <- OR Duplicate (when shifted)
                     if (isShifted) {
                         // Duplicate: copy entire sequence content, doubling length (capped at 64)
-                        processorRef.queueCommand(ProcessorCommand(
-                            [this]() {
-                                auto& seq = processorRef.getSequence();
-                                int currentLength = seq.getLength();
-                                int newLength = juce::jmin(currentLength * 2, Sequence::MAX_STEPS);
-                                int stepsToCopy = newLength - currentLength;  // How many steps we can actually copy
+                        int currentLength = state.getLength();
+                        int newLength = juce::jmin(currentLength * 2, ParamConstants::MAX_STEPS);
+                        int stepsToCopy = newLength - currentLength;
 
-                                // Copy steps from beginning to after current end
-                                for (int i = 0; i < stepsToCopy; i++) {
-                                    int srcIdx = i;
-                                    int dstIdx = currentLength + i;
-                                    auto& srcStep = seq.getStep(srcIdx);
-                                    auto& dstStep = seq.getStep(dstIdx);
-                                    auto& srcNotes = srcStep.getStepNotes();
-                                    auto& dstNotes = dstStep.getStepNotes();
-                                    dstNotes.setLength(srcNotes.getLength());
-                                    for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
-                                        dstNotes.setNote(n, srcNotes.getNote(n).getNoteNumber());
-                                    }
-                                }
-                                // Update sequence length
-                                seq.setLength(newLength);
-                                DBG("Duplicated sequence: " + juce::String(currentLength) + " -> " + juce::String(newLength) + " steps");
-                            },
-                            [this]() {
-                                sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-                                subsequenceControls.repaint();
+                        // Copy steps from beginning to after current end
+                        for (int i = 0; i < stepsToCopy; i++) {
+                            int srcIdx = i;
+                            int dstIdx = currentLength + i;
+                            state.setStepNotesLength(dstIdx, state.getStepNotesLength(srcIdx));
+                            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                                state.setStepNote(dstIdx, n, state.getStepNote(srcIdx, n));
                             }
-                        ));
+                        }
+                        // Update sequence length
+                        state.setLength(newLength);
+                        DBG("Duplicated sequence: " + juce::String(currentLength) + " -> " + juce::String(newLength) + " steps");
                     } else {
                         // Normal: Page left
                         int currentWindow = sequencerSteps.getWindowStart();
@@ -557,25 +485,13 @@ private:
                     if (isShifted) {
                         // Clear: set all steps in current window to rest
                         int windowStart = sequencerSteps.getWindowStart();
-                        processorRef.queueCommand(ProcessorCommand(
-                            [this, windowStart]() {
-                                auto& seq = processorRef.getSequence();
-                                for (int i = 0; i < 8; i++) {
-                                    int stepIdx = windowStart + i;
-                                    auto& stepNotes = seq.getStep(stepIdx).getStepNotes();
-                                    // Set all substeps to rest (-1)
-                                    for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
-                                        stepNotes.setNote(n, -1);
-                                    }
-                                }
-                                DBG("Cleared window starting at " + juce::String(windowStart));
-                            },
-                            [this]() {
-                                sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-                                updateSubsequenceBar();
+                        for (int i = 0; i < 8; i++) {
+                            int stepIdx = windowStart + i;
+                            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                                state.setStepNote(stepIdx, n, -1);
                             }
-                        ));
+                        }
+                        DBG("Cleared window starting at " + juce::String(windowStart));
                     } else {
                         // Normal: Page right
                         int currentWindow = sequencerSteps.getWindowStart();
@@ -587,158 +503,80 @@ private:
                 case 3:  // Length + OR Clear Step (when shifted)
                     if (isShifted) {
                         // Clear Step: set current step to rest
-                        processorRef.queueCommand(ProcessorCommand(
-                            [this]() {
-                                auto& seq = processorRef.getSequence();
-                                int selectedStep = seq.getSelectedStepForEditing();
-                                auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
-                                // Set all substeps to rest (-1)
-                                for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
-                                    stepNotes.setNote(n, -1);
-                                }
-                                DBG("Cleared step " + juce::String(selectedStep));
-                            },
-                            [this]() {
-                                sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-                                updateSubsequenceBar();
-                            }
-                        ));
+                        int selectedStep = state.getSelectedStepForEditing();
+                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                            state.setStepNote(selectedStep, n, -1);
+                        }
+                        DBG("Cleared step " + juce::String(selectedStep));
                     } else {
                         // Normal: Length +
-                        processorRef.queueCommand(ProcessorCommand(
-                            [this]() {
-                                processorRef.getSequence().increaseLength();
-                                DBG("Length increased to: " + juce::String(processorRef.getSequence().getLength()));
-                            },
-                            [this]() {
-                                sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-                            }
-                        ));
+                        state.increaseLength();
                     }
                     break;
                 case 4:  // Length - OR Step Randomize (when shifted)
                     if (isShifted) {
                         // Step: randomize current step's note
-                        processorRef.queueCommand(ProcessorCommand(
-                            [this]() {
-                                auto& seq = processorRef.getSequence();
-                                int selectedStep = seq.getSelectedStepForEditing();
-                                seq.getStep(selectedStep).randomizeNote(seq.getScale());
-                                DBG("Randomized step " + juce::String(selectedStep));
-                            },
-                            [this]() {
-                                sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-                                updateSubsequenceBar();
-                            }
-                        ));
+                        int selectedStep = state.getSelectedStepForEditing();
+                        state.randomizeStepNote(selectedStep);
+                        DBG("Randomized step " + juce::String(selectedStep));
                     } else {
                         // Normal: Length -
-                        processorRef.queueCommand(ProcessorCommand(
-                            [this]() {
-                                processorRef.getSequence().decreaseLength();
-                                DBG("Length decreased to: " + juce::String(processorRef.getSequence().getLength()));
-                            },
-                            [this]() {
-                                sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-                            }
-                        ));
+                        state.decreaseLength();
+                        DBG("Length decreased to: " + juce::String(state.getLength()));
                     }
                     break;
                 case 5:  // Nudge <- OR All Randomize (when shifted)
                     if (isShifted) {
                         // All: randomize all steps everywhere
-                        processorRef.queueCommand(ProcessorCommand(
-                            [this]() {
-                                auto& seq = processorRef.getSequence();
-                                for (int i = 0; i < Sequence::MAX_STEPS; i++) {
-                                    seq.getStep(i).randomizeNote(seq.getScale());
-                                }
-                                DBG("Randomized all steps");
-                            },
-                            [this]() {
-                                sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-                                updateSubsequenceBar();
-                            }
-                        ));
+                        for (int i = 0; i < ParamConstants::MAX_STEPS; i++) {
+                            state.randomizeStepNote(i);
+                        }
+                        DBG("Randomized all steps");
                     } else {
                         // Normal: Nudge left
-                        processorRef.queueCommand(ProcessorCommand(
-                            [this]() {
-                                processorRef.getSequence().nudgeLeft();
-                                DBG("Nudge left");
-                            },
-                            [this]() {
-                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-                            }
-                        ));
+                        state.nudgeLeft();
+                        DBG("Nudge left");
                     }
                     break;
                 case 6:  // Nudge -> OR Shuffle (when shifted)
                     if (isShifted) {
                         // Shuffle: randomly rearrange all steps in the sequence
-                        processorRef.queueCommand(ProcessorCommand(
-                            [this]() {
-                                auto& seq = processorRef.getSequence();
-                                int len = seq.getLength();
-                                // Fisher-Yates shuffle on the step notes
-                                static std::random_device rd;
-                                static std::mt19937 gen(rd());
-                                for (int i = len - 1; i > 0; i--) {
-                                    std::uniform_int_distribution<> dis(0, i);
-                                    int j = dis(gen);
-                                    // Swap steps i and j by swapping their note data
-                                    auto& stepI = seq.getStep(i).getStepNotes();
-                                    auto& stepJ = seq.getStep(j).getStepNotes();
-                                    // Swap lengths
-                                    int lenI = stepI.getLength();
-                                    int lenJ = stepJ.getLength();
-                                    stepI.setLength(lenJ);
-                                    stepJ.setLength(lenI);
-                                    // Swap all notes
-                                    for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
-                                        int noteI = stepI.getNote(n).getNoteNumber();
-                                        int noteJ = stepJ.getNote(n).getNoteNumber();
-                                        stepI.setNote(n, noteJ);
-                                        stepJ.setNote(n, noteI);
-                                    }
-                                }
-                                DBG("Shuffled all steps");
-                            },
-                            [this]() {
-                                sequencerSteps.repaint();
-                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-                                updateSubsequenceBar();
+                        int len = state.getLength();
+                        // Fisher-Yates shuffle on the step notes
+                        static std::random_device rd;
+                        static std::mt19937 gen(rd());
+                        for (int i = len - 1; i > 0; i--) {
+                            std::uniform_int_distribution<> dis(0, i);
+                            int j = dis(gen);
+                            // Swap steps i and j by swapping their note data
+                            // Save step i data
+                            int lenI = state.getStepNotesLength(i);
+                            std::array<int, ParamConstants::MAX_SUBSTEPS> notesI;
+                            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                                notesI[n] = state.getStepNote(i, n);
                             }
-                        ));
+                            // Copy j to i
+                            state.setStepNotesLength(i, state.getStepNotesLength(j));
+                            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                                state.setStepNote(i, n, state.getStepNote(j, n));
+                            }
+                            // Copy saved i to j
+                            state.setStepNotesLength(j, lenI);
+                            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                                state.setStepNote(j, n, notesI[n]);
+                            }
+                        }
+                        DBG("Shuffled all steps");
                     } else {
                         // Normal: Nudge right
-                        processorRef.queueCommand(ProcessorCommand(
-                            [this]() {
-                                processorRef.getSequence().nudgeRight();
-                                DBG("Nudge right");
-                            },
-                            [this]() {
-                                sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-                            }
-                        ));
+                        state.nudgeRight();
+                        DBG("Nudge right");
                     }
                     break;
                 case 7:  // Shift - toggle shift mode
-                    processorRef.queueCommand(ProcessorCommand(
-                        [this]() {
-                            auto& seq = processorRef.getSequence();
-                            seq.setIsShift(!seq.getIsShift());
-                            DBG("Shift mode: " + juce::String(seq.getIsShift() ? "ON" : "OFF"));
-                        },
-                        [this]() {
-                            sequencerControls.setButtonToggled(7, processorRef.getSequence().getIsShift());
-                        }
-                    ));
+                    state.setIsShift(!state.getIsShift());
+                    sequencerControls.setButtonToggled(7, state.getIsShift());
+                    DBG("Shift mode: " + juce::String(state.getIsShift() ? "ON" : "OFF"));
                     break;
                 default:
                     break;
@@ -749,10 +587,8 @@ private:
         sequencerControls.onButtonReleased = [this](int buttonIndex) {
             switch (buttonIndex) {
                 case 0:  // Roll - disable random mode when released
-                    processorRef.queueCommand(ProcessorCommand([this]() {
-                        processorRef.getSequence().setIsRandom(false);
-                        DBG("Roll released - random mode OFF");
-                    }));
+                    processorRef.getState().setIsRandom(false);
+                    DBG("Roll released - random mode OFF");
                     break;
                 default:
                     break;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BinaryData.h"
+#include "StateListenerComponent.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace NoteRangeControlsConstants {
@@ -148,10 +149,15 @@ private:
  *
  * Panel displayed to the right of the sequencer steps/controls.
  * Contains controls for note range settings (min/max range sliders).
+ *
+ * Observer Pattern:
+ * - Listens to scale range parameters (rangeMin, rangeMax)
+ * - Automatically updates UI when range parameters change
  */
-class NoteRangeControlsComponent : public juce::Component {
+class NoteRangeControlsComponent : public StateListenerComponent {
 public:
-    NoteRangeControlsComponent() {
+    explicit NoteRangeControlsComponent(PluginProcessor& processor)
+        : StateListenerComponent(processor) {
         // Load Inter 24pt Bold static font (designed for medium display sizes)
         interBoldFont = juce::Typeface::createSystemTypefaceFor (
             BinaryData::Inter_24ptBold_ttf,
@@ -177,6 +183,9 @@ public:
 
         // Setup range gauge
         addAndMakeVisible (rangeGauge);
+
+        // Subscribe to scale range parameters
+        listenToScaleRange();
     }
 
     /**
@@ -282,6 +291,21 @@ public:
         int gaugeWidth = halfWidth - (rangeBarHorizontalMargin * 2);
         int gaugeHeight = getHeight() - (rangeBarVerticalMargin * 2);
         rangeGauge.setBounds (gaugeX, gaugeY, gaugeWidth, gaugeHeight);
+    }
+
+protected:
+    /**
+     * Called on message thread when any subscribed parameter changes.
+     * Updates the sliders and gauge to reflect the current range state.
+     */
+    void onStateChanged() override {
+        auto& state = getState();
+        int minNote = state.getScaleRangeMin();
+        int maxNote = state.getScaleRangeMax();
+
+        minRangeSlider.setValue(static_cast<double>(minNote), juce::dontSendNotification);
+        maxRangeSlider.setValue(static_cast<double>(maxNote), juce::dontSendNotification);
+        rangeGauge.setRange(minNote, maxNote);
     }
 
 private:

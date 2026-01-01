@@ -40,9 +40,6 @@ PluginProcessor::PluginProcessor()
     clock.setBpm(120.0);
     clock.setSubdivision(Subdivision::SIXTEENTH);
 
-    // Random mode is off by default (enabled when Roll button is held)
-    sequence.setIsRandom(false);
-
     // Open first available MIDI output device for standalone mode
     auto midiOutputs = juce::MidiOutput::getAvailableDevices();
     if (!midiOutputs.isEmpty()) {
@@ -276,10 +273,6 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         int note = state.tick();
         int currentStepIndex = state.getCurrentIndex();
 
-        // Sync legacy Sequence object for UI compatibility (temporary bridge)
-        // The UI still reads from getSequence() so we need to keep it in sync
-        sequence.setCurrentIndex(currentStepIndex);
-
         DBG("Clock tick! Step: " << currentStepIndex << ", Note: " << note);
 
         if (note >= 0) {
@@ -379,12 +372,9 @@ void PluginProcessor::getStateInformation (juce::MemoryBlock& destData) {
     // Create root XML element to hold all state
     auto rootXml = std::make_unique<juce::XmlElement>("GamblerState");
 
-    // Save APVTS parameters (UI control states)
+    // Save APVTS parameters (contains all sequence data now)
     auto apvtsXml = apvts.copyState().createXml();
     rootXml->addChildElement(apvtsXml.release());
-
-    // Save Sequence data (all 64 steps with notes, velocities, gates, modulations, etc.)
-    rootXml->addChildElement(sequence.toXml().release());
 
     // Save Clock settings (mode, BPM, subdivision)
     rootXml->addChildElement(clock.toXml().release());
@@ -395,7 +385,7 @@ void PluginProcessor::getStateInformation (juce::MemoryBlock& destData) {
     // Convert to binary and save
     copyXmlToBinary(*rootXml, destData);
 
-    DBG("State saved: Sequence, Clock, and UserPreferences");
+    DBG("State saved: APVTS (sequence data), Clock, and UserPreferences");
 }
 
 void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
@@ -407,16 +397,10 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
         if (rootXml->hasTagName("GamblerState")) {
             DBG("Loading state: GamblerState format");
 
-            // Load APVTS parameters
+            // Load APVTS parameters (contains all sequence data)
             if (auto* apvtsXml = rootXml->getChildByName(apvts.state.getType())) {
                 apvts.replaceState(juce::ValueTree::fromXml(*apvtsXml));
-                DBG("  - APVTS loaded");
-            }
-
-            // Load Sequence data
-            if (auto* seqXml = rootXml->getChildByName("Sequence")) {
-                sequence.fromXml(*seqXml);
-                DBG("  - Sequence loaded");
+                DBG("  - APVTS loaded (sequence data included)");
             }
 
             // Load Clock settings
@@ -463,18 +447,25 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
 void PluginProcessor::triggerStepMidi(int stepIndex) {
     if (stepIndex < 0 || stepIndex >= 64) return;
 
-    // Queue command to set the selected step for editing (thread-safe)
-    queueCommand(ProcessorCommand([this, stepIndex]() {
-        sequence.setSelectedStepForEditing(stepIndex);
-    }));
+    auto& state = getState();
 
-    // Get the note for this step
-    const auto& step = sequence.getStep(stepIndex);
-    int note = step.getStepNotes().getCurrentNote().getNoteNumber();
+    // Set the selected step for editing via APVTS (thread-safe)
+    state.setSelectedStepForEditing(stepIndex);
 
-    // Get step modulations
-    const auto& stepMods = step.getStepModulations();
-    auto selectedMods = stepMods.getSelectedModulations();
+    // Get the note for this step from APVTS-backed state
+    int note = state.getCurrentNoteForStep(stepIndex);
+
+    // Get step modulations from APVTS-backed state
+    std::vector<StepModulation> selectedMods;
+    for (int i = 0; i < ParamConstants::NUM_MODULATIONS; i++) {
+        if (state.getStepModSelected(stepIndex, i)) {
+            StepModulation mod;
+            mod.setType(static_cast<ModulationType>(state.getStepModType(stepIndex, i)));
+            mod.setCCNumber(state.getStepModCCNum(stepIndex, i));
+            mod.setValue(state.getStepModValue(stepIndex, i));
+            selectedMods.push_back(mod);
+        }
+    }
 
     // Determine velocity (default to 100 if no velocity modulation is selected)
     juce::uint8 velocity = 100;
@@ -549,16 +540,25 @@ void PluginProcessor::triggerCurrentStepMidi(int noteOverride) {
     DBG("  midiOutput is " << (midiOutput ? "VALID" : "NULL"));
     DBG("  noteOverride: " << noteOverride);
 
-    int selectedStep = sequence.getSelectedStepForEditing();
+    auto& state = getState();
+
+    int selectedStep = state.getSelectedStepForEditing();
     if (selectedStep < 0 || selectedStep >= 64) {
         DBG("  ERROR: Invalid selected step: " << selectedStep);
         return;
     }
 
-    // Get step modulations
-    const auto& step = sequence.getStep(selectedStep);
-    const auto& stepMods = step.getStepModulations();
-    auto selectedMods = stepMods.getSelectedModulations();
+    // Get step modulations from APVTS-backed state
+    std::vector<StepModulation> selectedMods;
+    for (int i = 0; i < ParamConstants::NUM_MODULATIONS; i++) {
+        if (state.getStepModSelected(selectedStep, i)) {
+            StepModulation mod;
+            mod.setType(static_cast<ModulationType>(state.getStepModType(selectedStep, i)));
+            mod.setCCNumber(state.getStepModCCNum(selectedStep, i));
+            mod.setValue(state.getStepModValue(selectedStep, i));
+            selectedMods.push_back(mod);
+        }
+    }
 
     // Determine velocity (default to 100 if no velocity modulation is selected)
     juce::uint8 velocity = 100;
@@ -575,7 +575,7 @@ void PluginProcessor::triggerCurrentStepMidi(int noteOverride) {
         note = noteOverride;
         DBG("  Using override note: " << note);
     } else {
-        note = step.getStepNotes().getCurrentNote().getNoteNumber();
+        note = state.getCurrentNoteForStep(selectedStep);
         DBG("  Selected step: " << selectedStep << ", Note from step: " << note);
     }
 
@@ -647,12 +647,9 @@ std::unique_ptr<juce::XmlElement> PluginProcessor::getStateAsXml() {
     // Create root XML element to hold all state (same format as getStateInformation)
     auto rootXml = std::make_unique<juce::XmlElement>("GamblerState");
 
-    // Save APVTS parameters (UI control states)
+    // Save APVTS parameters (contains all sequence data)
     auto apvtsXml = apvts.copyState().createXml();
     rootXml->addChildElement(apvtsXml.release());
-
-    // Save Sequence data (all 64 steps with notes, velocities, gates, modulations, etc.)
-    rootXml->addChildElement(sequence.toXml().release());
 
     // Save Clock settings (mode, BPM, subdivision)
     rootXml->addChildElement(clock.toXml().release());
@@ -674,10 +671,10 @@ void PluginProcessor::loadStateFromXml(const juce::XmlElement& xml) {
 
     DBG("Loading preset state from XML");
 
-    // Load APVTS parameters
+    // Load APVTS parameters (contains all sequence data)
     if (auto* apvtsXml = xml.getChildByName(apvts.state.getType())) {
         apvts.replaceState(juce::ValueTree::fromXml(*apvtsXml));
-        DBG("  - APVTS loaded");
+        DBG("  - APVTS loaded (sequence data included)");
     }
 
     // Queue command to load domain state on audio thread
@@ -686,12 +683,6 @@ void PluginProcessor::loadStateFromXml(const juce::XmlElement& xml) {
 
     queueCommand(ProcessorCommand(
         [this, xmlCopy]() {
-            // Load Sequence data
-            if (auto* seqXml = xmlCopy->getChildByName("Sequence")) {
-                sequence.fromXml(*seqXml);
-                DBG("  - Sequence loaded");
-            }
-
             // Load Clock settings
             if (auto* clockXml = xmlCopy->getChildByName("Clock")) {
                 clock.fromXml(*clockXml);
@@ -831,6 +822,8 @@ void PluginProcessor::processMidiInput(const juce::MidiBuffer& midiMessages) {
 }
 
 void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValue, bool isNoteOnOrCCPositive) {
+    auto& state = getState();
+
     // Convert MIDI value using the mapping's conversion settings
     float normalizedValue = MidiValueConverter::midiToScaled(
         midiValue, mapping.minValue, mapping.maxValue, mapping.invert);
@@ -840,199 +833,127 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         // ========== OCTAVE SLIDER ==========
         case MidiControlId::OCTAVE_SLIDER: {
             int octaveIndex = MidiValueConverter::midiToDiscreteIndex(midiValue, 9);  // 0-9
-            queueCommand(ProcessorCommand(
-                [this, octaveIndex]() {
-                    auto& seq = getSequence();
-                    int selectedStep = seq.getSelectedStepForEditing();
-                    int currentNote = seq.getStep(selectedStep).getStepNotes().getCurrentNote().getNoteNumber();
-                    int pitchClass = currentNote % 12;
-                    int newNote = octaveIndex * 12 + pitchClass;
-                    seq.getStep(selectedStep).updateCurrentNoteNumber(newNote);
-                    DBG("  → Octave changed to " << octaveIndex << " (MIDI note " << newNote << ")");
-                },
-                [this]() {
-                    // Trigger UI refresh
-                    if (onSequenceTick) onSequenceTick();
-                }
-            ));
+            // Update via APVTS-backed state (thread-safe)
+            int selectedStep = state.getSelectedStepForEditing();
+            int currentNote = state.getCurrentNoteForStep(selectedStep);
+            int pitchClass = currentNote % 12;
+            int newNote = octaveIndex * 12 + pitchClass;
+            state.updateCurrentNoteForStep(selectedStep, newNote);
+            DBG("  → Octave changed to " << octaveIndex << " (MIDI note " << newNote << ")");
+            if (onSequenceTick) onSequenceTick();
             break;
         }
 
         // ========== NOTE SLIDER ==========
         case MidiControlId::NOTE_SLIDER: {
-            // Note slider is filtered to scale notes, so we need to map MIDI value to scale index
-            // For now, use a simple linear mapping (TODO: respect current scale)
             int pitchClass = MidiValueConverter::midiToDiscreteIndex(midiValue, 11);  // 0-11
-            queueCommand(ProcessorCommand(
-                [this, pitchClass]() {
-                    auto& seq = getSequence();
-                    int selectedStep = seq.getSelectedStepForEditing();
-                    int currentNote = seq.getStep(selectedStep).getStepNotes().getCurrentNote().getNoteNumber();
-                    int octave = currentNote / 12;
-                    int newNote = octave * 12 + pitchClass;
-                    seq.getStep(selectedStep).updateCurrentNoteNumber(newNote);
-                    DBG("  → Note changed to pitch class " << pitchClass << " (MIDI note " << newNote << ")");
-                },
-                [this]() {
-                    // Trigger UI refresh
-                    if (onSequenceTick) onSequenceTick();
-                }
-            ));
+            // Update via APVTS-backed state (thread-safe)
+            int selectedStep = state.getSelectedStepForEditing();
+            int currentNote = state.getCurrentNoteForStep(selectedStep);
+            int octave = currentNote / 12;
+            int newNote = octave * 12 + pitchClass;
+            state.updateCurrentNoteForStep(selectedStep, newNote);
+            DBG("  → Note changed to pitch class " << pitchClass << " (MIDI note " << newNote << ")");
+            if (onSequenceTick) onSequenceTick();
             break;
         }
 
         // ========== PROBABILITY SLIDER ==========
         case MidiControlId::PROBABILITY_SLIDER: {
             int percentage = static_cast<int>(normalizedValue * 100.0f);
-            queueCommand(ProcessorCommand(
-                [this, percentage]() {
-                    getSequence().setProbabilityPercentage(percentage);
-                    DBG("  → Probability changed to " << percentage << "%");
-                },
-                [this]() {
-                    // Trigger UI refresh
-                    if (onSequenceTick) onSequenceTick();
-                }
-            ));
+            state.setProbabilityPercentage(percentage);
+            DBG("  → Probability changed to " << percentage << "%");
+            if (onSequenceTick) onSequenceTick();
             break;
         }
 
         // ========== ROLL BUTTON (Momentary) ==========
         case MidiControlId::BUTTON_ROLL: {
             auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_ROLL);
-            queueCommand(ProcessorCommand(
-                [this, isNoteOnOrCCPositive]() {
-                    getSequence().setIsRandom(isNoteOnOrCCPositive);
-                    DBG("  → Roll " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-                },
-                [uiCallback, isNoteOnOrCCPositive]() {
-                    if (uiCallback) {
-                        uiCallback(isNoteOnOrCCPositive ? 1.0f : 0.0f);  // Pass button state
-                    }
-                }
-            ));
+            state.setIsRandom(isNoteOnOrCCPositive);
+            DBG("  → Roll " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (uiCallback) {
+                uiCallback(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+            }
             break;
         }
 
         // ========== SEQUENCER CONTROL BUTTONS ==========
         case MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE: {
-            if (isNoteOnOrCCPositive) {  // Only trigger on button press
+            if (isNoteOnOrCCPositive) {
                 auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE);
-                queueCommand(ProcessorCommand(
-                    [this]() {
-                        bool isShifted = getSequence().getIsShift();
-                        if (isShifted) {
-                            // Shifted: Duplicate sequence
-                            auto& seq = getSequence();
-                            int currentLength = seq.getLength();
-                            int newLength = juce::jmin(currentLength * 2, Sequence::MAX_STEPS);
-                            int stepsToCopy = newLength - currentLength;
+                bool isShifted = state.getIsShift();
+                if (isShifted) {
+                    // Shifted: Duplicate sequence
+                    int currentLength = state.getLength();
+                    int newLength = juce::jmin(currentLength * 2, ParamConstants::MAX_STEPS);
+                    int stepsToCopy = newLength - currentLength;
 
-                            for (int i = 0; i < stepsToCopy; i++) {
-                                int srcIdx = i;
-                                int dstIdx = currentLength + i;
-                                auto& srcStep = seq.getStep(srcIdx);
-                                auto& dstStep = seq.getStep(dstIdx);
-                                auto& srcNotes = srcStep.getStepNotes();
-                                auto& dstNotes = dstStep.getStepNotes();
-                                dstNotes.setLength(srcNotes.getLength());
-                                for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
-                                    dstNotes.setNote(n, srcNotes.getNote(n).getNoteNumber());
-                                }
-                            }
-                            seq.setLength(newLength);
-                            DBG("  → Duplicated sequence to " << newLength << " steps");
-                        } else {
-                            // Normal: Page left (handled by UI)
-                            DBG("  → Page left (UI only)");
-                        }
-                    },
-                    [uiCallback]() {
-                        if (uiCallback) {
-                            uiCallback(1.0f);  // Trigger action
+                    for (int i = 0; i < stepsToCopy; i++) {
+                        int srcIdx = i;
+                        int dstIdx = currentLength + i;
+                        state.setStepNotesLength(dstIdx, state.getStepNotesLength(srcIdx));
+                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                            state.setStepNote(dstIdx, n, state.getStepNote(srcIdx, n));
                         }
                     }
-                ));
+                    state.setLength(newLength);
+                    DBG("  → Duplicated sequence to " << newLength << " steps");
+                } else {
+                    DBG("  → Page left (UI only)");
+                }
+                if (uiCallback) uiCallback(1.0f);
             }
             break;
         }
 
         case MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP: {
-            if (isNoteOnOrCCPositive) {  // Only trigger on button press
+            if (isNoteOnOrCCPositive) {
                 auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP);
-                queueCommand(ProcessorCommand(
-                    [this]() {
-                        bool isShifted = getSequence().getIsShift();
-                        if (isShifted) {
-                            // Shifted: Clear current step
-                            auto& seq = getSequence();
-                            int selectedStep = seq.getSelectedStepForEditing();
-                            auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
-                            for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
-                                stepNotes.setNote(n, -1);
-                            }
-                            DBG("  → Cleared step " << selectedStep);
-                        } else {
-                            // Normal: Increase length
-                            getSequence().increaseLength();
-                            DBG("  → Length increased to " << getSequence().getLength());
-                        }
-                    },
-                    [uiCallback]() {
-                        if (uiCallback) {
-                            uiCallback(1.0f);
-                        }
+                bool isShifted = state.getIsShift();
+                if (isShifted) {
+                    // Shifted: Clear current step
+                    int selectedStep = state.getSelectedStepForEditing();
+                    for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                        state.setStepNote(selectedStep, n, -1);
                     }
-                ));
+                    DBG("  → Cleared step " << selectedStep);
+                } else {
+                    // Normal: Increase length
+                    state.increaseLength();
+                    DBG("  → Length increased to " << state.getLength());
+                }
+                if (uiCallback) uiCallback(1.0f);
             }
             break;
         }
 
         case MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP: {
-            if (isNoteOnOrCCPositive) {  // Only trigger on button press
+            if (isNoteOnOrCCPositive) {
                 auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP);
-                queueCommand(ProcessorCommand(
-                    [this]() {
-                        bool isShifted = getSequence().getIsShift();
-                        if (isShifted) {
-                            // Shifted: Randomize current step
-                            auto& seq = getSequence();
-                            int selectedStep = seq.getSelectedStepForEditing();
-                            seq.getStep(selectedStep).randomizeNote(seq.getScale());
-                            DBG("  → Randomized step " << selectedStep);
-                        } else {
-                            // Normal: Decrease length
-                            getSequence().decreaseLength();
-                            DBG("  → Length decreased to " << getSequence().getLength());
-                        }
-                    },
-                    [uiCallback]() {
-                        if (uiCallback) {
-                            uiCallback(1.0f);
-                        }
-                    }
-                ));
+                bool isShifted = state.getIsShift();
+                if (isShifted) {
+                    // Shifted: Randomize current step
+                    int selectedStep = state.getSelectedStepForEditing();
+                    state.randomizeStepNote(selectedStep);
+                    DBG("  → Randomized step " << selectedStep);
+                } else {
+                    // Normal: Decrease length
+                    state.decreaseLength();
+                    DBG("  → Length decreased to " << state.getLength());
+                }
+                if (uiCallback) uiCallback(1.0f);
             }
             break;
         }
 
         case MidiControlId::BUTTON_SHIFT: {
-            if (isNoteOnOrCCPositive) {  // Only trigger on button press
+            if (isNoteOnOrCCPositive) {
                 auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_SHIFT);
-                queueCommand(ProcessorCommand(
-                    [this]() {
-                        auto& seq = getSequence();
-                        bool newShiftState = !seq.getIsShift();
-                        seq.setIsShift(newShiftState);
-                        DBG("  → Shift " << (newShiftState ? "ON" : "OFF"));
-                    },
-                    [uiCallback, this]() {
-                        if (uiCallback) {
-                            bool shiftState = getSequence().getIsShift();
-                            uiCallback(shiftState ? 1.0f : 0.0f);
-                        }
-                    }
-                ));
+                bool newShiftState = !state.getIsShift();
+                state.setIsShift(newShiftState);
+                DBG("  → Shift " << (newShiftState ? "ON" : "OFF"));
+                if (uiCallback) uiCallback(newShiftState ? 1.0f : 0.0f);
             }
             break;
         }
@@ -1046,16 +967,9 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::STEP_5:
         case MidiControlId::STEP_6:
         case MidiControlId::STEP_7: {
-            if (isNoteOnOrCCPositive) {  // Only trigger on button press
-                // Calculate step index within current window
+            if (isNoteOnOrCCPositive) {
                 int localStepIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::STEP_0);
-                queueCommand(ProcessorCommand(
-                    [this, localStepIndex]() {
-                        // For now, trigger step 0-7 directly (TODO: respect window position)
-                        DBG("  → Step " << localStepIndex << " clicked");
-                        // This would trigger MIDI preview in the full implementation
-                    }
-                ));
+                DBG("  → Step " << localStepIndex << " clicked");
             }
             break;
         }
@@ -1063,36 +977,26 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         // ========== SUBSEQUENCE CONTROLS ==========
         case MidiControlId::SUBSEQ_MINUS: {
             if (isNoteOnOrCCPositive) {
-                queueCommand(ProcessorCommand(
-                    [this]() {
-                        auto& seq = getSequence();
-                        int selectedStep = seq.getSelectedStepForEditing();
-                        auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
-                        stepNotes.decreaseLength();
-                        DBG("  → Substep length decreased to " << stepNotes.getLength());
-                    },
-                    [this]() {
-                        if (onSequenceTick) onSequenceTick();
-                    }
-                ));
+                int selectedStep = state.getSelectedStepForEditing();
+                int currentLength = state.getStepNotesLength(selectedStep);
+                if (currentLength > 1) {
+                    state.setStepNotesLength(selectedStep, currentLength - 1);
+                    DBG("  → Substep length decreased to " << (currentLength - 1));
+                }
+                if (onSequenceTick) onSequenceTick();
             }
             break;
         }
 
         case MidiControlId::SUBSEQ_PLUS: {
             if (isNoteOnOrCCPositive) {
-                queueCommand(ProcessorCommand(
-                    [this]() {
-                        auto& seq = getSequence();
-                        int selectedStep = seq.getSelectedStepForEditing();
-                        auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
-                        stepNotes.increaseLength();
-                        DBG("  → Substep length increased to " << stepNotes.getLength());
-                    },
-                    [this]() {
-                        if (onSequenceTick) onSequenceTick();
-                    }
-                ));
+                int selectedStep = state.getSelectedStepForEditing();
+                int currentLength = state.getStepNotesLength(selectedStep);
+                if (currentLength < ParamConstants::MAX_SUBSTEPS) {
+                    state.setStepNotesLength(selectedStep, currentLength + 1);
+                    DBG("  → Substep length increased to " << (currentLength + 1));
+                }
+                if (onSequenceTick) onSequenceTick();
             }
             break;
         }
@@ -1107,20 +1011,13 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::SUBSEQ_BAR_7: {
             if (isNoteOnOrCCPositive) {
                 int barIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::SUBSEQ_BAR_0);
-                queueCommand(ProcessorCommand(
-                    [this, barIndex]() {
-                        auto& seq = getSequence();
-                        int selectedStep = seq.getSelectedStepForEditing();
-                        auto& stepNotes = seq.getStep(selectedStep).getStepNotes();
-                        if (barIndex < stepNotes.getLength()) {
-                            stepNotes.setCurrentIndex(barIndex);
-                            DBG("  → Substep " << barIndex << " selected");
-                        }
-                    },
-                    [this]() {
-                        if (onSequenceTick) onSequenceTick();
-                    }
-                ));
+                int selectedStep = state.getSelectedStepForEditing();
+                int substepLength = state.getStepNotesLength(selectedStep);
+                if (barIndex < substepLength) {
+                    state.setStepNotesCurrentIndex(selectedStep, barIndex);
+                    DBG("  → Substep " << barIndex << " selected");
+                }
+                if (onSequenceTick) onSequenceTick();
             }
             break;
         }
@@ -1128,29 +1025,17 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         // ========== NOTE RANGE CONTROLS ==========
         case MidiControlId::NOTE_RANGE_MIN: {
             int minNote = MidiValueConverter::midiToDiscreteIndex(midiValue, 127);
-            queueCommand(ProcessorCommand(
-                [this, minNote]() {
-                    getSequence().getScale().setRangeMin(minNote);
-                    DBG("  → Note range min set to " << minNote);
-                },
-                [this]() {
-                    if (onSequenceTick) onSequenceTick();
-                }
-            ));
+            state.setScaleRangeMin(minNote);
+            DBG("  → Note range min set to " << minNote);
+            if (onSequenceTick) onSequenceTick();
             break;
         }
 
         case MidiControlId::NOTE_RANGE_MAX: {
             int maxNote = MidiValueConverter::midiToDiscreteIndex(midiValue, 127);
-            queueCommand(ProcessorCommand(
-                [this, maxNote]() {
-                    getSequence().getScale().setRangeMax(maxNote);
-                    DBG("  → Note range max set to " << maxNote);
-                },
-                [this]() {
-                    if (onSequenceTick) onSequenceTick();
-                }
-            ));
+            state.setScaleRangeMax(maxNote);
+            DBG("  → Note range max set to " << maxNote);
+            if (onSequenceTick) onSequenceTick();
             break;
         }
 
@@ -1164,22 +1049,12 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::CC_LANE_6_VALUE: {
             int laneIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::CC_LANE_0_VALUE);
             int ccValue = static_cast<int>(normalizedValue * 127.0f);
-            queueCommand(ProcessorCommand(
-                [this, laneIndex, ccValue]() {
-                    auto& seq = getSequence();
-                    int selectedStep = seq.getSelectedStepForEditing();
-                    auto& mods = seq.getStep(selectedStep).getStepModulations();
-                    // Only set value if lane index is within bounds
-                    if (laneIndex >= 0 && laneIndex < 7) {
-                        auto& mod = mods.getModulation(laneIndex);
-                        mod.setValue(ccValue);
-                        DBG("  → CC Lane " << laneIndex << " value set to " << ccValue);
-                    }
-                },
-                [this]() {
-                    if (onSequenceTick) onSequenceTick();
-                }
-            ));
+            if (laneIndex >= 0 && laneIndex < ParamConstants::NUM_MODULATIONS) {
+                int selectedStep = state.getSelectedStepForEditing();
+                state.setStepModValue(selectedStep, laneIndex, ccValue);
+                DBG("  → CC Lane " << laneIndex << " value set to " << ccValue);
+            }
+            if (onSequenceTick) onSequenceTick();
             break;
         }
 
@@ -1196,33 +1071,24 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::SCALE_NOTE_A:
         case MidiControlId::SCALE_NOTE_Bb:
         case MidiControlId::SCALE_NOTE_B: {
-            if (isNoteOnOrCCPositive) {  // Only trigger on button press
+            if (isNoteOnOrCCPositive) {
                 int noteIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::SCALE_NOTE_C);
-                queueCommand(ProcessorCommand(
-                    [this, noteIndex]() {
-                        auto& scale = getSequence().getScale();
-                        // Toggle the scale note
-                        bool currentState = scale.getScaleNotes()[noteIndex];
+                bool currentState = state.getScaleNote(noteIndex);
 
-                        // Only toggle if there's more than one note in the scale
-                        int activeNotes = 0;
-                        for (int i = 0; i < 12; i++) {
-                            if (scale.getScaleNotes()[i]) activeNotes++;
-                        }
+                // Only toggle if there's more than one note in the scale
+                int activeNotes = 0;
+                for (int i = 0; i < 12; i++) {
+                    if (state.getScaleNote(i)) activeNotes++;
+                }
 
-                        if (activeNotes > 1 || !currentState) {
-                            scale.setScaleNote(noteIndex, !currentState);
-                            // Quantize all notes to the new scale
-                            getSequence().quantizeAllNotesToScale();
-                            DBG("  → Scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
-                        } else {
-                            DBG("  → Cannot disable last scale note");
-                        }
-                    },
-                    [this]() {
-                        if (onSequenceTick) onSequenceTick();
-                    }
-                ));
+                if (activeNotes > 1 || !currentState) {
+                    state.setScaleNote(noteIndex, !currentState);
+                    state.quantizeAllNotesToScale();
+                    DBG("  → Scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
+                } else {
+                    DBG("  → Cannot disable last scale note");
+                }
+                if (onSequenceTick) onSequenceTick();
             }
             break;
         }
@@ -1231,23 +1097,13 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW: {
             if (isNoteOnOrCCPositive) {
                 auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW);
-                queueCommand(ProcessorCommand(
-                    [this]() {
-                        bool isShifted = getSequence().getIsShift();
-                        if (isShifted) {
-                            // Shifted: Clear window (handled by UI - would need window position)
-                            DBG("  → Clear window (UI only)");
-                        } else {
-                            // Normal: Page right (handled by UI)
-                            DBG("  → Page right (UI only)");
-                        }
-                    },
-                    [uiCallback]() {
-                        if (uiCallback) {
-                            uiCallback(1.0f);
-                        }
-                    }
-                ));
+                bool isShifted = state.getIsShift();
+                if (isShifted) {
+                    DBG("  → Clear window (UI only)");
+                } else {
+                    DBG("  → Page right (UI only)");
+                }
+                if (uiCallback) uiCallback(1.0f);
             }
             break;
         }
@@ -1255,28 +1111,19 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL: {
             if (isNoteOnOrCCPositive) {
                 auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL);
-                queueCommand(ProcessorCommand(
-                    [this]() {
-                        bool isShifted = getSequence().getIsShift();
-                        if (isShifted) {
-                            // Shifted: Randomize all steps
-                            auto& seq = getSequence();
-                            for (int i = 0; i < Sequence::MAX_STEPS; i++) {
-                                seq.getStep(i).randomizeNote(seq.getScale());
-                            }
-                            DBG("  → Randomized all steps");
-                        } else {
-                            // Normal: Nudge left
-                            getSequence().nudgeLeft();
-                            DBG("  → Nudged left");
-                        }
-                    },
-                    [uiCallback]() {
-                        if (uiCallback) {
-                            uiCallback(1.0f);
-                        }
+                bool isShifted = state.getIsShift();
+                if (isShifted) {
+                    // Shifted: Randomize all steps
+                    for (int i = 0; i < ParamConstants::MAX_STEPS; i++) {
+                        state.randomizeStepNote(i);
                     }
-                ));
+                    DBG("  → Randomized all steps");
+                } else {
+                    // Normal: Nudge left
+                    state.nudgeLeft();
+                    DBG("  → Nudged left");
+                }
+                if (uiCallback) uiCallback(1.0f);
             }
             break;
         }
@@ -1284,48 +1131,39 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE: {
             if (isNoteOnOrCCPositive) {
                 auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE);
-                queueCommand(ProcessorCommand(
-                    [this]() {
-                        bool isShifted = getSequence().getIsShift();
-                        if (isShifted) {
-                            // Shifted: Shuffle all steps
-                            auto& seq = getSequence();
-                            int len = seq.getLength();
-                            // Fisher-Yates shuffle
-                            static std::random_device rd;
-                            static std::mt19937 gen(rd());
-                            for (int i = len - 1; i > 0; i--) {
-                                std::uniform_int_distribution<> dis(0, i);
-                                int j = dis(gen);
-                                // Swap steps i and j
-                                auto& stepI = seq.getStep(i).getStepNotes();
-                                auto& stepJ = seq.getStep(j).getStepNotes();
-                                // Swap lengths
-                                int lenI = stepI.getLength();
-                                int lenJ = stepJ.getLength();
-                                stepI.setLength(lenJ);
-                                stepJ.setLength(lenI);
-                                // Swap all notes
-                                for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
-                                    int noteI = stepI.getNote(n).getNoteNumber();
-                                    int noteJ = stepJ.getNote(n).getNoteNumber();
-                                    stepI.setNote(n, noteJ);
-                                    stepJ.setNote(n, noteI);
-                                }
-                            }
-                            DBG("  → Shuffled all steps");
-                        } else {
-                            // Normal: Nudge right
-                            getSequence().nudgeRight();
-                            DBG("  → Nudged right");
+                bool isShifted = state.getIsShift();
+                if (isShifted) {
+                    // Shifted: Shuffle all steps
+                    int len = state.getLength();
+                    static std::random_device rd;
+                    static std::mt19937 gen(rd());
+                    for (int i = len - 1; i > 0; i--) {
+                        std::uniform_int_distribution<> dis(0, i);
+                        int j = dis(gen);
+                        // Swap steps i and j
+                        int lenI = state.getStepNotesLength(i);
+                        std::array<int, ParamConstants::MAX_SUBSTEPS> notesI;
+                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                            notesI[n] = state.getStepNote(i, n);
                         }
-                    },
-                    [uiCallback]() {
-                        if (uiCallback) {
-                            uiCallback(1.0f);
+                        // Copy j to i
+                        state.setStepNotesLength(i, state.getStepNotesLength(j));
+                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                            state.setStepNote(i, n, state.getStepNote(j, n));
+                        }
+                        // Copy saved i to j
+                        state.setStepNotesLength(j, lenI);
+                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                            state.setStepNote(j, n, notesI[n]);
                         }
                     }
-                ));
+                    DBG("  → Shuffled all steps");
+                } else {
+                    // Normal: Nudge right
+                    state.nudgeRight();
+                    DBG("  → Nudged right");
+                }
+                if (uiCallback) uiCallback(1.0f);
             }
             break;
         }
@@ -1340,22 +1178,13 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::CC_LANE_6_TOGGLE: {
             if (isNoteOnOrCCPositive) {
                 int laneIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::CC_LANE_0_TOGGLE);
-                queueCommand(ProcessorCommand(
-                    [this, laneIndex]() {
-                        auto& seq = getSequence();
-                        int selectedStep = seq.getSelectedStepForEditing();
-                        auto& mods = seq.getStep(selectedStep).getStepModulations();
-                        if (laneIndex >= 0 && laneIndex < 7) {
-                            auto& mod = mods.getModulation(laneIndex);
-                            // Toggle selection
-                            mod.setSelected(!mod.isSelected());
-                            DBG("  → CC Lane " << laneIndex << " toggled " << (mod.isSelected() ? "ON" : "OFF"));
-                        }
-                    },
-                    [this]() {
-                        if (onSequenceTick) onSequenceTick();
-                    }
-                ));
+                if (laneIndex >= 0 && laneIndex < ParamConstants::NUM_MODULATIONS) {
+                    int selectedStep = state.getSelectedStepForEditing();
+                    bool currentSelected = state.getStepModSelected(selectedStep, laneIndex);
+                    state.setStepModSelected(selectedStep, laneIndex, !currentSelected);
+                    DBG("  → CC Lane " << laneIndex << " toggled to " << (!currentSelected ? "ON" : "OFF"));
+                }
+                if (onSequenceTick) onSequenceTick();
             }
             break;
         }
@@ -1395,17 +1224,9 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::GRID_STEP_62: case MidiControlId::GRID_STEP_63: {
             if (isNoteOnOrCCPositive) {
                 int gridStepIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::GRID_STEP_0);
-                queueCommand(ProcessorCommand(
-                    [this, gridStepIndex]() {
-                        // Set this as the selected step for editing
-                        getSequence().setSelectedStepForEditing(gridStepIndex);
-                        DBG("  → Grid step " << gridStepIndex << " selected for editing");
-                        // Note: Window navigation would be handled by UI in full implementation
-                    },
-                    [this]() {
-                        if (onSequenceTick) onSequenceTick();
-                    }
-                ));
+                state.setSelectedStepForEditing(gridStepIndex);
+                DBG("  → Grid step " << gridStepIndex << " selected for editing");
+                if (onSequenceTick) onSequenceTick();
             }
             break;
         }

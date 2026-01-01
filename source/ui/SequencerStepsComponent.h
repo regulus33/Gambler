@@ -4,6 +4,7 @@
 #include "BinaryData.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "SequenceGrid.h"
+#include "StateListenerComponent.h"
 
 // Forward declaration
 class PluginProcessor;
@@ -35,16 +36,29 @@ namespace SequencerStepsConstants {
  * - Active step indicator: black circle (40px diameter) with white text
  *
  * The window can be moved through the sequence to view different sections.
+ *
+ * Observer Pattern:
+ * - Listens to all step note parameters (64 steps × 8 substeps)
+ * - Listens to sequence metadata (length, currentIndex, selectedStep)
+ * - Automatically repaints when any subscribed parameter changes
  */
-class SequencerStepsComponent : public juce::Component {
+class SequencerStepsComponent : public StateListenerComponent {
 public:
-    explicit SequencerStepsComponent(PluginProcessor& processor) : processorRef(processor) {
+    explicit SequencerStepsComponent(PluginProcessor& processor)
+        : StateListenerComponent(processor) {
         using namespace SequencerStepsConstants;
 
         // Load Inter font from binary data
         interFont = juce::Typeface::createSystemTypefaceFor (
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
+
+        // Subscribe to all step note parameters (we display any of the 64 steps)
+        listenToStepNotes(0, 63);
+        listenToStepNotesLength(0, 63);
+
+        // Subscribe to sequence metadata
+        listenToSequenceMetadata();
 
         setSize (componentWidth, componentHeight);
     }
@@ -69,12 +83,11 @@ public:
 
     /**
      * Set which step is currently active (0-63, or -1 for none)
+     * This writes to APVTS - the observer pattern will trigger repaint automatically.
      */
     void setActiveStep (int stepIndex) {
-        if (activeStepIndex != stepIndex) {
-            activeStepIndex = stepIndex;
-            repaint();
-        }
+        // Write to APVTS - observer pattern will handle repaint
+        getState().setCurrentIndex(stepIndex);
     }
 
     /**
@@ -86,12 +99,11 @@ public:
 
     /**
      * Set which step is currently selected for editing (0-63, or -1 for none)
+     * This writes to APVTS - the observer pattern will trigger repaint automatically.
      */
     void setSelectedStep (int stepIndex) {
-        if (selectedStepIndex != stepIndex) {
-            selectedStepIndex = stepIndex;
-            repaint();
-        }
+        // Write to APVTS - observer pattern will handle repaint
+        getState().setSelectedStepForEditing(stepIndex);
     }
 
     /**
@@ -130,8 +142,8 @@ private:
     void drawStep (juce::Graphics& g, int visibleIndex, int stepIndex, float stepSizeParam, float gapParam) {
         using namespace SequencerStepsConstants;
 
-        // Get state from APVTS
-        auto& state = processorRef.getState();
+        // Get state from APVTS (via base class)
+        auto& state = getState();
 
         // Calculate step bounds
         float x = visibleIndex * (stepSizeParam + gapParam);
@@ -278,8 +290,24 @@ private:
         }
     }
 
+    // ========================================
+    // StateListenerComponent implementation
+    // ========================================
+
+    /**
+     * Called on message thread when any subscribed parameter changes.
+     * This handles automatic UI updates from APVTS changes (DAW automation, MIDI, etc.)
+     */
+    void onStateChanged() override {
+        // Update local cached values from state
+        activeStepIndex = getState().getCurrentIndex();
+        selectedStepIndex = getState().getSelectedStepForEditing();
+
+        // Repaint to reflect the new state
+        repaint();
+    }
+
     juce::Typeface::Ptr interFont;
-    PluginProcessor& processorRef; // Reference to the processor for state access
     int activeStepIndex = -1; // -1 means no active step (playback position), 0-63 for sequence steps
     int selectedStepIndex = 0; // Which step is selected for editing (0-63)
     int windowStartIndex = 0; // Which step is at the left edge of the window (0-56)

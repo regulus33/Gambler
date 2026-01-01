@@ -175,6 +175,15 @@ public:
     }
 
     /**
+     * Update the current note for a step (at its current substep index)
+     */
+    void updateCurrentNoteForStep(int stepIndex, int noteNumber) {
+        int substepIdx = getStepNotesCurrentIndex(stepIndex);
+        if (substepIdx < 0) substepIdx = 0;
+        setStepNote(stepIndex, substepIdx, noteNumber);
+    }
+
+    /**
      * Check if a step's current note is a rest (-1)
      */
     bool stepHasRest(int stepIndex) const {

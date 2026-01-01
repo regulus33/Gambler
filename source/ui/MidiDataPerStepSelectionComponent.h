@@ -3,6 +3,7 @@
 #include "Icons.h"
 #include "VerticalBarSlider.h"
 #include "BinaryData.h"
+#include "StateListenerComponent.h"
 #include "../PluginProcessor.h"
 #include "../backend/ProcessorCommand.h"
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -41,12 +42,16 @@ namespace MidiDataPerStepConstants {
  * - ComboBox changes trigger ProcessorCommand to update CC numbers in audio thread
  * - Slider changes trigger ProcessorCommand to update modulation values in audio thread
  * - Lane enable/disable triggers ProcessorCommand to update selected state in audio thread
- * - updateFromSequence() reads current step's StepModulations and updates UI
+ *
+ * Observer Pattern:
+ * - Listens to all modulation parameters for all steps
+ * - Listens to selected step parameter to know which step's modulations to display
+ * - Automatically updates UI when any subscribed parameter changes
  */
-class MidiDataPerStepSelectionComponent : public juce::Component {
+class MidiDataPerStepSelectionComponent : public StateListenerComponent {
 public:
     explicit MidiDataPerStepSelectionComponent(PluginProcessor& processor)
-        : processorRef(processor),
+        : StateListenerComponent(processor),
           interFont (juce::Typeface::createSystemTypefaceFor (BinaryData::InterVariableFont_ttf,
                                                               BinaryData::InterVariableFont_ttfSize)),
           comboLookAndFeel (interFont)
@@ -107,8 +112,8 @@ public:
                     int ccNumber = selectedId - 1; // ID is 1-based, CC is 0-based
 
                     // Queue command to update CC number in audio thread
-                    processorRef.queueCommand(ProcessorCommand([this, laneIndex, ccNumber]() {
-                        auto& seq = processorRef.getSequence();
+                    getProcessor().queueCommand(ProcessorCommand([this, laneIndex, ccNumber]() {
+                        auto& seq = getProcessor().getSequence();
                         int selectedStep = seq.getSelectedStepForEditing();
 
                         auto& stepMods = seq.getStep(selectedStep).getStepModulations();
@@ -153,8 +158,8 @@ public:
                 int midiValue = static_cast<int>(value * 127.0f);
 
                 // Queue command to update modulation value in audio thread
-                processorRef.queueCommand(ProcessorCommand([this, laneIndex, midiValue]() {
-                    auto& seq = processorRef.getSequence();
+                getProcessor().queueCommand(ProcessorCommand([this, laneIndex, midiValue]() {
+                    auto& seq = getProcessor().getSequence();
                     int selectedStep = seq.getSelectedStepForEditing();
 
                     auto& stepMods = seq.getStep(selectedStep).getStepModulations();
@@ -166,6 +171,11 @@ public:
         }
         laneEnabled.assign (sliders.size(), true);
 
+        // Subscribe to all modulation parameters (we need to update when any step's modulations change)
+        listenToModulations(0, 63);
+
+        // Subscribe to selected step parameter (to know which step's modulations to display)
+        listenToParameter(Params::Keys::ID::SEQ_SELECTED_STEP);
     }
 
 
@@ -184,8 +194,8 @@ public:
             sliders[static_cast<size_t> (laneIndex)]->setAlpha (alpha);
 
         // Queue command to update selected state in audio thread
-        processorRef.queueCommand(ProcessorCommand([this, laneIndex, shouldBeEnabled]() {
-            auto& seq = processorRef.getSequence();
+        getProcessor().queueCommand(ProcessorCommand([this, laneIndex, shouldBeEnabled]() {
+            auto& seq = getProcessor().getSequence();
             int selectedStep = seq.getSelectedStepForEditing();
 
             auto& stepMods = seq.getStep(selectedStep).getStepModulations();
@@ -230,7 +240,7 @@ public:
      */
     void updateFromSequence()
     {
-        auto& state = processorRef.getState();
+        auto& state = getState();
         int selectedStep = state.getSelectedStepForEditing();
 
         // Update all 7 lanes from SequenceState
@@ -253,6 +263,15 @@ public:
         }
     }
 
+protected:
+    /**
+     * Called on message thread when any subscribed parameter changes.
+     * Updates the UI to reflect the current state.
+     */
+    void onStateChanged() override {
+        updateFromSequence();
+    }
+
     /**
      * Randomize all CC selections in all 7 lanes
      * Picks a random CC number (0-127) for each lane
@@ -269,8 +288,8 @@ public:
             dummyDropdowns[i]->setSelectedId(randomCC + 1, juce::dontSendNotification);
 
             // Update the backend
-            processorRef.queueCommand(ProcessorCommand([this, i, randomCC]() {
-                auto& seq = processorRef.getSequence();
+            getProcessor().queueCommand(ProcessorCommand([this, i, randomCC]() {
+                auto& seq = getProcessor().getSequence();
                 int selectedStep = seq.getSelectedStepForEditing();
 
                 auto& stepMods = seq.getStep(selectedStep).getStepModulations();
@@ -551,8 +570,6 @@ private:
         bool isOn { false };
         std::function<void (bool)> onToggleChanged;
     };
-
-    PluginProcessor& processorRef;
 
     juce::Typeface::Ptr interFont;
     SmallComboBoxLookAndFeel comboLookAndFeel;

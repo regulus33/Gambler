@@ -2,6 +2,7 @@
 
 #include "BinaryData.h"
 #include "SequenceGrid.h"
+#include "StateListenerComponent.h"
 #include "UIConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
@@ -23,15 +24,27 @@ namespace SequenceOverviewConstants {
  * Top-level container for the Sequence Overview UI.
  * - Title "Sequence" at the top
  * - SequenceGrid (8x8 grid of colored squares)
+ *
+ * Observer Pattern:
+ * - Listens to all step note parameters and sequence metadata
+ * - Automatically updates the SequenceGrid when state changes
  */
-class SequenceOverviewComponent : public juce::Component {
+class SequenceOverviewComponent : public StateListenerComponent {
 public:
-    SequenceOverviewComponent()
-        : interBoldFont (juce::Typeface::createSystemTypefaceFor (
+    explicit SequenceOverviewComponent(PluginProcessor& processor)
+        : StateListenerComponent(processor),
+          interBoldFont (juce::Typeface::createSystemTypefaceFor (
               BinaryData::Inter_24ptBold_ttf,
               BinaryData::Inter_24ptBold_ttfSize))
     {
         addAndMakeVisible (sequenceGrid);
+
+        // Subscribe to all step notes (for color updates)
+        listenToStepNotes(0, 63);
+        listenToStepNotesLength(0, 63);
+
+        // Subscribe to sequence metadata (for length, current index, selected step)
+        listenToSequenceMetadata();
     }
 
     void paint (juce::Graphics& g) override {
@@ -69,6 +82,19 @@ public:
     // Access to the grid for external updates
     SequenceGrid& getSequenceGrid() { return sequenceGrid; }
     const SequenceGrid& getSequenceGrid() const { return sequenceGrid; }
+
+protected:
+    /**
+     * Called on message thread when any subscribed parameter changes.
+     * Updates the SequenceGrid from APVTS state.
+     */
+    void onStateChanged() override {
+        // Get the current playback step from state
+        int playbackStep = getState().getCurrentIndex();
+
+        // Update grid from APVTS state
+        sequenceGrid.updateFromState(getState(), playbackStep);
+    }
 
 private:
     juce::Typeface::Ptr interBoldFont;

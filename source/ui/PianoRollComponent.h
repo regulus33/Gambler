@@ -2,6 +2,7 @@
 
 #include "../backend/Scale.h"
 #include "BinaryData.h"
+#include "StateListenerComponent.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace PianoRollConstants {
@@ -41,10 +42,15 @@ struct KeyData {
  * Displays 12 keys representing the chromatic scale using custom SVG paths
  * Users can toggle notes on/off to define the scale
  * Total size: 422 x 206 pixels (scaled 3.1% to match 4 sequencer steps + 3 gaps)
+ *
+ * Observer Pattern:
+ * - Listens to all scale parameters (12 notes + range min/max)
+ * - Automatically updates UI when scale parameters change
  */
-class PianoRollComponent : public juce::Component {
+class PianoRollComponent : public StateListenerComponent {
 public:
-    PianoRollComponent() {
+    explicit PianoRollComponent(PluginProcessor& processor)
+        : StateListenerComponent(processor) {
         using namespace PianoRollConstants;
 
         // Load Inter font from binary data
@@ -81,6 +87,9 @@ public:
 
         // Set up paths with proper positioning
         setupKeyPaths();
+
+        // Subscribe to scale parameters
+        listenToScale();
 
         setSize (componentWidth, componentHeight);
     }
@@ -227,6 +236,24 @@ public:
      * Callback when a note is toggled
      */
     std::function<void()> onNoteChanged;
+
+protected:
+    /**
+     * Called on message thread when any subscribed parameter changes.
+     * Updates the piano roll to reflect the current scale state.
+     */
+    void onStateChanged() override {
+        // Read scale from APVTS state
+        Scale scale = getState().getScale();
+
+        // Update key toggle states
+        auto scaleNotes = scale.getScaleNotes();
+        for (int i = 0; i < 12; i++) {
+            keys[i]->isToggled = (scaleNotes[i] != 0);
+        }
+
+        repaint();
+    }
 
 private:
     /**

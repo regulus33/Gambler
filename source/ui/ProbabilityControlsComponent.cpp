@@ -9,14 +9,12 @@ ProbabilityControlsComponent::ProbabilityControlsComponent(PluginProcessor& proc
     addAndMakeVisible(probabilitySlider);
     addAndMakeVisible(probabilityGauge);
 
-    // TODO: is this threadsafe? probably not. But if just done once not a huge problem.
-    // Initialize UI from backend state
-    // Count how many true values are in the playProbability array to determine the percentage
-    auto& sequence = processorRef.getSequence();
+    // Initialize UI from APVTS-backed state (thread-safe)
+    auto& state = processorRef.getState();
     int trueCount = 0;
     std::array<bool, 64> probabilityArray;
     for (int i = 0; i < 64; ++i) {
-        probabilityArray[i] = sequence.getPlayProbability(i);
+        probabilityArray[i] = state.getPlayProbability(i);
         if (probabilityArray[i]) {
             trueCount++;
         }
@@ -30,32 +28,22 @@ ProbabilityControlsComponent::ProbabilityControlsComponent(PluginProcessor& proc
     probabilityGauge.updateFromProbabilityArray(probabilityArray);
 
     // Set up callback for slider changes
-    // This triggers randomization in the audio thread and updates the gauge via completion callback
     probabilitySlider.onValueChange = [this](float newValue) {
         // Convert 0.0-1.0 to 0-100 percentage
         int percentage = static_cast<int>(std::round(newValue * 100.0f));
 
-        // Queue command to randomize probability array in audio thread
-        processorRef.queueCommand(ProcessorCommand(
-            // Command: runs on audio thread
-            [this, percentage]() {
-                processorRef.getSequence().setProbabilityPercentage(percentage);
-                DBG("Probability randomized: " << percentage << "%");
-            },
-            // Completion callback: runs on message thread after command executes
-            [this]() {
-                // Read the randomized probability array from the backend
-                auto& sequence = processorRef.getSequence();
-                std::array<bool, 64> probabilityArray;
-                for (int i = 0; i < 64; ++i) {
-                    probabilityArray[i] = sequence.getPlayProbability(i);
-                }
+        // Update via APVTS-backed state (thread-safe)
+        auto& state = processorRef.getState();
+        state.setProbabilityPercentage(percentage);
+        DBG("Probability randomized: " << percentage << "%");
 
-                // Update the gauge with the backend data
-                probabilityGauge.updateFromProbabilityArray(probabilityArray);
-                DBG("Probability gauge updated from backend");
-            }
-        ));
+        // Read back the randomized probability array and update gauge
+        std::array<bool, 64> probabilityArray;
+        for (int i = 0; i < 64; ++i) {
+            probabilityArray[i] = state.getPlayProbability(i);
+        }
+        probabilityGauge.updateFromProbabilityArray(probabilityArray);
+        DBG("Probability gauge updated from backend");
     };
 }
 

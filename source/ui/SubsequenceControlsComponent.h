@@ -1,7 +1,9 @@
 #pragma once
 
 #include "BinaryData.h"
+#include "MusicConstants.h"
 #include "SequenceGrid.h"  // For SquareState and constants
+#include "StateListenerComponent.h"
 #include "UIConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
@@ -239,11 +241,16 @@ private:
  * - Title "Sub" at the top
  * - SubsequenceBar (8 vertical clickable rectangles)
  * - Two buttons: "-" and "+"
+ *
+ * Observer Pattern:
+ * - Listens to selected step and substep parameters
+ * - Automatically updates UI when substep data changes
  */
-class SubsequenceControlsComponent : public juce::Component {
+class SubsequenceControlsComponent : public StateListenerComponent {
 public:
-    SubsequenceControlsComponent()
-        : interBoldFont (juce::Typeface::createSystemTypefaceFor (
+    explicit SubsequenceControlsComponent(PluginProcessor& processor)
+        : StateListenerComponent(processor),
+          interBoldFont (juce::Typeface::createSystemTypefaceFor (
               BinaryData::Inter_24ptBold_ttf,
               BinaryData::Inter_24ptBold_ttfSize)),
           minusButton ("-"),
@@ -269,6 +276,11 @@ public:
             if (onPlusClicked)
                 onPlusClicked();
         };
+
+        // Subscribe to selected step and all substep parameters
+        listenToParameter(Params::Keys::ID::SEQ_SELECTED_STEP);
+        listenToStepNotes(0, ParamConstants::MAX_STEPS - 1);
+        listenToStepNotesLength(0, ParamConstants::MAX_STEPS - 1);
     }
 
     void paint (juce::Graphics& g) override {
@@ -321,6 +333,34 @@ public:
     std::function<void(int)> onBarClicked;
     std::function<void()> onMinusClicked;
     std::function<void()> onPlusClicked;
+
+protected:
+    /**
+     * Called on message thread when any subscribed parameter changes.
+     * Updates the subsequence bar to reflect the current substep state.
+     */
+    void onStateChanged() override {
+        auto& state = getState();
+        int selectedStep = state.getSelectedStepForEditing();
+        int substepLength = state.getStepNotesLength(selectedStep);
+
+        // Update bar colors and borders based on substep data
+        for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
+            if (i < substepLength) {
+                // Get the note for this substep and determine its color
+                int noteNumber = state.getStepNote(selectedStep, i);
+                int pitchClass = noteNumber % 12;
+                juce::Colour noteColor = MusicConstants::NOTE_COLOURS[static_cast<size_t>(pitchClass)];
+                subsequenceBar.setBarColor(i, noteColor);
+            } else {
+                // Inactive substep - grey
+                subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::defaultGreyHex));
+            }
+
+            // Clear all borders - the current substep border is handled by playback
+            subsequenceBar.setBarBorder(i, false);
+        }
+    }
 
 private:
     juce::Typeface::Ptr interBoldFont;
