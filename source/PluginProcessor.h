@@ -2,6 +2,7 @@
 
 #include "data/Params.h"
 #include "backend/Sequence.h"
+#include "backend/SequenceState.h"
 #include "backend/Clock.h"
 #include "backend/DawSync.h"
 #include "backend/UserPreferences.h"
@@ -54,12 +55,16 @@ public:
     APVTS& getAPVTS() noexcept { return apvts; }
     const APVTS& getAPVTS() const noexcept { return apvts; }
 
-    // Access to domain layer
+    // Access to domain layer (legacy - prefer getState() for new code)
     Sequence& getSequence() noexcept { return sequence; }
     const Sequence& getSequence() const noexcept { return sequence; }
 
     Clock& getClock() noexcept { return clock; }
     const Clock& getClock() const noexcept { return clock; }
+
+    // Access to APVTS-backed state (thread-safe, preferred for new code)
+    SequenceState& getState() noexcept { return *sequenceState; }
+    const SequenceState& getState() const noexcept { return *sequenceState; }
 
     // Callback for UI updates when sequence ticks (called from audio thread)
     // The callback should be thread-safe (e.g., trigger an AsyncUpdater)
@@ -147,10 +152,13 @@ private:
     // Application Layer - Controller
     // ========================================
 
-    // Persistence layer (APVTS)
+    // Persistence layer (APVTS) - single source of truth for all state
     APVTS apvts;
 
-    // Domain layer
+    // APVTS-backed state accessor (thread-safe)
+    std::unique_ptr<SequenceState> sequenceState;
+
+    // Legacy domain layer (kept for backward compatibility during transition)
     Sequence sequence;
     Clock clock;
     DawSync dawSync;  // DAW synchronization utility

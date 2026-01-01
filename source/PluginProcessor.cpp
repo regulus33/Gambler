@@ -12,6 +12,10 @@ PluginProcessor::PluginProcessor()
 #endif
               ),
       apvts (*this, nullptr, "Parameters", createParameterLayout()) {
+
+    // Initialize APVTS-backed state accessor
+    sequenceState = std::make_unique<SequenceState>(apvts);
+
     // Register as listener for all parameter changes
     // This ensures State stays in sync when parameters change from UI
     for (auto* param : apvts.processor.getParameters()) {
@@ -20,20 +24,18 @@ PluginProcessor::PluginProcessor()
         }
     }
 
-    // Initialize clock settings
+    // Initialize clock settings based on host type
     // Default to internal clock for standalone, DAW sync for plugin
-    // Note: We use runtime detection because the shared code is compiled with
-    // all plugin format flags enabled, so preprocessor checks don't work here.
-    // or at least in development.
-    // it just runs on startup so who cares.
     juce::PluginHostType hostType;
     if (hostType.type == juce::PluginHostType::UnknownHost) {
         // Standalone app - use internal clock
         clock.setMode(ClockMode::INTERNAL);
         clock.start();
+        sequenceState->setClockMode(0);  // 0 = INTERNAL
     } else {
         // Running in a DAW - use DAW sync
         clock.setMode(ClockMode::DAW_SYNC);
+        sequenceState->setClockMode(1);  // 1 = DAW_SYNC
     }
     clock.setBpm(120.0);
     clock.setSubdivision(Subdivision::SIXTEENTH);

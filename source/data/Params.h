@@ -1,6 +1,10 @@
 //
 // Created by Gambler developers on 15.10.2025.
 //
+    // Comprehensive APVTS parameter definitions for Gambler.
+// All sequencer state is backed by APVTS parameters for thread-safe access
+// and automatic DAW automation support.
+//
 
 #ifndef GAMBLER_GAMBLERPARAMS_H
 #define GAMBLER_GAMBLERPARAMS_H
@@ -10,16 +14,105 @@
 using namespace std;
 using namespace juce;
 
+// Constants for parameter array sizes
+namespace ParamConstants {
+    constexpr int MAX_STEPS = 64;
+    constexpr int MAX_SUBSTEPS = 8;
+    constexpr int NUM_MODULATIONS = 7;
+    constexpr int NUM_SCALE_NOTES = 12;
+    constexpr int DEFAULT_NOTE = 60;  // Middle C
+    constexpr int DEFAULT_VELOCITY = 100;
+    constexpr int DEFAULT_LENGTH = 8;
+}
 
 // This namespace holds keys for the APVTS as well as parameter creation.
-// All Controls properties are mapped to APVTS parameters for persistence.
+// All state is backed by APVTS parameters for thread-safe access.
 namespace Params
 {
     namespace Keys
     {
         namespace ID
         {
-            // Bottom row buttons
+            // ========================================
+            // SEQUENCE METADATA
+            // ========================================
+            inline const String SEQ_LENGTH = "seq_length";
+            inline const String SEQ_CURRENT_INDEX = "seq_current_index";
+            inline const String SEQ_SELECTED_STEP = "seq_selected_step";
+            inline const String SEQ_IS_RANDOM = "seq_is_random";
+            inline const String SEQ_IS_SHIFT = "seq_is_shift";
+            inline const String SEQ_LAST_PROB_INDEX = "seq_last_prob_index";
+
+            // Play probability array (64 bools)
+            inline String playProbability(int index) {
+                return "seq_prob_" + String(index);
+            }
+
+            // ========================================
+            // STEP NOTE DATA (64 steps × 8 substeps)
+            // ========================================
+            // Note number for step[stepIndex].substep[substepIndex]
+            inline String stepNote(int stepIndex, int substepIndex) {
+                return "step_" + String(stepIndex) + "_note_" + String(substepIndex);
+            }
+
+            // StepNotes metadata per step
+            inline String stepNotesLength(int stepIndex) {
+                return "step_" + String(stepIndex) + "_notes_len";
+            }
+            inline String stepNotesCurrentIndex(int stepIndex) {
+                return "step_" + String(stepIndex) + "_notes_idx";
+            }
+
+            // ========================================
+            // STEP MODULATION DATA (64 steps × 7 modulations)
+            // ========================================
+            // Modulation type (0=CC, 1=Velocity)
+            inline String stepModType(int stepIndex, int modIndex) {
+                return "step_" + String(stepIndex) + "_mod_" + String(modIndex) + "_type";
+            }
+            // CC number (0-127)
+            inline String stepModCCNum(int stepIndex, int modIndex) {
+                return "step_" + String(stepIndex) + "_mod_" + String(modIndex) + "_cc";
+            }
+            // Value (0-127)
+            inline String stepModValue(int stepIndex, int modIndex) {
+                return "step_" + String(stepIndex) + "_mod_" + String(modIndex) + "_val";
+            }
+            // Selected (bool)
+            inline String stepModSelected(int stepIndex, int modIndex) {
+                return "step_" + String(stepIndex) + "_mod_" + String(modIndex) + "_sel";
+            }
+
+            // ========================================
+            // SCALE
+            // ========================================
+            // Scale note enabled (12 chromatic notes)
+            inline String scaleNote(int noteIndex) {
+                return "scale_note_" + String(noteIndex);
+            }
+            inline const String SCALE_RANGE_MIN = "scale_range_min";
+            inline const String SCALE_RANGE_MAX = "scale_range_max";
+
+            // ========================================
+            // CLOCK
+            // ========================================
+            inline const String CLOCK_MODE = "clock_mode";  // 0=INTERNAL, 1=DAW_SYNC
+            inline const String CLOCK_BPM = "clock_bpm";
+            inline const String CLOCK_SUBDIVISION = "clock_subdivision";  // 0=QUARTER, 1=EIGHTH, 2=SIXTEENTH, 3=THIRTY_SECOND
+
+            // ========================================
+            // USER PREFERENCES
+            // ========================================
+            inline const String PREF_PREVIEW_NOTES = "pref_preview_notes";
+            inline const String PREF_FOLLOW_STEP = "pref_follow_step";
+            inline const String PREF_FOLLOW_PLAYBACK = "pref_follow_playback";
+            inline const String PREF_NOTE_LENGTH = "pref_note_length";
+
+            // ========================================
+            // UI STATE (kept for backward compatibility)
+            // ========================================
+            // Bottom row buttons (momentary/trigger)
             inline const String ROLL = "roll";
             inline const String INDEX_LEFT = "index_left";
             inline const String INDEX_RIGHT = "index_right";
@@ -38,7 +131,7 @@ namespace Params
             inline const String SUB_NOTES_PLUS = "sub_notes_plus";
             inline const String SUB_NOTES_MINUS = "sub_notes_minus";
 
-            // Main controls
+            // Main controls (these now map to the selected step's data)
             inline const String OCTAVE = "octave";
             inline const String NOTE = "note";
             inline const String PROBABILITY = "probability";
@@ -46,22 +139,77 @@ namespace Params
             // MIDI mode
             inline const String MIDI_MODE = "midi_mode";
 
-            // Note range
+            // Note range (legacy - now use SCALE_RANGE_MIN/MAX)
             inline const String NOTE_RANGE_MIN = "note_range_min";
             inline const String NOTE_RANGE_MAX = "note_range_max";
 
-            // Step buttons (8 buttons)
+            // Step buttons (8 buttons for UI window)
             inline String stepButtonSelected(int index) { return "step_button_" + String(index) + "_selected"; }
             inline String stepButtonHighlighted(int index) { return "step_button_" + String(index) + "_highlighted"; }
 
-            // CC controls (7 slots)
+            // CC controls (7 slots - legacy, now use stepModValue)
             inline String ccNumber(int slot) { return "cc_number_" + String(slot); }
             inline String ccValue(int slot) { return "cc_value_" + String(slot); }
         }
 
         namespace LABEL
         {
-            // Bottom row buttons
+            // Sequence metadata
+            inline const String SEQ_LENGTH = "Sequence Length";
+            inline const String SEQ_CURRENT_INDEX = "Current Step";
+            inline const String SEQ_SELECTED_STEP = "Selected Step";
+            inline const String SEQ_IS_RANDOM = "Random Mode";
+            inline const String SEQ_IS_SHIFT = "Shift Mode";
+
+            inline String playProbability(int index) {
+                return "Probability " + String(index);
+            }
+
+            // Step notes
+            inline String stepNote(int stepIndex, int substepIndex) {
+                return "Step " + String(stepIndex) + " Note " + String(substepIndex);
+            }
+            inline String stepNotesLength(int stepIndex) {
+                return "Step " + String(stepIndex) + " Substep Count";
+            }
+            inline String stepNotesCurrentIndex(int stepIndex) {
+                return "Step " + String(stepIndex) + " Current Substep";
+            }
+
+            // Step modulations
+            inline String stepModType(int stepIndex, int modIndex) {
+                return "Step " + String(stepIndex) + " Mod " + String(modIndex) + " Type";
+            }
+            inline String stepModCCNum(int stepIndex, int modIndex) {
+                return "Step " + String(stepIndex) + " Mod " + String(modIndex) + " CC#";
+            }
+            inline String stepModValue(int stepIndex, int modIndex) {
+                return "Step " + String(stepIndex) + " Mod " + String(modIndex) + " Value";
+            }
+            inline String stepModSelected(int stepIndex, int modIndex) {
+                return "Step " + String(stepIndex) + " Mod " + String(modIndex) + " Active";
+            }
+
+            // Scale
+            inline String scaleNote(int noteIndex) {
+                static const char* noteNames[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
+                return String("Scale ") + noteNames[noteIndex];
+            }
+            inline const String SCALE_RANGE_MIN = "Scale Range Min";
+            inline const String SCALE_RANGE_MAX = "Scale Range Max";
+
+            // Clock
+            inline const String CLOCK_MODE = "Clock Mode";
+            inline const String CLOCK_BPM = "BPM";
+            inline const String CLOCK_SUBDIVISION = "Subdivision";
+
+            // User preferences
+            inline const String PREF_PREVIEW_NOTES = "Preview Notes";
+            inline const String PREF_FOLLOW_STEP = "Follow Step";
+            inline const String PREF_FOLLOW_PLAYBACK = "Follow Playback";
+            inline const String PREF_NOTE_LENGTH = "Note Length";
+
+            // Legacy UI labels
             inline const String ROLL = "Roll";
             inline const String INDEX_LEFT = "Index Left";
             inline const String INDEX_RIGHT = "Index Right";
@@ -70,53 +218,151 @@ namespace Params
             inline const String NUDGE_LEFT = "Nudge Left";
             inline const String NUDGE_RIGHT = "Nudge Right";
             inline const String SHIFT = "Shift";
-
-            // Top right buttons
             inline const String EXPORT = "Export";
             inline const String SAVE = "Save";
             inline const String LOAD = "Load";
-
-            // Sub notes buttons
             inline const String SUB_NOTES_PLUS = "Sub Notes +";
             inline const String SUB_NOTES_MINUS = "Sub Notes -";
-
-            // Main controls
             inline const String OCTAVE = "Octave";
             inline const String NOTE = "Note";
             inline const String PROBABILITY = "Probability";
-
-            // MIDI mode
             inline const String MIDI_MODE = "MIDI Mode";
-
-            // Note range
             inline const String NOTE_RANGE_MIN = "Note Range Min";
             inline const String NOTE_RANGE_MAX = "Note Range Max";
-
-            // Step buttons
             inline String stepButtonSelected(int index) { return "Step " + String(index) + " Selected"; }
             inline String stepButtonHighlighted(int index) { return "Step " + String(index) + " Highlighted"; }
-
-            // CC controls
             inline String ccNumber(int slot) { return "CC " + String(slot) + " Number"; }
             inline String ccValue(int slot) { return "CC " + String(slot) + " Value"; }
         }
     };
 
+    /**
+     * Create the complete parameter layout for all sequencer state.
+     * This creates ~2500 parameters to back all domain state.
+     */
     static AudioProcessorValueTreeState::ParameterLayout createDefaultParameterLayout()
     {
         vector<unique_ptr<RangedAudioParameter>> params;
 
-        // Helper lambda to create bool parameters
+        // Helper lambdas
         auto createBoolParam = [](const String& id, const String& label, bool defaultValue = false) {
             return make_unique<AudioParameterBool>(id, label, defaultValue);
         };
 
-        // Helper lambda to create int parameters
         auto createIntParam = [](const String& id, const String& label, int min, int max, int defaultValue) {
             return make_unique<AudioParameterInt>(id, label, min, max, defaultValue);
         };
 
-        // Bottom row buttons
+        auto createFloatParam = [](const String& id, const String& label, float min, float max, float defaultValue) {
+            return make_unique<AudioParameterFloat>(id, label, NormalisableRange<float>(min, max), defaultValue);
+        };
+
+        // ========================================
+        // SEQUENCE METADATA
+        // ========================================
+        params.push_back(createIntParam(Keys::ID::SEQ_LENGTH, Keys::LABEL::SEQ_LENGTH,
+            1, ParamConstants::MAX_STEPS, ParamConstants::DEFAULT_LENGTH));
+        params.push_back(createIntParam(Keys::ID::SEQ_CURRENT_INDEX, Keys::LABEL::SEQ_CURRENT_INDEX,
+            -1, ParamConstants::MAX_STEPS - 1, -1));
+        params.push_back(createIntParam(Keys::ID::SEQ_SELECTED_STEP, Keys::LABEL::SEQ_SELECTED_STEP,
+            0, ParamConstants::MAX_STEPS - 1, 0));
+        params.push_back(createBoolParam(Keys::ID::SEQ_IS_RANDOM, Keys::LABEL::SEQ_IS_RANDOM, false));
+        params.push_back(createBoolParam(Keys::ID::SEQ_IS_SHIFT, Keys::LABEL::SEQ_IS_SHIFT, false));
+        params.push_back(createIntParam(Keys::ID::SEQ_LAST_PROB_INDEX, "Last Prob Index", -1, 63, -1));
+
+        // Play probability array (64 bools, default all true = 100% probability)
+        for (int i = 0; i < ParamConstants::MAX_STEPS; ++i) {
+            params.push_back(createBoolParam(Keys::ID::playProbability(i),
+                Keys::LABEL::playProbability(i), true));
+        }
+
+        // ========================================
+        // STEP NOTE DATA (64 steps × 8 substeps)
+        // ========================================
+        for (int step = 0; step < ParamConstants::MAX_STEPS; ++step) {
+            // Note values for each substep (-1 to 127, -1 = rest)
+            for (int substep = 0; substep < ParamConstants::MAX_SUBSTEPS; ++substep) {
+                params.push_back(createIntParam(
+                    Keys::ID::stepNote(step, substep),
+                    Keys::LABEL::stepNote(step, substep),
+                    -1, 127, ParamConstants::DEFAULT_NOTE));
+            }
+
+            // StepNotes metadata
+            params.push_back(createIntParam(
+                Keys::ID::stepNotesLength(step),
+                Keys::LABEL::stepNotesLength(step),
+                1, ParamConstants::MAX_SUBSTEPS, 1));
+            params.push_back(createIntParam(
+                Keys::ID::stepNotesCurrentIndex(step),
+                Keys::LABEL::stepNotesCurrentIndex(step),
+                -1, ParamConstants::MAX_SUBSTEPS - 1, -1));
+        }
+
+        // ========================================
+        // STEP MODULATION DATA (64 steps × 7 modulations)
+        // ========================================
+        for (int step = 0; step < ParamConstants::MAX_STEPS; ++step) {
+            for (int mod = 0; mod < ParamConstants::NUM_MODULATIONS; ++mod) {
+                // Type: 0=CC, 1=Velocity
+                int defaultType = (mod == 0) ? 1 : 0;  // First slot is velocity
+                params.push_back(createIntParam(
+                    Keys::ID::stepModType(step, mod),
+                    Keys::LABEL::stepModType(step, mod),
+                    0, 1, defaultType));
+
+                // CC number (0-127)
+                params.push_back(createIntParam(
+                    Keys::ID::stepModCCNum(step, mod),
+                    Keys::LABEL::stepModCCNum(step, mod),
+                    0, 127, mod));  // Default CC numbers 0-6
+
+                // Value (0-127)
+                int defaultValue = (mod == 0) ? ParamConstants::DEFAULT_VELOCITY : 64;
+                params.push_back(createIntParam(
+                    Keys::ID::stepModValue(step, mod),
+                    Keys::LABEL::stepModValue(step, mod),
+                    0, 127, defaultValue));
+
+                // Selected (bool)
+                params.push_back(createBoolParam(
+                    Keys::ID::stepModSelected(step, mod),
+                    Keys::LABEL::stepModSelected(step, mod),
+                    false));
+            }
+        }
+
+        // ========================================
+        // SCALE
+        // ========================================
+        // 12 chromatic notes (default: all enabled = chromatic scale)
+        for (int i = 0; i < ParamConstants::NUM_SCALE_NOTES; ++i) {
+            params.push_back(createBoolParam(
+                Keys::ID::scaleNote(i),
+                Keys::LABEL::scaleNote(i),
+                true));  // All notes enabled by default
+        }
+        params.push_back(createIntParam(Keys::ID::SCALE_RANGE_MIN, Keys::LABEL::SCALE_RANGE_MIN, 0, 127, 0));
+        params.push_back(createIntParam(Keys::ID::SCALE_RANGE_MAX, Keys::LABEL::SCALE_RANGE_MAX, 0, 127, 127));
+
+        // ========================================
+        // CLOCK
+        // ========================================
+        params.push_back(createIntParam(Keys::ID::CLOCK_MODE, Keys::LABEL::CLOCK_MODE, 0, 1, 0));  // 0=INTERNAL
+        params.push_back(createFloatParam(Keys::ID::CLOCK_BPM, Keys::LABEL::CLOCK_BPM, 20.0f, 999.0f, 120.0f));
+        params.push_back(createIntParam(Keys::ID::CLOCK_SUBDIVISION, Keys::LABEL::CLOCK_SUBDIVISION, 0, 3, 2));  // 2=SIXTEENTH
+
+        // ========================================
+        // USER PREFERENCES
+        // ========================================
+        params.push_back(createBoolParam(Keys::ID::PREF_PREVIEW_NOTES, Keys::LABEL::PREF_PREVIEW_NOTES, true));
+        params.push_back(createBoolParam(Keys::ID::PREF_FOLLOW_STEP, Keys::LABEL::PREF_FOLLOW_STEP, true));
+        params.push_back(createBoolParam(Keys::ID::PREF_FOLLOW_PLAYBACK, Keys::LABEL::PREF_FOLLOW_PLAYBACK, true));
+        params.push_back(createFloatParam(Keys::ID::PREF_NOTE_LENGTH, Keys::LABEL::PREF_NOTE_LENGTH, 0.0f, 1.0f, 0.9f));
+
+        // ========================================
+        // LEGACY UI STATE (for backward compatibility)
+        // ========================================
         params.push_back(createBoolParam(Keys::ID::ROLL, Keys::LABEL::ROLL));
         params.push_back(createBoolParam(Keys::ID::INDEX_LEFT, Keys::LABEL::INDEX_LEFT));
         params.push_back(createBoolParam(Keys::ID::INDEX_RIGHT, Keys::LABEL::INDEX_RIGHT));
@@ -125,35 +371,23 @@ namespace Params
         params.push_back(createBoolParam(Keys::ID::NUDGE_LEFT, Keys::LABEL::NUDGE_LEFT));
         params.push_back(createBoolParam(Keys::ID::NUDGE_RIGHT, Keys::LABEL::NUDGE_RIGHT));
         params.push_back(createBoolParam(Keys::ID::SHIFT, Keys::LABEL::SHIFT));
-
-        // Top right buttons
         params.push_back(createBoolParam(Keys::ID::EXPORT, Keys::LABEL::EXPORT));
         params.push_back(createBoolParam(Keys::ID::SAVE, Keys::LABEL::SAVE));
         params.push_back(createBoolParam(Keys::ID::LOAD, Keys::LABEL::LOAD));
-
-        // Sub notes buttons
         params.push_back(createBoolParam(Keys::ID::SUB_NOTES_PLUS, Keys::LABEL::SUB_NOTES_PLUS));
         params.push_back(createBoolParam(Keys::ID::SUB_NOTES_MINUS, Keys::LABEL::SUB_NOTES_MINUS));
-
-        // Main controls
         params.push_back(createIntParam(Keys::ID::OCTAVE, Keys::LABEL::OCTAVE, -4, 4, 0));
         params.push_back(createIntParam(Keys::ID::NOTE, Keys::LABEL::NOTE, 0, 127, 60));
         params.push_back(createIntParam(Keys::ID::PROBABILITY, Keys::LABEL::PROBABILITY, 0, 100, 100));
-
-        // MIDI mode (0 = CC_TO_NOTE, 1 = NOTE_TO_CC)
         params.push_back(createIntParam(Keys::ID::MIDI_MODE, Keys::LABEL::MIDI_MODE, 0, 1, 0));
-
-        // Note range
         params.push_back(createIntParam(Keys::ID::NOTE_RANGE_MIN, Keys::LABEL::NOTE_RANGE_MIN, 0, 127, 0));
         params.push_back(createIntParam(Keys::ID::NOTE_RANGE_MAX, Keys::LABEL::NOTE_RANGE_MAX, 0, 127, 127));
 
-        // Step buttons (8 buttons, each with selected and highlighted state)
         for (int i = 0; i < 8; ++i) {
             params.push_back(createBoolParam(Keys::ID::stepButtonSelected(i), Keys::LABEL::stepButtonSelected(i)));
             params.push_back(createBoolParam(Keys::ID::stepButtonHighlighted(i), Keys::LABEL::stepButtonHighlighted(i)));
         }
 
-        // CC controls (7 slots, each with number and value)
         for (int i = 0; i < 7; ++i) {
             params.push_back(createIntParam(Keys::ID::ccNumber(i), Keys::LABEL::ccNumber(i), 0, 127, i + 1));
             params.push_back(createIntParam(Keys::ID::ccValue(i), Keys::LABEL::ccValue(i), 0, 127, 64));
