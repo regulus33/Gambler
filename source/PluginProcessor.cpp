@@ -917,6 +917,7 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         // ========== SEQUENCER CONTROL BUTTONS ==========
         case MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE: {
             if (isNoteOnOrCCPositive) {  // Only trigger on button press
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE);
                 queueCommand(ProcessorCommand(
                     [this]() {
                         bool isShifted = getSequence().getIsShift();
@@ -946,8 +947,10 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
                             DBG("  → Page left (UI only)");
                         }
                     },
-                    [this]() {
-                        if (onSequenceTick) onSequenceTick();
+                    [uiCallback]() {
+                        if (uiCallback) {
+                            uiCallback(1.0f);  // Trigger action
+                        }
                     }
                 ));
             }
@@ -956,6 +959,7 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
 
         case MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP: {
             if (isNoteOnOrCCPositive) {  // Only trigger on button press
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP);
                 queueCommand(ProcessorCommand(
                     [this]() {
                         bool isShifted = getSequence().getIsShift();
@@ -974,8 +978,10 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
                             DBG("  → Length increased to " << getSequence().getLength());
                         }
                     },
-                    [this]() {
-                        if (onSequenceTick) onSequenceTick();
+                    [uiCallback]() {
+                        if (uiCallback) {
+                            uiCallback(1.0f);
+                        }
                     }
                 ));
             }
@@ -984,6 +990,7 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
 
         case MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP: {
             if (isNoteOnOrCCPositive) {  // Only trigger on button press
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP);
                 queueCommand(ProcessorCommand(
                     [this]() {
                         bool isShifted = getSequence().getIsShift();
@@ -999,8 +1006,10 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
                             DBG("  → Length decreased to " << getSequence().getLength());
                         }
                     },
-                    [this]() {
-                        if (onSequenceTick) onSequenceTick();
+                    [uiCallback]() {
+                        if (uiCallback) {
+                            uiCallback(1.0f);
+                        }
                     }
                 ));
             }
@@ -1009,6 +1018,7 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
 
         case MidiControlId::BUTTON_SHIFT: {
             if (isNoteOnOrCCPositive) {  // Only trigger on button press
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_SHIFT);
                 queueCommand(ProcessorCommand(
                     [this]() {
                         auto& seq = getSequence();
@@ -1016,8 +1026,11 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
                         seq.setIsShift(newShiftState);
                         DBG("  → Shift " << (newShiftState ? "ON" : "OFF"));
                     },
-                    [this]() {
-                        if (onSequenceTick) onSequenceTick();
+                    [uiCallback, this]() {
+                        if (uiCallback) {
+                            bool shiftState = getSequence().getIsShift();
+                            uiCallback(shiftState ? 1.0f : 0.0f);
+                        }
                     }
                 ));
             }
@@ -1217,6 +1230,7 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         // ========== REMAINING SEQUENCER CONTROL BUTTONS ==========
         case MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW: {
             if (isNoteOnOrCCPositive) {
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW);
                 queueCommand(ProcessorCommand(
                     [this]() {
                         bool isShifted = getSequence().getIsShift();
@@ -1227,6 +1241,11 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
                             // Normal: Page right (handled by UI)
                             DBG("  → Page right (UI only)");
                         }
+                    },
+                    [uiCallback]() {
+                        if (uiCallback) {
+                            uiCallback(1.0f);
+                        }
                     }
                 ));
             }
@@ -1235,6 +1254,7 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
 
         case MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL: {
             if (isNoteOnOrCCPositive) {
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL);
                 queueCommand(ProcessorCommand(
                     [this]() {
                         bool isShifted = getSequence().getIsShift();
@@ -1251,8 +1271,10 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
                             DBG("  → Nudged left");
                         }
                     },
-                    [this]() {
-                        if (onSequenceTick) onSequenceTick();
+                    [uiCallback]() {
+                        if (uiCallback) {
+                            uiCallback(1.0f);
+                        }
                     }
                 ));
             }
@@ -1261,6 +1283,7 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
 
         case MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE: {
             if (isNoteOnOrCCPositive) {
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE);
                 queueCommand(ProcessorCommand(
                     [this]() {
                         bool isShifted = getSequence().getIsShift();
@@ -1297,8 +1320,10 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
                             DBG("  → Nudged right");
                         }
                     },
-                    [this]() {
-                        if (onSequenceTick) onSequenceTick();
+                    [uiCallback]() {
+                        if (uiCallback) {
+                            uiCallback(1.0f);
+                        }
                     }
                 ));
             }
