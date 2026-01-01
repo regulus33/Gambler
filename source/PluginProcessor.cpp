@@ -737,7 +737,10 @@ void PluginProcessor::processMidiInput(const juce::MidiBuffer& midiMessages) {
                     DBG("Learned: CH" << channel << "-CC" << ccNumber);
                     // Trigger UI update callback
                     if (onMidiLearned) {
+                        DBG("  Calling onMidiLearned callback");
                         onMidiLearned();
+                    } else {
+                        DBG("  WARNING: onMidiLearned callback is null!");
                     }
                     continue;  // Don't process as regular mapping
                 }
@@ -785,7 +788,10 @@ void PluginProcessor::processMidiInput(const juce::MidiBuffer& midiMessages) {
                     DBG("Learned: CH" << channel << "-N" << noteNumber);
                     // Trigger UI update callback
                     if (onMidiLearned) {
+                        DBG("  Calling onMidiLearned callback");
                         onMidiLearned();
+                    } else {
+                        DBG("  WARNING: onMidiLearned callback is null!");
                     }
                     continue;  // Don't process as regular mapping
                 }

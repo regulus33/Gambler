@@ -379,6 +379,9 @@ public:
         // Repaint the sequencer steps to show updated note values
         sequencerSteps.repaint();
 
+        // Repaint the sequencer controls to show updated MIDI mappings
+        sequencerControls.repaint();
+
         // Update the note range gauge to highlight the current playing note
         const auto& step = seq.getStep(currentStep);
         int currentNote = step.getStepNotes().getCurrentNote().getNoteNumber();
