@@ -9,6 +9,7 @@
 #include "backend/ProcessorCommand.h"
 #include "backend/MidiMappingManager.h"
 #include "backend/MidiLearnRegistry.h"
+#include "backend/MidiUIUpdateCallbacks.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 
@@ -104,6 +105,10 @@ public:
     MidiLearnRegistry& getMidiLearnRegistry() noexcept { return midiLearnRegistry; }
     const MidiLearnRegistry& getMidiLearnRegistry() const noexcept { return midiLearnRegistry; }
 
+    // MIDI UI update callbacks (for visual feedback when MIDI controls UI)
+    MidiUIUpdateCallbacks& getMidiUICallbacks() noexcept { return midiUICallbacks; }
+    const MidiUIUpdateCallbacks& getMidiUICallbacks() const noexcept { return midiUICallbacks; }
+
     /**
      * Get the current plugin state as XML (for preset saving)
      * This creates a complete snapshot of all state that should be saved.
@@ -186,6 +191,9 @@ private:
 
     // MIDI learn registry for user-configurable mappings
     MidiLearnRegistry midiLearnRegistry;
+
+    // MIDI UI update callbacks for visual feedback
+    MidiUIUpdateCallbacks midiUICallbacks;
 
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();

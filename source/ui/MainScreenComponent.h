@@ -507,6 +507,9 @@ private:
         // Wire up MIDI learn registry for sequencer controls
         sequencerControls.setRegistry(&processorRef.getMidiLearnRegistry());
 
+        // Register UI update callbacks for MIDI control
+        setupMidiUICallbacks();
+
         // Setup callback for control button clicks
         // Button indices: 0=Roll, 1=Page<-, 2=Page->, 3=Length+, 4=Length-, 5=Nudge<-, 6=Nudge->, 7=Shift
         sequencerControls.onButtonClicked = [this](int buttonIndex) {
@@ -806,6 +809,56 @@ private:
             int windowRow = clampedWindow / 8;  // Convert window start (0, 8, 16, ..., 56) to row (0-7)
             sequenceOverview.getSequenceGrid().setCurrentWindowRow(windowRow);
         }
+    }
+
+    /**
+     * Register UI update callbacks for MIDI control
+     * These callbacks are invoked when MIDI changes state, to provide visual feedback
+     */
+    void setupMidiUICallbacks() {
+        auto& callbacks = processorRef.getMidiUICallbacks();
+
+        // Roll button - repaint to show pressed state
+        callbacks.registerCallback(MidiControlId::BUTTON_ROLL, [this]() {
+            sequencerControls.repaint();
+        });
+
+        // Other sequencer control buttons - repaint for visual feedback
+        callbacks.registerCallback(MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE, [this]() {
+            sequencerControls.repaint();
+            sequencerSteps.repaint();
+        });
+
+        callbacks.registerCallback(MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW, [this]() {
+            sequencerControls.repaint();
+            sequencerSteps.repaint();
+        });
+
+        callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP, [this]() {
+            sequencerControls.repaint();
+            sequencerSteps.repaint();
+            sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+        });
+
+        callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP, [this]() {
+            sequencerControls.repaint();
+            sequencerSteps.repaint();
+            sequenceOverview.getSequenceGrid().updateFromSequence(processorRef.getSequence());
+        });
+
+        callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL, [this]() {
+            sequencerControls.repaint();
+            sequencerSteps.repaint();
+        });
+
+        callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE, [this]() {
+            sequencerControls.repaint();
+            sequencerSteps.repaint();
+        });
+
+        callbacks.registerCallback(MidiControlId::BUTTON_SHIFT, [this]() {
+            sequencerControls.repaint();
+        });
     }
 
     PluginProcessor& processorRef;

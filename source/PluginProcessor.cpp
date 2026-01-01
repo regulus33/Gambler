@@ -899,10 +899,14 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
 
         // ========== ROLL BUTTON (Momentary) ==========
         case MidiControlId::BUTTON_ROLL: {
-            queueCommand(ProcessorCommand([this, isNoteOnOrCCPositive]() {
-                getSequence().setIsRandom(isNoteOnOrCCPositive);
-                DBG("  → Roll " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }));
+            auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_ROLL);
+            queueCommand(ProcessorCommand(
+                [this, isNoteOnOrCCPositive]() {
+                    getSequence().setIsRandom(isNoteOnOrCCPositive);
+                    DBG("  → Roll " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+                },
+                uiCallback  // UI update callback (e.g., button visual feedback)
+            ));
             break;
         }
 
