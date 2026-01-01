@@ -271,18 +271,16 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             DBG("MIDI Note OFF: " << lastPlayedNote);
         }
 
-        // Tick the sequence to get the next note
-        int note = sequence.tick();
+        // Tick the sequence to get the next note (using APVTS-backed state)
+        auto& state = getState();
+        int note = state.tick();
+        int currentStepIndex = state.getCurrentIndex();
 
-        DBG("Clock tick! Step: " << sequence.getCurrentIndex() << ", Note: " << note);
-
-        // Get current step to record rest if roll is engaged
-        auto& currentStep = sequence.getCurrentStep();
+        DBG("Clock tick! Step: " << currentStepIndex << ", Note: " << note);
 
         if (note >= 0) {
-            // Get step modulations for this step
-            const auto& stepMods = currentStep.getStepModulations();
-            auto selectedMods = stepMods.getSelectedModulations();
+            // Get step modulations for this step (using APVTS-backed state)
+            auto selectedMods = state.getSelectedModulations(currentStepIndex);
 
             // Determine velocity (default to 100 if no velocity modulation is selected)
             juce::uint8 velocity = 100;
@@ -337,8 +335,8 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             }
 
             if (samplesPerStep > 0.0) {
-                // Calculate note-off time based on note length percentage
-                double noteLengthPercent = userPreferences.defaultNoteLength;
+                // Calculate note-off time based on note length percentage (using APVTS-backed state)
+                double noteLengthPercent = state.getNoteLength();
                 juce::int64 noteOffDelay = static_cast<juce::int64>(samplesPerStep * noteLengthPercent);
                 scheduledNoteOffSample = currentSamplePosition + noteOffDelay;
                 scheduledNoteOffNote = note;
@@ -350,13 +348,9 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         } else {
             // Rest - no note to play
             lastPlayedNote = -1;
-
-            // If roll is engaged, record this step as a rest (note number = -1)
-            if (sequence.getIsRandom()) {
-                int idx = currentStep.getStepNotes().getCurrentIndex();
-                if (idx == -1) idx = 0;
-                currentStep.getStepNotes().setNote(idx, -1);
-                DBG("Rest recorded at step: " << sequence.getCurrentIndex());
+            // Note: Rest recording is now handled inside state.tick() when roll is engaged
+            if (state.getIsRandom()) {
+                DBG("Rest recorded at step: " << currentStepIndex);
             }
         }
 

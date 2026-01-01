@@ -422,19 +422,40 @@ public:
 
             setLastProbabilityIndex(probabilityIndex);
 
-            // Check play probability - if false, return -1 (rest)
+            // Tick the substep first to advance the substep index
+            int substepIdx = tickStepSubstepOnly(currentIndex);
+
+            // Check play probability - if false, record rest and return -1
             if (!getPlayProbability(probabilityIndex)) {
+                // Record this step as a rest (note number = -1)
+                setStepNote(currentIndex, substepIdx, -1);
                 return -1;
             }
 
             // Probability check passed - randomize the current step's note
             randomizeStepNote(currentIndex);
+            return getStepNote(currentIndex, substepIdx);
         } else {
             setLastProbabilityIndex(-1);
         }
 
         // Tick the current step's substep and return its note
         return tickStep(currentIndex);
+    }
+
+    /**
+     * Advance a step's substep index without returning the note
+     * Used internally by tick() when we need to advance first, then decide what to do
+     */
+    int tickStepSubstepOnly(int stepIndex) {
+        int substepLength = getStepNotesLength(stepIndex);
+        int substepIndex = getStepNotesCurrentIndex(stepIndex);
+
+        // Advance substep index
+        substepIndex = (substepIndex + 1) % substepLength;
+        setStepNotesCurrentIndex(stepIndex, substepIndex);
+
+        return substepIndex;
     }
 
     /**
