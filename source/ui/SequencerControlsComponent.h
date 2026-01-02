@@ -1,7 +1,9 @@
 #pragma once
 
 #include "Icons.h"
+#include "StateListenerComponent.h"
 #include "../backend/MidiLearnRegistry.h"
+#include "../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace SequencerControlsConstants {
@@ -37,8 +39,14 @@ namespace SequencerControlsConstants {
  * - Nudge -> (shift notes right)
  *
  * Each button is 92×92 pixels with 18px spacing, matching the SequencerStepsComponent above.
+ *
+ * APVTS-Driven State:
+ * - Roll button visual state is driven by SEQ_IS_RANDOM parameter
+ * - Shift button visual state is driven by SEQ_IS_SHIFT parameter
+ * - This ensures UI updates automatically when parameters change from any source
+ *   (UI click, MIDI controller, DAW automation)
  */
-class SequencerControlsComponent : public juce::Component {
+class SequencerControlsComponent : public StateListenerComponent {
 public:
     // Button indices for clarity
     static constexpr int kRollButton = 0;
@@ -50,7 +58,13 @@ public:
     static constexpr int kNudgeRightButton = 6;
     static constexpr int kShiftButton = 7;
 
-    SequencerControlsComponent() {
+    explicit SequencerControlsComponent(PluginProcessor& processor)
+        : StateListenerComponent(processor) {
+
+        // Subscribe to APVTS parameters that drive button visual state
+        listenToParameter(Params::Keys::ID::SEQ_IS_RANDOM);
+        listenToParameter(Params::Keys::ID::SEQ_IS_SHIFT);
+
         // Create 8 buttons
         for (int i = 0; i < 8; i++) {
             auto* button = new ControlButton();
@@ -140,9 +154,9 @@ public:
         }
     }
 
-    // Check if Shift mode is active
+    // Check if Shift mode is active - reads from APVTS for consistency
     bool isShiftActive() const {
-        return isButtonToggled(kShiftButton);
+        return getState().getIsShift();
     }
 
     // Set the MIDI learn registry (called from parent)
@@ -204,6 +218,30 @@ public:
             buttons[kNudgeRightButton]->setIcon(Icons::createNudgeRightIcon());
             buttons[kNudgeRightButton]->setLabel("Nudge");
         }
+    }
+
+protected:
+    // ========================================
+    // StateListenerComponent implementation
+    // ========================================
+
+    /**
+     * Called on message thread when SEQ_IS_RANDOM or SEQ_IS_SHIFT changes.
+     * Updates button visual states to reflect APVTS state.
+     */
+    void onStateChanged() override {
+        // Read current state from APVTS
+        bool isRandom = getState().getIsRandom();
+        bool isShift = getState().getIsShift();
+
+        // Update Roll button visual state (momentary button shows pressed when random is active)
+        buttons[kRollButton]->setPressed(isRandom);
+
+        // Update Shift button visual state (toggle button)
+        buttons[kShiftButton]->setToggled(isShift);
+
+        // Update button appearances based on shift state
+        updateShiftedButtonAppearances();
     }
 
 private:

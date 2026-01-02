@@ -66,8 +66,9 @@ public:
     explicit MainScreenComponent(PluginProcessor& processor)
         : processorRef(processor),
           pianoRoll(processor),
-          sequencerSteps(processor),
           midiDataPerStep(processor),
+          sequencerSteps(processor),
+          sequencerControls(processor),
           mainControls(processor),
           sequenceOverview(processor),
           subsequenceControls(processor),
@@ -573,9 +574,8 @@ private:
                         DBG("Nudge right");
                     }
                     break;
-                case 7:  // Shift - toggle shift mode
+                case 7:  // Shift - toggle shift mode (UI updates via APVTS listener)
                     state.setIsShift(!state.getIsShift());
-                    sequencerControls.setButtonToggled(7, state.getIsShift());
                     DBG("Shift mode: " + juce::String(state.getIsShift() ? "ON" : "OFF"));
                     break;
                 default:
@@ -642,11 +642,8 @@ private:
     void setupMidiUICallbacks() {
         auto& callbacks = processorRef.getMidiUICallbacks();
 
-        // Roll button - set pressed state (momentary button)
-        callbacks.registerCallback(MidiControlId::BUTTON_ROLL, [this](float value) {
-            bool pressed = (value > 0.5f);  // Convert to boolean
-            sequencerControls.setButtonPressed(SequencerControlsComponent::kRollButton, pressed);
-        });
+        // Note: Roll and Shift button UI updates are now handled automatically via APVTS listeners
+        // in SequencerControlsComponent::onStateChanged()
 
         // Other sequencer control buttons - trigger visual update (momentary actions)
         callbacks.registerCallback(MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE, [this](float value) {
@@ -674,11 +671,6 @@ private:
 
         callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE, [this](float value) {
             sequencerSteps.repaint();
-        });
-
-        callbacks.registerCallback(MidiControlId::BUTTON_SHIFT, [this](float value) {
-            bool toggled = (value > 0.5f);
-            sequencerControls.setButtonToggled(SequencerControlsComponent::kShiftButton, toggled);
         });
     }
 
