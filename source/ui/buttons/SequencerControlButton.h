@@ -1,0 +1,180 @@
+#pragma once
+
+#include "../StateListenerComponent.h"
+#include "../Icons.h"
+#include "../../backend/MidiLearnRegistry.h"
+#include "../../data/Params.h"
+#include <juce_gui_basics/juce_gui_basics.h>
+
+// Use the same constants as SequencerControlsComponent for visual consistency
+namespace SequencerButtonConstants {
+    constexpr float cornerRadius = 4.4f;
+    constexpr float borderWidth = 2.2f;
+    constexpr juce::uint32 bgColorActive = 0xffffffff;     // White when active
+    constexpr juce::uint32 bgColorInactive = 0xff303030;  // Dark grey when inactive
+    constexpr float maxIconSize = 26.0f;
+    constexpr float textAreaHeight = 16.0f;
+    constexpr float iconVerticalOffset = 13.0f;
+    constexpr float fontSize = 10.0f;
+    constexpr float textYOffset = 4.0f;
+    constexpr float textHeight = 12.0f;
+}
+
+/**
+ * SequencerControlButton - Base class for APVTS-driven sequencer control buttons
+ * 
+ * This implements the observer pattern where:
+ * 1. mouseDown/mouseUp only set the APVTS parameter (true/false)
+ * 2. Visual state is driven entirely by listening to the APVTS parameter
+ * 3. Actions are triggered by PluginProcessor's parameterChanged listener
+ * 
+ * Subclasses just need to specify:
+ * - The parameter ID to control
+ * - The icon and label
+ * - The MidiControlId for MIDI learn
+ */
+class SequencerControlButton : public StateListenerComponent {
+public:
+    SequencerControlButton(PluginProcessor& processor, 
+                           const juce::String& paramId,
+                           MidiControlId midiControlId)
+        : StateListenerComponent(processor)
+        , paramId_(paramId)
+        , midiControlId_(midiControlId)
+    {
+        // Subscribe to our parameter
+        listenToParameter(paramId_);
+    }
+
+    void setIcon(const juce::Path& icon) {
+        iconPath_ = icon;
+        repaint();
+    }
+
+    void setLabel(const juce::String& label) {
+        label_ = label;
+        repaint();
+    }
+
+    void setRegistry(MidiLearnRegistry* reg) {
+        registry_ = reg;
+    }
+
+    void paint(juce::Graphics& g) override {
+        using namespace SequencerButtonConstants;
+        auto bounds = getLocalBounds().toFloat();
+
+        // Visual state is driven by APVTS parameter
+        bool isActive = isParamOn();
+        juce::Colour bgColor = isActive ? juce::Colour(bgColorActive) : juce::Colour(bgColorInactive);
+        juce::Colour borderColor = juce::Colours::white;
+        juce::Colour contentColor = isActive ? juce::Colours::black : juce::Colours::white;
+
+        // Fill background
+        g.setColour(bgColor);
+        g.fillRoundedRectangle(bounds, cornerRadius);
+
+        // Draw border
+        g.setColour(borderColor);
+        float inset = borderWidth * 0.5f;
+        g.drawRoundedRectangle(bounds.reduced(inset), cornerRadius - inset, borderWidth);
+
+        // Draw icon
+        if (iconPath_.has_value()) {
+            g.setColour(contentColor);
+            auto iconBounds = iconPath_->getBounds();
+            float longestSide = juce::jmax(iconBounds.getWidth(), iconBounds.getHeight());
+            float scale = maxIconSize / longestSide;
+            float iconAreaHeight = bounds.getHeight() - textAreaHeight;
+            float scaledWidth = iconBounds.getWidth() * scale;
+            float scaledHeight = iconBounds.getHeight() * scale;
+            float offsetX = (bounds.getWidth() - scaledWidth) * 0.5f;
+            float offsetY = (iconAreaHeight - scaledHeight) * 0.5f + iconVerticalOffset;
+
+            juce::AffineTransform transform = juce::AffineTransform::scale(scale)
+                .translated(offsetX - iconBounds.getX() * scale,
+                           offsetY - iconBounds.getY() * scale);
+            g.fillPath(*iconPath_, transform);
+        }
+
+        // Draw label
+        if (label_.isNotEmpty()) {
+            g.setColour(contentColor);
+            juce::Font font{juce::FontOptions(fontSize)};
+            font.setBold(true);
+            g.setFont(font);
+            float textY = bounds.getHeight() - textYOffset - textHeight;
+            g.drawText(label_, juce::Rectangle<float>(0, textY, bounds.getWidth(), textHeight).toNearestInt(),
+                      juce::Justification::centredBottom);
+        }
+
+        // Draw MIDI learn overlay
+        paintMidiLearnOverlay(g);
+    }
+
+    void mouseDown(const juce::MouseEvent& event) override {
+        // Handle MIDI learn mode
+        if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT) {
+            registry_->setLearningControl(midiControlId_);
+            repaint();
+            return;
+        }
+
+        // Set parameter to ON - this triggers the listener chain
+        setParamOn(true);
+    }
+
+    void mouseUp(const juce::MouseEvent& event) override {
+        // Set parameter to OFF
+        setParamOn(false);
+    }
+
+protected:
+    void onStateChanged() override {
+        // Parameter changed - repaint to reflect new state
+        repaint();
+    }
+
+    bool isParamOn() const {
+        if (auto* param = getProcessor().getAPVTS().getParameter(paramId_)) {
+            return param->getValue() > 0.5f;
+        }
+        return false;
+    }
+
+    void setParamOn(bool on) {
+        if (auto* param = getProcessor().getAPVTS().getParameter(paramId_)) {
+            param->setValueNotifyingHost(on ? 1.0f : 0.0f);
+        }
+    }
+
+private:
+    void paintMidiLearnOverlay(juce::Graphics& g) {
+        if (!registry_ || !registry_->isLearning()) return;
+        if (midiControlId_ == MidiControlId::COUNT) return;
+
+        auto bounds = getLocalBounds();
+        bool isLearningThis = (registry_->getLearningControl() == midiControlId_);
+
+        g.setColour(juce::Colour(0x4080CCFF));
+        g.fillRoundedRectangle(bounds.toFloat(), SequencerButtonConstants::cornerRadius);
+
+        if (isLearningThis) {
+            g.setColour(juce::Colours::white);
+            g.drawRoundedRectangle(bounds.toFloat().reduced(1.5f), SequencerButtonConstants::cornerRadius, 3.0f);
+        }
+
+        if (const auto* midiId = registry_->getMidiForControl(midiControlId_)) {
+            g.setColour(juce::Colours::white);
+            g.setFont(9.0f);
+            g.drawText(midiId->toString(), bounds, juce::Justification::centred);
+        }
+    }
+
+    juce::String paramId_;
+    MidiControlId midiControlId_;
+    juce::String label_;
+    std::optional<juce::Path> iconPath_;
+    MidiLearnRegistry* registry_ = nullptr;
+};
+

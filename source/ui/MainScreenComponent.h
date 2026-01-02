@@ -474,8 +474,8 @@ private:
                 }
 
                 case SequencerControlsComponent::kLengthPlusButton:
-                    state.increaseLength();
-                    DBG("Length increased to: " + juce::String(state.getLength()));
+                    // Now handled via observer pattern in PluginProcessor::parameterChanged
+                    // The LengthPlusButton sets the APVTS param, which triggers the action
                     break;
 
                 case SequencerControlsComponent::kLengthMinusButton:
@@ -661,10 +661,8 @@ private:
             sequencerSteps.repaint();
         });
 
-        callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_PLUS, [this](float value) {
-            sequencerSteps.repaint();
-            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-        });
+        // LENGTH_PLUS no longer needs a callback here - UI updates automatically via
+        // StateListenerComponent observing SEQ_LENGTH parameter changes
 
         callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_MINUS, [this](float value) {
             sequencerSteps.repaint();

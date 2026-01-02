@@ -2,6 +2,7 @@
 
 #include "Icons.h"
 #include "StateListenerComponent.h"
+#include "buttons/LengthPlusButton.h"
 #include "../backend/MidiLearnRegistry.h"
 #include "../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -81,7 +82,8 @@ public:
     static constexpr int kTotalButtons = kPrimaryRowCount + kSecondaryRowCount;
 
     explicit SequencerControlsComponent(PluginProcessor& processor)
-        : StateListenerComponent(processor) {
+        : StateListenerComponent(processor)
+        , lengthPlusButton(processor) {
 
         // Subscribe to APVTS parameters that drive button visual state
         listenToParameter(Params::Keys::ID::SEQ_IS_RANDOM);
@@ -107,9 +109,9 @@ public:
         buttons[kPageRightButton]->setLabel("Page");
         buttons[kPageRightButton]->setMidiControlId(MidiControlId::BUTTON_PAGE_RIGHT);
 
-        buttons[kLengthPlusButton]->setIcon(Icons::createLengthPlusIcon());
-        buttons[kLengthPlusButton]->setLabel("Length");
-        buttons[kLengthPlusButton]->setMidiControlId(MidiControlId::BUTTON_LENGTH_PLUS);
+        // Length+ button uses new observer pattern - hide old button, use new component
+        buttons[kLengthPlusButton]->setVisible(false);
+        addAndMakeVisible(lengthPlusButton);
 
         buttons[kLengthMinusButton]->setIcon(Icons::createLengthMinusIcon());
         buttons[kLengthMinusButton]->setLabel("Length");
@@ -176,6 +178,12 @@ public:
                                  static_cast<int>(buttonSize));
         }
 
+        // Position the new LengthPlusButton in the same spot as the old one
+        float lengthPlusX = kLengthPlusButton * (buttonSize + gap);
+        lengthPlusButton.setBounds(static_cast<int>(lengthPlusX), 0,
+                                   static_cast<int>(buttonSize),
+                                   static_cast<int>(buttonSize));
+
         // Layout secondary row (below primary, positions 1-6 to align with Page Left through Nudge Right)
         // Secondary buttons align with primary buttons at indices 1-6
         for (int i = 0; i < kSecondaryRowCount; i++) {
@@ -226,6 +234,8 @@ public:
         for (auto* button : buttons) {
             button->setRegistry(reg);
         }
+        // Also set on new observer-pattern buttons
+        lengthPlusButton.setRegistry(reg);
     }
 
     // Update secondary row visibility based on Shift state
@@ -498,5 +508,8 @@ private:
 
     juce::OwnedArray<ControlButton> buttons;
     MidiLearnRegistry* registry = nullptr;
+
+    // New observer-pattern buttons (replacing old ControlButton instances)
+    LengthPlusButton lengthPlusButton;
 };
 

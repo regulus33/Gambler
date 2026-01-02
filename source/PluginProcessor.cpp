@@ -435,9 +435,22 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
 //==============================================================================
 
 void PluginProcessor::parameterChanged (const juce::String& parameterID, float newValue) {
-    juce::ignoreUnused(parameterID, newValue);
-    // APVTS parameters are used for UI state only
-    // Sequence data is persisted directly via toXml/fromXml
+    // Handle sequencer control button actions
+    // These are triggered when the button param transitions to ON (true)
+    // The param is set by UI clicks, DAW automation, or MIDI input
+
+    bool isOn = newValue > 0.5f;
+
+    // ========== SEQUENCER CONTROL BUTTONS ==========
+    // Only trigger action on the ON transition (debounce)
+
+    if (parameterID == Params::Keys::ID::LENGTH_PLUS && isOn) {
+        getState().increaseLength();
+        DBG("LENGTH_PLUS triggered - new length: " << getState().getLength());
+    }
+
+    // TODO: Add other button handlers as they are migrated:
+    // LENGTH_MINUS, NUDGE_LEFT, NUDGE_RIGHT, INDEX_LEFT, INDEX_RIGHT, etc.
 }
 
 //==============================================================================
