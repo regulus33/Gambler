@@ -1,6 +1,5 @@
 #include "ProbabilityControlsComponent.h"
 #include "../PluginProcessor.h"
-#include "../backend/ProcessorCommand.h"
 
 ProbabilityControlsComponent::ProbabilityControlsComponent(PluginProcessor& processor)
     : processorRef(processor)

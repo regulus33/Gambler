@@ -5,7 +5,6 @@
 #include "BinaryData.h"
 #include "StateListenerComponent.h"
 #include "../PluginProcessor.h"
-#include "../backend/ProcessorCommand.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <vector>
 #include <functional>
@@ -39,9 +38,9 @@ namespace MidiDataPerStepConstants {
  * - 4px spacing between all grid items
  *
  * Thread-safe communication:
- * - ComboBox changes trigger ProcessorCommand to update CC numbers in audio thread
- * - Slider changes trigger ProcessorCommand to update modulation values in audio thread
- * - Lane enable/disable triggers ProcessorCommand to update selected state in audio thread
+ * - ComboBox changes update CC numbers via APVTS-backed SequenceState (thread-safe)
+ * - Slider changes update modulation values via APVTS-backed SequenceState (thread-safe)
+ * - Lane enable/disable updates selected state via APVTS-backed SequenceState (thread-safe)
  *
  * Observer Pattern:
  * - Listens to all modulation parameters for all steps
@@ -111,15 +110,11 @@ public:
                 if (selectedId > 0) {
                     int ccNumber = selectedId - 1; // ID is 1-based, CC is 0-based
 
-                    // Queue command to update CC number in audio thread
-                    getProcessor().queueCommand(ProcessorCommand([this, laneIndex, ccNumber]() {
-                        auto& seq = getProcessor().getSequence();
-                        int selectedStep = seq.getSelectedStepForEditing();
-
-                        auto& stepMods = seq.getStep(selectedStep).getStepModulations();
-                        stepMods.setModulationCCNumber(laneIndex, ccNumber);
-                        DBG("Lane " + juce::String(laneIndex) + " CC changed to: " + juce::String(ccNumber));
-                    }));
+                    // Update CC number via APVTS-backed state (thread-safe)
+                    auto& state = getProcessor().getState();
+                    int selectedStep = state.getSelectedStepForEditing();
+                    state.setStepModCCNum(selectedStep, laneIndex, ccNumber);
+                    DBG("Lane " + juce::String(laneIndex) + " CC changed to: " + juce::String(ccNumber));
                 }
             };
 
@@ -157,15 +152,11 @@ public:
                 // Convert 0.0-1.0 to 0-127 MIDI range
                 int midiValue = static_cast<int>(value * 127.0f);
 
-                // Queue command to update modulation value in audio thread
-                getProcessor().queueCommand(ProcessorCommand([this, laneIndex, midiValue]() {
-                    auto& seq = getProcessor().getSequence();
-                    int selectedStep = seq.getSelectedStepForEditing();
-
-                    auto& stepMods = seq.getStep(selectedStep).getStepModulations();
-                    stepMods.setModulationValue(laneIndex, midiValue);
-                    DBG("Lane " + juce::String(laneIndex) + " value changed to: " + juce::String(midiValue));
-                }));
+                // Update modulation value via APVTS-backed state (thread-safe)
+                auto& state = getProcessor().getState();
+                int selectedStep = state.getSelectedStepForEditing();
+                state.setStepModValue(selectedStep, laneIndex, midiValue);
+                DBG("Lane " + juce::String(laneIndex) + " value changed to: " + juce::String(midiValue));
             };
 
         }
@@ -193,15 +184,11 @@ public:
         if (laneIndex < static_cast<int> (sliders.size()))
             sliders[static_cast<size_t> (laneIndex)]->setAlpha (alpha);
 
-        // Queue command to update selected state in audio thread
-        getProcessor().queueCommand(ProcessorCommand([this, laneIndex, shouldBeEnabled]() {
-            auto& seq = getProcessor().getSequence();
-            int selectedStep = seq.getSelectedStepForEditing();
-
-            auto& stepMods = seq.getStep(selectedStep).getStepModulations();
-            stepMods.setModulationSelected(laneIndex, shouldBeEnabled);
-            // DBG("Lane " + juce::String(laneIndex) + " selected state: " + juce::String(shouldBeEnabled));
-        }));
+        // Update selected state via APVTS-backed state (thread-safe)
+        auto& state = getProcessor().getState();
+        int selectedStep = state.getSelectedStepForEditing();
+        state.setStepModSelected(selectedStep, laneIndex, shouldBeEnabled);
+        // DBG("Lane " + juce::String(laneIndex) + " selected state: " + juce::String(shouldBeEnabled));
     }
 
     void toggleLaneEnabled (int laneIndex)
@@ -280,6 +267,9 @@ protected:
     {
         juce::Random random;
 
+        auto& state = getProcessor().getState();
+        int selectedStep = state.getSelectedStepForEditing();
+
         for (int i = 0; i < 7; ++i) {
             // Pick a random CC number (0-127)
             int randomCC = random.nextInt(128);
@@ -287,15 +277,9 @@ protected:
             // Update the ComboBox UI
             dummyDropdowns[i]->setSelectedId(randomCC + 1, juce::dontSendNotification);
 
-            // Update the backend
-            getProcessor().queueCommand(ProcessorCommand([this, i, randomCC]() {
-                auto& seq = getProcessor().getSequence();
-                int selectedStep = seq.getSelectedStepForEditing();
-
-                auto& stepMods = seq.getStep(selectedStep).getStepModulations();
-                stepMods.setModulationCCNumber(i, randomCC);
-                DBG("Lane " + juce::String(i) + " randomized to CC: " + juce::String(randomCC));
-            }));
+            // Update the backend via APVTS-backed state (thread-safe)
+            state.setStepModCCNum(selectedStep, i, randomCC);
+            DBG("Lane " + juce::String(i) + " randomized to CC: " + juce::String(randomCC));
         }
     }
 

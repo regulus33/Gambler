@@ -22,8 +22,8 @@ namespace ProbabilityControlsConstants {
  * Contains an AnalogueSlider (left) and ProbabilityGauge (right) in a 2-column layout.
  *
  * Thread-safe communication:
- * - Slider changes trigger ProcessorCommand to randomize probability in audio thread
- * - Completion callback updates gauge with the randomized data from backend
+ * - Slider changes update probability via APVTS-backed SequenceState (thread-safe)
+ * - Gauge is updated immediately after state change
  */
 class ProbabilityControlsComponent : public juce::Component {
 public:

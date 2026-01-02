@@ -174,12 +174,10 @@ private:
             };
 
             settingsScreen->onPlayClicked = [this]() {
-                processorRef.queueCommand(ProcessorCommand([this]() {
-                    // Reset sequence to beginning and start clock
-                    processorRef.getSequence().reset();
-                    processorRef.getClock().start();
-                    DBG("Play clicked - sequence reset to index 0, clock started");
-                }));
+                // Reset sequence to beginning and start clock via APVTS-backed state
+                processorRef.getState().reset();
+                processorRef.getClock().start();
+                DBG("Play clicked - sequence reset to index 0, clock started");
             };
 
             settingsScreen->onStopClicked = [this]() {
