@@ -112,7 +112,7 @@ namespace Params
             // ========================================
             // UI STATE (kept for backward compatibility)
             // ========================================
-            // Bottom row buttons (momentary/trigger)
+            // Primary row buttons (momentary/trigger)
             inline const String ROLL = "roll";
             inline const String INDEX_LEFT = "index_left";
             inline const String INDEX_RIGHT = "index_right";
@@ -121,6 +121,14 @@ namespace Params
             inline const String NUDGE_LEFT = "nudge_left";
             inline const String NUDGE_RIGHT = "nudge_right";
             inline const String SHIFT = "shift";
+
+            // Secondary row buttons (visible when Shift is active)
+            inline const String DUPLICATE = "duplicate";
+            inline const String CLEAR_WINDOW = "clear_window";
+            inline const String CLEAR_STEP = "clear_step";
+            inline const String RANDOMIZE_STEP = "randomize_step";
+            inline const String RANDOMIZE_ALL = "randomize_all";
+            inline const String SHUFFLE = "shuffle";
 
             // Top right buttons
             inline const String EXPORT = "export";
@@ -209,7 +217,7 @@ namespace Params
             inline const String PREF_FOLLOW_PLAYBACK = "Follow Playback";
             inline const String PREF_NOTE_LENGTH = "Note Length";
 
-            // Legacy UI labels
+            // Legacy UI labels - Primary row
             inline const String ROLL = "Roll";
             inline const String INDEX_LEFT = "Index Left";
             inline const String INDEX_RIGHT = "Index Right";
@@ -218,6 +226,15 @@ namespace Params
             inline const String NUDGE_LEFT = "Nudge Left";
             inline const String NUDGE_RIGHT = "Nudge Right";
             inline const String SHIFT = "Shift";
+
+            // Secondary row labels
+            inline const String DUPLICATE = "Duplicate";
+            inline const String CLEAR_WINDOW = "Clear Window";
+            inline const String CLEAR_STEP = "Clear Step";
+            inline const String RANDOMIZE_STEP = "Randomize Step";
+            inline const String RANDOMIZE_ALL = "Randomize All";
+            inline const String SHUFFLE = "Shuffle";
+
             inline const String EXPORT = "Export";
             inline const String SAVE = "Save";
             inline const String LOAD = "Load";
@@ -363,6 +380,7 @@ namespace Params
         // ========================================
         // LEGACY UI STATE (for backward compatibility)
         // ========================================
+        // Primary row buttons
         params.push_back(createBoolParam(Keys::ID::ROLL, Keys::LABEL::ROLL));
         params.push_back(createBoolParam(Keys::ID::INDEX_LEFT, Keys::LABEL::INDEX_LEFT));
         params.push_back(createBoolParam(Keys::ID::INDEX_RIGHT, Keys::LABEL::INDEX_RIGHT));
@@ -371,6 +389,15 @@ namespace Params
         params.push_back(createBoolParam(Keys::ID::NUDGE_LEFT, Keys::LABEL::NUDGE_LEFT));
         params.push_back(createBoolParam(Keys::ID::NUDGE_RIGHT, Keys::LABEL::NUDGE_RIGHT));
         params.push_back(createBoolParam(Keys::ID::SHIFT, Keys::LABEL::SHIFT));
+
+        // Secondary row buttons (visible when Shift is active)
+        params.push_back(createBoolParam(Keys::ID::DUPLICATE, Keys::LABEL::DUPLICATE));
+        params.push_back(createBoolParam(Keys::ID::CLEAR_WINDOW, Keys::LABEL::CLEAR_WINDOW));
+        params.push_back(createBoolParam(Keys::ID::CLEAR_STEP, Keys::LABEL::CLEAR_STEP));
+        params.push_back(createBoolParam(Keys::ID::RANDOMIZE_STEP, Keys::LABEL::RANDOMIZE_STEP));
+        params.push_back(createBoolParam(Keys::ID::RANDOMIZE_ALL, Keys::LABEL::RANDOMIZE_ALL));
+        params.push_back(createBoolParam(Keys::ID::SHUFFLE, Keys::LABEL::SHUFFLE));
+
         params.push_back(createBoolParam(Keys::ID::EXPORT, Keys::LABEL::EXPORT));
         params.push_back(createBoolParam(Keys::ID::SAVE, Keys::LABEL::SAVE));
         params.push_back(createBoolParam(Keys::ID::LOAD, Keys::LABEL::LOAD));

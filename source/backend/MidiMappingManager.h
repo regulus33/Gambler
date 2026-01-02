@@ -171,16 +171,25 @@ private:
         addMapping({ MidiMessageType::CC, 36, MidiControlId::SUBSEQ_BAR_6, 0.0f, 1.0f, false });
         addMapping({ MidiMessageType::CC, 37, MidiControlId::SUBSEQ_BAR_7, 0.0f, 1.0f, false });
 
-        // ========== SEQUENCER CONTROL BUTTONS (Notes 36-43 = C2-G2) ==========
+        // ========== SEQUENCER CONTROL BUTTONS - PRIMARY ROW (Notes 36-43 = C2-G2) ==========
         // Momentary behavior: Note On = press, Note Off = release
         addMapping({ MidiMessageType::NOTE, 36, MidiControlId::BUTTON_ROLL, 0.0f, 1.0f, false });
-        addMapping({ MidiMessageType::NOTE, 37, MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE, 0.0f, 1.0f, false });
-        addMapping({ MidiMessageType::NOTE, 38, MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW, 0.0f, 1.0f, false });
-        addMapping({ MidiMessageType::NOTE, 39, MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP, 0.0f, 1.0f, false });
-        addMapping({ MidiMessageType::NOTE, 40, MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP, 0.0f, 1.0f, false });
-        addMapping({ MidiMessageType::NOTE, 41, MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL, 0.0f, 1.0f, false });
-        addMapping({ MidiMessageType::NOTE, 42, MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE, 0.0f, 1.0f, false });
+        addMapping({ MidiMessageType::NOTE, 37, MidiControlId::BUTTON_PAGE_LEFT, 0.0f, 1.0f, false });
+        addMapping({ MidiMessageType::NOTE, 38, MidiControlId::BUTTON_PAGE_RIGHT, 0.0f, 1.0f, false });
+        addMapping({ MidiMessageType::NOTE, 39, MidiControlId::BUTTON_LENGTH_PLUS, 0.0f, 1.0f, false });
+        addMapping({ MidiMessageType::NOTE, 40, MidiControlId::BUTTON_LENGTH_MINUS, 0.0f, 1.0f, false });
+        addMapping({ MidiMessageType::NOTE, 41, MidiControlId::BUTTON_NUDGE_LEFT, 0.0f, 1.0f, false });
+        addMapping({ MidiMessageType::NOTE, 42, MidiControlId::BUTTON_NUDGE_RIGHT, 0.0f, 1.0f, false });
         addMapping({ MidiMessageType::NOTE, 43, MidiControlId::BUTTON_SHIFT, 0.0f, 1.0f, false });
+
+        // ========== SEQUENCER CONTROL BUTTONS - SECONDARY ROW (Notes 24-29 = C1-F1) ==========
+        // These are the "shifted" functions, now as separate buttons
+        addMapping({ MidiMessageType::NOTE, 24, MidiControlId::BUTTON_DUPLICATE, 0.0f, 1.0f, false });
+        addMapping({ MidiMessageType::NOTE, 25, MidiControlId::BUTTON_CLEAR_WINDOW, 0.0f, 1.0f, false });
+        addMapping({ MidiMessageType::NOTE, 26, MidiControlId::BUTTON_CLEAR_STEP, 0.0f, 1.0f, false });
+        addMapping({ MidiMessageType::NOTE, 27, MidiControlId::BUTTON_RANDOMIZE_STEP, 0.0f, 1.0f, false });
+        addMapping({ MidiMessageType::NOTE, 28, MidiControlId::BUTTON_RANDOMIZE_ALL, 0.0f, 1.0f, false });
+        addMapping({ MidiMessageType::NOTE, 29, MidiControlId::BUTTON_SHUFFLE, 0.0f, 1.0f, false });
 
         // ========== SEQUENCER WINDOW STEPS (Notes 48-55 = C3-G3) ==========
         // Alternate note-based triggering for drum pad controllers

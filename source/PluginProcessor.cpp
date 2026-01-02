@@ -878,70 +878,60 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
             break;
         }
 
-        // ========== SEQUENCER CONTROL BUTTONS ==========
-        case MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE: {
+        // ========== SEQUENCER CONTROL BUTTONS - PRIMARY ROW ==========
+        case MidiControlId::BUTTON_PAGE_LEFT: {
             if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE);
-                bool isShifted = state.getIsShift();
-                if (isShifted) {
-                    // Shifted: Duplicate sequence
-                    int currentLength = state.getLength();
-                    int newLength = juce::jmin(currentLength * 2, ParamConstants::MAX_STEPS);
-                    int stepsToCopy = newLength - currentLength;
-
-                    for (int i = 0; i < stepsToCopy; i++) {
-                        int srcIdx = i;
-                        int dstIdx = currentLength + i;
-                        state.setStepNotesLength(dstIdx, state.getStepNotesLength(srcIdx));
-                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                            state.setStepNote(dstIdx, n, state.getStepNote(srcIdx, n));
-                        }
-                    }
-                    state.setLength(newLength);
-                    DBG("  → Duplicated sequence to " << newLength << " steps");
-                } else {
-                    DBG("  → Page left (UI only)");
-                }
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_PAGE_LEFT);
+                DBG("  → Page left (UI only)");
                 if (uiCallback) uiCallback(1.0f);
             }
             break;
         }
 
-        case MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP: {
+        case MidiControlId::BUTTON_PAGE_RIGHT: {
             if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP);
-                bool isShifted = state.getIsShift();
-                if (isShifted) {
-                    // Shifted: Clear current step
-                    int selectedStep = state.getSelectedStepForEditing();
-                    for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                        state.setStepNote(selectedStep, n, -1);
-                    }
-                    DBG("  → Cleared step " << selectedStep);
-                } else {
-                    // Normal: Increase length
-                    state.increaseLength();
-                    DBG("  → Length increased to " << state.getLength());
-                }
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_PAGE_RIGHT);
+                DBG("  → Page right (UI only)");
                 if (uiCallback) uiCallback(1.0f);
             }
             break;
         }
 
-        case MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP: {
+        case MidiControlId::BUTTON_LENGTH_PLUS: {
             if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP);
-                bool isShifted = state.getIsShift();
-                if (isShifted) {
-                    // Shifted: Randomize current step
-                    int selectedStep = state.getSelectedStepForEditing();
-                    state.randomizeStepNote(selectedStep);
-                    DBG("  → Randomized step " << selectedStep);
-                } else {
-                    // Normal: Decrease length
-                    state.decreaseLength();
-                    DBG("  → Length decreased to " << state.getLength());
-                }
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_LENGTH_PLUS);
+                state.increaseLength();
+                DBG("  → Length increased to " << state.getLength());
+                if (uiCallback) uiCallback(1.0f);
+            }
+            break;
+        }
+
+        case MidiControlId::BUTTON_LENGTH_MINUS: {
+            if (isNoteOnOrCCPositive) {
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_LENGTH_MINUS);
+                state.decreaseLength();
+                DBG("  → Length decreased to " << state.getLength());
+                if (uiCallback) uiCallback(1.0f);
+            }
+            break;
+        }
+
+        case MidiControlId::BUTTON_NUDGE_LEFT: {
+            if (isNoteOnOrCCPositive) {
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_NUDGE_LEFT);
+                state.nudgeLeft();
+                DBG("  → Nudged left");
+                if (uiCallback) uiCallback(1.0f);
+            }
+            break;
+        }
+
+        case MidiControlId::BUTTON_NUDGE_RIGHT: {
+            if (isNoteOnOrCCPositive) {
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_NUDGE_RIGHT);
+                state.nudgeRight();
+                DBG("  → Nudged right");
                 if (uiCallback) uiCallback(1.0f);
             }
             break;
@@ -1093,76 +1083,101 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
             break;
         }
 
-        // ========== REMAINING SEQUENCER CONTROL BUTTONS ==========
-        case MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW: {
+        // ========== SEQUENCER CONTROL BUTTONS - SECONDARY ROW ==========
+        case MidiControlId::BUTTON_DUPLICATE: {
             if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW);
-                bool isShifted = state.getIsShift();
-                if (isShifted) {
-                    DBG("  → Clear window (UI only)");
-                } else {
-                    DBG("  → Page right (UI only)");
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_DUPLICATE);
+                int currentLength = state.getLength();
+                int newLength = juce::jmin(currentLength * 2, ParamConstants::MAX_STEPS);
+                int stepsToCopy = newLength - currentLength;
+
+                for (int i = 0; i < stepsToCopy; i++) {
+                    int srcIdx = i;
+                    int dstIdx = currentLength + i;
+                    state.setStepNotesLength(dstIdx, state.getStepNotesLength(srcIdx));
+                    for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                        state.setStepNote(dstIdx, n, state.getStepNote(srcIdx, n));
+                    }
                 }
+                state.setLength(newLength);
+                DBG("  → Duplicated sequence to " << newLength << " steps");
                 if (uiCallback) uiCallback(1.0f);
             }
             break;
         }
 
-        case MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL: {
+        case MidiControlId::BUTTON_CLEAR_WINDOW: {
             if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL);
-                bool isShifted = state.getIsShift();
-                if (isShifted) {
-                    // Shifted: Randomize all steps
-                    for (int i = 0; i < ParamConstants::MAX_STEPS; i++) {
-                        state.randomizeStepNote(i);
-                    }
-                    DBG("  → Randomized all steps");
-                } else {
-                    // Normal: Nudge left
-                    state.nudgeLeft();
-                    DBG("  → Nudged left");
-                }
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_CLEAR_WINDOW);
+                DBG("  → Clear window (UI only - window position not tracked in processor)");
                 if (uiCallback) uiCallback(1.0f);
             }
             break;
         }
 
-        case MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE: {
+        case MidiControlId::BUTTON_CLEAR_STEP: {
             if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE);
-                bool isShifted = state.getIsShift();
-                if (isShifted) {
-                    // Shifted: Shuffle all steps
-                    int len = state.getLength();
-                    static std::random_device rd;
-                    static std::mt19937 gen(rd());
-                    for (int i = len - 1; i > 0; i--) {
-                        std::uniform_int_distribution<> dis(0, i);
-                        int j = dis(gen);
-                        // Swap steps i and j
-                        int lenI = state.getStepNotesLength(i);
-                        std::array<int, ParamConstants::MAX_SUBSTEPS> notesI;
-                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                            notesI[n] = state.getStepNote(i, n);
-                        }
-                        // Copy j to i
-                        state.setStepNotesLength(i, state.getStepNotesLength(j));
-                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                            state.setStepNote(i, n, state.getStepNote(j, n));
-                        }
-                        // Copy saved i to j
-                        state.setStepNotesLength(j, lenI);
-                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                            state.setStepNote(j, n, notesI[n]);
-                        }
-                    }
-                    DBG("  → Shuffled all steps");
-                } else {
-                    // Normal: Nudge right
-                    state.nudgeRight();
-                    DBG("  → Nudged right");
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_CLEAR_STEP);
+                int selectedStep = state.getSelectedStepForEditing();
+                for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                    state.setStepNote(selectedStep, n, -1);
                 }
+                DBG("  → Cleared step " << selectedStep);
+                if (uiCallback) uiCallback(1.0f);
+            }
+            break;
+        }
+
+        case MidiControlId::BUTTON_RANDOMIZE_STEP: {
+            if (isNoteOnOrCCPositive) {
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_RANDOMIZE_STEP);
+                int selectedStep = state.getSelectedStepForEditing();
+                state.randomizeStepNote(selectedStep);
+                DBG("  → Randomized step " << selectedStep);
+                if (uiCallback) uiCallback(1.0f);
+            }
+            break;
+        }
+
+        case MidiControlId::BUTTON_RANDOMIZE_ALL: {
+            if (isNoteOnOrCCPositive) {
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_RANDOMIZE_ALL);
+                for (int i = 0; i < state.getLength(); i++) {
+                    state.randomizeStepNote(i);
+                }
+                DBG("  → Randomized all steps");
+                if (uiCallback) uiCallback(1.0f);
+            }
+            break;
+        }
+
+        case MidiControlId::BUTTON_SHUFFLE: {
+            if (isNoteOnOrCCPositive) {
+                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_SHUFFLE);
+                int len = state.getLength();
+                static std::random_device rd;
+                static std::mt19937 gen(rd());
+                for (int i = len - 1; i > 0; i--) {
+                    std::uniform_int_distribution<> dis(0, i);
+                    int j = dis(gen);
+                    // Swap steps i and j
+                    int lenI = state.getStepNotesLength(i);
+                    std::array<int, ParamConstants::MAX_SUBSTEPS> notesI;
+                    for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                        notesI[static_cast<size_t>(n)] = state.getStepNote(i, n);
+                    }
+                    // Copy j to i
+                    state.setStepNotesLength(i, state.getStepNotesLength(j));
+                    for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                        state.setStepNote(i, n, state.getStepNote(j, n));
+                    }
+                    // Copy saved i to j
+                    state.setStepNotesLength(j, lenI);
+                    for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                        state.setStepNote(j, n, notesI[static_cast<size_t>(n)]);
+                    }
+                }
+                DBG("  → Shuffled all steps");
                 if (uiCallback) uiCallback(1.0f);
             }
             break;

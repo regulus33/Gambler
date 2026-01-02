@@ -8,6 +8,7 @@ ProcessorCommand MidiCommandFactory::createButtonCommand(
     UIUpdateCallback uiCallback)
 {
     switch (controlId) {
+        // ========== PRIMARY ROW BUTTONS ==========
         case MidiControlId::BUTTON_ROLL:
             // Roll button - momentary: enables random mode while pressed
             return ProcessorCommand(
@@ -32,9 +33,7 @@ ProcessorCommand MidiCommandFactory::createButtonCommand(
             }
             return createNoOpCommand(controlId);
 
-        case MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP:
-            // Length + (or Clear Step when shifted)
-            // For now, just implement length increase
+        case MidiControlId::BUTTON_LENGTH_PLUS:
             return ProcessorCommand(
                 [&sequence]() {
                     sequence.increaseLength();
@@ -43,9 +42,7 @@ ProcessorCommand MidiCommandFactory::createButtonCommand(
                 uiCallback
             );
 
-        case MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP:
-            // Length - (or Randomize Step when shifted)
-            // For now, just implement length decrease
+        case MidiControlId::BUTTON_LENGTH_MINUS:
             return ProcessorCommand(
                 [&sequence]() {
                     sequence.decreaseLength();
@@ -54,8 +51,7 @@ ProcessorCommand MidiCommandFactory::createButtonCommand(
                 uiCallback
             );
 
-        case MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL:
-            // Nudge left (or Randomize All when shifted)
+        case MidiControlId::BUTTON_NUDGE_LEFT:
             return ProcessorCommand(
                 [&sequence]() {
                     sequence.nudgeLeft();
@@ -64,8 +60,7 @@ ProcessorCommand MidiCommandFactory::createButtonCommand(
                 uiCallback
             );
 
-        case MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE:
-            // Nudge right (or Shuffle when shifted)
+        case MidiControlId::BUTTON_NUDGE_RIGHT:
             return ProcessorCommand(
                 [&sequence]() {
                     sequence.nudgeRight();
@@ -74,14 +69,81 @@ ProcessorCommand MidiCommandFactory::createButtonCommand(
                 uiCallback
             );
 
-        case MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE:
-        case MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW:
+        case MidiControlId::BUTTON_PAGE_LEFT:
+        case MidiControlId::BUTTON_PAGE_RIGHT:
             // Page left/right - these are UI-only (change window view)
             // We'll handle these via UI callback only
             if (isPressed && uiCallback) {
                 return ProcessorCommand(
                     [controlId]() {
                         DBG("MIDI Page button - " << getMidiControlName(controlId));
+                    },
+                    uiCallback
+                );
+            }
+            return createNoOpCommand(controlId);
+
+        // ========== SECONDARY ROW BUTTONS ==========
+        case MidiControlId::BUTTON_DUPLICATE:
+            // Duplicate sequence - handled via UI callback (needs access to state)
+            if (isPressed && uiCallback) {
+                return ProcessorCommand(
+                    []() { DBG("MIDI Duplicate button pressed"); },
+                    uiCallback
+                );
+            }
+            return createNoOpCommand(controlId);
+
+        case MidiControlId::BUTTON_CLEAR_WINDOW:
+            // Clear current window - handled via UI callback
+            if (isPressed && uiCallback) {
+                return ProcessorCommand(
+                    []() { DBG("MIDI Clear Window button pressed"); },
+                    uiCallback
+                );
+            }
+            return createNoOpCommand(controlId);
+
+        case MidiControlId::BUTTON_CLEAR_STEP:
+            // Clear current step - handled via UI callback
+            if (isPressed && uiCallback) {
+                return ProcessorCommand(
+                    []() { DBG("MIDI Clear Step button pressed"); },
+                    uiCallback
+                );
+            }
+            return createNoOpCommand(controlId);
+
+        case MidiControlId::BUTTON_RANDOMIZE_STEP:
+            // Randomize current step
+            if (isPressed && uiCallback) {
+                return ProcessorCommand(
+                    []() { DBG("MIDI Randomize Step button pressed"); },
+                    uiCallback
+                );
+            }
+            return createNoOpCommand(controlId);
+
+        case MidiControlId::BUTTON_RANDOMIZE_ALL:
+            // Randomize all steps
+            if (isPressed) {
+                return ProcessorCommand(
+                    [&sequence]() {
+                        sequence.randomizeAllNotes();
+                        DBG("MIDI Randomize All");
+                    },
+                    uiCallback
+                );
+            }
+            return createNoOpCommand(controlId);
+
+        case MidiControlId::BUTTON_SHUFFLE:
+            // Shuffle step order
+            if (isPressed) {
+                return ProcessorCommand(
+                    [&sequence]() {
+                        sequence.shuffle();
+                        DBG("MIDI Shuffle");
                     },
                     uiCallback
                 );

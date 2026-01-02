@@ -320,6 +320,54 @@ public:
     }
 
     /**
+     * Randomize all notes in the sequence.
+     * Each step's current substep note is randomized within the scale and range.
+     */
+    void randomizeAllNotes() {
+        for (int stepIdx = 0; stepIdx < length; stepIdx++) {
+            steps[stepIdx].randomizeNote(scale);
+        }
+    }
+
+    /**
+     * Shuffle the order of steps in the sequence.
+     * Randomly reorders all steps within the current length.
+     */
+    void shuffle() {
+        if (length <= 1) return;
+
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+        // Fisher-Yates shuffle on step data
+        for (int i = length - 1; i > 0; i--) {
+            std::uniform_int_distribution<> dist(0, i);
+            int j = dist(gen);
+
+            // Swap step data (notes and modulations)
+            if (i != j) {
+                // Swap StepNotes
+                auto& notesI = steps[i].getStepNotes();
+                auto& notesJ = steps[j].getStepNotes();
+
+                // Swap all substep notes
+                for (int n = 0; n < StepNotes::MAX_LENGTH; n++) {
+                    int noteI = notesI.getNote(n).getNoteNumber();
+                    int noteJ = notesJ.getNote(n).getNoteNumber();
+                    notesI.setNote(n, noteJ);
+                    notesJ.setNote(n, noteI);
+                }
+
+                // Swap substep lengths
+                int lenI = notesI.getLength();
+                int lenJ = notesJ.getLength();
+                notesI.setLength(lenJ);
+                notesJ.setLength(lenI);
+            }
+        }
+    }
+
+    /**
      * Serialize entire sequence state to XML
      * This is the main entry point for saving plugin state
      */

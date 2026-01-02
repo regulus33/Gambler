@@ -28,15 +28,25 @@ namespace SequencerControlsConstants {
 /**
  * SequencerControlsComponent
  *
- * Displays 8 control buttons below the sequencer steps:
- * - Roll (toggle random mode)
- * - Shift (modifier key)
+ * Displays two rows of control buttons below the sequencer steps:
+ *
+ * PRIMARY ROW (always visible, 8 buttons):
+ * - Roll (momentary: enable random mode while held)
  * - Page <- (page view window left by 8 steps)
  * - Page -> (page view window right by 8 steps)
  * - Length + (increase sequence length)
  * - Length - (decrease sequence length)
- * - Nudge <- (shift notes left)
- * - Nudge -> (shift notes right)
+ * - Nudge <- (shift all notes left)
+ * - Nudge -> (shift all notes right)
+ * - Shift (toggle to show/hide secondary row)
+ *
+ * SECONDARY ROW (visible when Shift is active, 6 buttons):
+ * - Duplicate (double sequence length, copy content)
+ * - Clear (clear current 8-step window)
+ * - Clear Step (clear current step to rest)
+ * - Randomize Step (randomize current step)
+ * - Randomize All (randomize all steps)
+ * - Shuffle (shuffle step order)
  *
  * Each button is 92×92 pixels with 18px spacing, matching the SequencerStepsComponent above.
  *
@@ -48,7 +58,7 @@ namespace SequencerControlsConstants {
  */
 class SequencerControlsComponent : public StateListenerComponent {
 public:
-    // Button indices for clarity
+    // Primary row button indices (0-7)
     static constexpr int kRollButton = 0;
     static constexpr int kPageLeftButton = 1;
     static constexpr int kPageRightButton = 2;
@@ -58,6 +68,18 @@ public:
     static constexpr int kNudgeRightButton = 6;
     static constexpr int kShiftButton = 7;
 
+    // Secondary row button indices (8-13)
+    static constexpr int kDuplicateButton = 8;
+    static constexpr int kClearWindowButton = 9;
+    static constexpr int kClearStepButton = 10;
+    static constexpr int kRandomizeStepButton = 11;
+    static constexpr int kRandomizeAllButton = 12;
+    static constexpr int kShuffleButton = 13;
+
+    static constexpr int kPrimaryRowCount = 8;
+    static constexpr int kSecondaryRowCount = 6;
+    static constexpr int kTotalButtons = kPrimaryRowCount + kSecondaryRowCount;
+
     explicit SequencerControlsComponent(PluginProcessor& processor)
         : StateListenerComponent(processor) {
 
@@ -65,73 +87,111 @@ public:
         listenToParameter(Params::Keys::ID::SEQ_IS_RANDOM);
         listenToParameter(Params::Keys::ID::SEQ_IS_SHIFT);
 
-        // Create 8 buttons
-        for (int i = 0; i < 8; i++) {
+        // Create all buttons (primary + secondary rows)
+        for (int i = 0; i < kTotalButtons; i++) {
             auto* button = new ControlButton();
             buttons.add(button);
             addAndMakeVisible(button);
         }
 
-        // Set button icons, labels, and MIDI control IDs (normal mode)
+        // ========== PRIMARY ROW SETUP ==========
         buttons[kRollButton]->setIcon(Icons::createDiceIcon());
         buttons[kRollButton]->setLabel("Roll");
         buttons[kRollButton]->setMidiControlId(MidiControlId::BUTTON_ROLL);
 
         buttons[kPageLeftButton]->setIcon(Icons::createIndexLeftIcon());
         buttons[kPageLeftButton]->setLabel("Page");
-        buttons[kPageLeftButton]->setMidiControlId(MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE);
+        buttons[kPageLeftButton]->setMidiControlId(MidiControlId::BUTTON_PAGE_LEFT);
 
         buttons[kPageRightButton]->setIcon(Icons::createIndexRightIcon());
         buttons[kPageRightButton]->setLabel("Page");
-        buttons[kPageRightButton]->setMidiControlId(MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW);
+        buttons[kPageRightButton]->setMidiControlId(MidiControlId::BUTTON_PAGE_RIGHT);
 
         buttons[kLengthPlusButton]->setIcon(Icons::createLengthPlusIcon());
         buttons[kLengthPlusButton]->setLabel("Length");
-        buttons[kLengthPlusButton]->setMidiControlId(MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP);
+        buttons[kLengthPlusButton]->setMidiControlId(MidiControlId::BUTTON_LENGTH_PLUS);
 
         buttons[kLengthMinusButton]->setIcon(Icons::createLengthMinusIcon());
         buttons[kLengthMinusButton]->setLabel("Length");
-        buttons[kLengthMinusButton]->setMidiControlId(MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP);
+        buttons[kLengthMinusButton]->setMidiControlId(MidiControlId::BUTTON_LENGTH_MINUS);
 
         buttons[kNudgeLeftButton]->setIcon(Icons::createNudgeLeftIcon());
         buttons[kNudgeLeftButton]->setLabel("Nudge");
-        buttons[kNudgeLeftButton]->setMidiControlId(MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL);
+        buttons[kNudgeLeftButton]->setMidiControlId(MidiControlId::BUTTON_NUDGE_LEFT);
 
         buttons[kNudgeRightButton]->setIcon(Icons::createNudgeRightIcon());
         buttons[kNudgeRightButton]->setLabel("Nudge");
-        buttons[kNudgeRightButton]->setMidiControlId(MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE);
+        buttons[kNudgeRightButton]->setMidiControlId(MidiControlId::BUTTON_NUDGE_RIGHT);
 
         buttons[kShiftButton]->setIcon(Icons::createShiftIcon());
         buttons[kShiftButton]->setLabel("Shift");
         buttons[kShiftButton]->setMidiControlId(MidiControlId::BUTTON_SHIFT);
-
-        // Set toggle state for Shift only (Roll is momentary)
         buttons[kShiftButton]->setToggleable(true);
+
+        // ========== SECONDARY ROW SETUP ==========
+        buttons[kDuplicateButton]->setIcon(Icons::createDupIcon());
+        buttons[kDuplicateButton]->setLabel("Duplicate");
+        buttons[kDuplicateButton]->setMidiControlId(MidiControlId::BUTTON_DUPLICATE);
+
+        buttons[kClearWindowButton]->setIcon(Icons::createTrashIcon());
+        buttons[kClearWindowButton]->setLabel("Clear");
+        buttons[kClearWindowButton]->setMidiControlId(MidiControlId::BUTTON_CLEAR_WINDOW);
+
+        buttons[kClearStepButton]->setIcon(Icons::createEraserIcon());
+        buttons[kClearStepButton]->setLabel("Clear Step");
+        buttons[kClearStepButton]->setMidiControlId(MidiControlId::BUTTON_CLEAR_STEP);
+
+        buttons[kRandomizeStepButton]->setIcon(Icons::createDiceOneIcon());
+        buttons[kRandomizeStepButton]->setLabel("Step");
+        buttons[kRandomizeStepButton]->setMidiControlId(MidiControlId::BUTTON_RANDOMIZE_STEP);
+
+        buttons[kRandomizeAllButton]->setIcon(Icons::createRandomAllIcon());
+        buttons[kRandomizeAllButton]->setLabel("All");
+        buttons[kRandomizeAllButton]->setMidiControlId(MidiControlId::BUTTON_RANDOMIZE_ALL);
+
+        buttons[kShuffleButton]->setIcon(Icons::createShuffleIcon());
+        buttons[kShuffleButton]->setLabel("Shuffle");
+        buttons[kShuffleButton]->setMidiControlId(MidiControlId::BUTTON_SHUFFLE);
+
+        // Initially hide secondary row (Shift not active)
+        updateSecondaryRowVisibility();
     }
-    
+
     ~SequencerControlsComponent() override {
         buttons.clear(true);
     }
-    
+
     void paint (juce::Graphics& g) override {
         // Background is transparent - buttons draw themselves
     }
-    
+
     void resized() override {
         using namespace SequencerControlsConstants;
 
-        for (int i = 0; i < buttons.size(); i++) {
+        // Layout primary row (always visible)
+        for (int i = 0; i < kPrimaryRowCount; i++) {
             float x = i * (buttonSize + gap);
             buttons[i]->setBounds(static_cast<int>(x), 0,
                                  static_cast<int>(buttonSize),
                                  static_cast<int>(buttonSize));
         }
+
+        // Layout secondary row (below primary, positions 1-6 to align with Page Left through Nudge Right)
+        // Secondary buttons align with primary buttons at indices 1-6
+        for (int i = 0; i < kSecondaryRowCount; i++) {
+            int primaryAlignIndex = i + 1;  // Align with Page Left (1) through Nudge Right (6)
+            float x = primaryAlignIndex * (buttonSize + gap);
+            float y = buttonSize + gap;  // Below primary row
+            buttons[kPrimaryRowCount + i]->setBounds(static_cast<int>(x), static_cast<int>(y),
+                                                     static_cast<int>(buttonSize),
+                                                     static_cast<int>(buttonSize));
+        }
     }
-    
+
     // Callbacks for button clicks
     std::function<void(int buttonIndex)> onButtonClicked;
     std::function<void(int buttonIndex)> onButtonReleased;
-    
+
     // Get button toggle state (for Roll and Shift)
     bool isButtonToggled(int index) const {
         if (index >= 0 && index < buttons.size()) {
@@ -139,7 +199,7 @@ public:
         }
         return false;
     }
-    
+
     // Set button toggle state (for Roll and Shift)
     void setButtonToggled(int index, bool toggled) {
         if (index >= 0 && index < buttons.size()) {
@@ -168,55 +228,11 @@ public:
         }
     }
 
-    // Update button appearances based on Shift state
-    // Called when Shift is toggled to change icons/labels of affected buttons
-    void updateShiftedButtonAppearances() {
-        bool shifted = isShiftActive();
-
-        if (shifted) {
-            // Shifted mode: change affected buttons
-            // Page Left -> Duplicate
-            buttons[kPageLeftButton]->setIcon(Icons::createDupIcon());
-            buttons[kPageLeftButton]->setLabel("Duplicate");
-
-            // Page Right -> Clear (clears current sequence window)
-            buttons[kPageRightButton]->setIcon(Icons::createTrashIcon());
-            buttons[kPageRightButton]->setLabel("Clear");
-
-            // Length+ -> Clear Step (clears current step to rest)
-            buttons[kLengthPlusButton]->setIcon(Icons::createEraserIcon());
-            buttons[kLengthPlusButton]->setLabel("Clear Step");
-
-            // Length- -> Step (randomize current step)
-            buttons[kLengthMinusButton]->setIcon(Icons::createDiceOneIcon());
-            buttons[kLengthMinusButton]->setLabel("Step");
-
-            // Nudge Left -> All (randomize everything everywhere)
-            buttons[kNudgeLeftButton]->setIcon(Icons::createRandomAllIcon());
-            buttons[kNudgeLeftButton]->setLabel("All");
-
-            // Nudge Right -> Shuffle (randomly move around all steps)
-            buttons[kNudgeRightButton]->setIcon(Icons::createShuffleIcon());
-            buttons[kNudgeRightButton]->setLabel("Shuffle");
-        } else {
-            // Normal mode: restore original icons/labels
-            buttons[kPageLeftButton]->setIcon(Icons::createIndexLeftIcon());
-            buttons[kPageLeftButton]->setLabel("Page");
-
-            buttons[kPageRightButton]->setIcon(Icons::createIndexRightIcon());
-            buttons[kPageRightButton]->setLabel("Page");
-
-            buttons[kLengthPlusButton]->setIcon(Icons::createLengthPlusIcon());
-            buttons[kLengthPlusButton]->setLabel("Length");
-
-            buttons[kLengthMinusButton]->setIcon(Icons::createLengthMinusIcon());
-            buttons[kLengthMinusButton]->setLabel("Length");
-
-            buttons[kNudgeLeftButton]->setIcon(Icons::createNudgeLeftIcon());
-            buttons[kNudgeLeftButton]->setLabel("Nudge");
-
-            buttons[kNudgeRightButton]->setIcon(Icons::createNudgeRightIcon());
-            buttons[kNudgeRightButton]->setLabel("Nudge");
+    // Update secondary row visibility based on Shift state
+    void updateSecondaryRowVisibility() {
+        bool showSecondary = isShiftActive();
+        for (int i = kPrimaryRowCount; i < kTotalButtons; i++) {
+            buttons[i]->setVisible(showSecondary);
         }
     }
 
@@ -240,8 +256,8 @@ protected:
         // Update Shift button visual state (toggle button)
         buttons[kShiftButton]->setToggled(isShift);
 
-        // Update button appearances based on shift state
-        updateShiftedButtonAppearances();
+        // Update secondary row visibility based on shift state
+        updateSecondaryRowVisibility();
     }
 
 private:
@@ -362,7 +378,11 @@ private:
                           juce::Justification::centred);
             }
         }
-        
+
+        // This is the outermost captured click event for any button in this component, it then redirects
+        // this event to the appropriate callback related to that button.
+        // if shift we expose the shift buttons. (or we're supposed to but this is a bug now)
+        // if its within the functional index, we call the
         void mouseDown (const juce::MouseEvent& event) override {
             // Check if in MIDI learn mode first
             if (registry && registry->isLearning() && controlId != MidiControlId::COUNT) {
@@ -385,9 +405,9 @@ private:
                 // Find our index
                 int index = parent->buttons.indexOf(this);
 
-                // If Shift button was toggled, update button appearances
+                // If Shift button was toggled, update secondary row visibility
                 if (index == kShiftButton) {
-                    parent->updateShiftedButtonAppearances();
+                    parent->updateSecondaryRowVisibility();
                 }
 
                 if (parent->onButtonClicked) {

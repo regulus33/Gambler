@@ -445,139 +445,145 @@ private:
         setupMidiUICallbacks();
 
         // Setup callback for control button clicks
-        // Button indices: 0=Roll, 1=Page<-, 2=Page->, 3=Length+, 4=Length-, 5=Nudge<-, 6=Nudge->, 7=Shift
+        // Primary row: 0=Roll, 1=Page<-, 2=Page->, 3=Length+, 4=Length-, 5=Nudge<-, 6=Nudge->, 7=Shift
+        // Secondary row: 8=Duplicate, 9=Clear, 10=ClearStep, 11=RandomizeStep, 12=RandomizeAll, 13=Shuffle
         sequencerControls.onButtonClicked = [this](int buttonIndex) {
-            bool isShifted = sequencerControls.isShiftActive();
             auto& state = processorRef.getState();
 
             switch (buttonIndex) {
-                case 0:  // Roll - momentary: enable random mode while held (no UI update needed)
+                // ========== PRIMARY ROW ==========
+                case SequencerControlsComponent::kRollButton:
                     state.setIsRandom(true);
                     DBG("Roll pressed - random mode ON");
                     break;
-                case 1:  // Page <- OR Duplicate (when shifted)
-                    if (isShifted) {
-                        // Duplicate: copy entire sequence content, doubling length (capped at 64)
-                        int currentLength = state.getLength();
-                        int newLength = juce::jmin(currentLength * 2, ParamConstants::MAX_STEPS);
-                        int stepsToCopy = newLength - currentLength;
 
-                        // Copy steps from beginning to after current end
-                        for (int i = 0; i < stepsToCopy; i++) {
-                            int srcIdx = i;
-                            int dstIdx = currentLength + i;
-                            state.setStepNotesLength(dstIdx, state.getStepNotesLength(srcIdx));
-                            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                                state.setStepNote(dstIdx, n, state.getStepNote(srcIdx, n));
-                            }
-                        }
-                        // Update sequence length
-                        state.setLength(newLength);
-                        DBG("Duplicated sequence: " + juce::String(currentLength) + " -> " + juce::String(newLength) + " steps");
-                    } else {
-                        // Normal: Page left
-                        int currentWindow = sequencerSteps.getWindowStart();
-                        int newWindow = currentWindow - 8;
-                        setSequencerWindow(newWindow);
-                        DBG("Page left, window now at: " + juce::String(sequencerSteps.getWindowStart()));
-                    }
+                case SequencerControlsComponent::kPageLeftButton: {
+                    int currentWindow = sequencerSteps.getWindowStart();
+                    int newWindow = currentWindow - 8;
+                    setSequencerWindow(newWindow);
+                    DBG("Page left, window now at: " + juce::String(sequencerSteps.getWindowStart()));
                     break;
-                case 2:  // Page -> OR Clear (when shifted)
-                    if (isShifted) {
-                        // Clear: set all steps in current window to rest
-                        int windowStart = sequencerSteps.getWindowStart();
-                        for (int i = 0; i < 8; i++) {
-                            int stepIdx = windowStart + i;
-                            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                                state.setStepNote(stepIdx, n, -1);
-                            }
-                        }
-                        DBG("Cleared window starting at " + juce::String(windowStart));
-                    } else {
-                        // Normal: Page right
-                        int currentWindow = sequencerSteps.getWindowStart();
-                        int newWindow = currentWindow + 8;
-                        setSequencerWindow(newWindow);
-                        DBG("Page right, window now at: " + juce::String(sequencerSteps.getWindowStart()));
-                    }
+                }
+
+                case SequencerControlsComponent::kPageRightButton: {
+                    int currentWindow = sequencerSteps.getWindowStart();
+                    int newWindow = currentWindow + 8;
+                    setSequencerWindow(newWindow);
+                    DBG("Page right, window now at: " + juce::String(sequencerSteps.getWindowStart()));
                     break;
-                case 3:  // Length + OR Clear Step (when shifted)
-                    if (isShifted) {
-                        // Clear Step: set current step to rest
-                        int selectedStep = state.getSelectedStepForEditing();
-                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                            state.setStepNote(selectedStep, n, -1);
-                        }
-                        DBG("Cleared step " + juce::String(selectedStep));
-                    } else {
-                        // Normal: Length +
-                        state.increaseLength();
-                    }
+                }
+
+                case SequencerControlsComponent::kLengthPlusButton:
+                    state.increaseLength();
+                    DBG("Length increased to: " + juce::String(state.getLength()));
                     break;
-                case 4:  // Length - OR Step Randomize (when shifted)
-                    if (isShifted) {
-                        // Step: randomize current step's note
-                        int selectedStep = state.getSelectedStepForEditing();
-                        state.randomizeStepNote(selectedStep);
-                        DBG("Randomized step " + juce::String(selectedStep));
-                    } else {
-                        // Normal: Length -
-                        state.decreaseLength();
-                        DBG("Length decreased to: " + juce::String(state.getLength()));
-                    }
+
+                case SequencerControlsComponent::kLengthMinusButton:
+                    state.decreaseLength();
+                    DBG("Length decreased to: " + juce::String(state.getLength()));
                     break;
-                case 5:  // Nudge <- OR All Randomize (when shifted)
-                    if (isShifted) {
-                        // All: randomize all steps everywhere
-                        for (int i = 0; i < ParamConstants::MAX_STEPS; i++) {
-                            state.randomizeStepNote(i);
-                        }
-                        DBG("Randomized all steps");
-                    } else {
-                        // Normal: Nudge left
-                        state.nudgeLeft();
-                        DBG("Nudge left");
-                    }
+
+                case SequencerControlsComponent::kNudgeLeftButton:
+                    state.nudgeLeft();
+                    DBG("Nudge left");
                     break;
-                case 6:  // Nudge -> OR Shuffle (when shifted)
-                    if (isShifted) {
-                        // Shuffle: randomly rearrange all steps in the sequence
-                        int len = state.getLength();
-                        // Fisher-Yates shuffle on the step notes
-                        static std::random_device rd;
-                        static std::mt19937 gen(rd());
-                        for (int i = len - 1; i > 0; i--) {
-                            std::uniform_int_distribution<> dis(0, i);
-                            int j = dis(gen);
-                            // Swap steps i and j by swapping their note data
-                            // Save step i data
-                            int lenI = state.getStepNotesLength(i);
-                            std::array<int, ParamConstants::MAX_SUBSTEPS> notesI;
-                            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                                notesI[n] = state.getStepNote(i, n);
-                            }
-                            // Copy j to i
-                            state.setStepNotesLength(i, state.getStepNotesLength(j));
-                            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                                state.setStepNote(i, n, state.getStepNote(j, n));
-                            }
-                            // Copy saved i to j
-                            state.setStepNotesLength(j, lenI);
-                            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                                state.setStepNote(j, n, notesI[n]);
-                            }
-                        }
-                        DBG("Shuffled all steps");
-                    } else {
-                        // Normal: Nudge right
-                        state.nudgeRight();
-                        DBG("Nudge right");
-                    }
+
+                case SequencerControlsComponent::kNudgeRightButton:
+                    state.nudgeRight();
+                    DBG("Nudge right");
                     break;
-                case 7:  // Shift - toggle shift mode (UI updates via APVTS listener)
+
+                case SequencerControlsComponent::kShiftButton:
                     state.setIsShift(!state.getIsShift());
                     DBG("Shift mode: " + juce::String(state.getIsShift() ? "ON" : "OFF"));
                     break;
+
+                // ========== SECONDARY ROW ==========
+                case SequencerControlsComponent::kDuplicateButton: {
+                    // Duplicate: copy entire sequence content, doubling length (capped at 64)
+                    int currentLength = state.getLength();
+                    int newLength = juce::jmin(currentLength * 2, ParamConstants::MAX_STEPS);
+                    int stepsToCopy = newLength - currentLength;
+
+                    for (int i = 0; i < stepsToCopy; i++) {
+                        int srcIdx = i;
+                        int dstIdx = currentLength + i;
+                        state.setStepNotesLength(dstIdx, state.getStepNotesLength(srcIdx));
+                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                            state.setStepNote(dstIdx, n, state.getStepNote(srcIdx, n));
+                        }
+                    }
+                    state.setLength(newLength);
+                    DBG("Duplicated sequence: " + juce::String(currentLength) + " -> " + juce::String(newLength) + " steps");
+                    break;
+                }
+
+                case SequencerControlsComponent::kClearWindowButton: {
+                    // Clear: set all steps in current window to rest
+                    int windowStart = sequencerSteps.getWindowStart();
+                    for (int i = 0; i < 8; i++) {
+                        int stepIdx = windowStart + i;
+                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                            state.setStepNote(stepIdx, n, -1);
+                        }
+                    }
+                    DBG("Cleared window starting at " + juce::String(windowStart));
+                    break;
+                }
+
+                case SequencerControlsComponent::kClearStepButton: {
+                    // Clear Step: set current step to rest
+                    int selectedStep = state.getSelectedStepForEditing();
+                    for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                        state.setStepNote(selectedStep, n, -1);
+                    }
+                    DBG("Cleared step " + juce::String(selectedStep));
+                    break;
+                }
+
+                case SequencerControlsComponent::kRandomizeStepButton: {
+                    // Randomize current step's note
+                    int selectedStep = state.getSelectedStepForEditing();
+                    state.randomizeStepNote(selectedStep);
+                    DBG("Randomized step " + juce::String(selectedStep));
+                    break;
+                }
+
+                case SequencerControlsComponent::kRandomizeAllButton:
+                    // Randomize all steps
+                    for (int i = 0; i < state.getLength(); i++) {
+                        state.randomizeStepNote(i);
+                    }
+                    DBG("Randomized all steps");
+                    break;
+
+                case SequencerControlsComponent::kShuffleButton: {
+                    // Shuffle: randomly rearrange all steps in the sequence
+                    int len = state.getLength();
+                    static std::random_device rd;
+                    static std::mt19937 gen(rd());
+                    for (int i = len - 1; i > 0; i--) {
+                        std::uniform_int_distribution<> dis(0, i);
+                        int j = dis(gen);
+                        // Swap steps i and j
+                        int lenI = state.getStepNotesLength(i);
+                        std::array<int, ParamConstants::MAX_SUBSTEPS> notesI;
+                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                            notesI[n] = state.getStepNote(i, n);
+                        }
+                        state.setStepNotesLength(i, state.getStepNotesLength(j));
+                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                            state.setStepNote(i, n, state.getStepNote(j, n));
+                        }
+                        state.setStepNotesLength(j, lenI);
+                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                            state.setStepNote(j, n, notesI[n]);
+                        }
+                    }
+                    DBG("Shuffled all steps");
+                    break;
+                }
+
                 default:
                     break;
             }
@@ -586,7 +592,7 @@ private:
         // Setup callback for control button releases (for momentary buttons like Roll)
         sequencerControls.onButtonReleased = [this](int buttonIndex) {
             switch (buttonIndex) {
-                case 0:  // Roll - disable random mode when released
+                case SequencerControlsComponent::kRollButton:
                     processorRef.getState().setIsRandom(false);
                     DBG("Roll released - random mode OFF");
                     break;
@@ -645,32 +651,60 @@ private:
         // Note: Roll and Shift button UI updates are now handled automatically via APVTS listeners
         // in SequencerControlsComponent::onStateChanged()
 
-        // Other sequencer control buttons - trigger visual update (momentary actions)
-        callbacks.registerCallback(MidiControlId::BUTTON_PAGE_LEFT_SHIFT_DUPLICATE_SEQUENCE, [this](float value) {
+        // Primary row buttons - trigger visual update
+        callbacks.registerCallback(MidiControlId::BUTTON_PAGE_LEFT, [this](float value) {
             sequencerSteps.repaint();
             sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
         });
 
-        callbacks.registerCallback(MidiControlId::BUTTON_PAGE_RIGHT_SHIFT_CLEAR_WINDOW, [this](float value) {
+        callbacks.registerCallback(MidiControlId::BUTTON_PAGE_RIGHT, [this](float value) {
             sequencerSteps.repaint();
         });
 
-        callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_PLUS_SHIFT_CLEAR_STEP, [this](float value) {
+        callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_PLUS, [this](float value) {
             sequencerSteps.repaint();
             sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
         });
 
-        callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_MINUS_SHIFT_RANDOMIZE_STEP, [this](float value) {
+        callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_MINUS, [this](float value) {
             sequencerSteps.repaint();
             sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
         });
 
-        callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_LEFT_SHIFT_RANDOMIZE_ALL, [this](float value) {
+        callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_LEFT, [this](float value) {
             sequencerSteps.repaint();
         });
 
-        callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_RIGHT_SHIFT_SHUFFLE, [this](float value) {
+        callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_RIGHT, [this](float value) {
             sequencerSteps.repaint();
+        });
+
+        // Secondary row buttons - trigger visual update
+        callbacks.registerCallback(MidiControlId::BUTTON_DUPLICATE, [this](float value) {
+            sequencerSteps.repaint();
+            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
+        });
+
+        callbacks.registerCallback(MidiControlId::BUTTON_CLEAR_WINDOW, [this](float value) {
+            sequencerSteps.repaint();
+        });
+
+        callbacks.registerCallback(MidiControlId::BUTTON_CLEAR_STEP, [this](float value) {
+            sequencerSteps.repaint();
+        });
+
+        callbacks.registerCallback(MidiControlId::BUTTON_RANDOMIZE_STEP, [this](float value) {
+            sequencerSteps.repaint();
+        });
+
+        callbacks.registerCallback(MidiControlId::BUTTON_RANDOMIZE_ALL, [this](float value) {
+            sequencerSteps.repaint();
+            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
+        });
+
+        callbacks.registerCallback(MidiControlId::BUTTON_SHUFFLE, [this](float value) {
+            sequencerSteps.repaint();
+            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
         });
     }
 
