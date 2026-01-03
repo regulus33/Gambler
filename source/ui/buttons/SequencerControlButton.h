@@ -60,6 +60,10 @@ public:
         registry_ = reg;
     }
 
+    MidiLearnRegistry* getRegistry() const {
+        return registry_;
+    }
+
     void paint(juce::Graphics& g) override {
         using namespace SequencerButtonConstants;
         auto bounds = getLocalBounds().toFloat();
