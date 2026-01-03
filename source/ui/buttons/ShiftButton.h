@@ -3,31 +3,28 @@
 #include "SequencerControlButton.h"
 
 /**
- * ShiftButton - Toggles visibility of secondary button row
+ * ShiftButton - Toggles between normal and shift button modes
  *
  * Observer pattern implementation:
- * - mouseDown toggles SHIFT param (true <-> false)
+ * - mouseDown toggles SEQ_IS_SHIFT param directly (true <-> false)
  * - mouseUp does nothing (toggle persists)
- * - Visual state reflects SEQ_IS_SHIFT param (the actual state, not the button trigger)
- * - PluginProcessor::parameterChanged handles the state change
+ * - Visual state reflects SEQ_IS_SHIFT param value
  *
  * This is a TOGGLE button - clicking toggles the state, which persists until clicked again.
- *
- * Note: This button observes SEQ_IS_SHIFT for visual state (the actual shift mode state),
- * but sets the SHIFT param on click (the button trigger). The PluginProcessor bridges these.
+ * When shift is ON, buttons at positions 1-6 are replaced with alternate functions.
  */
 class ShiftButton : public SequencerControlButton {
 public:
     explicit ShiftButton(PluginProcessor& processor)
         : SequencerControlButton(processor,
-                                  Params::Keys::ID::SEQ_IS_SHIFT,  // Observe the state param for visuals
+                                  Params::Keys::ID::SEQ_IS_SHIFT,
                                   MidiControlId::BUTTON_SHIFT)
     {
         setIcon(Icons::createShiftIcon());
         setLabel("Shift");
     }
 
-    // Override mouseDown to toggle the SHIFT button param
+    // Override mouseDown to toggle SEQ_IS_SHIFT directly
     void mouseDown(const juce::MouseEvent& event) override {
         juce::ignoreUnused(event);
 
@@ -40,11 +37,8 @@ public:
             }
         }
 
-        // Toggle the SHIFT button param (not SEQ_IS_SHIFT - that's handled by PluginProcessor)
-        if (auto* param = getProcessor().getAPVTS().getParameter(Params::Keys::ID::SHIFT)) {
-            bool currentState = param->getValue() > 0.5f;
-            param->setValueNotifyingHost(currentState ? 0.0f : 1.0f);
-        }
+        // Toggle SEQ_IS_SHIFT directly
+        setParamOn(!isParamOn());
     }
 
     // Override mouseUp to do nothing (toggle persists)

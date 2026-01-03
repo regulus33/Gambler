@@ -42,25 +42,28 @@ namespace SequencerControlsConstants {
 /**
  * SequencerControlsComponent
  *
- * Displays two rows of control buttons below the sequencer steps:
+ * Displays a single row of 8 control buttons below the sequencer steps.
+ * When Shift is toggled, buttons at positions 1-6 are replaced with alternate functions.
  *
- * PRIMARY ROW (always visible, 8 buttons):
- * - Roll (momentary: enable random mode while held)
- * - Page <- (page view window left by 8 steps)
- * - Page -> (page view window right by 8 steps)
- * - Length + (increase sequence length)
- * - Length - (decrease sequence length)
- * - Nudge <- (shift all notes left)
- * - Nudge -> (shift all notes right)
- * - Shift (toggle to show/hide secondary row)
+ * NORMAL MODE (Shift OFF):
+ * Position 0: Roll (momentary: enable random mode while held)
+ * Position 1: Page <- (page view window left by 8 steps)
+ * Position 2: Page -> (page view window right by 8 steps)
+ * Position 3: Length + (increase sequence length)
+ * Position 4: Length - (decrease sequence length)
+ * Position 5: Nudge <- (shift all notes left)
+ * Position 6: Nudge -> (shift all notes right)
+ * Position 7: Shift (toggle to swap buttons)
  *
- * SECONDARY ROW (visible when Shift is active, 6 buttons):
- * - Duplicate (double sequence length, copy content)
- * - Clear (clear current 8-step window)
- * - Clear Step (clear current step to rest)
- * - Randomize Step (randomize current step)
- * - Randomize All (randomize all steps)
- * - Shuffle (shuffle step order)
+ * SHIFT MODE (Shift ON):
+ * Position 0: Roll (unchanged)
+ * Position 1: Duplicate (double sequence length, copy content)
+ * Position 2: Clear Window (clear current 8-step window)
+ * Position 3: Clear Step (clear current step to rest)
+ * Position 4: Randomize All (randomize all steps)
+ * Position 5: Randomize Step (randomize current step)
+ * Position 6: Shuffle (shuffle step order)
+ * Position 7: Shift (unchanged)
  *
  * Each button is 92×92 pixels with 18px spacing, matching the SequencerStepsComponent above.
  *
@@ -72,76 +75,66 @@ namespace SequencerControlsConstants {
  */
 class SequencerControlsComponent : public StateListenerComponent {
 public:
-    // Primary row button indices (0-7)
-    static constexpr int kRollButton = 0;
-    static constexpr int kPageLeftButton = 1;
-    static constexpr int kPageRightButton = 2;
-    static constexpr int kLengthPlusButton = 3;
-    static constexpr int kLengthMinusButton = 4;
-    static constexpr int kNudgeLeftButton = 5;
-    static constexpr int kNudgeRightButton = 6;
-    static constexpr int kShiftButton = 7;
-
-    // Secondary row button indices (8-13)
-    static constexpr int kDuplicateButton = 8;
-    static constexpr int kClearWindowButton = 9;
-    static constexpr int kClearStepButton = 10;
-    static constexpr int kRandomizeStepButton = 11;
-    static constexpr int kRandomizeAllButton = 12;
-    static constexpr int kShuffleButton = 13;
-
-    static constexpr int kPrimaryRowCount = 8;
-    static constexpr int kSecondaryRowCount = 6;
-    static constexpr int kTotalButtons = kPrimaryRowCount + kSecondaryRowCount;
+    // Button position indices
+    static constexpr int kPosition0 = 0;  // Roll (always)
+    static constexpr int kPosition1 = 1;  // Page Left / Duplicate
+    static constexpr int kPosition2 = 2;  // Page Right / Clear Window
+    static constexpr int kPosition3 = 3;  // Length+ / Clear Step
+    static constexpr int kPosition4 = 4;  // Length- / Randomize All
+    static constexpr int kPosition5 = 5;  // Nudge Left / Randomize Step
+    static constexpr int kPosition6 = 6;  // Nudge Right / Shuffle
+    static constexpr int kPosition7 = 7;  // Shift (always)
 
     explicit SequencerControlsComponent(PluginProcessor& processor)
         : StateListenerComponent(processor)
-        // Primary row buttons
+        // Always-visible buttons
         , rollButton(processor)
+        , shiftButton(processor)
+        // Normal mode buttons (positions 1-6)
         , pageLeftButton(processor)
         , pageRightButton(processor)
         , lengthPlusButton(processor)
         , lengthMinusButton(processor)
         , nudgeLeftButton(processor)
         , nudgeRightButton(processor)
-        , shiftButton(processor)
-        // Secondary row buttons
+        // Shift mode buttons (positions 1-6)
         , duplicateButton(processor)
         , clearWindowButton(processor)
         , clearStepButton(processor)
-        , randomizeStepButton(processor)
         , randomizeAllButton(processor)
+        , randomizeStepButton(processor)
         , shuffleButton(processor)
     {
-        // Subscribe to APVTS parameters for secondary row visibility
+        // Subscribe to shift state changes
         listenToParameter(Params::Keys::ID::SEQ_IS_SHIFT);
 
-        // ========== PRIMARY ROW - Add new observer-pattern buttons ==========
+        // ========== ALWAYS VISIBLE ==========
         addAndMakeVisible(rollButton);
+        addAndMakeVisible(shiftButton);
+
+        // ========== NORMAL MODE BUTTONS (positions 1-6) ==========
         addAndMakeVisible(pageLeftButton);
         addAndMakeVisible(pageRightButton);
         addAndMakeVisible(lengthPlusButton);
         addAndMakeVisible(lengthMinusButton);
         addAndMakeVisible(nudgeLeftButton);
         addAndMakeVisible(nudgeRightButton);
-        addAndMakeVisible(shiftButton);
 
-        // ========== SECONDARY ROW - Add new observer-pattern buttons ==========
-        addAndMakeVisible(duplicateButton);
-        addAndMakeVisible(clearWindowButton);
-        addAndMakeVisible(clearStepButton);
-        addAndMakeVisible(randomizeStepButton);
-        addAndMakeVisible(randomizeAllButton);
-        addAndMakeVisible(shuffleButton);
+        // ========== SHIFT MODE BUTTONS (positions 1-6) ==========
+        addChildComponent(duplicateButton);      // Hidden initially
+        addChildComponent(clearWindowButton);
+        addChildComponent(clearStepButton);
+        addChildComponent(randomizeAllButton);
+        addChildComponent(randomizeStepButton);
+        addChildComponent(shuffleButton);
 
-        // Initially hide secondary row (Shift not active)
-        updateSecondaryRowVisibility();
+        // Set initial visibility based on shift state
+        updateButtonVisibility();
     }
 
     ~SequencerControlsComponent() override = default;
 
-    void paint (juce::Graphics& g) override {
-        // Background is transparent - buttons draw themselves
+    void paint(juce::Graphics& g) override {
         juce::ignoreUnused(g);
     }
 
@@ -150,98 +143,98 @@ public:
         int size = static_cast<int>(buttonSize);
         int spacing = static_cast<int>(buttonSize + gap);
 
-        // ========== PRIMARY ROW ==========
-        rollButton.setBounds(kRollButton * spacing, 0, size, size);
-        pageLeftButton.setBounds(kPageLeftButton * spacing, 0, size, size);
-        pageRightButton.setBounds(kPageRightButton * spacing, 0, size, size);
-        lengthPlusButton.setBounds(kLengthPlusButton * spacing, 0, size, size);
-        lengthMinusButton.setBounds(kLengthMinusButton * spacing, 0, size, size);
-        nudgeLeftButton.setBounds(kNudgeLeftButton * spacing, 0, size, size);
-        nudgeRightButton.setBounds(kNudgeRightButton * spacing, 0, size, size);
-        shiftButton.setBounds(kShiftButton * spacing, 0, size, size);
+        // Position 0: Roll (always visible)
+        rollButton.setBounds(kPosition0 * spacing, 0, size, size);
 
-        // ========== SECONDARY ROW ==========
-        // Secondary buttons align with primary buttons at indices 1-6
-        int secondaryY = static_cast<int>(buttonSize + gap);
-        duplicateButton.setBounds(1 * spacing, secondaryY, size, size);
-        clearWindowButton.setBounds(2 * spacing, secondaryY, size, size);
-        clearStepButton.setBounds(3 * spacing, secondaryY, size, size);
-        randomizeStepButton.setBounds(4 * spacing, secondaryY, size, size);
-        randomizeAllButton.setBounds(5 * spacing, secondaryY, size, size);
-        shuffleButton.setBounds(6 * spacing, secondaryY, size, size);
+        // Position 7: Shift (always visible)
+        shiftButton.setBounds(kPosition7 * spacing, 0, size, size);
+
+        // Positions 1-6: Normal mode buttons
+        pageLeftButton.setBounds(kPosition1 * spacing, 0, size, size);
+        pageRightButton.setBounds(kPosition2 * spacing, 0, size, size);
+        lengthPlusButton.setBounds(kPosition3 * spacing, 0, size, size);
+        lengthMinusButton.setBounds(kPosition4 * spacing, 0, size, size);
+        nudgeLeftButton.setBounds(kPosition5 * spacing, 0, size, size);
+        nudgeRightButton.setBounds(kPosition6 * spacing, 0, size, size);
+
+        // Positions 1-6: Shift mode buttons (same positions, different buttons)
+        duplicateButton.setBounds(kPosition1 * spacing, 0, size, size);
+        clearWindowButton.setBounds(kPosition2 * spacing, 0, size, size);
+        clearStepButton.setBounds(kPosition3 * spacing, 0, size, size);
+        randomizeAllButton.setBounds(kPosition4 * spacing, 0, size, size);
+        randomizeStepButton.setBounds(kPosition5 * spacing, 0, size, size);
+        shuffleButton.setBounds(kPosition6 * spacing, 0, size, size);
     }
 
-    // Check if Shift mode is active - reads from APVTS for consistency
     bool isShiftActive() const {
         return getState().getIsShift();
     }
 
-    // Set the MIDI learn registry (called from parent)
     void setRegistry(MidiLearnRegistry* reg) {
         registry = reg;
-        // Pass to all observer-pattern buttons
+        // Pass to all buttons
         rollButton.setRegistry(reg);
+        shiftButton.setRegistry(reg);
         pageLeftButton.setRegistry(reg);
         pageRightButton.setRegistry(reg);
         lengthPlusButton.setRegistry(reg);
         lengthMinusButton.setRegistry(reg);
         nudgeLeftButton.setRegistry(reg);
         nudgeRightButton.setRegistry(reg);
-        shiftButton.setRegistry(reg);
         duplicateButton.setRegistry(reg);
         clearWindowButton.setRegistry(reg);
         clearStepButton.setRegistry(reg);
-        randomizeStepButton.setRegistry(reg);
         randomizeAllButton.setRegistry(reg);
+        randomizeStepButton.setRegistry(reg);
         shuffleButton.setRegistry(reg);
     }
 
-    // Update secondary row visibility based on Shift state
-    void updateSecondaryRowVisibility() {
-        bool showSecondary = isShiftActive();
-        duplicateButton.setVisible(showSecondary);
-        clearWindowButton.setVisible(showSecondary);
-        clearStepButton.setVisible(showSecondary);
-        randomizeStepButton.setVisible(showSecondary);
-        randomizeAllButton.setVisible(showSecondary);
-        shuffleButton.setVisible(showSecondary);
+    void updateButtonVisibility() {
+        bool shiftOn = isShiftActive();
+
+        // Normal mode buttons: visible when shift is OFF
+        pageLeftButton.setVisible(!shiftOn);
+        pageRightButton.setVisible(!shiftOn);
+        lengthPlusButton.setVisible(!shiftOn);
+        lengthMinusButton.setVisible(!shiftOn);
+        nudgeLeftButton.setVisible(!shiftOn);
+        nudgeRightButton.setVisible(!shiftOn);
+
+        // Shift mode buttons: visible when shift is ON
+        duplicateButton.setVisible(shiftOn);
+        clearWindowButton.setVisible(shiftOn);
+        clearStepButton.setVisible(shiftOn);
+        randomizeAllButton.setVisible(shiftOn);
+        randomizeStepButton.setVisible(shiftOn);
+        shuffleButton.setVisible(shiftOn);
     }
 
 protected:
-    // ========================================
-    // StateListenerComponent implementation
-    // ========================================
-
-    /**
-     * Called on message thread when SEQ_IS_SHIFT changes.
-     * Updates secondary row visibility.
-     * Note: Individual button visual states are handled by each button's own
-     * StateListenerComponent - they observe their own params.
-     */
     void onStateChanged() override {
-        // Update secondary row visibility based on shift state
-        updateSecondaryRowVisibility();
+        updateButtonVisibility();
     }
 
 private:
     MidiLearnRegistry* registry = nullptr;
 
-    // ========== PRIMARY ROW BUTTONS ==========
+    // ========== ALWAYS VISIBLE ==========
     RollButton rollButton;
+    ShiftButton shiftButton;
+
+    // ========== NORMAL MODE BUTTONS (positions 1-6) ==========
     PageLeftButton pageLeftButton;
     PageRightButton pageRightButton;
     LengthPlusButton lengthPlusButton;
     LengthMinusButton lengthMinusButton;
     NudgeLeftButton nudgeLeftButton;
     NudgeRightButton nudgeRightButton;
-    ShiftButton shiftButton;
 
-    // ========== SECONDARY ROW BUTTONS ==========
+    // ========== SHIFT MODE BUTTONS (positions 1-6) ==========
     DuplicateButton duplicateButton;
     ClearWindowButton clearWindowButton;
     ClearStepButton clearStepButton;
-    RandomizeStepButton randomizeStepButton;
     RandomizeAllButton randomizeAllButton;
+    RandomizeStepButton randomizeStepButton;
     ShuffleButton shuffleButton;
 };
 

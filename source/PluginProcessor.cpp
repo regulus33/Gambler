@@ -475,10 +475,9 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
         DBG("NUDGE_RIGHT triggered");
     }
 
-    if (parameterID == Params::Keys::ID::SHIFT) {
-        // Shift is a toggle - set isShift to match param state
-        getState().setIsShift(isOn);
-        DBG("SHIFT " + juce::String(isOn ? "ON" : "OFF"));
+    if (parameterID == Params::Keys::ID::SEQ_IS_SHIFT) {
+        // SEQ_IS_SHIFT is the actual shift state - just log it
+        DBG("SEQ_IS_SHIFT " + juce::String(isOn ? "ON" : "OFF"));
     }
 
     // ========== SECONDARY ROW BUTTONS ==========
@@ -1044,12 +1043,12 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         }
 
         case MidiControlId::BUTTON_SHIFT: {
-            // Shift is a toggle - only toggle on note-on
+            // Shift is a toggle - only toggle on note-on/CC positive
             if (isNoteOnOrCCPositive) {
-                if (auto* param = apvts.getParameter(Params::Keys::ID::SHIFT)) {
+                if (auto* param = apvts.getParameter(Params::Keys::ID::SEQ_IS_SHIFT)) {
                     bool currentState = param->getValue() > 0.5f;
                     param->setValueNotifyingHost(currentState ? 0.0f : 1.0f);
-                    DBG("  → SHIFT toggled to " << (!currentState ? "ON" : "OFF"));
+                    DBG("  → SEQ_IS_SHIFT toggled to " << (!currentState ? "ON" : "OFF"));
                 }
             }
             break;

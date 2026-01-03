@@ -120,9 +120,9 @@ namespace Params
             inline const String LENGTH_PLUS = "length_plus";
             inline const String NUDGE_LEFT = "nudge_left";
             inline const String NUDGE_RIGHT = "nudge_right";
-            inline const String SHIFT = "shift";
+            // Note: Shift uses SEQ_IS_SHIFT (in Sequence metadata section)
 
-            // Secondary row buttons (visible when Shift is active)
+            // Shift mode buttons (replace positions 1-6 when shift is active)
             inline const String DUPLICATE = "duplicate";
             inline const String CLEAR_WINDOW = "clear_window";
             inline const String CLEAR_STEP = "clear_step";
@@ -225,9 +225,9 @@ namespace Params
             inline const String LENGTH_PLUS = "Length +";
             inline const String NUDGE_LEFT = "Nudge Left";
             inline const String NUDGE_RIGHT = "Nudge Right";
-            inline const String SHIFT = "Shift";
+            // Note: Shift uses SEQ_IS_SHIFT label
 
-            // Secondary row labels
+            // Shift mode button labels
             inline const String DUPLICATE = "Duplicate";
             inline const String CLEAR_WINDOW = "Clear Window";
             inline const String CLEAR_STEP = "Clear Step";
@@ -388,9 +388,9 @@ namespace Params
         params.push_back(createBoolParam(Keys::ID::LENGTH_PLUS, Keys::LABEL::LENGTH_PLUS));
         params.push_back(createBoolParam(Keys::ID::NUDGE_LEFT, Keys::LABEL::NUDGE_LEFT));
         params.push_back(createBoolParam(Keys::ID::NUDGE_RIGHT, Keys::LABEL::NUDGE_RIGHT));
-        params.push_back(createBoolParam(Keys::ID::SHIFT, Keys::LABEL::SHIFT));
+        // Note: Shift uses SEQ_IS_SHIFT param (already created in sequence metadata section)
 
-        // Secondary row buttons (visible when Shift is active)
+        // Shift mode buttons (replace positions 1-6 when shift is active)
         params.push_back(createBoolParam(Keys::ID::DUPLICATE, Keys::LABEL::DUPLICATE));
         params.push_back(createBoolParam(Keys::ID::CLEAR_WINDOW, Keys::LABEL::CLEAR_WINDOW));
         params.push_back(createBoolParam(Keys::ID::CLEAR_STEP, Keys::LABEL::CLEAR_STEP));
