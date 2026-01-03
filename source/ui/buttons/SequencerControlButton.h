@@ -13,11 +13,11 @@ namespace SequencerButtonConstants {
     constexpr juce::uint32 bgColorActive = 0xffffffff;     // White when active
     constexpr juce::uint32 bgColorInactive = 0xff303030;  // Dark grey when inactive
     constexpr float maxIconSize = 26.0f;
-    constexpr float textAreaHeight = 16.0f;
+    constexpr float textAreaHeight = 33.0f;   // Match SequencerControlsConstants
     constexpr float iconVerticalOffset = 13.0f;
-    constexpr float fontSize = 10.0f;
-    constexpr float textYOffset = 4.0f;
-    constexpr float textHeight = 12.0f;
+    constexpr float fontSize = 13.0f;         // Match SequencerControlsConstants
+    constexpr float textYOffset = 13.0f;      // Match SequencerControlsConstants
+    constexpr float textHeight = 13.0f;       // Match SequencerControlsConstants
 }
 
 /**

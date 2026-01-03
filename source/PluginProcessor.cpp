@@ -911,11 +911,11 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         }
 
         case MidiControlId::BUTTON_LENGTH_PLUS: {
-            if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_LENGTH_PLUS);
-                state.increaseLength();
-                DBG("  → Length increased to " << state.getLength());
-                if (uiCallback) uiCallback(1.0f);
+            // Set param based on note-on/note-off state - observer pattern handles the rest
+            // param = true on note-on, param = false on note-off
+            if (auto* param = apvts.getParameter(Params::Keys::ID::LENGTH_PLUS)) {
+                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG("  → LENGTH_PLUS param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
