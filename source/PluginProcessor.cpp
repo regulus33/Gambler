@@ -444,13 +444,116 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
     // ========== SEQUENCER CONTROL BUTTONS ==========
     // Only trigger action on the ON transition (debounce)
 
-    if (parameterID == Params::Keys::ID::LENGTH_PLUS && isOn) {
-        getState().increaseLength();
-        DBG("LENGTH_PLUS triggered - new length: " << getState().getLength());
+    // ========== PRIMARY ROW BUTTONS ==========
+
+    if (parameterID == Params::Keys::ID::ROLL) {
+        // Roll is momentary - set isRandom to match param state
+        getState().setIsRandom(isOn);
+        DBG("ROLL " + juce::String(isOn ? "ON" : "OFF") + " - isRandom: " + juce::String(getState().getIsRandom() ? "true" : "false"));
     }
 
-    // TODO: Add other button handlers as they are migrated:
-    // LENGTH_MINUS, NUDGE_LEFT, NUDGE_RIGHT, INDEX_LEFT, INDEX_RIGHT, etc.
+    // PAGE_LEFT and PAGE_RIGHT are handled in UI (need window position)
+    // The param change will trigger UI callback via StateListenerComponent
+
+    if (parameterID == Params::Keys::ID::LENGTH_PLUS && isOn) {
+        getState().increaseLength();
+        DBG("LENGTH_PLUS triggered - new length: " + juce::String(getState().getLength()));
+    }
+
+    if (parameterID == Params::Keys::ID::LENGTH_MINUS && isOn) {
+        getState().decreaseLength();
+        DBG("LENGTH_MINUS triggered - new length: " + juce::String(getState().getLength()));
+    }
+
+    if (parameterID == Params::Keys::ID::NUDGE_LEFT && isOn) {
+        getState().nudgeLeft();
+        DBG("NUDGE_LEFT triggered");
+    }
+
+    if (parameterID == Params::Keys::ID::NUDGE_RIGHT && isOn) {
+        getState().nudgeRight();
+        DBG("NUDGE_RIGHT triggered");
+    }
+
+    if (parameterID == Params::Keys::ID::SHIFT) {
+        // Shift is a toggle - set isShift to match param state
+        getState().setIsShift(isOn);
+        DBG("SHIFT " + juce::String(isOn ? "ON" : "OFF"));
+    }
+
+    // ========== SECONDARY ROW BUTTONS ==========
+
+    if (parameterID == Params::Keys::ID::DUPLICATE && isOn) {
+        auto& state = getState();
+        int currentLength = state.getLength();
+        int newLength = juce::jmin(currentLength * 2, ParamConstants::MAX_STEPS);
+        int stepsToCopy = newLength - currentLength;
+
+        for (int i = 0; i < stepsToCopy; i++) {
+            int srcIdx = i;
+            int dstIdx = currentLength + i;
+            state.setStepNotesLength(dstIdx, state.getStepNotesLength(srcIdx));
+            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                state.setStepNote(dstIdx, n, state.getStepNote(srcIdx, n));
+            }
+        }
+        state.setLength(newLength);
+        DBG("DUPLICATE triggered - new length: " + juce::String(newLength));
+    }
+
+    // CLEAR_WINDOW is handled in UI (needs window position)
+
+    if (parameterID == Params::Keys::ID::CLEAR_STEP && isOn) {
+        auto& state = getState();
+        int selectedStep = state.getSelectedStepForEditing();
+        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+            state.setStepNote(selectedStep, n, -1);
+        }
+        DBG("CLEAR_STEP triggered - cleared step " + juce::String(selectedStep));
+    }
+
+    if (parameterID == Params::Keys::ID::RANDOMIZE_STEP && isOn) {
+        auto& state = getState();
+        int selectedStep = state.getSelectedStepForEditing();
+        state.randomizeStepNote(selectedStep);
+        DBG("RANDOMIZE_STEP triggered - randomized step " + juce::String(selectedStep));
+    }
+
+    if (parameterID == Params::Keys::ID::RANDOMIZE_ALL && isOn) {
+        auto& state = getState();
+        for (int i = 0; i < state.getLength(); i++) {
+            state.randomizeStepNote(i);
+        }
+        DBG("RANDOMIZE_ALL triggered");
+    }
+
+    if (parameterID == Params::Keys::ID::SHUFFLE && isOn) {
+        auto& state = getState();
+        int len = state.getLength();
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        for (int i = len - 1; i > 0; i--) {
+            std::uniform_int_distribution<> dis(0, i);
+            int j = dis(gen);
+            // Swap steps i and j
+            int lenI = state.getStepNotesLength(i);
+            std::array<int, ParamConstants::MAX_SUBSTEPS> notesI;
+            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                notesI[static_cast<size_t>(n)] = state.getStepNote(i, n);
+            }
+            // Copy j to i
+            state.setStepNotesLength(i, state.getStepNotesLength(j));
+            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                state.setStepNote(i, n, state.getStepNote(j, n));
+            }
+            // Copy saved i to j
+            state.setStepNotesLength(j, lenI);
+            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                state.setStepNote(j, n, notesI[static_cast<size_t>(n)]);
+            }
+        }
+        DBG("SHUFFLE triggered");
+    }
 }
 
 //==============================================================================
@@ -880,39 +983,35 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
             break;
         }
 
-        // ========== ROLL BUTTON (Momentary) ==========
+        // ========== SEQUENCER CONTROL BUTTONS - PRIMARY ROW ==========
+        // All buttons use param-based approach: set param on note-on/off,
+        // parameterChanged handles the action, UI observes param for visual state
+
         case MidiControlId::BUTTON_ROLL: {
-            auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_ROLL);
-            state.setIsRandom(isNoteOnOrCCPositive);
-            DBG("  → Roll " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            if (uiCallback) {
-                uiCallback(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+            if (auto* param = apvts.getParameter(Params::Keys::ID::ROLL)) {
+                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG("  → ROLL param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
-        // ========== SEQUENCER CONTROL BUTTONS - PRIMARY ROW ==========
         case MidiControlId::BUTTON_PAGE_LEFT: {
-            if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_PAGE_LEFT);
-                DBG("  → Page left (UI only)");
-                if (uiCallback) uiCallback(1.0f);
+            if (auto* param = apvts.getParameter(Params::Keys::ID::INDEX_LEFT)) {
+                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG("  → INDEX_LEFT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_PAGE_RIGHT: {
-            if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_PAGE_RIGHT);
-                DBG("  → Page right (UI only)");
-                if (uiCallback) uiCallback(1.0f);
+            if (auto* param = apvts.getParameter(Params::Keys::ID::INDEX_RIGHT)) {
+                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG("  → INDEX_RIGHT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_LENGTH_PLUS: {
-            // Set param based on note-on/note-off state - observer pattern handles the rest
-            // param = true on note-on, param = false on note-off
             if (auto* param = apvts.getParameter(Params::Keys::ID::LENGTH_PLUS)) {
                 param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
                 DBG("  → LENGTH_PLUS param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
@@ -921,42 +1020,37 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         }
 
         case MidiControlId::BUTTON_LENGTH_MINUS: {
-            if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_LENGTH_MINUS);
-                state.decreaseLength();
-                DBG("  → Length decreased to " << state.getLength());
-                if (uiCallback) uiCallback(1.0f);
+            if (auto* param = apvts.getParameter(Params::Keys::ID::LENGTH_MINUS)) {
+                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG("  → LENGTH_MINUS param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_NUDGE_LEFT: {
-            if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_NUDGE_LEFT);
-                state.nudgeLeft();
-                DBG("  → Nudged left");
-                if (uiCallback) uiCallback(1.0f);
+            if (auto* param = apvts.getParameter(Params::Keys::ID::NUDGE_LEFT)) {
+                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG("  → NUDGE_LEFT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_NUDGE_RIGHT: {
-            if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_NUDGE_RIGHT);
-                state.nudgeRight();
-                DBG("  → Nudged right");
-                if (uiCallback) uiCallback(1.0f);
+            if (auto* param = apvts.getParameter(Params::Keys::ID::NUDGE_RIGHT)) {
+                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG("  → NUDGE_RIGHT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_SHIFT: {
+            // Shift is a toggle - only toggle on note-on
             if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_SHIFT);
-                bool newShiftState = !state.getIsShift();
-                state.setIsShift(newShiftState);
-                DBG("  → Shift " << (newShiftState ? "ON" : "OFF"));
-                if (uiCallback) uiCallback(newShiftState ? 1.0f : 0.0f);
+                if (auto* param = apvts.getParameter(Params::Keys::ID::SHIFT)) {
+                    bool currentState = param->getValue() > 0.5f;
+                    param->setValueNotifyingHost(currentState ? 0.0f : 1.0f);
+                    DBG("  → SHIFT toggled to " << (!currentState ? "ON" : "OFF"));
+                }
             }
             break;
         }
@@ -1097,101 +1191,52 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         }
 
         // ========== SEQUENCER CONTROL BUTTONS - SECONDARY ROW ==========
-        case MidiControlId::BUTTON_DUPLICATE: {
-            if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_DUPLICATE);
-                int currentLength = state.getLength();
-                int newLength = juce::jmin(currentLength * 2, ParamConstants::MAX_STEPS);
-                int stepsToCopy = newLength - currentLength;
+        // All buttons use param-based approach
 
-                for (int i = 0; i < stepsToCopy; i++) {
-                    int srcIdx = i;
-                    int dstIdx = currentLength + i;
-                    state.setStepNotesLength(dstIdx, state.getStepNotesLength(srcIdx));
-                    for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                        state.setStepNote(dstIdx, n, state.getStepNote(srcIdx, n));
-                    }
-                }
-                state.setLength(newLength);
-                DBG("  → Duplicated sequence to " << newLength << " steps");
-                if (uiCallback) uiCallback(1.0f);
+        case MidiControlId::BUTTON_DUPLICATE: {
+            if (auto* param = apvts.getParameter(Params::Keys::ID::DUPLICATE)) {
+                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG("  → DUPLICATE param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_CLEAR_WINDOW: {
-            if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_CLEAR_WINDOW);
-                DBG("  → Clear window (UI only - window position not tracked in processor)");
-                if (uiCallback) uiCallback(1.0f);
+            if (auto* param = apvts.getParameter(Params::Keys::ID::CLEAR_WINDOW)) {
+                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG("  → CLEAR_WINDOW param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_CLEAR_STEP: {
-            if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_CLEAR_STEP);
-                int selectedStep = state.getSelectedStepForEditing();
-                for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                    state.setStepNote(selectedStep, n, -1);
-                }
-                DBG("  → Cleared step " << selectedStep);
-                if (uiCallback) uiCallback(1.0f);
+            if (auto* param = apvts.getParameter(Params::Keys::ID::CLEAR_STEP)) {
+                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG("  → CLEAR_STEP param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_RANDOMIZE_STEP: {
-            if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_RANDOMIZE_STEP);
-                int selectedStep = state.getSelectedStepForEditing();
-                state.randomizeStepNote(selectedStep);
-                DBG("  → Randomized step " << selectedStep);
-                if (uiCallback) uiCallback(1.0f);
+            if (auto* param = apvts.getParameter(Params::Keys::ID::RANDOMIZE_STEP)) {
+                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG("  → RANDOMIZE_STEP param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_RANDOMIZE_ALL: {
-            if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_RANDOMIZE_ALL);
-                for (int i = 0; i < state.getLength(); i++) {
-                    state.randomizeStepNote(i);
-                }
-                DBG("  → Randomized all steps");
-                if (uiCallback) uiCallback(1.0f);
+            if (auto* param = apvts.getParameter(Params::Keys::ID::RANDOMIZE_ALL)) {
+                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG("  → RANDOMIZE_ALL param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_SHUFFLE: {
-            if (isNoteOnOrCCPositive) {
-                auto uiCallback = midiUICallbacks.getCallback(MidiControlId::BUTTON_SHUFFLE);
-                int len = state.getLength();
-                static std::random_device rd;
-                static std::mt19937 gen(rd());
-                for (int i = len - 1; i > 0; i--) {
-                    std::uniform_int_distribution<> dis(0, i);
-                    int j = dis(gen);
-                    // Swap steps i and j
-                    int lenI = state.getStepNotesLength(i);
-                    std::array<int, ParamConstants::MAX_SUBSTEPS> notesI;
-                    for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                        notesI[static_cast<size_t>(n)] = state.getStepNote(i, n);
-                    }
-                    // Copy j to i
-                    state.setStepNotesLength(i, state.getStepNotesLength(j));
-                    for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                        state.setStepNote(i, n, state.getStepNote(j, n));
-                    }
-                    // Copy saved i to j
-                    state.setStepNotesLength(j, lenI);
-                    for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                        state.setStepNote(j, n, notesI[static_cast<size_t>(n)]);
-                    }
-                }
-                DBG("  → Shuffled all steps");
-                if (uiCallback) uiCallback(1.0f);
+            if (auto* param = apvts.getParameter(Params::Keys::ID::SHUFFLE)) {
+                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG("  → SHUFFLE param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }

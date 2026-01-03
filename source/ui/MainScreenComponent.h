@@ -60,8 +60,13 @@ namespace MainScreenLayout {
  * - Note range controls
  *
  * This component handles all the main sequencer UI and callbacks.
+ *
+ * It also listens to certain APVTS parameters that require UI-specific handling:
+ * - INDEX_LEFT/INDEX_RIGHT: Page the view window (needs window position from UI)
+ * - CLEAR_WINDOW: Clear steps in current window (needs window position from UI)
  */
-class MainScreenComponent : public juce::Component {
+class MainScreenComponent : public juce::Component,
+                            private juce::AudioProcessorValueTreeState::Listener {
 public:
     explicit MainScreenComponent(PluginProcessor& processor)
         : processorRef(processor),
@@ -205,6 +210,17 @@ public:
         setupSubsequenceCallbacks();
         setupSequencerCallbacks();
         setupNoteRangeCallbacks();
+
+        // Listen to UI-specific button params that need window position
+        processorRef.getAPVTS().addParameterListener(Params::Keys::ID::INDEX_LEFT, this);
+        processorRef.getAPVTS().addParameterListener(Params::Keys::ID::INDEX_RIGHT, this);
+        processorRef.getAPVTS().addParameterListener(Params::Keys::ID::CLEAR_WINDOW, this);
+    }
+
+    ~MainScreenComponent() override {
+        processorRef.getAPVTS().removeParameterListener(Params::Keys::ID::INDEX_LEFT, this);
+        processorRef.getAPVTS().removeParameterListener(Params::Keys::ID::INDEX_RIGHT, this);
+        processorRef.getAPVTS().removeParameterListener(Params::Keys::ID::CLEAR_WINDOW, this);
     }
 
     void paint(juce::Graphics& g) override {
@@ -441,165 +457,11 @@ private:
         // Wire up MIDI learn registry for sequencer controls
         sequencerControls.setRegistry(&processorRef.getMidiLearnRegistry());
 
-        // Register UI update callbacks for MIDI control
-        setupMidiUICallbacks();
-
-        // Setup callback for control button clicks
-        // Primary row: 0=Roll, 1=Page<-, 2=Page->, 3=Length+, 4=Length-, 5=Nudge<-, 6=Nudge->, 7=Shift
-        // Secondary row: 8=Duplicate, 9=Clear, 10=ClearStep, 11=RandomizeStep, 12=RandomizeAll, 13=Shuffle
-        sequencerControls.onButtonClicked = [this](int buttonIndex) {
-            auto& state = processorRef.getState();
-
-            switch (buttonIndex) {
-                // ========== PRIMARY ROW ==========
-                case SequencerControlsComponent::kRollButton:
-                    state.setIsRandom(true);
-                    DBG("Roll pressed - random mode ON");
-                    break;
-
-                case SequencerControlsComponent::kPageLeftButton: {
-                    int currentWindow = sequencerSteps.getWindowStart();
-                    int newWindow = currentWindow - 8;
-                    setSequencerWindow(newWindow);
-                    DBG("Page left, window now at: " + juce::String(sequencerSteps.getWindowStart()));
-                    break;
-                }
-
-                case SequencerControlsComponent::kPageRightButton: {
-                    int currentWindow = sequencerSteps.getWindowStart();
-                    int newWindow = currentWindow + 8;
-                    setSequencerWindow(newWindow);
-                    DBG("Page right, window now at: " + juce::String(sequencerSteps.getWindowStart()));
-                    break;
-                }
-
-                case SequencerControlsComponent::kLengthPlusButton:
-                    // Now handled via observer pattern in PluginProcessor::parameterChanged
-                    // The LengthPlusButton sets the APVTS param, which triggers the action
-                    break;
-
-                case SequencerControlsComponent::kLengthMinusButton:
-                    state.decreaseLength();
-                    DBG("Length decreased to: " + juce::String(state.getLength()));
-                    break;
-
-                case SequencerControlsComponent::kNudgeLeftButton:
-                    state.nudgeLeft();
-                    DBG("Nudge left");
-                    break;
-
-                case SequencerControlsComponent::kNudgeRightButton:
-                    state.nudgeRight();
-                    DBG("Nudge right");
-                    break;
-
-                case SequencerControlsComponent::kShiftButton:
-                    state.setIsShift(!state.getIsShift());
-                    DBG("Shift mode: " + juce::String(state.getIsShift() ? "ON" : "OFF"));
-                    break;
-
-                // ========== SECONDARY ROW ==========
-                case SequencerControlsComponent::kDuplicateButton: {
-                    // Duplicate: copy entire sequence content, doubling length (capped at 64)
-                    int currentLength = state.getLength();
-                    int newLength = juce::jmin(currentLength * 2, ParamConstants::MAX_STEPS);
-                    int stepsToCopy = newLength - currentLength;
-
-                    for (int i = 0; i < stepsToCopy; i++) {
-                        int srcIdx = i;
-                        int dstIdx = currentLength + i;
-                        state.setStepNotesLength(dstIdx, state.getStepNotesLength(srcIdx));
-                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                            state.setStepNote(dstIdx, n, state.getStepNote(srcIdx, n));
-                        }
-                    }
-                    state.setLength(newLength);
-                    DBG("Duplicated sequence: " + juce::String(currentLength) + " -> " + juce::String(newLength) + " steps");
-                    break;
-                }
-
-                case SequencerControlsComponent::kClearWindowButton: {
-                    // Clear: set all steps in current window to rest
-                    int windowStart = sequencerSteps.getWindowStart();
-                    for (int i = 0; i < 8; i++) {
-                        int stepIdx = windowStart + i;
-                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                            state.setStepNote(stepIdx, n, -1);
-                        }
-                    }
-                    DBG("Cleared window starting at " + juce::String(windowStart));
-                    break;
-                }
-
-                case SequencerControlsComponent::kClearStepButton: {
-                    // Clear Step: set current step to rest
-                    int selectedStep = state.getSelectedStepForEditing();
-                    for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                        state.setStepNote(selectedStep, n, -1);
-                    }
-                    DBG("Cleared step " + juce::String(selectedStep));
-                    break;
-                }
-
-                case SequencerControlsComponent::kRandomizeStepButton: {
-                    // Randomize current step's note
-                    int selectedStep = state.getSelectedStepForEditing();
-                    state.randomizeStepNote(selectedStep);
-                    DBG("Randomized step " + juce::String(selectedStep));
-                    break;
-                }
-
-                case SequencerControlsComponent::kRandomizeAllButton:
-                    // Randomize all steps
-                    for (int i = 0; i < state.getLength(); i++) {
-                        state.randomizeStepNote(i);
-                    }
-                    DBG("Randomized all steps");
-                    break;
-
-                case SequencerControlsComponent::kShuffleButton: {
-                    // Shuffle: randomly rearrange all steps in the sequence
-                    int len = state.getLength();
-                    static std::random_device rd;
-                    static std::mt19937 gen(rd());
-                    for (int i = len - 1; i > 0; i--) {
-                        std::uniform_int_distribution<> dis(0, i);
-                        int j = dis(gen);
-                        // Swap steps i and j
-                        int lenI = state.getStepNotesLength(i);
-                        std::array<int, ParamConstants::MAX_SUBSTEPS> notesI;
-                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                            notesI[n] = state.getStepNote(i, n);
-                        }
-                        state.setStepNotesLength(i, state.getStepNotesLength(j));
-                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                            state.setStepNote(i, n, state.getStepNote(j, n));
-                        }
-                        state.setStepNotesLength(j, lenI);
-                        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                            state.setStepNote(j, n, notesI[n]);
-                        }
-                    }
-                    DBG("Shuffled all steps");
-                    break;
-                }
-
-                default:
-                    break;
-            }
-        };
-
-        // Setup callback for control button releases (for momentary buttons like Roll)
-        sequencerControls.onButtonReleased = [this](int buttonIndex) {
-            switch (buttonIndex) {
-                case SequencerControlsComponent::kRollButton:
-                    processorRef.getState().setIsRandom(false);
-                    DBG("Roll released - random mode OFF");
-                    break;
-                default:
-                    break;
-            }
-        };
+        // Note: Button actions are now handled via the observer pattern:
+        // - Each button sets its APVTS param on mouseDown/mouseUp
+        // - PluginProcessor::parameterChanged handles the action
+        // - UI-specific actions (PAGE_LEFT, PAGE_RIGHT, CLEAR_WINDOW) are handled
+        //   in this component's parameterChanged method
     }
 
     void setupNoteRangeCallbacks() {
@@ -646,63 +508,56 @@ private:
      * These callbacks are invoked when MIDI changes state, to provide visual feedback
      */
     void setupMidiUICallbacks() {
-        auto& callbacks = processorRef.getMidiUICallbacks();
+        // Note: Button visual states are now handled automatically via the observer pattern.
+        // Each button listens to its own APVTS param and updates its visual state accordingly.
+        // MIDI input sets the param, which triggers the button's StateListenerComponent.
+        //
+        // This method is kept for any future MIDI callbacks that may be needed,
+        // but the button-related callbacks have been removed as they're now redundant.
+        juce::ignoreUnused(processorRef);
+    }
 
-        // Note: Roll and Shift button UI updates are now handled automatically via APVTS listeners
-        // in SequencerControlsComponent::onStateChanged()
+    // ========================================
+    // AudioProcessorValueTreeState::Listener implementation
+    // ========================================
 
-        // Primary row buttons - trigger visual update
-        callbacks.registerCallback(MidiControlId::BUTTON_PAGE_LEFT, [this](float value) {
-            sequencerSteps.repaint();
-            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-        });
+    /**
+     * Handle UI-specific button params that need window position.
+     * Called from any thread when param changes - use MessageManager for UI updates.
+     */
+    void parameterChanged(const juce::String& parameterID, float newValue) override {
+        bool isOn = newValue > 0.5f;
 
-        callbacks.registerCallback(MidiControlId::BUTTON_PAGE_RIGHT, [this](float value) {
-            sequencerSteps.repaint();
-        });
+        // Only act on the ON transition (button press)
+        if (!isOn) return;
 
-        // LENGTH_PLUS no longer needs a callback here - UI updates automatically via
-        // StateListenerComponent observing SEQ_LENGTH parameter changes
-
-        callbacks.registerCallback(MidiControlId::BUTTON_LENGTH_MINUS, [this](float value) {
-            sequencerSteps.repaint();
-            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-        });
-
-        callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_LEFT, [this](float value) {
-            sequencerSteps.repaint();
-        });
-
-        callbacks.registerCallback(MidiControlId::BUTTON_NUDGE_RIGHT, [this](float value) {
-            sequencerSteps.repaint();
-        });
-
-        // Secondary row buttons - trigger visual update
-        callbacks.registerCallback(MidiControlId::BUTTON_DUPLICATE, [this](float value) {
-            sequencerSteps.repaint();
-            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-        });
-
-        callbacks.registerCallback(MidiControlId::BUTTON_CLEAR_WINDOW, [this](float value) {
-            sequencerSteps.repaint();
-        });
-
-        callbacks.registerCallback(MidiControlId::BUTTON_CLEAR_STEP, [this](float value) {
-            sequencerSteps.repaint();
-        });
-
-        callbacks.registerCallback(MidiControlId::BUTTON_RANDOMIZE_STEP, [this](float value) {
-            sequencerSteps.repaint();
-        });
-
-        callbacks.registerCallback(MidiControlId::BUTTON_RANDOMIZE_ALL, [this](float value) {
-            sequencerSteps.repaint();
-            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
-        });
-
-        callbacks.registerCallback(MidiControlId::BUTTON_SHUFFLE, [this](float value) {
-            sequencerSteps.repaint();
-            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
+        // Use MessageManager to safely update UI from any thread
+        juce::MessageManager::callAsync([this, parameterID]() {
+            if (parameterID == Params::Keys::ID::INDEX_LEFT) {
+                int currentWindow = sequencerSteps.getWindowStart();
+                int newWindow = currentWindow - 8;
+                setSequencerWindow(newWindow);
+                DBG("Page left, window now at: " + juce::String(sequencerSteps.getWindowStart()));
+            }
+            else if (parameterID == Params::Keys::ID::INDEX_RIGHT) {
+                int currentWindow = sequencerSteps.getWindowStart();
+                int newWindow = currentWindow + 8;
+                setSequencerWindow(newWindow);
+                DBG("Page right, window now at: " + juce::String(sequencerSteps.getWindowStart()));
+            }
+            else if (parameterID == Params::Keys::ID::CLEAR_WINDOW) {
+                // Clear: set all steps in current window to rest
+                auto& state = processorRef.getState();
+                int windowStart = sequencerSteps.getWindowStart();
+                for (int i = 0; i < 8; i++) {
+                    int stepIdx = windowStart + i;
+                    for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+                        state.setStepNote(stepIdx, n, -1);
+                    }
+                }
+                sequencerSteps.repaint();
+                DBG("Cleared window starting at " + juce::String(windowStart));
+            }
         });
     }
 

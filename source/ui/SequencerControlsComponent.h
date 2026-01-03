@@ -2,7 +2,20 @@
 
 #include "Icons.h"
 #include "StateListenerComponent.h"
+#include "buttons/RollButton.h"
+#include "buttons/PageLeftButton.h"
+#include "buttons/PageRightButton.h"
 #include "buttons/LengthPlusButton.h"
+#include "buttons/LengthMinusButton.h"
+#include "buttons/NudgeLeftButton.h"
+#include "buttons/NudgeRightButton.h"
+#include "buttons/ShiftButton.h"
+#include "buttons/DuplicateButton.h"
+#include "buttons/ClearWindowButton.h"
+#include "buttons/ClearStepButton.h"
+#include "buttons/RandomizeStepButton.h"
+#include "buttons/RandomizeAllButton.h"
+#include "buttons/ShuffleButton.h"
 #include "../backend/MidiLearnRegistry.h"
 #include "../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -83,143 +96,79 @@ public:
 
     explicit SequencerControlsComponent(PluginProcessor& processor)
         : StateListenerComponent(processor)
-        , lengthPlusButton(processor) {
-
-        // Subscribe to APVTS parameters that drive button visual state
-        listenToParameter(Params::Keys::ID::SEQ_IS_RANDOM);
+        // Primary row buttons
+        , rollButton(processor)
+        , pageLeftButton(processor)
+        , pageRightButton(processor)
+        , lengthPlusButton(processor)
+        , lengthMinusButton(processor)
+        , nudgeLeftButton(processor)
+        , nudgeRightButton(processor)
+        , shiftButton(processor)
+        // Secondary row buttons
+        , duplicateButton(processor)
+        , clearWindowButton(processor)
+        , clearStepButton(processor)
+        , randomizeStepButton(processor)
+        , randomizeAllButton(processor)
+        , shuffleButton(processor)
+    {
+        // Subscribe to APVTS parameters for secondary row visibility
         listenToParameter(Params::Keys::ID::SEQ_IS_SHIFT);
 
-        // Create all buttons (primary + secondary rows)
-        for (int i = 0; i < kTotalButtons; i++) {
-            auto* button = new ControlButton();
-            buttons.add(button);
-            addAndMakeVisible(button);
-        }
-
-        // ========== PRIMARY ROW SETUP ==========
-        buttons[kRollButton]->setIcon(Icons::createDiceIcon());
-        buttons[kRollButton]->setLabel("Roll");
-        buttons[kRollButton]->setMidiControlId(MidiControlId::BUTTON_ROLL);
-
-        buttons[kPageLeftButton]->setIcon(Icons::createIndexLeftIcon());
-        buttons[kPageLeftButton]->setLabel("Page");
-        buttons[kPageLeftButton]->setMidiControlId(MidiControlId::BUTTON_PAGE_LEFT);
-
-        buttons[kPageRightButton]->setIcon(Icons::createIndexRightIcon());
-        buttons[kPageRightButton]->setLabel("Page");
-        buttons[kPageRightButton]->setMidiControlId(MidiControlId::BUTTON_PAGE_RIGHT);
-
-        // Length+ button uses new observer pattern - hide old button, use new component
-        buttons[kLengthPlusButton]->setVisible(false);
+        // ========== PRIMARY ROW - Add new observer-pattern buttons ==========
+        addAndMakeVisible(rollButton);
+        addAndMakeVisible(pageLeftButton);
+        addAndMakeVisible(pageRightButton);
         addAndMakeVisible(lengthPlusButton);
+        addAndMakeVisible(lengthMinusButton);
+        addAndMakeVisible(nudgeLeftButton);
+        addAndMakeVisible(nudgeRightButton);
+        addAndMakeVisible(shiftButton);
 
-        buttons[kLengthMinusButton]->setIcon(Icons::createLengthMinusIcon());
-        buttons[kLengthMinusButton]->setLabel("Length");
-        buttons[kLengthMinusButton]->setMidiControlId(MidiControlId::BUTTON_LENGTH_MINUS);
-
-        buttons[kNudgeLeftButton]->setIcon(Icons::createNudgeLeftIcon());
-        buttons[kNudgeLeftButton]->setLabel("Nudge");
-        buttons[kNudgeLeftButton]->setMidiControlId(MidiControlId::BUTTON_NUDGE_LEFT);
-
-        buttons[kNudgeRightButton]->setIcon(Icons::createNudgeRightIcon());
-        buttons[kNudgeRightButton]->setLabel("Nudge");
-        buttons[kNudgeRightButton]->setMidiControlId(MidiControlId::BUTTON_NUDGE_RIGHT);
-
-        buttons[kShiftButton]->setIcon(Icons::createShiftIcon());
-        buttons[kShiftButton]->setLabel("Shift");
-        buttons[kShiftButton]->setMidiControlId(MidiControlId::BUTTON_SHIFT);
-        buttons[kShiftButton]->setToggleable(true);
-
-        // ========== SECONDARY ROW SETUP ==========
-        buttons[kDuplicateButton]->setIcon(Icons::createDupIcon());
-        buttons[kDuplicateButton]->setLabel("Duplicate");
-        buttons[kDuplicateButton]->setMidiControlId(MidiControlId::BUTTON_DUPLICATE);
-
-        buttons[kClearWindowButton]->setIcon(Icons::createTrashIcon());
-        buttons[kClearWindowButton]->setLabel("Clear");
-        buttons[kClearWindowButton]->setMidiControlId(MidiControlId::BUTTON_CLEAR_WINDOW);
-
-        buttons[kClearStepButton]->setIcon(Icons::createEraserIcon());
-        buttons[kClearStepButton]->setLabel("Clear Step");
-        buttons[kClearStepButton]->setMidiControlId(MidiControlId::BUTTON_CLEAR_STEP);
-
-        buttons[kRandomizeStepButton]->setIcon(Icons::createDiceOneIcon());
-        buttons[kRandomizeStepButton]->setLabel("Step");
-        buttons[kRandomizeStepButton]->setMidiControlId(MidiControlId::BUTTON_RANDOMIZE_STEP);
-
-        buttons[kRandomizeAllButton]->setIcon(Icons::createRandomAllIcon());
-        buttons[kRandomizeAllButton]->setLabel("All");
-        buttons[kRandomizeAllButton]->setMidiControlId(MidiControlId::BUTTON_RANDOMIZE_ALL);
-
-        buttons[kShuffleButton]->setIcon(Icons::createShuffleIcon());
-        buttons[kShuffleButton]->setLabel("Shuffle");
-        buttons[kShuffleButton]->setMidiControlId(MidiControlId::BUTTON_SHUFFLE);
+        // ========== SECONDARY ROW - Add new observer-pattern buttons ==========
+        addAndMakeVisible(duplicateButton);
+        addAndMakeVisible(clearWindowButton);
+        addAndMakeVisible(clearStepButton);
+        addAndMakeVisible(randomizeStepButton);
+        addAndMakeVisible(randomizeAllButton);
+        addAndMakeVisible(shuffleButton);
 
         // Initially hide secondary row (Shift not active)
         updateSecondaryRowVisibility();
     }
 
-    ~SequencerControlsComponent() override {
-        buttons.clear(true);
-    }
+    ~SequencerControlsComponent() override = default;
 
     void paint (juce::Graphics& g) override {
         // Background is transparent - buttons draw themselves
+        juce::ignoreUnused(g);
     }
 
     void resized() override {
         using namespace SequencerControlsConstants;
+        int size = static_cast<int>(buttonSize);
+        int spacing = static_cast<int>(buttonSize + gap);
 
-        // Layout primary row (always visible)
-        for (int i = 0; i < kPrimaryRowCount; i++) {
-            float x = i * (buttonSize + gap);
-            buttons[i]->setBounds(static_cast<int>(x), 0,
-                                 static_cast<int>(buttonSize),
-                                 static_cast<int>(buttonSize));
-        }
+        // ========== PRIMARY ROW ==========
+        rollButton.setBounds(kRollButton * spacing, 0, size, size);
+        pageLeftButton.setBounds(kPageLeftButton * spacing, 0, size, size);
+        pageRightButton.setBounds(kPageRightButton * spacing, 0, size, size);
+        lengthPlusButton.setBounds(kLengthPlusButton * spacing, 0, size, size);
+        lengthMinusButton.setBounds(kLengthMinusButton * spacing, 0, size, size);
+        nudgeLeftButton.setBounds(kNudgeLeftButton * spacing, 0, size, size);
+        nudgeRightButton.setBounds(kNudgeRightButton * spacing, 0, size, size);
+        shiftButton.setBounds(kShiftButton * spacing, 0, size, size);
 
-        // Position the new LengthPlusButton in the same spot as the old one
-        float lengthPlusX = kLengthPlusButton * (buttonSize + gap);
-        lengthPlusButton.setBounds(static_cast<int>(lengthPlusX), 0,
-                                   static_cast<int>(buttonSize),
-                                   static_cast<int>(buttonSize));
-
-        // Layout secondary row (below primary, positions 1-6 to align with Page Left through Nudge Right)
+        // ========== SECONDARY ROW ==========
         // Secondary buttons align with primary buttons at indices 1-6
-        for (int i = 0; i < kSecondaryRowCount; i++) {
-            int primaryAlignIndex = i + 1;  // Align with Page Left (1) through Nudge Right (6)
-            float x = primaryAlignIndex * (buttonSize + gap);
-            float y = buttonSize + gap;  // Below primary row
-            buttons[kPrimaryRowCount + i]->setBounds(static_cast<int>(x), static_cast<int>(y),
-                                                     static_cast<int>(buttonSize),
-                                                     static_cast<int>(buttonSize));
-        }
-    }
-
-    // Callbacks for button clicks
-    std::function<void(int buttonIndex)> onButtonClicked;
-    std::function<void(int buttonIndex)> onButtonReleased;
-
-    // Get button toggle state (for Roll and Shift)
-    bool isButtonToggled(int index) const {
-        if (index >= 0 && index < buttons.size()) {
-            return buttons[index]->isToggled();
-        }
-        return false;
-    }
-
-    // Set button toggle state (for Roll and Shift)
-    void setButtonToggled(int index, bool toggled) {
-        if (index >= 0 && index < buttons.size()) {
-            buttons[index]->setToggled(toggled);
-        }
-    }
-
-    // Set button pressed state (for momentary buttons like Roll)
-    void setButtonPressed(int index, bool pressed) {
-        if (index >= 0 && index < buttons.size()) {
-            buttons[index]->setPressed(pressed);
-        }
+        int secondaryY = static_cast<int>(buttonSize + gap);
+        duplicateButton.setBounds(1 * spacing, secondaryY, size, size);
+        clearWindowButton.setBounds(2 * spacing, secondaryY, size, size);
+        clearStepButton.setBounds(3 * spacing, secondaryY, size, size);
+        randomizeStepButton.setBounds(4 * spacing, secondaryY, size, size);
+        randomizeAllButton.setBounds(5 * spacing, secondaryY, size, size);
+        shuffleButton.setBounds(6 * spacing, secondaryY, size, size);
     }
 
     // Check if Shift mode is active - reads from APVTS for consistency
@@ -230,20 +179,32 @@ public:
     // Set the MIDI learn registry (called from parent)
     void setRegistry(MidiLearnRegistry* reg) {
         registry = reg;
-        // Pass to all buttons
-        for (auto* button : buttons) {
-            button->setRegistry(reg);
-        }
-        // Also set on new observer-pattern buttons
+        // Pass to all observer-pattern buttons
+        rollButton.setRegistry(reg);
+        pageLeftButton.setRegistry(reg);
+        pageRightButton.setRegistry(reg);
         lengthPlusButton.setRegistry(reg);
+        lengthMinusButton.setRegistry(reg);
+        nudgeLeftButton.setRegistry(reg);
+        nudgeRightButton.setRegistry(reg);
+        shiftButton.setRegistry(reg);
+        duplicateButton.setRegistry(reg);
+        clearWindowButton.setRegistry(reg);
+        clearStepButton.setRegistry(reg);
+        randomizeStepButton.setRegistry(reg);
+        randomizeAllButton.setRegistry(reg);
+        shuffleButton.setRegistry(reg);
     }
 
     // Update secondary row visibility based on Shift state
     void updateSecondaryRowVisibility() {
         bool showSecondary = isShiftActive();
-        for (int i = kPrimaryRowCount; i < kTotalButtons; i++) {
-            buttons[i]->setVisible(showSecondary);
-        }
+        duplicateButton.setVisible(showSecondary);
+        clearWindowButton.setVisible(showSecondary);
+        clearStepButton.setVisible(showSecondary);
+        randomizeStepButton.setVisible(showSecondary);
+        randomizeAllButton.setVisible(showSecondary);
+        shuffleButton.setVisible(showSecondary);
     }
 
 protected:
@@ -252,264 +213,35 @@ protected:
     // ========================================
 
     /**
-     * Called on message thread when SEQ_IS_RANDOM or SEQ_IS_SHIFT changes.
-     * Updates button visual states to reflect APVTS state.
+     * Called on message thread when SEQ_IS_SHIFT changes.
+     * Updates secondary row visibility.
+     * Note: Individual button visual states are handled by each button's own
+     * StateListenerComponent - they observe their own params.
      */
     void onStateChanged() override {
-        // Read current state from APVTS
-        bool isRandom = getState().getIsRandom();
-        bool isShift = getState().getIsShift();
-
-        // Update Roll button visual state (momentary button shows pressed when random is active)
-        buttons[kRollButton]->setPressed(isRandom);
-
-        // Update Shift button visual state (toggle button)
-        buttons[kShiftButton]->setToggled(isShift);
-
         // Update secondary row visibility based on shift state
         updateSecondaryRowVisibility();
     }
 
 private:
-    /**
-     * Individual control button
-     * Matches the design: rounded rectangle with white border, grey background
-     */
-    class ControlButton : public juce::Component {
-    public:
-        ControlButton() = default;
-
-        void setRegistry(MidiLearnRegistry* reg) {
-            registry = reg;
-            updateRegistration();
-        }
-
-        void setMidiControlId(MidiControlId id) {
-            controlId = id;
-            updateRegistration();
-        }
-        
-        void paint (juce::Graphics& g) override {
-            using namespace SequencerControlsConstants;
-            auto bounds = getLocalBounds().toFloat();
-
-            // Determine colors based on toggle state OR pressed state
-            bool isActive = isToggled_ || isPressed_;
-            juce::Colour bgColor = isActive ? juce::Colour(bgColorActive) : juce::Colour(bgColorInactive);
-            juce::Colour borderColor = juce::Colours::white;
-            juce::Colour textColor = isActive ? juce::Colours::black : juce::Colours::white;
-            juce::Colour iconColor = isActive ? juce::Colours::black : juce::Colours::white;
-
-            // Fill background
-            g.setColour(bgColor);
-            g.fillRoundedRectangle(bounds, cornerRadius);
-
-            // Draw white border inside the bounds
-            g.setColour(borderColor);
-            float inset = borderWidth * 0.5f;
-            juce::Rectangle<float> borderBounds = bounds.reduced(inset);
-            float borderRadiusInner = juce::jmax(0.0f, cornerRadius - inset);
-            g.drawRoundedRectangle(borderBounds, borderRadiusInner, borderWidth);
-
-            // Draw icon and/or label text
-            if (iconPath_.has_value()) {
-                // Draw the icon path
-                g.setColour(iconColor);
-
-                // Get the icon's bounding box
-                auto iconBounds = iconPath_->getBounds();
-
-                // Calculate scale to limit icon to maxIconSize on longest side
-                float longestSide = juce::jmax(iconBounds.getWidth(), iconBounds.getHeight());
-                float scale = maxIconSize / longestSide;
-
-                // Calculate the space available for the icon (above the text)
-                float iconAreaHeight = bounds.getHeight() - textAreaHeight;
-
-                // Center the icon in the available space, then apply vertical offset
-                float scaledWidth = iconBounds.getWidth() * scale;
-                float scaledHeight = iconBounds.getHeight() * scale;
-                float offsetX = (bounds.getWidth() - scaledWidth) * 0.5f;
-                float offsetY = (iconAreaHeight - scaledHeight) * 0.5f + iconVerticalOffset;
-
-                // Apply transform and draw
-                juce::AffineTransform transform = juce::AffineTransform::scale(scale)
-                    .translated(offsetX - iconBounds.getX() * scale,
-                               offsetY - iconBounds.getY() * scale);
-
-                g.fillPath(*iconPath_, transform);
-            }
-
-            // Draw label text if present (below icon or centered if no icon)
-            if (label_.isNotEmpty()) {
-                g.setColour(textColor);
-                juce::Font font{juce::FontOptions(fontSize)};
-                font.setBold(true);
-                g.setFont(font);
-
-                // Position text from bottom
-                float textY = bounds.getHeight() - textYOffset - textHeight;
-                juce::Rectangle<float> textBounds(0, textY, bounds.getWidth(), textHeight);
-
-                g.drawText(label_, textBounds.toNearestInt(), juce::Justification::centredBottom);
-            }
-
-            // Draw MIDI learn overlay if in learn mode
-            paintMidiLearnOverlay(g);
-        }
-
-        void paintMidiLearnOverlay(juce::Graphics& g) {
-            if (!registry || !registry->isLearning()) return;
-            if (controlId == MidiControlId::COUNT) return;
-
-            auto bounds = getLocalBounds();
-
-            // Determine if this control is currently being learned
-            bool isLearningThisControl = (registry->getLearningControl() == controlId);
-
-            // Semi-transparent blue rectangle
-            auto overlayColor = juce::Colour(0x4080CCFF);  // Blue with ~25% opacity
-            g.setColour(overlayColor);
-            g.fillRoundedRectangle(bounds.toFloat(), SequencerControlsConstants::cornerRadius);
-
-            // White border if actively learning
-            if (isLearningThisControl) {
-                g.setColour(juce::Colours::white);
-                g.drawRoundedRectangle(bounds.toFloat().reduced(1.5f), SequencerControlsConstants::cornerRadius, 3.0f);
-            }
-
-            // Display MIDI mapping info (if mapped)
-            const auto* midiId = registry->getMidiForControl(controlId);
-            if (midiId) {
-                g.setColour(juce::Colours::white);
-                g.setFont(9.0f);
-                g.drawText(midiId->toString(),
-                          bounds,
-                          juce::Justification::centred);
-            }
-        }
-
-        // This is the outermost captured click event for any button in this component, it then redirects
-        // this event to the appropriate callback related to that button.
-        // if shift we expose the shift buttons. (or we're supposed to but this is a bug now)
-        // if its within the functional index, we call the
-        void mouseDown (const juce::MouseEvent& event) override {
-            // Check if in MIDI learn mode first
-            if (registry && registry->isLearning() && controlId != MidiControlId::COUNT) {
-                // Set this control as the learning target
-                registry->setLearningControl(controlId);
-                repaint();
-                return;  // Don't trigger normal button action
-            }
-
-            if (isToggleable_) {
-                setToggled(!isToggled_);
-            } else {
-                // For momentary buttons, show pressed state
-                isPressed_ = true;
-                repaint();
-            }
-
-            // Notify parent
-            if (auto* parent = dynamic_cast<SequencerControlsComponent*>(getParentComponent())) {
-                // Find our index
-                int index = parent->buttons.indexOf(this);
-
-                // If Shift button was toggled, update secondary row visibility
-                if (index == kShiftButton) {
-                    parent->updateSecondaryRowVisibility();
-                }
-
-                if (parent->onButtonClicked) {
-                    parent->onButtonClicked(index);
-                }
-            }
-        }
-
-        void mouseUp (const juce::MouseEvent& /*event*/) override {
-            // Clear pressed state for momentary buttons
-            if (!isToggleable_ && isPressed_) {
-                isPressed_ = false;
-                repaint();
-
-                // Notify parent of button release
-                if (auto* parent = dynamic_cast<SequencerControlsComponent*>(getParentComponent())) {
-                    if (parent->onButtonReleased) {
-                        int index = parent->buttons.indexOf(this);
-                        parent->onButtonReleased(index);
-                    }
-                }
-            }
-        }
-        
-        void setLabel(const juce::String& label) {
-            label_ = label;
-            repaint();
-        }
-
-        void setIcon(const juce::Path& icon) {
-            iconPath_ = icon;
-            repaint();
-        }
-
-        void setToggleable(bool toggleable) {
-            isToggleable_ = toggleable;
-        }
-
-        bool isToggled() const {
-            return isToggled_;
-        }
-
-        void setToggled(bool toggled) {
-            if (isToggled_ != toggled) {
-                isToggled_ = toggled;
-                repaint();
-            }
-        }
-
-        void setPressed(bool pressed) {
-            if (isPressed_ != pressed) {
-                isPressed_ = pressed;
-                repaint();
-            }
-        }
-
-        bool isPressed() const {
-            return isPressed_;
-        }
-
-        void resized() override {
-            updateBoundsInRegistry();
-        }
-
-    private:
-        void updateRegistration() {
-            if (registry && controlId != MidiControlId::COUNT && isShowing()) {
-                auto screenBounds = getScreenBounds();
-                registry->registerControl(controlId, screenBounds, getMidiControlName(controlId));
-            }
-        }
-
-        void updateBoundsInRegistry() {
-            if (registry && controlId != MidiControlId::COUNT) {
-                auto screenBounds = getScreenBounds();
-                registry->updateControlBounds(controlId, screenBounds);
-            }
-        }
-
-        juce::String label_;
-        std::optional<juce::Path> iconPath_;
-        bool isToggleable_ = false;
-        bool isToggled_ = false;
-        bool isPressed_ = false;  // Track pressed state for momentary buttons
-        MidiLearnRegistry* registry = nullptr;
-        MidiControlId controlId = MidiControlId::COUNT;
-    };
-
-    juce::OwnedArray<ControlButton> buttons;
     MidiLearnRegistry* registry = nullptr;
 
-    // New observer-pattern buttons (replacing old ControlButton instances)
+    // ========== PRIMARY ROW BUTTONS ==========
+    RollButton rollButton;
+    PageLeftButton pageLeftButton;
+    PageRightButton pageRightButton;
     LengthPlusButton lengthPlusButton;
+    LengthMinusButton lengthMinusButton;
+    NudgeLeftButton nudgeLeftButton;
+    NudgeRightButton nudgeRightButton;
+    ShiftButton shiftButton;
+
+    // ========== SECONDARY ROW BUTTONS ==========
+    DuplicateButton duplicateButton;
+    ClearWindowButton clearWindowButton;
+    ClearStepButton clearStepButton;
+    RandomizeStepButton randomizeStepButton;
+    RandomizeAllButton randomizeAllButton;
+    ShuffleButton shuffleButton;
 };
 
