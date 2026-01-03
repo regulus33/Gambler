@@ -14,44 +14,55 @@ PluginProcessor::PluginProcessor()
       apvts (*this, nullptr, "Parameters", createParameterLayout()) {
 
     // Initialize APVTS-backed state accessor
-    sequenceState = std::make_unique<SequenceState>(apvts);
+    sequenceState = std::make_unique<SequenceState> (apvts);
 
     // Register as listener for all parameter changes
-    // This ensures State stays in sync when parameters change from UI
     for (auto* param : apvts.processor.getParameters()) {
+        // we dynamic cast the param because we don't know what type it will be and RangedAudioParameter is the top parent of AudioParameterBool and so on.
         if (auto* paramWithID = dynamic_cast<juce::RangedAudioParameter*> (param)) {
+            // we tell apvts to call this class when any param changes. All we need to pass is the param id. This tells us exactly which parameter to look up and grab the change of.
             apvts.addParameterListener (paramWithID->paramID, this);
         }
     }
 
-    // Initialize clock settings based on host type
-    // Default to internal clock for standalone, DAW sync for plugin
-    juce::PluginHostType hostType;
+    // Initialize clock settings based on standalone vs plugin mode.
+    juce::PluginHostType hostType; // this tells us we are in standalone if no host.
     if (hostType.type == juce::PluginHostType::UnknownHost) {
         // Standalone app - use internal clock
-        clock.setMode(ClockMode::INTERNAL);
+        clock.setMode (ClockMode::INTERNAL);
+        // start the clock
         clock.start();
-        sequenceState->setClockMode(0);  // 0 = INTERNAL
+        // set the clock mode in the apvts (TODO: use enum)
+        sequenceState->setClockMode (0); // 0 = INTERNAL
     } else {
         // Running in a DAW - use DAW sync
-        clock.setMode(ClockMode::DAW_SYNC);
-        sequenceState->setClockMode(1);  // 1 = DAW_SYNC
+        clock.setMode (ClockMode::DAW_SYNC);
+        // set the clock mode
+        sequenceState->setClockMode (1); // 1 = DAW_SYNC (TODO: use enum)
     }
-    clock.setBpm(120.0);
-    clock.setSubdivision(Subdivision::SIXTEENTH);
+    // clock.setBpm(120.0); this isn't necessary because its set by default, but putting it here for completeness.
+    clock.setSubdivision (Subdivision::SIXTEENTH);
 
     // Open first available MIDI output device for standalone mode
-    auto midiOutputs = juce::MidiOutput::getAvailableDevices();
-    if (!midiOutputs.isEmpty()) {
-        for (const auto& device : midiOutputs) {
-            DBG("Found MIDI output device: " << device.name);
+    if (hostType.type == juce::PluginHostType::UnknownHost) {
+        // get the available devices from juce api
+        auto midiOutputs = juce::MidiOutput::getAvailableDevices();
+        // if we find any
+        if (!midiOutputs.isEmpty()) {
+            // just log them all in dev
+            for (const auto& device : midiOutputs) {
+                DBG ("Found MIDI output device: " << device.name);
+            }
+            // TODO: make this configurable through a dropdown in settings
+            midiOutput = juce::MidiOutput::openDevice (midiOutputs[0].identifier);
+            if (midiOutput) {
+                // TODO: make this configurable through a dropdown in settings
+                DBG ("Opened MIDI output: " << midiOutputs[0].name);
+            }
+        } else {
+            // if we have nothing plugged in
+            DBG ("No MIDI output devices found!");
         }
-        midiOutput = juce::MidiOutput::openDevice(midiOutputs[0].identifier);
-        if (midiOutput) {
-            DBG("Opened MIDI output: " << midiOutputs[0].name);
-        }
-    } else {
-        DBG("No MIDI output devices found!");
     }
 }
 
@@ -128,7 +139,7 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock) {
     juce::ignoreUnused (samplesPerBlock);
 
     // Set sample rate for internal clock timing
-    clock.setSampleRate(sampleRate);
+    clock.setSampleRate (sampleRate);
 }
 
 void PluginProcessor::releaseResources() {
@@ -168,7 +179,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         buffer.clear (i, 0, buffer.getNumSamples());
 
     // Process incoming MIDI for control mapping (before clearing)
-    processMidiInput(midiMessages);
+    processMidiInput (midiMessages);
 
     // Clear incoming MIDI (we're generating, not processing MIDI through)
     midiMessages.clear();
@@ -176,7 +187,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // Execute any queued commands from UI thread (thread-safe state modifications)
     int numCommands = commandQueue.executeAll();
     if (numCommands > 0) {
-        DBG("Executed " << numCommands << " queued commands");
+        DBG ("Executed " << numCommands << " queued commands");
 
         // If any commands had completion callbacks, notify the UI to execute them
         if (commandQueue.hasCompletionCallbacks() && onCompletionCallbacksPending) {
@@ -186,48 +197,48 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     // Process any queued preview MIDI messages (from UI thread)
     int start1, size1, start2, size2;
-    previewMidiFifo.prepareToRead(previewMidiFifo.getNumReady(), start1, size1, start2, size2);
+    previewMidiFifo.prepareToRead (previewMidiFifo.getNumReady(), start1, size1, start2, size2);
 
     for (int i = 0; i < size1; ++i) {
         const auto& msg = previewMidiBuffer[start1 + i];
         if (msg.isNoteOn) {
-            auto noteOn = juce::MidiMessage::noteOn(1, msg.noteNumber, msg.velocity);
-            midiMessages.addEvent(noteOn, 0);
-            DBG("Preview MIDI Note ON added to buffer: " << msg.noteNumber);
+            auto noteOn = juce::MidiMessage::noteOn (1, msg.noteNumber, msg.velocity);
+            midiMessages.addEvent (noteOn, 0);
+            DBG ("Preview MIDI Note ON added to buffer: " << msg.noteNumber);
         } else {
-            auto noteOff = juce::MidiMessage::noteOff(1, msg.noteNumber, msg.velocity);
-            midiMessages.addEvent(noteOff, 0);
-            DBG("Preview MIDI Note OFF added to buffer: " << msg.noteNumber);
+            auto noteOff = juce::MidiMessage::noteOff (1, msg.noteNumber, msg.velocity);
+            midiMessages.addEvent (noteOff, 0);
+            DBG ("Preview MIDI Note OFF added to buffer: " << msg.noteNumber);
         }
     }
 
     for (int i = 0; i < size2; ++i) {
         const auto& msg = previewMidiBuffer[start2 + i];
         if (msg.isNoteOn) {
-            auto noteOn = juce::MidiMessage::noteOn(1, msg.noteNumber, msg.velocity);
-            midiMessages.addEvent(noteOn, 0);
-            DBG("Preview MIDI Note ON added to buffer: " << msg.noteNumber);
+            auto noteOn = juce::MidiMessage::noteOn (1, msg.noteNumber, msg.velocity);
+            midiMessages.addEvent (noteOn, 0);
+            DBG ("Preview MIDI Note ON added to buffer: " << msg.noteNumber);
         } else {
-            auto noteOff = juce::MidiMessage::noteOff(1, msg.noteNumber, msg.velocity);
-            midiMessages.addEvent(noteOff, 0);
-            DBG("Preview MIDI Note OFF added to buffer: " << msg.noteNumber);
+            auto noteOff = juce::MidiMessage::noteOff (1, msg.noteNumber, msg.velocity);
+            midiMessages.addEvent (noteOff, 0);
+            DBG ("Preview MIDI Note OFF added to buffer: " << msg.noteNumber);
         }
     }
 
     if (size1 + size2 > 0) {
-        previewMidiFifo.finishedRead(size1 + size2);
+        previewMidiFifo.finishedRead (size1 + size2);
     }
 
     // Check if scheduled note-off should be sent
     if (scheduledNoteOffSample >= 0 && currentSamplePosition >= scheduledNoteOffSample) {
-        auto noteOff = juce::MidiMessage::noteOff(1, scheduledNoteOffNote, scheduledNoteOffVelocity);
-        midiMessages.addEvent(noteOff, 0);
+        auto noteOff = juce::MidiMessage::noteOff (1, scheduledNoteOffNote, scheduledNoteOffVelocity);
+        midiMessages.addEvent (noteOff, 0);
 
         // Send directly to MIDI output device (for standalone mode)
         if (midiOutput) {
-            midiOutput->sendMessageNow(noteOff);
+            midiOutput->sendMessageNow (noteOff);
         }
-        DBG("Scheduled MIDI Note OFF: " << scheduledNoteOffNote << " at sample " << currentSamplePosition);
+        DBG ("Scheduled MIDI Note OFF: " << scheduledNoteOffNote << " at sample " << currentSamplePosition);
 
         // Clear scheduled note-off
         scheduledNoteOffSample = -1;
@@ -239,15 +250,15 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     // Process clock based on current mode
     if (clock.getMode() == ClockMode::DAW_SYNC) {
-        // DAW sync mode: get timing from host transport
+        // DAW sync mode: get timing from host transport (that's the play-head)
         if (auto* playHead = getPlayHead()) {
             auto position = playHead->getPosition();
-            int pulseCount = dawSync.update(position);
-            clock.updateDawSync(pulseCount);
+            int pulseCount = dawSync.update (position);
+            clock.updateDawSync (pulseCount);
         }
     } else {
         // Internal clock mode: process samples for timing
-        clock.processInternalClock(buffer.getNumSamples());
+        clock.processInternalClock (buffer.getNumSamples());
     }
 
     // Check if clock triggered a tick
@@ -258,14 +269,14 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
         // Send note off for previous note immediately (if any)
         if (lastPlayedNote >= 0) {
-            auto noteOff = juce::MidiMessage::noteOff(1, lastPlayedNote, (juce::uint8)0);
-            midiMessages.addEvent(noteOff, 0);
+            auto noteOff = juce::MidiMessage::noteOff (1, lastPlayedNote, (juce::uint8) 0);
+            midiMessages.addEvent (noteOff, 0);
 
             // Send directly to MIDI output device (for standalone mode)
             if (midiOutput) {
-                midiOutput->sendMessageNow(noteOff);
+                midiOutput->sendMessageNow (noteOff);
             }
-            DBG("MIDI Note OFF: " << lastPlayedNote);
+            DBG ("MIDI Note OFF: " << lastPlayedNote);
         }
 
         // Tick the sequence to get the next note (using APVTS-backed state)
@@ -273,11 +284,11 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         int note = state.tick();
         int currentStepIndex = state.getCurrentIndex();
 
-        DBG("Clock tick! Step: " << currentStepIndex << ", Note: " << note);
+        DBG ("Clock tick! Step: " << currentStepIndex << ", Note: " << note);
 
         if (note >= 0) {
             // Get step modulations for this step (using APVTS-backed state)
-            auto selectedMods = state.getSelectedModulations(currentStepIndex);
+            auto selectedMods = state.getSelectedModulations (currentStepIndex);
 
             // Determine velocity (default to 100 if no velocity modulation is selected)
             juce::uint8 velocity = 100;
@@ -286,29 +297,29 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             for (const auto& mod : selectedMods) {
                 if (mod.getType() == ModulationType::Velocity) {
                     // Use this as the note velocity
-                    velocity = static_cast<juce::uint8>(mod.getValue());
+                    velocity = static_cast<juce::uint8> (mod.getValue());
                 } else if (mod.getType() == ModulationType::CC) {
                     // Send CC message
-                    auto ccMsg = juce::MidiMessage::controllerEvent(1, mod.getCCNumber(), mod.getValue());
-                    midiMessages.addEvent(ccMsg, 0);
+                    auto ccMsg = juce::MidiMessage::controllerEvent (1, mod.getCCNumber(), mod.getValue());
+                    midiMessages.addEvent (ccMsg, 0);
 
                     // Send directly to MIDI output device (for standalone mode)
                     if (midiOutput) {
-                        midiOutput->sendMessageNow(ccMsg);
+                        midiOutput->sendMessageNow (ccMsg);
                     }
-                    DBG("MIDI CC: " << mod.getCCNumber() << " = " << mod.getValue());
+                    DBG ("MIDI CC: " << mod.getCCNumber() << " = " << mod.getValue());
                 }
             }
 
             // Valid note - send note on with velocity
-            auto noteOn = juce::MidiMessage::noteOn(1, note, velocity);
-            midiMessages.addEvent(noteOn, 0);
+            auto noteOn = juce::MidiMessage::noteOn (1, note, velocity);
+            midiMessages.addEvent (noteOn, 0);
 
             // Send directly to MIDI output device (for standalone mode)
             if (midiOutput) {
-                midiOutput->sendMessageNow(noteOn);
+                midiOutput->sendMessageNow (noteOn);
             }
-            DBG("MIDI Note ON: " << note << " (velocity " << (int)velocity << ", channel 1)");
+            DBG ("MIDI Note ON: " << note << " (velocity " << (int) velocity << ", channel 1)");
             lastPlayedNote = note;
 
             // Schedule note-off based on note length setting
@@ -324,7 +335,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                     if (position.hasValue() && position->getBpm().hasValue()) {
                         double bpm = *position->getBpm();
                         double sampleRate = getSampleRate();
-                        int pulsesPerQuarterNote = getPulsesPerQuarterNote(clock.getSubdivision());
+                        int pulsesPerQuarterNote = getPulsesPerQuarterNote (clock.getSubdivision());
                         double pulsesPerSecond = (bpm * pulsesPerQuarterNote) / 60.0;
                         samplesPerStep = sampleRate / pulsesPerSecond;
                     }
@@ -334,20 +345,20 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             if (samplesPerStep > 0.0) {
                 // Calculate note-off time based on note length percentage (using APVTS-backed state)
                 double noteLengthPercent = state.getNoteLength();
-                juce::int64 noteOffDelay = static_cast<juce::int64>(samplesPerStep * noteLengthPercent);
+                juce::int64 noteOffDelay = static_cast<juce::int64> (samplesPerStep * noteLengthPercent);
                 scheduledNoteOffSample = currentSamplePosition + noteOffDelay;
                 scheduledNoteOffNote = note;
-                scheduledNoteOffVelocity = 0;  // Standard note-off velocity
+                scheduledNoteOffVelocity = 0; // Standard note-off velocity
 
-                DBG("Scheduled note-off for note " << note << " at sample " << scheduledNoteOffSample
-                    << " (delay: " << noteOffDelay << " samples, " << (noteLengthPercent * 100.0) << "% of step)");
+                DBG ("Scheduled note-off for note " << note << " at sample " << scheduledNoteOffSample
+                                                    << " (delay: " << noteOffDelay << " samples, " << (noteLengthPercent * 100.0) << "% of step)");
             }
         } else {
             // Rest - no note to play
             lastPlayedNote = -1;
             // Note: Rest recording is now handled inside state.tick() when roll is engaged
             if (state.getIsRandom()) {
-                DBG("Rest recorded at step: " << currentStepIndex);
+                DBG ("Rest recorded at step: " << currentStepIndex);
             }
         }
 
@@ -370,22 +381,22 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor() {
 //==============================================================================
 void PluginProcessor::getStateInformation (juce::MemoryBlock& destData) {
     // Create root XML element to hold all state
-    auto rootXml = std::make_unique<juce::XmlElement>("GamblerState");
+    auto rootXml = std::make_unique<juce::XmlElement> ("GamblerState");
 
     // Save APVTS parameters (contains all sequence data now)
     auto apvtsXml = apvts.copyState().createXml();
-    rootXml->addChildElement(apvtsXml.release());
+    rootXml->addChildElement (apvtsXml.release());
 
     // Save Clock settings (mode, BPM, subdivision)
-    rootXml->addChildElement(clock.toXml().release());
+    rootXml->addChildElement (clock.toXml().release());
 
     // Save User Preferences
-    rootXml->addChildElement(userPreferences.toXml().release());
+    rootXml->addChildElement (userPreferences.toXml().release());
 
     // Convert to binary and save
-    copyXmlToBinary(*rootXml, destData);
+    copyXmlToBinary (*rootXml, destData);
 
-    DBG("State saved: APVTS (sequence data), Clock, and UserPreferences");
+    DBG ("State saved: APVTS (sequence data), Clock, and UserPreferences");
 }
 
 void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
@@ -394,38 +405,37 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
 
     if (rootXml != nullptr) {
         // Check if this is the new format (GamblerState root element)
-        if (rootXml->hasTagName("GamblerState")) {
-            DBG("Loading state: GamblerState format");
+        if (rootXml->hasTagName ("GamblerState")) {
+            DBG ("Loading state: GamblerState format");
 
             // Load APVTS parameters (contains all sequence data)
-            if (auto* apvtsXml = rootXml->getChildByName(apvts.state.getType())) {
-                apvts.replaceState(juce::ValueTree::fromXml(*apvtsXml));
-                DBG("  - APVTS loaded (sequence data included)");
+            if (auto* apvtsXml = rootXml->getChildByName (apvts.state.getType())) {
+                apvts.replaceState (juce::ValueTree::fromXml (*apvtsXml));
+                DBG ("  - APVTS loaded (sequence data included)");
             }
 
             // Load Clock settings
-            if (auto* clockXml = rootXml->getChildByName("Clock")) {
-                clock.fromXml(*clockXml);
+            if (auto* clockXml = rootXml->getChildByName ("Clock")) {
+                clock.fromXml (*clockXml);
                 juce::String modeStr = (clock.getMode() == ClockMode::INTERNAL) ? "INTERNAL" : "DAW_SYNC";
-                DBG("  - Clock loaded (mode: " + modeStr + ", BPM: " + juce::String(clock.getBpm()) + ")");
+                DBG ("  - Clock loaded (mode: " + modeStr + ", BPM: " + juce::String (clock.getBpm()) + ")");
             }
 
             // Load User Preferences
-            if (auto* prefsXml = rootXml->getChildByName("UserPreferences")) {
-                userPreferences.fromXml(*prefsXml);
-                DBG("  - UserPreferences loaded (previewNotesOnEdit: " +
-                    juce::String(userPreferences.previewNotesOnEdit ? "true" : "false") + ")");
+            if (auto* prefsXml = rootXml->getChildByName ("UserPreferences")) {
+                userPreferences.fromXml (*prefsXml);
+                DBG ("  - UserPreferences loaded (previewNotesOnEdit: " + juce::String (userPreferences.previewNotesOnEdit ? "true" : "false") + ")");
             }
             // Backward compatibility: Load from old "Settings" element
-            else if (auto* settingsXml = rootXml->getChildByName("Settings")) {
-                userPreferences.previewNotesOnEdit = settingsXml->getBoolAttribute("previewNotesOnEdit", true);
-                DBG("  - UserPreferences loaded from legacy Settings format");
+            else if (auto* settingsXml = rootXml->getChildByName ("Settings")) {
+                userPreferences.previewNotesOnEdit = settingsXml->getBoolAttribute ("previewNotesOnEdit", true);
+                DBG ("  - UserPreferences loaded from legacy Settings format");
             }
         }
         // Fallback: Old format (just APVTS)
-        else if (rootXml->hasTagName(apvts.state.getType())) {
-            DBG("Loading state: Legacy APVTS-only format");
-            apvts.replaceState(juce::ValueTree::fromXml(*rootXml));
+        else if (rootXml->hasTagName (apvts.state.getType())) {
+            DBG ("Loading state: Legacy APVTS-only format");
+            apvts.replaceState (juce::ValueTree::fromXml (*rootXml));
         }
     }
 }
@@ -448,8 +458,8 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
 
     if (parameterID == Params::Keys::ID::ROLL) {
         // Roll is momentary - set isRandom to match param state
-        getState().setIsRandom(isOn);
-        DBG("ROLL " + juce::String(isOn ? "ON" : "OFF") + " - isRandom: " + juce::String(getState().getIsRandom() ? "true" : "false"));
+        getState().setIsRandom (isOn);
+        DBG ("ROLL " + juce::String (isOn ? "ON" : "OFF") + " - isRandom: " + juce::String (getState().getIsRandom() ? "true" : "false"));
     }
 
     // PAGE_LEFT and PAGE_RIGHT are handled in UI (need window position)
@@ -457,27 +467,27 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
 
     if (parameterID == Params::Keys::ID::LENGTH_PLUS && isOn) {
         getState().increaseLength();
-        DBG("LENGTH_PLUS triggered - new length: " + juce::String(getState().getLength()));
+        DBG ("LENGTH_PLUS triggered - new length: " + juce::String (getState().getLength()));
     }
 
     if (parameterID == Params::Keys::ID::LENGTH_MINUS && isOn) {
         getState().decreaseLength();
-        DBG("LENGTH_MINUS triggered - new length: " + juce::String(getState().getLength()));
+        DBG ("LENGTH_MINUS triggered - new length: " + juce::String (getState().getLength()));
     }
 
     if (parameterID == Params::Keys::ID::NUDGE_LEFT && isOn) {
         getState().nudgeLeft();
-        DBG("NUDGE_LEFT triggered");
+        DBG ("NUDGE_LEFT triggered");
     }
 
     if (parameterID == Params::Keys::ID::NUDGE_RIGHT && isOn) {
         getState().nudgeRight();
-        DBG("NUDGE_RIGHT triggered");
+        DBG ("NUDGE_RIGHT triggered");
     }
 
     if (parameterID == Params::Keys::ID::SEQ_IS_SHIFT) {
         // SEQ_IS_SHIFT is the actual shift state - just log it
-        DBG("SEQ_IS_SHIFT " + juce::String(isOn ? "ON" : "OFF"));
+        DBG ("SEQ_IS_SHIFT " + juce::String (isOn ? "ON" : "OFF"));
     }
 
     // ========== SECONDARY ROW BUTTONS ==========
@@ -485,19 +495,19 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
     if (parameterID == Params::Keys::ID::DUPLICATE && isOn) {
         auto& state = getState();
         int currentLength = state.getLength();
-        int newLength = juce::jmin(currentLength * 2, ParamConstants::MAX_STEPS);
+        int newLength = juce::jmin (currentLength * 2, ParamConstants::MAX_STEPS);
         int stepsToCopy = newLength - currentLength;
 
         for (int i = 0; i < stepsToCopy; i++) {
             int srcIdx = i;
             int dstIdx = currentLength + i;
-            state.setStepNotesLength(dstIdx, state.getStepNotesLength(srcIdx));
+            state.setStepNotesLength (dstIdx, state.getStepNotesLength (srcIdx));
             for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                state.setStepNote(dstIdx, n, state.getStepNote(srcIdx, n));
+                state.setStepNote (dstIdx, n, state.getStepNote (srcIdx, n));
             }
         }
-        state.setLength(newLength);
-        DBG("DUPLICATE triggered - new length: " + juce::String(newLength));
+        state.setLength (newLength);
+        DBG ("DUPLICATE triggered - new length: " + juce::String (newLength));
     }
 
     // CLEAR_WINDOW is handled in UI (needs window position)
@@ -506,52 +516,52 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
         auto& state = getState();
         int selectedStep = state.getSelectedStepForEditing();
         for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-            state.setStepNote(selectedStep, n, -1);
+            state.setStepNote (selectedStep, n, -1);
         }
-        DBG("CLEAR_STEP triggered - cleared step " + juce::String(selectedStep));
+        DBG ("CLEAR_STEP triggered - cleared step " + juce::String (selectedStep));
     }
 
     if (parameterID == Params::Keys::ID::RANDOMIZE_STEP && isOn) {
         auto& state = getState();
         int selectedStep = state.getSelectedStepForEditing();
-        state.randomizeStepNote(selectedStep);
-        DBG("RANDOMIZE_STEP triggered - randomized step " + juce::String(selectedStep));
+        state.randomizeStepNote (selectedStep);
+        DBG ("RANDOMIZE_STEP triggered - randomized step " + juce::String (selectedStep));
     }
 
     if (parameterID == Params::Keys::ID::RANDOMIZE_ALL && isOn) {
         auto& state = getState();
         for (int i = 0; i < state.getLength(); i++) {
-            state.randomizeStepNote(i);
+            state.randomizeStepNote (i);
         }
-        DBG("RANDOMIZE_ALL triggered");
+        DBG ("RANDOMIZE_ALL triggered");
     }
 
     if (parameterID == Params::Keys::ID::SHUFFLE && isOn) {
         auto& state = getState();
         int len = state.getLength();
         static std::random_device rd;
-        static std::mt19937 gen(rd());
+        static std::mt19937 gen (rd());
         for (int i = len - 1; i > 0; i--) {
-            std::uniform_int_distribution<> dis(0, i);
-            int j = dis(gen);
+            std::uniform_int_distribution<> dis (0, i);
+            int j = dis (gen);
             // Swap steps i and j
-            int lenI = state.getStepNotesLength(i);
+            int lenI = state.getStepNotesLength (i);
             std::array<int, ParamConstants::MAX_SUBSTEPS> notesI;
             for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                notesI[static_cast<size_t>(n)] = state.getStepNote(i, n);
+                notesI[static_cast<size_t> (n)] = state.getStepNote (i, n);
             }
             // Copy j to i
-            state.setStepNotesLength(i, state.getStepNotesLength(j));
+            state.setStepNotesLength (i, state.getStepNotesLength (j));
             for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                state.setStepNote(i, n, state.getStepNote(j, n));
+                state.setStepNote (i, n, state.getStepNote (j, n));
             }
             // Copy saved i to j
-            state.setStepNotesLength(j, lenI);
+            state.setStepNotesLength (j, lenI);
             for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                state.setStepNote(j, n, notesI[static_cast<size_t>(n)]);
+                state.setStepNote (j, n, notesI[static_cast<size_t> (n)]);
             }
         }
-        DBG("SHUFFLE triggered");
+        DBG ("SHUFFLE triggered");
     }
 }
 
@@ -559,26 +569,27 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
 // UI Preview Methods
 //==============================================================================
 
-void PluginProcessor::triggerStepMidi(int stepIndex) {
-    if (stepIndex < 0 || stepIndex >= 64) return;
+void PluginProcessor::triggerStepMidi (int stepIndex) {
+    if (stepIndex < 0 || stepIndex >= 64)
+        return;
 
     auto& state = getState();
 
     // Set the selected step for editing via APVTS (thread-safe)
-    state.setSelectedStepForEditing(stepIndex);
+    state.setSelectedStepForEditing (stepIndex);
 
     // Get the note for this step from APVTS-backed state
-    int note = state.getCurrentNoteForStep(stepIndex);
+    int note = state.getCurrentNoteForStep (stepIndex);
 
     // Get step modulations from APVTS-backed state
     std::vector<StepModulation> selectedMods;
     for (int i = 0; i < ParamConstants::NUM_MODULATIONS; i++) {
-        if (state.getStepModSelected(stepIndex, i)) {
+        if (state.getStepModSelected (stepIndex, i)) {
             StepModulation mod;
-            mod.setType(static_cast<ModulationType>(state.getStepModType(stepIndex, i)));
-            mod.setCCNumber(state.getStepModCCNum(stepIndex, i));
-            mod.setValue(state.getStepModValue(stepIndex, i));
-            selectedMods.push_back(mod);
+            mod.setType (static_cast<ModulationType> (state.getStepModType (stepIndex, i)));
+            mod.setCCNumber (state.getStepModCCNum (stepIndex, i));
+            mod.setValue (state.getStepModValue (stepIndex, i));
+            selectedMods.push_back (mod);
         }
     }
 
@@ -586,7 +597,7 @@ void PluginProcessor::triggerStepMidi(int stepIndex) {
     juce::uint8 velocity = 100;
     for (const auto& mod : selectedMods) {
         if (mod.getType() == ModulationType::Velocity) {
-            velocity = static_cast<juce::uint8>(mod.getValue());
+            velocity = static_cast<juce::uint8> (mod.getValue());
             break;
         }
     }
@@ -595,17 +606,17 @@ void PluginProcessor::triggerStepMidi(int stepIndex) {
     if (lastPlayedNote >= 0) {
         if (midiOutput) {
             // Standalone mode: send directly to MIDI device
-            auto noteOff = juce::MidiMessage::noteOff(1, lastPlayedNote, (juce::uint8)0);
-            midiOutput->sendMessageNow(noteOff);
-            DBG("Preview MIDI Note OFF (standalone): " << lastPlayedNote);
+            auto noteOff = juce::MidiMessage::noteOff (1, lastPlayedNote, (juce::uint8) 0);
+            midiOutput->sendMessageNow (noteOff);
+            DBG ("Preview MIDI Note OFF (standalone): " << lastPlayedNote);
         } else {
             // DAW mode: queue for audio thread
             int start1, size1, start2, size2;
-            previewMidiFifo.prepareToWrite(1, start1, size1, start2, size2);
+            previewMidiFifo.prepareToWrite (1, start1, size1, start2, size2);
             if (size1 > 0) {
                 previewMidiBuffer[start1] = { lastPlayedNote, false, 0 };
-                previewMidiFifo.finishedWrite(1);
-                DBG("Preview MIDI Note OFF queued (DAW): " << lastPlayedNote);
+                previewMidiFifo.finishedWrite (1);
+                DBG ("Preview MIDI Note OFF queued (DAW): " << lastPlayedNote);
             }
         }
     }
@@ -617,26 +628,26 @@ void PluginProcessor::triggerStepMidi(int stepIndex) {
         if (midiOutput) {
             for (const auto& mod : selectedMods) {
                 if (mod.getType() == ModulationType::CC) {
-                    auto ccMsg = juce::MidiMessage::controllerEvent(1, mod.getCCNumber(), mod.getValue());
-                    midiOutput->sendMessageNow(ccMsg);
-                    DBG("Preview MIDI CC (standalone): " << mod.getCCNumber() << " = " << mod.getValue());
+                    auto ccMsg = juce::MidiMessage::controllerEvent (1, mod.getCCNumber(), mod.getValue());
+                    midiOutput->sendMessageNow (ccMsg);
+                    DBG ("Preview MIDI CC (standalone): " << mod.getCCNumber() << " = " << mod.getValue());
                 }
             }
         }
 
         if (midiOutput) {
             // Standalone mode: send directly to MIDI device
-            auto noteOn = juce::MidiMessage::noteOn(1, note, velocity);
-            midiOutput->sendMessageNow(noteOn);
-            DBG("Preview MIDI Note ON (standalone): " << note << " (velocity " << (int)velocity << ", step " << stepIndex << ")");
+            auto noteOn = juce::MidiMessage::noteOn (1, note, velocity);
+            midiOutput->sendMessageNow (noteOn);
+            DBG ("Preview MIDI Note ON (standalone): " << note << " (velocity " << (int) velocity << ", step " << stepIndex << ")");
         } else {
             // DAW mode: queue for audio thread
             int start1, size1, start2, size2;
-            previewMidiFifo.prepareToWrite(1, start1, size1, start2, size2);
+            previewMidiFifo.prepareToWrite (1, start1, size1, start2, size2);
             if (size1 > 0) {
                 previewMidiBuffer[start1] = { note, true, velocity };
-                previewMidiFifo.finishedWrite(1);
-                DBG("Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int)velocity << ", step " << stepIndex << ")");
+                previewMidiFifo.finishedWrite (1);
+                DBG ("Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int) velocity << ", step " << stepIndex << ")");
             }
         }
         lastPlayedNote = note;
@@ -650,28 +661,28 @@ void PluginProcessor::triggerStepMidi(int stepIndex) {
     }
 }
 
-void PluginProcessor::triggerCurrentStepMidi(int noteOverride) {
-    DBG("=== triggerCurrentStepMidi() called ===");
-    DBG("  midiOutput is " << (midiOutput ? "VALID" : "NULL"));
-    DBG("  noteOverride: " << noteOverride);
+void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
+    DBG ("=== triggerCurrentStepMidi() called ===");
+    DBG ("  midiOutput is " << (midiOutput ? "VALID" : "NULL"));
+    DBG ("  noteOverride: " << noteOverride);
 
     auto& state = getState();
 
     int selectedStep = state.getSelectedStepForEditing();
     if (selectedStep < 0 || selectedStep >= 64) {
-        DBG("  ERROR: Invalid selected step: " << selectedStep);
+        DBG ("  ERROR: Invalid selected step: " << selectedStep);
         return;
     }
 
     // Get step modulations from APVTS-backed state
     std::vector<StepModulation> selectedMods;
     for (int i = 0; i < ParamConstants::NUM_MODULATIONS; i++) {
-        if (state.getStepModSelected(selectedStep, i)) {
+        if (state.getStepModSelected (selectedStep, i)) {
             StepModulation mod;
-            mod.setType(static_cast<ModulationType>(state.getStepModType(selectedStep, i)));
-            mod.setCCNumber(state.getStepModCCNum(selectedStep, i));
-            mod.setValue(state.getStepModValue(selectedStep, i));
-            selectedMods.push_back(mod);
+            mod.setType (static_cast<ModulationType> (state.getStepModType (selectedStep, i)));
+            mod.setCCNumber (state.getStepModCCNum (selectedStep, i));
+            mod.setValue (state.getStepModValue (selectedStep, i));
+            selectedMods.push_back (mod);
         }
     }
 
@@ -679,7 +690,7 @@ void PluginProcessor::triggerCurrentStepMidi(int noteOverride) {
     juce::uint8 velocity = 100;
     for (const auto& mod : selectedMods) {
         if (mod.getType() == ModulationType::Velocity) {
-            velocity = static_cast<juce::uint8>(mod.getValue());
+            velocity = static_cast<juce::uint8> (mod.getValue());
             break;
         }
     }
@@ -688,29 +699,29 @@ void PluginProcessor::triggerCurrentStepMidi(int noteOverride) {
     int note;
     if (noteOverride >= 0) {
         note = noteOverride;
-        DBG("  Using override note: " << note);
+        DBG ("  Using override note: " << note);
     } else {
-        note = state.getCurrentNoteForStep(selectedStep);
-        DBG("  Selected step: " << selectedStep << ", Note from step: " << note);
+        note = state.getCurrentNoteForStep (selectedStep);
+        DBG ("  Selected step: " << selectedStep << ", Note from step: " << note);
     }
 
     // Send note off for previous note (if any)
     if (lastPlayedNote >= 0) {
         if (midiOutput) {
             // Standalone mode: send directly to MIDI device
-            auto noteOff = juce::MidiMessage::noteOff(1, lastPlayedNote, (juce::uint8)0);
-            midiOutput->sendMessageNow(noteOff);
-            DBG("  Preview MIDI Note OFF sent (standalone): " << lastPlayedNote);
+            auto noteOff = juce::MidiMessage::noteOff (1, lastPlayedNote, (juce::uint8) 0);
+            midiOutput->sendMessageNow (noteOff);
+            DBG ("  Preview MIDI Note OFF sent (standalone): " << lastPlayedNote);
         } else {
             // DAW mode: queue for audio thread
             int start1, size1, start2, size2;
-            previewMidiFifo.prepareToWrite(1, start1, size1, start2, size2);
+            previewMidiFifo.prepareToWrite (1, start1, size1, start2, size2);
             if (size1 > 0) {
                 previewMidiBuffer[start1] = { lastPlayedNote, false, 0 };
-                previewMidiFifo.finishedWrite(1);
-                DBG("  Preview MIDI Note OFF queued (DAW): " << lastPlayedNote);
+                previewMidiFifo.finishedWrite (1);
+                DBG ("  Preview MIDI Note OFF queued (DAW): " << lastPlayedNote);
             } else {
-                DBG("  Preview MIDI queue full, Note OFF dropped: " << lastPlayedNote);
+                DBG ("  Preview MIDI queue full, Note OFF dropped: " << lastPlayedNote);
             }
         }
     }
@@ -722,36 +733,36 @@ void PluginProcessor::triggerCurrentStepMidi(int noteOverride) {
         if (midiOutput) {
             for (const auto& mod : selectedMods) {
                 if (mod.getType() == ModulationType::CC) {
-                    auto ccMsg = juce::MidiMessage::controllerEvent(1, mod.getCCNumber(), mod.getValue());
-                    midiOutput->sendMessageNow(ccMsg);
-                    DBG("  Preview MIDI CC (standalone): " << mod.getCCNumber() << " = " << mod.getValue());
+                    auto ccMsg = juce::MidiMessage::controllerEvent (1, mod.getCCNumber(), mod.getValue());
+                    midiOutput->sendMessageNow (ccMsg);
+                    DBG ("  Preview MIDI CC (standalone): " << mod.getCCNumber() << " = " << mod.getValue());
                 }
             }
         }
 
         if (midiOutput) {
             // Standalone mode: send directly to MIDI device
-            auto noteOn = juce::MidiMessage::noteOn(1, note, velocity);
-            midiOutput->sendMessageNow(noteOn);
-            DBG("  Preview MIDI Note ON sent (standalone): " << note << " (velocity " << (int)velocity << ")");
+            auto noteOn = juce::MidiMessage::noteOn (1, note, velocity);
+            midiOutput->sendMessageNow (noteOn);
+            DBG ("  Preview MIDI Note ON sent (standalone): " << note << " (velocity " << (int) velocity << ")");
         } else {
             // DAW mode: queue for audio thread
             int start1, size1, start2, size2;
-            previewMidiFifo.prepareToWrite(1, start1, size1, start2, size2);
+            previewMidiFifo.prepareToWrite (1, start1, size1, start2, size2);
             if (size1 > 0) {
                 previewMidiBuffer[start1] = { note, true, velocity };
-                previewMidiFifo.finishedWrite(1);
-                DBG("  Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int)velocity << ")");
+                previewMidiFifo.finishedWrite (1);
+                DBG ("  Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int) velocity << ")");
             } else {
-                DBG("  Preview MIDI queue full, Note ON dropped: " << note);
+                DBG ("  Preview MIDI queue full, Note ON dropped: " << note);
             }
         }
         lastPlayedNote = note;
     } else {
         lastPlayedNote = -1;
-        DBG("  No note to play (note < 0)");
+        DBG ("  No note to play (note < 0)");
     }
-    DBG("=== triggerCurrentStepMidi() complete ===");
+    DBG ("=== triggerCurrentStepMidi() complete ===");
 }
 
 //==============================================================================
@@ -760,71 +771,70 @@ void PluginProcessor::triggerCurrentStepMidi(int noteOverride) {
 
 std::unique_ptr<juce::XmlElement> PluginProcessor::getStateAsXml() {
     // Create root XML element to hold all state (same format as getStateInformation)
-    auto rootXml = std::make_unique<juce::XmlElement>("GamblerState");
+    auto rootXml = std::make_unique<juce::XmlElement> ("GamblerState");
 
     // Save APVTS parameters (contains all sequence data)
     auto apvtsXml = apvts.copyState().createXml();
-    rootXml->addChildElement(apvtsXml.release());
+    rootXml->addChildElement (apvtsXml.release());
 
     // Save Clock settings (mode, BPM, subdivision)
-    rootXml->addChildElement(clock.toXml().release());
+    rootXml->addChildElement (clock.toXml().release());
 
     // Save User Preferences
-    rootXml->addChildElement(userPreferences.toXml().release());
+    rootXml->addChildElement (userPreferences.toXml().release());
 
     // Save MIDI Learn Mappings
-    rootXml->addChildElement(midiLearnRegistry.toXml().release());
+    rootXml->addChildElement (midiLearnRegistry.toXml().release());
 
     return rootXml;
 }
 
-void PluginProcessor::loadStateFromXml(const juce::XmlElement& xml) {
-    if (!xml.hasTagName("GamblerState")) {
-        DBG("PluginProcessor::loadStateFromXml - Invalid XML format (expected GamblerState root)");
+void PluginProcessor::loadStateFromXml (const juce::XmlElement& xml) {
+    if (!xml.hasTagName ("GamblerState")) {
+        DBG ("PluginProcessor::loadStateFromXml - Invalid XML format (expected GamblerState root)");
         return;
     }
 
-    DBG("Loading preset state from XML");
+    DBG ("Loading preset state from XML");
 
     // Load APVTS parameters (contains all sequence data)
-    if (auto* apvtsXml = xml.getChildByName(apvts.state.getType())) {
-        apvts.replaceState(juce::ValueTree::fromXml(*apvtsXml));
-        DBG("  - APVTS loaded (sequence data included)");
+    if (auto* apvtsXml = xml.getChildByName (apvts.state.getType())) {
+        apvts.replaceState (juce::ValueTree::fromXml (*apvtsXml));
+        DBG ("  - APVTS loaded (sequence data included)");
     }
 
     // Queue command to load domain state on audio thread
     // We need to copy the XML data since the original may be destroyed
-    auto xmlCopy = std::make_shared<juce::XmlElement>(xml);
+    auto xmlCopy = std::make_shared<juce::XmlElement> (xml);
 
-    queueCommand(ProcessorCommand(
+    queueCommand (ProcessorCommand (
         [this, xmlCopy]() {
             // Load Clock settings
-            if (auto* clockXml = xmlCopy->getChildByName("Clock")) {
-                clock.fromXml(*clockXml);
+            if (auto* clockXml = xmlCopy->getChildByName ("Clock")) {
+                clock.fromXml (*clockXml);
                 juce::String modeStr = (clock.getMode() == ClockMode::INTERNAL) ? "INTERNAL" : "DAW_SYNC";
-                DBG("  - Clock loaded (mode: " + modeStr + ", BPM: " + juce::String(clock.getBpm()) + ")");
+                DBG ("  - Clock loaded (mode: " + modeStr + ", BPM: " + juce::String (clock.getBpm()) + ")");
             }
 
             // Load User Preferences
-            if (auto* prefsXml = xmlCopy->getChildByName("UserPreferences")) {
-                userPreferences.fromXml(*prefsXml);
-                DBG("  - UserPreferences loaded");
+            if (auto* prefsXml = xmlCopy->getChildByName ("UserPreferences")) {
+                userPreferences.fromXml (*prefsXml);
+                DBG ("  - UserPreferences loaded");
             }
 
             // Load MIDI Learn Mappings
-            if (auto* midiLearnXml = xmlCopy->getChildByName("MidiLearnMappings")) {
-                midiLearnRegistry.fromXml(*midiLearnXml);
-                DBG("  - MIDI Learn Mappings loaded");
+            if (auto* midiLearnXml = xmlCopy->getChildByName ("MidiLearnMappings")) {
+                midiLearnRegistry.fromXml (*midiLearnXml);
+                DBG ("  - MIDI Learn Mappings loaded");
             }
-        }
-    ));
+        }));
 }
 
 //==============================================================================
 // MIDI Input Processing
 //==============================================================================
 
-void PluginProcessor::processMidiInput(const juce::MidiBuffer& midiMessages) {
+void PluginProcessor::processMidiInput (const juce::MidiBuffer& midiMessages) {
     // Iterate through all incoming MIDI messages
     for (const auto& metadata : midiMessages) {
         auto msg = metadata.getMessage();
@@ -837,23 +847,23 @@ void PluginProcessor::processMidiInput(const juce::MidiBuffer& midiMessages) {
 
             // Check if we're in MIDI learn mode first
             if (midiLearnRegistry.isLearning()) {
-                bool learned = midiLearnRegistry.learnMidiMessage(
+                bool learned = midiLearnRegistry.learnMidiMessage (
                     MidiMessageType::CC, channel, ccNumber);
                 if (learned) {
-                    DBG("Learned: CH" << channel << "-CC" << ccNumber);
+                    DBG ("Learned: CH" << channel << "-CC" << ccNumber);
                     // Trigger UI update callback
                     if (onMidiLearned) {
-                        DBG("  Calling onMidiLearned callback");
+                        DBG ("  Calling onMidiLearned callback");
                         onMidiLearned();
                     } else {
-                        DBG("  WARNING: onMidiLearned callback is null!");
+                        DBG ("  WARNING: onMidiLearned callback is null!");
                     }
-                    continue;  // Don't process as regular mapping
+                    continue; // Don't process as regular mapping
                 }
             }
 
             // Check user mappings first (higher priority than defaults)
-            MidiControlId userControlId = midiLearnRegistry.findUserMapping(
+            MidiControlId userControlId = midiLearnRegistry.findUserMapping (
                 MidiMessageType::CC, channel, ccNumber);
 
             if (userControlId != MidiControlId::COUNT) {
@@ -866,17 +876,14 @@ void PluginProcessor::processMidiInput(const juce::MidiBuffer& midiMessages) {
                 userMapping.maxValue = 1.0f;
                 userMapping.invert = false;
 
-                DBG("MIDI CC " << ccNumber << " (user) = " << ccValue << " → " <<
-                    getMidiControlName(userControlId));
-                handleMidiMapping(userMapping, ccValue, ccValue >= 64);
-            }
-            else {
+                DBG ("MIDI CC " << ccNumber << " (user) = " << ccValue << " → " << getMidiControlName (userControlId));
+                handleMidiMapping (userMapping, ccValue, ccValue >= 64);
+            } else {
                 // Fall back to hardcoded default mappings
-                const MidiMapping* mapping = midiMappingManager.findCCMapping(ccNumber);
+                const MidiMapping* mapping = midiMappingManager.findCCMapping (ccNumber);
                 if (mapping) {
-                    DBG("MIDI CC " << ccNumber << " (default) = " << ccValue << " → " <<
-                        getMidiControlName(mapping->controlId));
-                    handleMidiMapping(*mapping, ccValue, ccValue >= 64);
+                    DBG ("MIDI CC " << ccNumber << " (default) = " << ccValue << " → " << getMidiControlName (mapping->controlId));
+                    handleMidiMapping (*mapping, ccValue, ccValue >= 64);
                 }
             }
         }
@@ -888,23 +895,23 @@ void PluginProcessor::processMidiInput(const juce::MidiBuffer& midiMessages) {
 
             // Check if we're in MIDI learn mode first
             if (midiLearnRegistry.isLearning() && isNoteOn) {
-                bool learned = midiLearnRegistry.learnMidiMessage(
+                bool learned = midiLearnRegistry.learnMidiMessage (
                     MidiMessageType::NOTE, channel, noteNumber);
                 if (learned) {
-                    DBG("Learned: CH" << channel << "-N" << noteNumber);
+                    DBG ("Learned: CH" << channel << "-N" << noteNumber);
                     // Trigger UI update callback
                     if (onMidiLearned) {
-                        DBG("  Calling onMidiLearned callback");
+                        DBG ("  Calling onMidiLearned callback");
                         onMidiLearned();
                     } else {
-                        DBG("  WARNING: onMidiLearned callback is null!");
+                        DBG ("  WARNING: onMidiLearned callback is null!");
                     }
-                    continue;  // Don't process as regular mapping
+                    continue; // Don't process as regular mapping
                 }
             }
 
             // Check user mappings first (higher priority than defaults)
-            MidiControlId userControlId = midiLearnRegistry.findUserMapping(
+            MidiControlId userControlId = midiLearnRegistry.findUserMapping (
                 MidiMessageType::NOTE, channel, noteNumber);
 
             if (userControlId != MidiControlId::COUNT) {
@@ -917,127 +924,127 @@ void PluginProcessor::processMidiInput(const juce::MidiBuffer& midiMessages) {
                 userMapping.maxValue = 1.0f;
                 userMapping.invert = false;
 
-                DBG("MIDI Note " << noteNumber << " (user) " << (isNoteOn ? "ON" : "OFF") <<
-                    " → " << getMidiControlName(userControlId));
+                DBG ("MIDI Note " << noteNumber << " (user) " << (isNoteOn ? "ON" : "OFF") << " → " << getMidiControlName (userControlId));
                 int value = isNoteOn ? 127 : 0;
-                handleMidiMapping(userMapping, value, isNoteOn);
-            }
-            else {
+                handleMidiMapping (userMapping, value, isNoteOn);
+            } else {
                 // Fall back to hardcoded default mappings
-                const MidiMapping* mapping = midiMappingManager.findNoteMapping(noteNumber);
+                const MidiMapping* mapping = midiMappingManager.findNoteMapping (noteNumber);
                 if (mapping) {
-                    DBG("MIDI Note " << noteNumber << " (default) " << (isNoteOn ? "ON" : "OFF") <<
-                        " → " << getMidiControlName(mapping->controlId));
+                    DBG ("MIDI Note " << noteNumber << " (default) " << (isNoteOn ? "ON" : "OFF") << " → " << getMidiControlName (mapping->controlId));
                     int value = isNoteOn ? 127 : 0;
-                    handleMidiMapping(*mapping, value, isNoteOn);
+                    handleMidiMapping (*mapping, value, isNoteOn);
                 }
             }
         }
     }
 }
 
-void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValue, bool isNoteOnOrCCPositive) {
+void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiValue, bool isNoteOnOrCCPositive) {
     auto& state = getState();
 
     // Convert MIDI value using the mapping's conversion settings
-    float normalizedValue = MidiValueConverter::midiToScaled(
+    float normalizedValue = MidiValueConverter::midiToScaled (
         midiValue, mapping.minValue, mapping.maxValue, mapping.invert);
 
     // Handle each control type
     switch (mapping.controlId) {
         // ========== OCTAVE SLIDER ==========
         case MidiControlId::OCTAVE_SLIDER: {
-            int octaveIndex = MidiValueConverter::midiToDiscreteIndex(midiValue, 9);  // 0-9
+            int octaveIndex = MidiValueConverter::midiToDiscreteIndex (midiValue, 9); // 0-9
             // Update via APVTS-backed state (thread-safe)
             int selectedStep = state.getSelectedStepForEditing();
-            int currentNote = state.getCurrentNoteForStep(selectedStep);
+            int currentNote = state.getCurrentNoteForStep (selectedStep);
             int pitchClass = currentNote % 12;
             int newNote = octaveIndex * 12 + pitchClass;
-            state.updateCurrentNoteForStep(selectedStep, newNote);
-            DBG("  → Octave changed to " << octaveIndex << " (MIDI note " << newNote << ")");
-            if (onSequenceTick) onSequenceTick();
+            state.updateCurrentNoteForStep (selectedStep, newNote);
+            DBG ("  → Octave changed to " << octaveIndex << " (MIDI note " << newNote << ")");
+            if (onSequenceTick)
+                onSequenceTick();
             break;
         }
 
         // ========== NOTE SLIDER ==========
         case MidiControlId::NOTE_SLIDER: {
-            int pitchClass = MidiValueConverter::midiToDiscreteIndex(midiValue, 11);  // 0-11
+            int pitchClass = MidiValueConverter::midiToDiscreteIndex (midiValue, 11); // 0-11
             // Update via APVTS-backed state (thread-safe)
             int selectedStep = state.getSelectedStepForEditing();
-            int currentNote = state.getCurrentNoteForStep(selectedStep);
+            int currentNote = state.getCurrentNoteForStep (selectedStep);
             int octave = currentNote / 12;
             int newNote = octave * 12 + pitchClass;
-            state.updateCurrentNoteForStep(selectedStep, newNote);
-            DBG("  → Note changed to pitch class " << pitchClass << " (MIDI note " << newNote << ")");
-            if (onSequenceTick) onSequenceTick();
+            state.updateCurrentNoteForStep (selectedStep, newNote);
+            DBG ("  → Note changed to pitch class " << pitchClass << " (MIDI note " << newNote << ")");
+            if (onSequenceTick)
+                onSequenceTick();
             break;
         }
 
         // ========== PROBABILITY SLIDER ==========
         case MidiControlId::PROBABILITY_SLIDER: {
-            int percentage = static_cast<int>(normalizedValue * 100.0f);
-            state.setProbabilityPercentage(percentage);
-            DBG("  → Probability changed to " << percentage << "%");
-            if (onSequenceTick) onSequenceTick();
+            int percentage = static_cast<int> (normalizedValue * 100.0f);
+            state.setProbabilityPercentage (percentage);
+            DBG ("  → Probability changed to " << percentage << "%");
+            if (onSequenceTick)
+                onSequenceTick();
             break;
         }
 
-        // ========== SEQUENCER CONTROL BUTTONS - PRIMARY ROW ==========
-        // All buttons use param-based approach: set param on note-on/off,
-        // parameterChanged handles the action, UI observes param for visual state
+            // ========== SEQUENCER CONTROL BUTTONS - PRIMARY ROW ==========
+            // All buttons use param-based approach: set param on note-on/off,
+            // parameterChanged handles the action, UI observes param for visual state
 
         case MidiControlId::BUTTON_ROLL: {
-            if (auto* param = apvts.getParameter(Params::Keys::ID::ROLL)) {
-                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG("  → ROLL param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (auto* param = apvts.getParameter (Params::Keys::ID::ROLL)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → ROLL param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_PAGE_LEFT: {
-            if (auto* param = apvts.getParameter(Params::Keys::ID::INDEX_LEFT)) {
-                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG("  → INDEX_LEFT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (auto* param = apvts.getParameter (Params::Keys::ID::INDEX_LEFT)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → INDEX_LEFT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_PAGE_RIGHT: {
-            if (auto* param = apvts.getParameter(Params::Keys::ID::INDEX_RIGHT)) {
-                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG("  → INDEX_RIGHT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (auto* param = apvts.getParameter (Params::Keys::ID::INDEX_RIGHT)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → INDEX_RIGHT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_LENGTH_PLUS: {
-            if (auto* param = apvts.getParameter(Params::Keys::ID::LENGTH_PLUS)) {
-                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG("  → LENGTH_PLUS param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (auto* param = apvts.getParameter (Params::Keys::ID::LENGTH_PLUS)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → LENGTH_PLUS param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_LENGTH_MINUS: {
-            if (auto* param = apvts.getParameter(Params::Keys::ID::LENGTH_MINUS)) {
-                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG("  → LENGTH_MINUS param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (auto* param = apvts.getParameter (Params::Keys::ID::LENGTH_MINUS)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → LENGTH_MINUS param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_NUDGE_LEFT: {
-            if (auto* param = apvts.getParameter(Params::Keys::ID::NUDGE_LEFT)) {
-                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG("  → NUDGE_LEFT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (auto* param = apvts.getParameter (Params::Keys::ID::NUDGE_LEFT)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → NUDGE_LEFT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_NUDGE_RIGHT: {
-            if (auto* param = apvts.getParameter(Params::Keys::ID::NUDGE_RIGHT)) {
-                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG("  → NUDGE_RIGHT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (auto* param = apvts.getParameter (Params::Keys::ID::NUDGE_RIGHT)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → NUDGE_RIGHT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
@@ -1045,10 +1052,10 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::BUTTON_SHIFT: {
             // Shift is a toggle - only toggle on note-on/CC positive
             if (isNoteOnOrCCPositive) {
-                if (auto* param = apvts.getParameter(Params::Keys::ID::SEQ_IS_SHIFT)) {
+                if (auto* param = apvts.getParameter (Params::Keys::ID::SEQ_IS_SHIFT)) {
                     bool currentState = param->getValue() > 0.5f;
-                    param->setValueNotifyingHost(currentState ? 0.0f : 1.0f);
-                    DBG("  → SEQ_IS_SHIFT toggled to " << (!currentState ? "ON" : "OFF"));
+                    param->setValueNotifyingHost (currentState ? 0.0f : 1.0f);
+                    DBG ("  → SEQ_IS_SHIFT toggled to " << (!currentState ? "ON" : "OFF"));
                 }
             }
             break;
@@ -1064,8 +1071,8 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::STEP_6:
         case MidiControlId::STEP_7: {
             if (isNoteOnOrCCPositive) {
-                int localStepIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::STEP_0);
-                DBG("  → Step " << localStepIndex << " clicked");
+                int localStepIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::STEP_0);
+                DBG ("  → Step " << localStepIndex << " clicked");
             }
             break;
         }
@@ -1074,12 +1081,13 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::SUBSEQ_MINUS: {
             if (isNoteOnOrCCPositive) {
                 int selectedStep = state.getSelectedStepForEditing();
-                int currentLength = state.getStepNotesLength(selectedStep);
+                int currentLength = state.getStepNotesLength (selectedStep);
                 if (currentLength > 1) {
-                    state.setStepNotesLength(selectedStep, currentLength - 1);
-                    DBG("  → Substep length decreased to " << (currentLength - 1));
+                    state.setStepNotesLength (selectedStep, currentLength - 1);
+                    DBG ("  → Substep length decreased to " << (currentLength - 1));
                 }
-                if (onSequenceTick) onSequenceTick();
+                if (onSequenceTick)
+                    onSequenceTick();
             }
             break;
         }
@@ -1087,12 +1095,13 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::SUBSEQ_PLUS: {
             if (isNoteOnOrCCPositive) {
                 int selectedStep = state.getSelectedStepForEditing();
-                int currentLength = state.getStepNotesLength(selectedStep);
+                int currentLength = state.getStepNotesLength (selectedStep);
                 if (currentLength < ParamConstants::MAX_SUBSTEPS) {
-                    state.setStepNotesLength(selectedStep, currentLength + 1);
-                    DBG("  → Substep length increased to " << (currentLength + 1));
+                    state.setStepNotesLength (selectedStep, currentLength + 1);
+                    DBG ("  → Substep length increased to " << (currentLength + 1));
                 }
-                if (onSequenceTick) onSequenceTick();
+                if (onSequenceTick)
+                    onSequenceTick();
             }
             break;
         }
@@ -1106,32 +1115,35 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::SUBSEQ_BAR_6:
         case MidiControlId::SUBSEQ_BAR_7: {
             if (isNoteOnOrCCPositive) {
-                int barIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::SUBSEQ_BAR_0);
+                int barIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::SUBSEQ_BAR_0);
                 int selectedStep = state.getSelectedStepForEditing();
-                int substepLength = state.getStepNotesLength(selectedStep);
+                int substepLength = state.getStepNotesLength (selectedStep);
                 if (barIndex < substepLength) {
-                    state.setStepNotesCurrentIndex(selectedStep, barIndex);
-                    DBG("  → Substep " << barIndex << " selected");
+                    state.setStepNotesCurrentIndex (selectedStep, barIndex);
+                    DBG ("  → Substep " << barIndex << " selected");
                 }
-                if (onSequenceTick) onSequenceTick();
+                if (onSequenceTick)
+                    onSequenceTick();
             }
             break;
         }
 
         // ========== NOTE RANGE CONTROLS ==========
         case MidiControlId::NOTE_RANGE_MIN: {
-            int minNote = MidiValueConverter::midiToDiscreteIndex(midiValue, 127);
-            state.setScaleRangeMin(minNote);
-            DBG("  → Note range min set to " << minNote);
-            if (onSequenceTick) onSequenceTick();
+            int minNote = MidiValueConverter::midiToDiscreteIndex (midiValue, 127);
+            state.setScaleRangeMin (minNote);
+            DBG ("  → Note range min set to " << minNote);
+            if (onSequenceTick)
+                onSequenceTick();
             break;
         }
 
         case MidiControlId::NOTE_RANGE_MAX: {
-            int maxNote = MidiValueConverter::midiToDiscreteIndex(midiValue, 127);
-            state.setScaleRangeMax(maxNote);
-            DBG("  → Note range max set to " << maxNote);
-            if (onSequenceTick) onSequenceTick();
+            int maxNote = MidiValueConverter::midiToDiscreteIndex (midiValue, 127);
+            state.setScaleRangeMax (maxNote);
+            DBG ("  → Note range max set to " << maxNote);
+            if (onSequenceTick)
+                onSequenceTick();
             break;
         }
 
@@ -1143,14 +1155,15 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::CC_LANE_4_VALUE:
         case MidiControlId::CC_LANE_5_VALUE:
         case MidiControlId::CC_LANE_6_VALUE: {
-            int laneIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::CC_LANE_0_VALUE);
-            int ccValue = static_cast<int>(normalizedValue * 127.0f);
+            int laneIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::CC_LANE_0_VALUE);
+            int ccValue = static_cast<int> (normalizedValue * 127.0f);
             if (laneIndex >= 0 && laneIndex < ParamConstants::NUM_MODULATIONS) {
                 int selectedStep = state.getSelectedStepForEditing();
-                state.setStepModValue(selectedStep, laneIndex, ccValue);
-                DBG("  → CC Lane " << laneIndex << " value set to " << ccValue);
+                state.setStepModValue (selectedStep, laneIndex, ccValue);
+                DBG ("  → CC Lane " << laneIndex << " value set to " << ccValue);
             }
-            if (onSequenceTick) onSequenceTick();
+            if (onSequenceTick)
+                onSequenceTick();
             break;
         }
 
@@ -1168,74 +1181,76 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::SCALE_NOTE_Bb:
         case MidiControlId::SCALE_NOTE_B: {
             if (isNoteOnOrCCPositive) {
-                int noteIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::SCALE_NOTE_C);
-                bool currentState = state.getScaleNote(noteIndex);
+                int noteIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::SCALE_NOTE_C);
+                bool currentState = state.getScaleNote (noteIndex);
 
                 // Only toggle if there's more than one note in the scale
                 int activeNotes = 0;
                 for (int i = 0; i < 12; i++) {
-                    if (state.getScaleNote(i)) activeNotes++;
+                    if (state.getScaleNote (i))
+                        activeNotes++;
                 }
 
                 if (activeNotes > 1 || !currentState) {
-                    state.setScaleNote(noteIndex, !currentState);
+                    state.setScaleNote (noteIndex, !currentState);
                     state.quantizeAllNotesToScale();
-                    DBG("  → Scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
+                    DBG ("  → Scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
                 } else {
-                    DBG("  → Cannot disable last scale note");
+                    DBG ("  → Cannot disable last scale note");
                 }
-                if (onSequenceTick) onSequenceTick();
+                if (onSequenceTick)
+                    onSequenceTick();
             }
             break;
         }
 
-        // ========== SEQUENCER CONTROL BUTTONS - SECONDARY ROW ==========
-        // All buttons use param-based approach
+            // ========== SEQUENCER CONTROL BUTTONS - SECONDARY ROW ==========
+            // All buttons use param-based approach
 
         case MidiControlId::BUTTON_DUPLICATE: {
-            if (auto* param = apvts.getParameter(Params::Keys::ID::DUPLICATE)) {
-                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG("  → DUPLICATE param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (auto* param = apvts.getParameter (Params::Keys::ID::DUPLICATE)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → DUPLICATE param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_CLEAR_WINDOW: {
-            if (auto* param = apvts.getParameter(Params::Keys::ID::CLEAR_WINDOW)) {
-                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG("  → CLEAR_WINDOW param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (auto* param = apvts.getParameter (Params::Keys::ID::CLEAR_WINDOW)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → CLEAR_WINDOW param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_CLEAR_STEP: {
-            if (auto* param = apvts.getParameter(Params::Keys::ID::CLEAR_STEP)) {
-                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG("  → CLEAR_STEP param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (auto* param = apvts.getParameter (Params::Keys::ID::CLEAR_STEP)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → CLEAR_STEP param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_RANDOMIZE_STEP: {
-            if (auto* param = apvts.getParameter(Params::Keys::ID::RANDOMIZE_STEP)) {
-                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG("  → RANDOMIZE_STEP param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (auto* param = apvts.getParameter (Params::Keys::ID::RANDOMIZE_STEP)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → RANDOMIZE_STEP param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_RANDOMIZE_ALL: {
-            if (auto* param = apvts.getParameter(Params::Keys::ID::RANDOMIZE_ALL)) {
-                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG("  → RANDOMIZE_ALL param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (auto* param = apvts.getParameter (Params::Keys::ID::RANDOMIZE_ALL)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → RANDOMIZE_ALL param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
         case MidiControlId::BUTTON_SHUFFLE: {
-            if (auto* param = apvts.getParameter(Params::Keys::ID::SHUFFLE)) {
-                param->setValueNotifyingHost(isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG("  → SHUFFLE param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            if (auto* param = apvts.getParameter (Params::Keys::ID::SHUFFLE)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → SHUFFLE param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
@@ -1249,56 +1264,90 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::CC_LANE_5_TOGGLE:
         case MidiControlId::CC_LANE_6_TOGGLE: {
             if (isNoteOnOrCCPositive) {
-                int laneIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::CC_LANE_0_TOGGLE);
+                int laneIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::CC_LANE_0_TOGGLE);
                 if (laneIndex >= 0 && laneIndex < ParamConstants::NUM_MODULATIONS) {
                     int selectedStep = state.getSelectedStepForEditing();
-                    bool currentSelected = state.getStepModSelected(selectedStep, laneIndex);
-                    state.setStepModSelected(selectedStep, laneIndex, !currentSelected);
-                    DBG("  → CC Lane " << laneIndex << " toggled to " << (!currentSelected ? "ON" : "OFF"));
+                    bool currentSelected = state.getStepModSelected (selectedStep, laneIndex);
+                    state.setStepModSelected (selectedStep, laneIndex, !currentSelected);
+                    DBG ("  → CC Lane " << laneIndex << " toggled to " << (!currentSelected ? "ON" : "OFF"));
                 }
-                if (onSequenceTick) onSequenceTick();
+                if (onSequenceTick)
+                    onSequenceTick();
             }
             break;
         }
 
         // ========== SEQUENCE GRID (64 absolute steps) ==========
-        case MidiControlId::GRID_STEP_0:  case MidiControlId::GRID_STEP_1:
-        case MidiControlId::GRID_STEP_2:  case MidiControlId::GRID_STEP_3:
-        case MidiControlId::GRID_STEP_4:  case MidiControlId::GRID_STEP_5:
-        case MidiControlId::GRID_STEP_6:  case MidiControlId::GRID_STEP_7:
-        case MidiControlId::GRID_STEP_8:  case MidiControlId::GRID_STEP_9:
-        case MidiControlId::GRID_STEP_10: case MidiControlId::GRID_STEP_11:
-        case MidiControlId::GRID_STEP_12: case MidiControlId::GRID_STEP_13:
-        case MidiControlId::GRID_STEP_14: case MidiControlId::GRID_STEP_15:
-        case MidiControlId::GRID_STEP_16: case MidiControlId::GRID_STEP_17:
-        case MidiControlId::GRID_STEP_18: case MidiControlId::GRID_STEP_19:
-        case MidiControlId::GRID_STEP_20: case MidiControlId::GRID_STEP_21:
-        case MidiControlId::GRID_STEP_22: case MidiControlId::GRID_STEP_23:
-        case MidiControlId::GRID_STEP_24: case MidiControlId::GRID_STEP_25:
-        case MidiControlId::GRID_STEP_26: case MidiControlId::GRID_STEP_27:
-        case MidiControlId::GRID_STEP_28: case MidiControlId::GRID_STEP_29:
-        case MidiControlId::GRID_STEP_30: case MidiControlId::GRID_STEP_31:
-        case MidiControlId::GRID_STEP_32: case MidiControlId::GRID_STEP_33:
-        case MidiControlId::GRID_STEP_34: case MidiControlId::GRID_STEP_35:
-        case MidiControlId::GRID_STEP_36: case MidiControlId::GRID_STEP_37:
-        case MidiControlId::GRID_STEP_38: case MidiControlId::GRID_STEP_39:
-        case MidiControlId::GRID_STEP_40: case MidiControlId::GRID_STEP_41:
-        case MidiControlId::GRID_STEP_42: case MidiControlId::GRID_STEP_43:
-        case MidiControlId::GRID_STEP_44: case MidiControlId::GRID_STEP_45:
-        case MidiControlId::GRID_STEP_46: case MidiControlId::GRID_STEP_47:
-        case MidiControlId::GRID_STEP_48: case MidiControlId::GRID_STEP_49:
-        case MidiControlId::GRID_STEP_50: case MidiControlId::GRID_STEP_51:
-        case MidiControlId::GRID_STEP_52: case MidiControlId::GRID_STEP_53:
-        case MidiControlId::GRID_STEP_54: case MidiControlId::GRID_STEP_55:
-        case MidiControlId::GRID_STEP_56: case MidiControlId::GRID_STEP_57:
-        case MidiControlId::GRID_STEP_58: case MidiControlId::GRID_STEP_59:
-        case MidiControlId::GRID_STEP_60: case MidiControlId::GRID_STEP_61:
-        case MidiControlId::GRID_STEP_62: case MidiControlId::GRID_STEP_63: {
+        case MidiControlId::GRID_STEP_0:
+        case MidiControlId::GRID_STEP_1:
+        case MidiControlId::GRID_STEP_2:
+        case MidiControlId::GRID_STEP_3:
+        case MidiControlId::GRID_STEP_4:
+        case MidiControlId::GRID_STEP_5:
+        case MidiControlId::GRID_STEP_6:
+        case MidiControlId::GRID_STEP_7:
+        case MidiControlId::GRID_STEP_8:
+        case MidiControlId::GRID_STEP_9:
+        case MidiControlId::GRID_STEP_10:
+        case MidiControlId::GRID_STEP_11:
+        case MidiControlId::GRID_STEP_12:
+        case MidiControlId::GRID_STEP_13:
+        case MidiControlId::GRID_STEP_14:
+        case MidiControlId::GRID_STEP_15:
+        case MidiControlId::GRID_STEP_16:
+        case MidiControlId::GRID_STEP_17:
+        case MidiControlId::GRID_STEP_18:
+        case MidiControlId::GRID_STEP_19:
+        case MidiControlId::GRID_STEP_20:
+        case MidiControlId::GRID_STEP_21:
+        case MidiControlId::GRID_STEP_22:
+        case MidiControlId::GRID_STEP_23:
+        case MidiControlId::GRID_STEP_24:
+        case MidiControlId::GRID_STEP_25:
+        case MidiControlId::GRID_STEP_26:
+        case MidiControlId::GRID_STEP_27:
+        case MidiControlId::GRID_STEP_28:
+        case MidiControlId::GRID_STEP_29:
+        case MidiControlId::GRID_STEP_30:
+        case MidiControlId::GRID_STEP_31:
+        case MidiControlId::GRID_STEP_32:
+        case MidiControlId::GRID_STEP_33:
+        case MidiControlId::GRID_STEP_34:
+        case MidiControlId::GRID_STEP_35:
+        case MidiControlId::GRID_STEP_36:
+        case MidiControlId::GRID_STEP_37:
+        case MidiControlId::GRID_STEP_38:
+        case MidiControlId::GRID_STEP_39:
+        case MidiControlId::GRID_STEP_40:
+        case MidiControlId::GRID_STEP_41:
+        case MidiControlId::GRID_STEP_42:
+        case MidiControlId::GRID_STEP_43:
+        case MidiControlId::GRID_STEP_44:
+        case MidiControlId::GRID_STEP_45:
+        case MidiControlId::GRID_STEP_46:
+        case MidiControlId::GRID_STEP_47:
+        case MidiControlId::GRID_STEP_48:
+        case MidiControlId::GRID_STEP_49:
+        case MidiControlId::GRID_STEP_50:
+        case MidiControlId::GRID_STEP_51:
+        case MidiControlId::GRID_STEP_52:
+        case MidiControlId::GRID_STEP_53:
+        case MidiControlId::GRID_STEP_54:
+        case MidiControlId::GRID_STEP_55:
+        case MidiControlId::GRID_STEP_56:
+        case MidiControlId::GRID_STEP_57:
+        case MidiControlId::GRID_STEP_58:
+        case MidiControlId::GRID_STEP_59:
+        case MidiControlId::GRID_STEP_60:
+        case MidiControlId::GRID_STEP_61:
+        case MidiControlId::GRID_STEP_62:
+        case MidiControlId::GRID_STEP_63: {
             if (isNoteOnOrCCPositive) {
-                int gridStepIndex = static_cast<int>(mapping.controlId) - static_cast<int>(MidiControlId::GRID_STEP_0);
-                state.setSelectedStepForEditing(gridStepIndex);
-                DBG("  → Grid step " << gridStepIndex << " selected for editing");
-                if (onSequenceTick) onSequenceTick();
+                int gridStepIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::GRID_STEP_0);
+                state.setSelectedStepForEditing (gridStepIndex);
+                DBG ("  → Grid step " << gridStepIndex << " selected for editing");
+                if (onSequenceTick)
+                    onSequenceTick();
             }
             break;
         }
@@ -1307,7 +1356,7 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::VIEW_TOGGLE: {
             if (isNoteOnOrCCPositive) {
                 // This is purely a UI concern - would need UI callback
-                DBG("  → View toggle (UI only)");
+                DBG ("  → View toggle (UI only)");
             }
             break;
         }
@@ -1315,7 +1364,7 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
         case MidiControlId::SETTINGS_TOGGLE: {
             if (isNoteOnOrCCPositive) {
                 // This is purely a UI concern - would need UI callback
-                DBG("  → Settings toggle (UI only)");
+                DBG ("  → Settings toggle (UI only)");
             }
             break;
         }
@@ -1326,7 +1375,7 @@ void PluginProcessor::handleMidiMapping(const MidiMapping& mapping, int midiValu
 
         default:
             // Unhandled control - log for debugging
-            DBG("  → Unhandled MIDI control: " << getMidiControlName(mapping.controlId));
+            DBG ("  → Unhandled MIDI control: " << getMidiControlName (mapping.controlId));
             break;
     }
 }

@@ -1,17 +1,17 @@
 #pragma once
 
-#include "data/Params.h"
-#include "backend/SequenceState.h"
 #include "backend/Clock.h"
 #include "backend/DawSync.h"
-#include "backend/UserPreferences.h"
+#include "backend/MidiLearnRegistry.h"
+#include "backend/MidiMappingManager.h"
+#include "backend/MidiUIUpdateCallbacks.h"
 #include "backend/PresetManager.h"
 #include "backend/ProcessorCommand.h"
-#include "backend/MidiMappingManager.h"
-#include "backend/MidiLearnRegistry.h"
-#include "backend/MidiUIUpdateCallbacks.h"
-#include <juce_audio_processors/juce_audio_processors.h>
+#include "backend/SequenceState.h"
+#include "backend/UserPreferences.h"
+#include "data/Params.h"
 #include <juce_audio_devices/juce_audio_devices.h>
+#include <juce_audio_processors/juce_audio_processors.h>
 
 #if (MSVC)
 #include "ipps.h"
@@ -154,8 +154,8 @@ private:
     std::unique_ptr<SequenceState> sequenceState;
 
     // Clock and DAW synchronization
-    Clock clock;
-    DawSync dawSync;
+    Clock clock; // clock just tells us if we shouldTick()
+    DawSync dawSync; // daw sing
 
     // User preferences (persisted with project)
     UserPreferences userPreferences;

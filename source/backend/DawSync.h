@@ -4,7 +4,7 @@
 #include "ClockMode.h"
 
 /**
- * DawSync - Utility for DAW synchronization
+ *
  * 
  * This class handles the DAW synchronization logic by interfacing with
  * JUCE's AudioPlayHead. It is kept separate from the Clock class to
@@ -23,10 +23,10 @@ public:
     /**
      * Default constructor
      */
-    DawSync() 
-        : subdivision(Subdivision::SIXTEENTH)
-        , lastPpqPosition(0.0)
-        , currentPulseCount(0)
+    DawSync()
+        : subdivision(Subdivision::SIXTEENTH) // initial ppqn
+        , lastPpqPosition(0.0) // this is basically a counter
+        , currentPulseCount(0) // this is the rounded truncated version of the above counter
         , isPlaying(false) {
     }
     
@@ -49,46 +49,54 @@ public:
     }
     
     /**
-     * Update the DAW sync state from AudioPlayHead position
-     * 
-     * This should be called from the audio callback.
-     * 
+     * This is called every frame of processBlock()
+     *
      * @param position Optional position info from AudioPlayHead
      * @return Current pulse count
      */
     int update(const juce::Optional<juce::AudioPlayHead::PositionInfo>& position) {
         if (!position.hasValue()) {
             // No position info available
+            // not sure when this would be the case
             isPlaying = false;
             return currentPulseCount;
         }
-        
+
+        // this is the audio playhead position info object
         auto& pos = *position;
         
-        // Check if DAW is playing
+        // Check if DAW is playing by talking to the position info
         if (pos.getIsPlaying()) {
             isPlaying = true;
             
-            // Get PPQ position (quarter note position)
+            // This provides us with that double, i.e we are at bar 4.6787
             auto ppqPos = pos.getPpqPosition();
             if (ppqPos.hasValue()) {
+                // this is not a derefernce of a pointer, it s juce optional and how we get the value.
                 double currentPpq = *ppqPos;
                 
-                // Detect playhead jump (user scrubbed or looped)
-                if (currentPpq < lastPpqPosition - 0.1 || currentPpq > lastPpqPosition + 1.0) {
+                // Detect play-head jump using buffers
+                // 0.1 is to make sure that we don't mistakenly detect backwards movement from
+                // floating point accumulation errors
+                // Expected: 8.5000000000
+                // Actual:   8.4999999997  // Oops, looks like it went "backward"!
+                // similarly with the forward jump but we can play with this...
+                // NOTE: this +1 maybe could be a source of a stupid bug?
+                if (currentPpq < lastPpqPosition - backPlayHeadJumpBuffer || currentPpq > lastPpqPosition + forwardPlayHeadJumpBuffer) {
                     // Playhead jumped - recalculate pulse count
                     currentPulseCount = calculatePulseCount(currentPpq);
                 } else {
                     // Normal playback - update pulse count
                     currentPulseCount = calculatePulseCount(currentPpq);
                 }
-                
-                lastPpqPosition = currentPpq;
+
+                lastPpqPosition = currentPpq; // just get ready for the next round
             }
         } else {
             // DAW stopped
             if (isPlaying) {
                 // Just stopped - reset
+                // TODO: this should be configurable in settings
                 reset();
             }
             isPlaying = false;
@@ -147,9 +155,11 @@ public:
     }
     
 private:
-    Subdivision subdivision;       // Note subdivision
-    double lastPpqPosition;        // Last PPQ position from DAW
-    int currentPulseCount;         // Current pulse count
-    bool isPlaying;                // Whether DAW is playing
+    Subdivision subdivision;                    // Note subdivision
+    double lastPpqPosition;                     // Last PPQ position from DAW
+    int currentPulseCount;                      // Current pulse count
+    bool isPlaying;                             // Whether DAW is playing
+    double backPlayHeadJumpBuffer = 0.1;        // detection buffer see notes above
+    double forwardPlayHeadJumpBuffer = 1.0;     // detection buffer see notes above
 };
 

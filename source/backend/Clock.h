@@ -27,18 +27,18 @@ public:
      * Initializes in INTERNAL mode with 120 BPM and 16th note subdivision
      */
     Clock() 
-        : mode(ClockMode::INTERNAL)
-        , subdivision(Subdivision::SIXTEENTH)
-        , internalClock()
-        , lastDawPulseCount(0)
+        : mode(ClockMode::INTERNAL) // default to internal
+        , subdivision(Subdivision::SIXTEENTH) // TODO: we can make this configurable in Settings
+        , internalClock() // initialize our internal clock
+        , lastDawPulseCount(0) // TODO: what is this?
         , shouldTriggerPulse(false) {
         
-        internalClock.setBpm(120.0);
-        internalClock.setSubdivision(subdivision);
+        internalClock.setBpm(120.0); // default internal bpm
+        internalClock.setSubdivision(subdivision); // default subdivision
     }
     
     /**
-     * Set the clock mode
+     * Sets the clock mode
      * 
      * @param newMode DAW_SYNC or INTERNAL
      */
@@ -47,16 +47,16 @@ public:
         
         // Reset state when switching modes
         if (mode == ClockMode::INTERNAL) {
-            internalClock.reset();
+            internalClock.reset(); // reset samples
         } else {
-            lastDawPulseCount = 0;
+            lastDawPulseCount = 0; // reset the pulse daw count.
         }
     }
     
     /**
-     * Get the current clock mode
+     * Just a getter for clock mode
      * 
-     * @return Current mode (DAW_SYNC or INTERNAL)
+     * @return An enum representing mode (DAW_SYNC or INTERNAL)
      */
     ClockMode getMode() const {
         return mode;
@@ -86,8 +86,8 @@ public:
      * @param newSubdivision The subdivision to use
      */
     void setSubdivision(Subdivision newSubdivision) {
-        subdivision = newSubdivision;
-        internalClock.setSubdivision(newSubdivision);
+        subdivision = newSubdivision; // set for non internal clock
+        internalClock.setSubdivision(newSubdivision); // set for internal clock
     }
     
     /**
@@ -169,6 +169,10 @@ public:
      * This should be called from the audio callback when in DAW_SYNC mode.
      * The pulse count should be calculated by the DawSync utility based on
      * the AudioPlayHead position.
+     * The algorithm is based on ppqn which we get from playHead, we are getting a double back
+     * and every frame (call of processblock) that number increments by just a hair (remember doubles are higher precision than floats)
+     * so we continuously in every prcess block multiply the ppqPosition by 4 (or whatever the subdivision is) and
+     * that's our number, then whenever that number reaches a whole number, the pulse ticks and we add the count.
      *
      * @param currentPulseCount Current pulse count from DAW position
      */
