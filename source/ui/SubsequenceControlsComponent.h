@@ -349,9 +349,17 @@ protected:
             if (i < substepLength) {
                 // Get the note for this substep and determine its color
                 int noteNumber = state.getStepNote(selectedStep, i);
-                int pitchClass = noteNumber % 12;
-                juce::Colour noteColor = MusicConstants::NOTE_COLOURS[static_cast<size_t>(pitchClass)];
-                subsequenceBar.setBarColor(i, noteColor);
+
+                // Check for rest before calculating pitch class
+                if (noteNumber == -1) {
+                    // Rest - use grey
+                    subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::defaultGreyHex));
+                } else {
+                    // Normal note - use chromatic color
+                    int pitchClass = noteNumber % 12;
+                    juce::Colour noteColor = MusicConstants::NOTE_COLOURS[static_cast<size_t>(pitchClass)];
+                    subsequenceBar.setBarColor(i, noteColor);
+                }
             } else {
                 // Inactive substep - grey
                 subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::defaultGreyHex));
