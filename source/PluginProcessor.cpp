@@ -179,8 +179,9 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
     // Clear any output channels that didn't contain input data
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
         buffer.clear (i, 0, buffer.getNumSamples());
+    }
 
     // Process incoming MIDI for control mapping (before clearing)
     processMidiInput (midiMessages);
@@ -188,35 +189,52 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     // Clear incoming MIDI (we're generating, not processing MIDI through)
     midiMessages.clear();
 
+    // NOTE: these are not called as far as I know, legacy code.
     // Execute any queued commands from UI thread (thread-safe state modifications)
     int numCommands = commandQueue.executeAll();
     if (numCommands > 0) {
         DBG ("Executed " << numCommands << " queued commands");
-
+        // Not supposed to be called anymore. We should be using listeners
+        jassertfalse;
         // If any commands had completion callbacks, notify the UI to execute them
+        // This simply calls functions if any functions are pending...
         if (commandQueue.hasCompletionCallbacks() && onCompletionCallbacksPending) {
-            onCompletionCallbacksPending();
+            onCompletionCallbacksPending(); // this just calls trigger async update
         }
     }
-
+    // STANDALONE MODE ==== previewing midi notes when touching UI ========================================================
     // Process any queued preview MIDI messages (from UI thread)
-    int start1, size1, start2, size2;
-    previewMidiFifo.prepareToRead (previewMidiFifo.getNumReady(), start1, size1, start2, size2);
+    // create 2 pairs of start and size
+    int start1, block_size1, start2, block_size2;
+    // Ok so we create a Queue - first in, first out. In order of the time in which they were added.
+    previewMidiFifo.prepareToRead (previewMidiFifo.getNumReady(), start1, block_size1, start2, block_size2);
+    // we just fed those variables to prepareToRead so now we know the size and start for both data structures
 
-    for (int i = 0; i < size1; ++i) {
+    // previewMidiFifo (AbstractFifo) - Manages indices only (read/write positions)
+    // previewMidiBuffer (array) - Stores the actual message data
+
+    // first part of buffer
+    for (int i = 0; i < block_size1; ++i) {
+        // get next message
         const auto& msg = previewMidiBuffer[start1 + i];
+        // If it is note on, then send to the midi buffer
         if (msg.isNoteOn) {
+            // play the note on full velocity always on 1
+            // TODO: this will need to be synced to whatever midi channel is configured to send out midi on.
             auto noteOn = juce::MidiMessage::noteOn (1, msg.noteNumber, msg.velocity);
+            // send to midi buffer
             midiMessages.addEvent (noteOn, 0);
             DBG ("Preview MIDI Note ON added to buffer: " << msg.noteNumber);
         } else {
+            // note off
             auto noteOff = juce::MidiMessage::noteOff (1, msg.noteNumber, msg.velocity);
             midiMessages.addEvent (noteOff, 0);
             DBG ("Preview MIDI Note OFF added to buffer: " << msg.noteNumber);
         }
     }
 
-    for (int i = 0; i < size2; ++i) {
+    // second part of buffer same idea as first...
+    for (int i = 0; i < block_size2; ++i) {
         const auto& msg = previewMidiBuffer[start2 + i];
         if (msg.isNoteOn) {
             auto noteOn = juce::MidiMessage::noteOn (1, msg.noteNumber, msg.velocity);
@@ -229,25 +247,34 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         }
     }
 
-    if (size1 + size2 > 0) {
-        previewMidiFifo.finishedRead (size1 + size2);
+    // tell the queue you are done reading it.
+    if (block_size1 + block_size2 > 0) {
+        previewMidiFifo.finishedRead (block_size1 + block_size2);
     }
 
-    // Check if scheduled note-off should be sent
+    // Check if scheduled note-off should be sent, this is necessary to allow length adjustments.
+    // Since this is mono and always will be we can just save the next note off number every time we just do a note on for that note.
     if (scheduledNoteOffSample >= 0 && currentSamplePosition >= scheduledNoteOffSample) {
+        // make the note off message
+        // TODO: again we need to make channel configurable, this will need to be changed.
         auto noteOff = juce::MidiMessage::noteOff (1, scheduledNoteOffNote, scheduledNoteOffVelocity);
+        // add the event...
         midiMessages.addEvent (noteOff, 0);
 
         // Send directly to MIDI output device (for standalone mode)
         if (midiOutput) {
+            // Because there is no host we simply move over USB midi.
+            // TODO: we will eventually allow the user to select multiple ways to send midi, from network midi to ble midi and possibly even OSC instead of midi.
             midiOutput->sendMessageNow (noteOff);
         }
+        // Note scheduled at
         DBG ("Scheduled MIDI Note OFF: " << scheduledNoteOffNote << " at sample " << currentSamplePosition);
 
         // Clear scheduled note-off
         scheduledNoteOffSample = -1;
         scheduledNoteOffNote = -1;
     }
+    // ========================================================
 
     // Update current sample position
     currentSamplePosition += buffer.getNumSamples();

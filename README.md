@@ -466,3 +466,106 @@ The main things to look at are what bitwig calls in save and load of projects
 
 All we are doing is loading and saving state as xml.
 ...
+
+
+## Source Code Review Checklist
+
+### Main Plugin Files
+- [x] [source/PluginProcessor.h](source/PluginProcessor.h)
+- [ ] [source/PluginProcessor.cpp](source/PluginProcessor.cpp)
+- [ ] [source/PluginEditor.h](source/PluginEditor.h)
+- [ ] [source/PluginEditor.cpp](source/PluginEditor.cpp)
+
+### Backend - Domain Layer
+- [x] [source/backend/Clock.h](source/backend/Clock.h)
+- [ ] [source/backend/ClockMode.h](source/backend/ClockMode.h)
+- [x] [source/backend/DawSync.h](source/backend/DawSync.h)
+- [ ] [source/backend/InternalClock.h](source/backend/InternalClock.h)
+- [ ] [source/backend/Sequence.h](source/backend/Sequence.h)
+- [ ] [source/backend/SequenceState.h](source/backend/SequenceState.h)
+- [ ] [source/backend/Step.h](source/backend/Step.h)
+- [ ] [source/backend/StepNote.h](source/backend/StepNote.h)
+- [ ] [source/backend/StepNotes.h](source/backend/StepNotes.h)
+- [ ] [source/backend/StepModulation.h](source/backend/StepModulation.h)
+- [ ] [source/backend/StepModulations.h](source/backend/StepModulations.h)
+- [ ] [source/backend/Scale.h](source/backend/Scale.h)
+- [ ] [source/backend/ProcessorCommand.h](source/backend/ProcessorCommand.h)
+- [ ] [source/backend/UserPreferences.h](source/backend/UserPreferences.h)
+- [ ] [source/backend/PresetManager.h](source/backend/PresetManager.h)
+
+### Backend - MIDI System
+- [ ] [source/backend/MidiMapping.h](source/backend/MidiMapping.h)
+- [ ] [source/backend/MidiMappingManager.h](source/backend/MidiMappingManager.h)
+- [ ] [source/backend/MidiLearnRegistry.h](source/backend/MidiLearnRegistry.h)
+- [ ] [source/backend/MidiCommandFactory.h](source/backend/MidiCommandFactory.h)
+- [ ] [source/backend/MidiCommandFactory.cpp](source/backend/MidiCommandFactory.cpp)
+- [ ] [source/backend/MidiUIUpdateCallbacks.h](source/backend/MidiUIUpdateCallbacks.h)
+
+### Data Layer
+- [ ] [source/data/Params.h](source/data/Params.h)
+
+### UI - Main Components
+- [ ] [source/ui/ApplicationComponent.h](source/ui/ApplicationComponent.h)
+- [ ] [source/ui/MainScreenComponent.h](source/ui/MainScreenComponent.h)
+- [ ] [source/ui/SettingsScreenComponent.h](source/ui/SettingsScreenComponent.h)
+- [ ] [source/ui/NavBarComponent.h](source/ui/NavBarComponent.h)
+- [ ] [source/ui/StateListenerComponent.h](source/ui/StateListenerComponent.h)
+
+### UI - Sequencer Components
+- [ ] [source/ui/SequencerStepsComponent.h](source/ui/SequencerStepsComponent.h)
+- [ ] [source/ui/SequencerControlsComponent.h](source/ui/SequencerControlsComponent.h)
+- [ ] [source/ui/SequenceOverviewComponent.h](source/ui/SequenceOverviewComponent.h)
+- [ ] [source/ui/SequenceGrid.h](source/ui/SequenceGrid.h)
+- [ ] [source/ui/PianoRollComponent.h](source/ui/PianoRollComponent.h)
+- [ ] [source/ui/SubsequenceControlsComponent.h](source/ui/SubsequenceControlsComponent.h)
+
+### UI - Control Components
+- [ ] [source/ui/MainControlsComponent.h](source/ui/MainControlsComponent.h)
+- [ ] [source/ui/NoteControlsComponent.h](source/ui/NoteControlsComponent.h)
+- [ ] [source/ui/NoteRangeControlsComponent.h](source/ui/NoteRangeControlsComponent.h)
+- [ ] [source/ui/ProbabilityControlsComponent.h](source/ui/ProbabilityControlsComponent.h)
+- [ ] [source/ui/ProbabilityControlsComponent.cpp](source/ui/ProbabilityControlsComponent.cpp)
+- [ ] [source/ui/MidiDataPerStepSelectionComponent.h](source/ui/MidiDataPerStepSelectionComponent.h)
+
+### UI - Preset Components
+- [ ] [source/ui/PresetSelectorComponent.h](source/ui/PresetSelectorComponent.h)
+- [ ] [source/ui/PresetDropdownComponent.h](source/ui/PresetDropdownComponent.h)
+- [ ] [source/ui/SavePresetDialogComponent.h](source/ui/SavePresetDialogComponent.h)
+
+### UI - Custom Controls
+- [ ] [source/ui/AnalogueSlider.h](source/ui/AnalogueSlider.h)
+- [ ] [source/ui/NotchedSlider.h](source/ui/NotchedSlider.h)
+- [ ] [source/ui/VerticalBarSlider.h](source/ui/VerticalBarSlider.h)
+- [ ] [source/ui/ProbabilityGauge.h](source/ui/ProbabilityGauge.h)
+- [ ] [source/ui/ToggleIconButton.h](source/ui/ToggleIconButton.h)
+- [ ] [source/ui/MidiMappableComponent.h](source/ui/MidiMappableComponent.h)
+
+### UI - Buttons
+- [ ] [source/ui/buttons/SequencerControlButton.h](source/ui/buttons/SequencerControlButton.h)
+- [ ] [source/ui/buttons/RollButton.h](source/ui/buttons/RollButton.h)
+- [ ] [source/ui/buttons/ShiftButton.h](source/ui/buttons/ShiftButton.h)
+- [ ] [source/ui/buttons/RandomizeStepButton.h](source/ui/buttons/RandomizeStepButton.h)
+- [ ] [source/ui/buttons/RandomizeAllButton.h](source/ui/buttons/RandomizeAllButton.h)
+- [ ] [source/ui/buttons/ClearStepButton.h](source/ui/buttons/ClearStepButton.h)
+- [ ] [source/ui/buttons/ClearWindowButton.h](source/ui/buttons/ClearWindowButton.h)
+- [ ] [source/ui/buttons/DuplicateButton.h](source/ui/buttons/DuplicateButton.h)
+- [ ] [source/ui/buttons/ShuffleButton.h](source/ui/buttons/ShuffleButton.h)
+- [ ] [source/ui/buttons/LengthPlusButton.h](source/ui/buttons/LengthPlusButton.h)
+- [ ] [source/ui/buttons/LengthMinusButton.h](source/ui/buttons/LengthMinusButton.h)
+- [ ] [source/ui/buttons/NudgeLeftButton.h](source/ui/buttons/NudgeLeftButton.h)
+- [ ] [source/ui/buttons/NudgeRightButton.h](source/ui/buttons/NudgeRightButton.h)
+- [ ] [source/ui/buttons/PageLeftButton.h](source/ui/buttons/PageLeftButton.h)
+- [ ] [source/ui/buttons/PageRightButton.h](source/ui/buttons/PageRightButton.h)
+
+### UI - Visual Assets & Constants
+- [ ] [source/ui/Icons.h](source/ui/Icons.h)
+- [ ] [source/ui/LogoComponent.h](source/ui/LogoComponent.h)
+- [ ] [source/ui/UIConstants.h](source/ui/UIConstants.h)
+- [ ] [source/ui/MusicConstants.h](source/ui/MusicConstants.h)
+
+### Utility
+- [ ] [source/utility/ComponentSnapshotUtility.h](source/utility/ComponentSnapshotUtility.h)
+
+---
+
+**Progress: 3/77 files reviewed**
