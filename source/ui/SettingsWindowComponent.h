@@ -2,11 +2,12 @@
 
 #include "BinaryData.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_audio_devices/juce_audio_devices.h>
 #include <functional>
 
 namespace SettingsWindowConstants {
     constexpr int windowWidth = 400;
-    constexpr int windowHeight = 300;
+    constexpr int windowHeight = 350;  // Increased height for MIDI device selector
     constexpr int padding = 20;
     constexpr int controlHeight = 30;
     constexpr int controlSpacing = 15;
@@ -146,6 +147,22 @@ public:
         noteLengthLabel.setJustificationType(juce::Justification::centredLeft);
         addAndMakeVisible(noteLengthLabel);
 
+        // Setup MIDI clock output device selector (standalone only)
+        midiClockDeviceLabel.setText("MIDI Clock Out", juce::dontSendNotification);
+        midiClockDeviceLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+        midiClockDeviceLabel.setJustificationType(juce::Justification::centredLeft);
+        addAndMakeVisible(midiClockDeviceLabel);
+
+        midiClockDeviceSelector.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF2A2A2A));
+        midiClockDeviceSelector.setColour(juce::ComboBox::textColourId, juce::Colours::white);
+        midiClockDeviceSelector.setColour(juce::ComboBox::outlineColourId, juce::Colours::grey);
+        midiClockDeviceSelector.setColour(juce::ComboBox::arrowColourId, juce::Colours::white);
+        midiClockDeviceSelector.onChange = [this] {
+            if (onMidiClockDeviceChanged)
+                onMidiClockDeviceChanged(midiClockDeviceSelector.getSelectedId() - 1);
+        };
+        addAndMakeVisible(midiClockDeviceSelector);
+
         setSize(SettingsWindowConstants::windowWidth, SettingsWindowConstants::windowHeight);
     }
 
@@ -200,6 +217,13 @@ public:
         // Follow step checkbox row
         auto followStepRow = area.removeFromTop(controlHeight);
         followStepToggle.setBounds(followStepRow);
+
+        area.removeFromTop(controlSpacing);
+
+        // MIDI clock device selector row
+        auto midiClockRow = area.removeFromTop(controlHeight);
+        midiClockDeviceLabel.setBounds(midiClockRow.removeFromLeft(labelWidth));
+        midiClockDeviceSelector.setBounds(midiClockRow);
     }
 
     // Callbacks for state changes
@@ -210,6 +234,7 @@ public:
     std::function<void(double)> onNoteLengthChanged;
     std::function<void(bool)> onPreviewNotesChanged;
     std::function<void(bool)> onFollowStepChanged;
+    std::function<void(int)> onMidiClockDeviceChanged;
 
     // Accessors for current values
     bool isInternalClockEnabled() const { return internalClockToggle.getToggleState(); }
@@ -232,6 +257,32 @@ public:
         followStepToggle.setToggleState(enabled, juce::dontSendNotification);
     }
 
+    // Methods to populate and manage MIDI device list
+    void refreshMidiDeviceList() {
+        midiClockDeviceSelector.clear();
+        auto devices = juce::MidiOutput::getAvailableDevices();
+
+        if (devices.isEmpty()) {
+            midiClockDeviceSelector.addItem("No MIDI devices found", 1);
+            midiClockDeviceSelector.setEnabled(false);
+        } else {
+            for (int i = 0; i < devices.size(); ++i) {
+                midiClockDeviceSelector.addItem(devices[i].name, i + 1);
+            }
+            midiClockDeviceSelector.setEnabled(true);
+        }
+    }
+
+    void setSelectedMidiDevice(int deviceIndex) {
+        if (deviceIndex >= 0) {
+            midiClockDeviceSelector.setSelectedId(deviceIndex + 1, juce::dontSendNotification);
+        }
+    }
+
+    int getSelectedMidiDevice() const {
+        return midiClockDeviceSelector.getSelectedId() - 1;
+    }
+
 private:
     juce::Typeface::Ptr interTypeface;
 
@@ -244,6 +295,8 @@ private:
     juce::Slider noteLengthSlider;
     juce::ToggleButton previewNotesToggle;
     juce::ToggleButton followStepToggle;
+    juce::Label midiClockDeviceLabel;
+    juce::ComboBox midiClockDeviceSelector;
 };
 
 /**

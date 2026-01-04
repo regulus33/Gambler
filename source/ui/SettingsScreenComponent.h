@@ -3,6 +3,7 @@
 #include "BinaryData.h"
 #include "NavBarComponent.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_audio_devices/juce_audio_devices.h>
 #include <functional>
 
 namespace SettingsScreenConstants {
@@ -33,26 +34,6 @@ public:
 
         // Add navbar
         addAndMakeVisible(navBar);
-
-        // Setup Play button
-        playButton.setButtonText("Play");
-        playButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF4CAF50)); // Green
-        playButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
-        playButton.onClick = [this] {
-            if (onPlayClicked)
-                onPlayClicked();
-        };
-        addAndMakeVisible(playButton);
-
-        // Setup Stop button
-        stopButton.setButtonText("Stop");
-        stopButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFFF44336)); // Red
-        stopButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
-        stopButton.onClick = [this] {
-            if (onStopClicked)
-                onStopClicked();
-        };
-        addAndMakeVisible(stopButton);
 
         // Setup internal clock checkbox
         internalClockToggle.setButtonText("Internal clock");
@@ -169,6 +150,18 @@ public:
         noteLengthLabel.setColour(juce::Label::textColourId, juce::Colours::white);
         noteLengthLabel.setJustificationType(juce::Justification::centredLeft);
         addAndMakeVisible(noteLengthLabel);
+
+        // Setup MIDI clock output checkbox (standalone only)
+        midiClockOutputToggle.setButtonText("MIDI Clock Output");
+        midiClockOutputToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        midiClockOutputToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
+        midiClockOutputToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+        midiClockOutputToggle.setToggleState(false, juce::dontSendNotification);
+        midiClockOutputToggle.onClick = [this] {
+            if (onMidiClockOutputChanged)
+                onMidiClockOutputChanged(midiClockOutputToggle.getToggleState());
+        };
+        addAndMakeVisible(midiClockOutputToggle);
     }
 
     void paint(juce::Graphics& g) override {
@@ -193,16 +186,6 @@ public:
         int contentWidth = 400;  // Fixed width for settings content
         auto contentArea = area.withSizeKeepingCentre(contentWidth, area.getHeight());
         contentArea = contentArea.reduced(padding, 0);
-
-        // Play/Stop buttons row
-        auto buttonRow = contentArea.removeFromTop(controlHeight);
-        constexpr int buttonWidth = 80;
-        constexpr int buttonGap = 10;
-        playButton.setBounds(buttonRow.removeFromLeft(buttonWidth));
-        buttonRow.removeFromLeft(buttonGap);
-        stopButton.setBounds(buttonRow.removeFromLeft(buttonWidth));
-
-        contentArea.removeFromTop(controlSpacing);
 
         // Internal clock checkbox row
         auto checkboxRow = contentArea.removeFromTop(controlHeight);
@@ -246,14 +229,18 @@ public:
         auto clearMidiRow = contentArea.removeFromTop(controlHeight);
         constexpr int clearButtonWidth = 200;
         clearMidiMappingsButton.setBounds(clearMidiRow.removeFromLeft(clearButtonWidth));
+
+        contentArea.removeFromTop(controlSpacing);
+
+        // MIDI clock output toggle row
+        auto midiClockRow = contentArea.removeFromTop(controlHeight);
+        midiClockOutputToggle.setBounds(midiClockRow);
     }
 
     // Accessors for navbar
     NavBarComponent& getNavBar() { return navBar; }
 
     // Callbacks for state changes
-    std::function<void()> onPlayClicked;
-    std::function<void()> onStopClicked;
     std::function<void(bool)> onInternalClockChanged;
     std::function<void(double)> onTempoChanged;
     std::function<void(double)> onNoteLengthChanged;
@@ -261,6 +248,7 @@ public:
     std::function<void(bool)> onFollowStepChanged;
     std::function<void(bool)> onFollowPlaybackChanged;
     std::function<void()> onClearMidiMappings;
+    std::function<void(bool)> onMidiClockOutputChanged;
 
     // Accessors for current values
     bool isInternalClockEnabled() const { return internalClockToggle.getToggleState(); }
@@ -287,12 +275,18 @@ public:
         followPlaybackToggle.setToggleState(enabled, juce::dontSendNotification);
     }
 
+    void setMidiClockOutputEnabled(bool enabled) {
+        midiClockOutputToggle.setToggleState(enabled, juce::dontSendNotification);
+    }
+
+    bool isMidiClockOutputEnabled() const {
+        return midiClockOutputToggle.getToggleState();
+    }
+
 private:
     juce::Typeface::Ptr interTypeface;
 
     NavBarComponent navBar;
-    juce::TextButton playButton;
-    juce::TextButton stopButton;
     juce::ToggleButton internalClockToggle;
     juce::Label tempoLabel;
     juce::Slider tempoSlider;
@@ -302,5 +296,6 @@ private:
     juce::ToggleButton followStepToggle;
     juce::ToggleButton followPlaybackToggle;
     juce::TextButton clearMidiMappingsButton;
+    juce::ToggleButton midiClockOutputToggle;
 };
 

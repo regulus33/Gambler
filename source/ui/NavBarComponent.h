@@ -36,7 +36,9 @@ public:
     NavBarComponent()
         : viewToggleButton(Icons::createViewToggleIcon1, Icons::createViewToggleIcon2, false, true),
           settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false),
-          midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, true)
+          midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, true),
+          playButton(Icons::createPlayIcon, Icons::createPlayIcon, false, false),
+          stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false)
     {
         // Add logo component
         addAndMakeVisible(logo);
@@ -75,6 +77,22 @@ public:
         settingsButton.onClick = [this](bool toggled) {
             if (onSettingsClicked) {
                 onSettingsClicked();
+            }
+        };
+
+        // Add play button
+        addAndMakeVisible(playButton);
+        playButton.onClick = [this](bool toggled) {
+            if (onPlayClicked) {
+                onPlayClicked();
+            }
+        };
+
+        // Add stop button
+        addAndMakeVisible(stopButton);
+        stopButton.onClick = [this](bool toggled) {
+            if (onStopClicked) {
+                onStopClicked();
             }
         };
     }
@@ -121,6 +139,16 @@ public:
         int versionLabelX = midiLearnButtonX - versionLabelWidth - versionLabelMarginRight;
         int versionLabelY = (height - versionLabelHeight) / 2;  // Vertically center
         versionLabel.setBounds(versionLabelX, versionLabelY, versionLabelWidth, versionLabelHeight);
+
+        // Position stop button left of version label
+        int stopButtonX = versionLabelX - buttonSize - buttonGap;
+        int stopButtonY = (height - buttonSize) / 2;  // Vertically center
+        stopButton.setBounds(stopButtonX, stopButtonY, buttonSize, buttonSize);
+
+        // Position play button left of stop button
+        int playButtonX = stopButtonX - buttonSize - buttonGap;
+        int playButtonY = (height - buttonSize) / 2;  // Vertically center
+        playButton.setBounds(playButtonX, playButtonY, buttonSize, buttonSize);
     }
 
     // Callback when settings button is clicked
@@ -133,6 +161,12 @@ public:
     // Callback when MIDI learn button is clicked
     // Parameter: true = MIDI learn mode ON, false = MIDI learn mode OFF
     std::function<void(bool)> onMidiLearnClicked;
+
+    // Callback when play button is clicked
+    std::function<void()> onPlayClicked;
+
+    // Callback when stop button is clicked
+    std::function<void()> onStopClicked;
 
     // Public method to set settings button toggle state (for ApplicationComponent)
     void setSettingsToggled(bool toggled) {
@@ -154,5 +188,7 @@ private:
     ToggleIconButton midiLearnButton;
     ToggleIconButton viewToggleButton;
     ToggleIconButton settingsButton;
+    ToggleIconButton playButton;
+    ToggleIconButton stopButton;
 };
 

@@ -20,6 +20,7 @@ struct UserPreferences {
     // MIDI output preferences
     double defaultNoteLength = 0.9;  // Note length as percentage of step duration (0.0-1.0)
                                      // Default 0.9 = 90% of step length (leaves small gap)
+    bool midiClockOutputEnabled = false;  // Whether to send MIDI clock to all devices (standalone only)
 
     // Future preferences can be added here:
     // - UI theme/color scheme
@@ -38,6 +39,7 @@ struct UserPreferences {
         xml->setAttribute("followStep", followStep);
         xml->setAttribute("followPlayback", followPlayback);
         xml->setAttribute("defaultNoteLength", defaultNoteLength);
+        xml->setAttribute("midiClockOutputEnabled", midiClockOutputEnabled);
 
         return xml;
     }
@@ -54,6 +56,7 @@ struct UserPreferences {
         followStep = xml.getBoolAttribute("followStep", true);
         followPlayback = xml.getBoolAttribute("followPlayback", true);
         defaultNoteLength = xml.getDoubleAttribute("defaultNoteLength", 0.9);
+        midiClockOutputEnabled = xml.getBoolAttribute("midiClockOutputEnabled", false);
     }
 };
 

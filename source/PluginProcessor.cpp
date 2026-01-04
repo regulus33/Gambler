@@ -261,8 +261,29 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         clock.processInternalClock (buffer.getNumSamples());
     }
 
+    // Send MIDI clock messages (only in internal clock mode for standalone)
+    if (clock.getMode() == ClockMode::INTERNAL && !midiClockOutputs.empty()) {
+        // Get accumulated MIDI clock pulses to send
+        int midiClockPulses = clock.getMidiClockPulsesToSend();
+
+        // Send accumulated MIDI clock messages
+        for (int i = 0; i < midiClockPulses; ++i) {
+            auto clockMsg = juce::MidiMessage::midiClock();
+            for (auto& output : midiClockOutputs) {
+                if (output) {
+                    output->sendMessageNow (clockMsg);
+                }
+            }
+        }
+    }
+
     // Check if clock triggered a tick
     if (clock.shouldTick()) {
+        // Accumulate MIDI clock pulses for the next cycle
+        if (clock.getMode() == ClockMode::INTERNAL && !midiClockOutputs.empty()) {
+            clock.accumulateMidiClockPulse();
+        }
+
         // Cancel any scheduled note-off (we're starting a new step)
         scheduledNoteOffSample = -1;
         scheduledNoteOffNote = -1;
@@ -1378,6 +1399,60 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             DBG ("  → Unhandled MIDI control: " << getMidiControlName (mapping.controlId));
             break;
     }
+}
+
+//==============================================================================
+// MIDI Clock Output Management
+//==============================================================================
+
+void PluginProcessor::openAllMidiClockOutputs() {
+    // Close any existing clock outputs
+    closeAllMidiClockOutputs();
+
+    // Get all available MIDI output devices
+    auto devices = juce::MidiOutput::getAvailableDevices();
+
+    DBG ("Opening MIDI clock outputs for " << devices.size() << " devices");
+
+    // Open each device for MIDI clock output
+    for (const auto& device : devices) {
+        auto output = juce::MidiOutput::openDevice (device.identifier);
+        if (output) {
+            DBG ("  Opened MIDI clock output: " << device.name);
+            midiClockOutputs.push_back (std::move (output));
+
+            // Send MIDI clock start message
+            auto startMsg = juce::MidiMessage::midiStart();
+            midiClockOutputs.back()->sendMessageNow (startMsg);
+        } else {
+            DBG ("  Failed to open MIDI clock output: " << device.name);
+        }
+    }
+}
+
+void PluginProcessor::closeAllMidiClockOutputs() {
+    // Send MIDI stop message to all devices before closing
+    auto stopMsg = juce::MidiMessage::midiStop();
+    for (auto& output : midiClockOutputs) {
+        if (output) {
+            output->sendMessageNow (stopMsg);
+        }
+    }
+
+    // Clear all MIDI clock outputs
+    midiClockOutputs.clear();
+    DBG ("Closed all MIDI clock outputs");
+}
+
+juce::StringArray PluginProcessor::getAvailableMidiOutputDeviceNames() const {
+    juce::StringArray names;
+    auto devices = juce::MidiOutput::getAvailableDevices();
+
+    for (const auto& device : devices) {
+        names.add (device.name);
+    }
+
+    return names;
 }
 
 //==============================================================================

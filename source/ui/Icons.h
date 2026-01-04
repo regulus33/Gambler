@@ -1289,6 +1289,39 @@ public:
 
         return path;
     }
+
+    /**
+     * Play Icon (triangle pointing right)
+     * Design: Classic play button triangle
+     * Size: ~18x18 coordinate space
+     */
+    static juce::Path createPlayIcon()
+    {
+        juce::Path path;
+
+        // Triangle pointing right
+        path.startNewSubPath(5.0f, 3.0f);
+        path.lineTo(15.0f, 9.0f);
+        path.lineTo(5.0f, 15.0f);
+        path.closeSubPath();
+
+        return path;
+    }
+
+    /**
+     * Stop Icon (square)
+     * Design: Classic stop button square
+     * Size: ~18x18 coordinate space
+     */
+    static juce::Path createStopIcon()
+    {
+        juce::Path path;
+
+        // Square
+        path.addRectangle(4.0f, 4.0f, 10.0f, 10.0f);
+
+        return path;
+    }
 };
 
 

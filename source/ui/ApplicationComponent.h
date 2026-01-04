@@ -51,6 +51,22 @@ public:
             }
         };
 
+        // Setup navbar callback for Play button
+        mainScreen.getNavBar().onPlayClicked = [this]() {
+            // Reset sequence to beginning and start clock via APVTS-backed state
+            processorRef.getState().reset();
+            processorRef.getClock().start();
+            DBG("Play clicked - sequence reset to index 0, clock started");
+        };
+
+        // Setup navbar callback for Stop button
+        mainScreen.getNavBar().onStopClicked = [this]() {
+            processorRef.queueCommand(ProcessorCommand([this]() {
+                processorRef.getClock().stop();
+                DBG("Stop clicked - clock stopped");
+            }));
+        };
+
         // Setup preset selector callbacks
         setupPresetSelector();
 
@@ -139,6 +155,22 @@ private:
                 }
             };
 
+            // Setup navbar callback for Play button
+            settingsScreen->getNavBar().onPlayClicked = [this]() {
+                // Reset sequence to beginning and start clock via APVTS-backed state
+                processorRef.getState().reset();
+                processorRef.getClock().start();
+                DBG("Play clicked - sequence reset to index 0, clock started");
+            };
+
+            // Setup navbar callback for Stop button
+            settingsScreen->getNavBar().onStopClicked = [this]() {
+                processorRef.queueCommand(ProcessorCommand([this]() {
+                    processorRef.getClock().stop();
+                    DBG("Stop clicked - clock stopped");
+                }));
+            };
+
             // Wire up settings callbacks to processor's clock
             // Sync initial state from processor
             settingsScreen->setInternalClockEnabled(processorRef.getClock().getMode() == ClockMode::INTERNAL);
@@ -173,20 +205,6 @@ private:
                 }));
             };
 
-            settingsScreen->onPlayClicked = [this]() {
-                // Reset sequence to beginning and start clock via APVTS-backed state
-                processorRef.getState().reset();
-                processorRef.getClock().start();
-                DBG("Play clicked - sequence reset to index 0, clock started");
-            };
-
-            settingsScreen->onStopClicked = [this]() {
-                processorRef.queueCommand(ProcessorCommand([this]() {
-                    processorRef.getClock().stop();
-                    DBG("Stop clicked - clock stopped");
-                }));
-            };
-
             // Sync preview notes setting from processor
             settingsScreen->setPreviewNotesEnabled(processorRef.getUserPreferences().previewNotesOnEdit);
             settingsScreen->onPreviewNotesChanged = [this](bool enabled) {
@@ -217,6 +235,19 @@ private:
                     // Trigger UI update to refresh overlay text
                     mainScreen.repaint();
                 }));
+            };
+
+            // MIDI Clock Output toggle callback (standalone only)
+            settingsScreen->setMidiClockOutputEnabled(processorRef.getUserPreferences().midiClockOutputEnabled);
+            settingsScreen->onMidiClockOutputChanged = [this](bool enabled) {
+                processorRef.getUserPreferences().midiClockOutputEnabled = enabled;
+                if (enabled) {
+                    processorRef.openAllMidiClockOutputs();
+                    DBG("MIDI clock output enabled - opened all devices");
+                } else {
+                    processorRef.closeAllMidiClockOutputs();
+                    DBG("MIDI clock output disabled - closed all devices");
+                }
             };
 
             addAndMakeVisible(*settingsScreen);

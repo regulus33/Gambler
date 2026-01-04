@@ -197,16 +197,41 @@ public:
     
     /**
      * Check if a clock pulse should be triggered
-     * 
+     *
      * This is the main method that the sequencer checks to determine
      * if it should advance to the next step.
-     * 
+     *
      * @return true if a pulse should be triggered, false otherwise
      */
     bool shouldTick() {
         bool result = shouldTriggerPulse;
         shouldTriggerPulse = false;  // Clear the flag after reading
         return result;
+    }
+
+    /**
+     * Get the number of MIDI clock pulses to send this cycle
+     * MIDI clock runs at 24 PPQN (pulses per quarter note)
+     * For 16th note subdivision: 24 / 4 = 6 MIDI clocks per tick
+     *
+     * @return Number of MIDI clock messages to send (0-6 for 16th notes)
+     */
+    int getMidiClockPulsesToSend() {
+        if (mode != ClockMode::INTERNAL) {
+            return 0;  // Only send MIDI clock in internal mode
+        }
+
+        int pulsesPerTick = getPulsesPerMidiClock(subdivision);
+        int pulsesToSend = midiClockPulsesAccumulated;
+        midiClockPulsesAccumulated = 0;  // Reset after reading
+        return pulsesToSend > pulsesPerTick ? pulsesPerTick : pulsesToSend;
+    }
+
+    /**
+     * Accumulate MIDI clock pulses (called when shouldTick returns true)
+     */
+    void accumulateMidiClockPulse() {
+        midiClockPulsesAccumulated += getPulsesPerMidiClock(subdivision);
     }
     
     /**
@@ -287,5 +312,25 @@ private:
     InternalClock internalClock;   // Internal timing engine
     int lastDawPulseCount;         // Last pulse count from DAW (for edge detection)
     bool shouldTriggerPulse;       // Flag indicating a pulse should be triggered
+    int midiClockPulsesAccumulated = 0;  // Accumulated MIDI clock pulses to send
+
+    /**
+     * Get the number of MIDI clock pulses per sequencer tick
+     * MIDI clock is 24 PPQN (pulses per quarter note)
+     *
+     * Quarter note: 24 pulses
+     * Eighth note: 12 pulses
+     * Sixteenth note: 6 pulses
+     * Thirty-second note: 3 pulses
+     */
+    static int getPulsesPerMidiClock(Subdivision sub) {
+        switch (sub) {
+            case Subdivision::QUARTER:        return 24;
+            case Subdivision::EIGHTH:         return 12;
+            case Subdivision::SIXTEENTH:      return 6;
+            case Subdivision::THIRTY_SECOND:  return 3;
+            default:                          return 6;
+        }
+    }
 };
 

@@ -140,6 +140,22 @@ public:
         return commandQueue.executeCompletionCallbacks();
     }
 
+    /**
+     * Open all available MIDI devices for clock output (standalone mode only)
+     * This should be called when the user wants to send MIDI clock to all devices.
+     */
+    void openAllMidiClockOutputs();
+
+    /**
+     * Close all MIDI clock output devices
+     */
+    void closeAllMidiClockOutputs();
+
+    /**
+     * Get list of available MIDI output device names
+     */
+    juce::StringArray getAvailableMidiOutputDeviceNames() const;
+
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 
@@ -174,6 +190,13 @@ private:
 
     // Direct MIDI output for standalone mode
     std::unique_ptr<juce::MidiOutput> midiOutput;
+
+    // MIDI clock output devices (for sending clock to all devices in standalone mode)
+    std::vector<std::unique_ptr<juce::MidiOutput>> midiClockOutputs;
+
+    // Track MIDI clock timing
+    int midiClockPulsesSinceLastTick = 0;
+    static constexpr int MIDI_CLOCKS_PER_TICK = 6;  // 24 PPQN = 6 clocks per 16th note at default subdivision
 
     // Preview MIDI queue (for UI-triggered notes in DAW mode)
     // Thread-safe queue to pass MIDI from UI thread to audio thread
