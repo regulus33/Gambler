@@ -310,7 +310,14 @@ public:
                 // Active substep - color based on note value
                 int midiNote = state.getStepNote(selectedStep, i);
                 int chromaticNote = midiNote % 12;
-                juce::Colour noteColor = MusicConstants::NOTE_COLOURS[chromaticNote];
+                juce::Colour noteColor;
+                // if note is rest, chromatic note colour won't work/
+                if (midiNote == -1) {
+                    noteColor = juce::Colour(SequenceGridConstants::defaultGreyHex);
+                } else {
+                    noteColor = MusicConstants::NOTE_COLOURS[chromaticNote];
+                }
+
                 bool isCurrentSubstep = (i == currentSubstepIndex);
                 bar.setBarColor(i, noteColor);
                 bar.setBarBorder(i, isCurrentSubstep);

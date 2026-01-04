@@ -40,6 +40,7 @@ namespace SubsequenceControlsConstants {
 
 /**
  * SingleBar - Individual clickable rectangle component
+ *
  */
 class SingleBar : public juce::Component {
 public:
@@ -50,12 +51,12 @@ public:
     }
 
     void paint (juce::Graphics& g) override {
-        using namespace SubsequenceControlsConstants;
-        auto bounds = getLocalBounds().toFloat();
+        using namespace SubsequenceControlsConstants; // provide the constants
+        auto bounds = getLocalBounds().toFloat(); // get local bounds
 
         // Fill bar with color
-        g.setColour (color);
-        g.fillRoundedRectangle (bounds, barCornerRadius);
+        g.setColour (color); // whatever the colour is
+        g.fillRoundedRectangle (bounds, barCornerRadius); //
 
         // Draw white border if enabled
         if (hasBorder) {
@@ -353,7 +354,7 @@ protected:
                 // Check for rest before calculating pitch class
                 if (noteNumber == -1) {
                     // Rest - use grey
-                    subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::defaultGreyHex));
+                    subsequenceBar.setBarColor(i, juce::Colours::red);
                 } else {
                     // Normal note - use chromatic color
                     int pitchClass = noteNumber % 12;

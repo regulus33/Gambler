@@ -66,13 +66,17 @@ PluginProcessor::PluginProcessor()
     }
 }
 
+// Generate the param layout for the audio processor value tree.
+// remember, createParameterLayout is simply the argument to APVTS() constructor
 APVTS::ParameterLayout PluginProcessor::createParameterLayout() {
     return Params::createDefaultParameterLayout();
 }
 
+// The destructor is called
 PluginProcessor::~PluginProcessor() {
     // Unregister parameter listeners
     for (auto* param : apvts.processor.getParameters()) {
+        
         if (auto* paramWithID = dynamic_cast<juce::RangedAudioParameter*> (param)) {
             apvts.removeParameterListener (paramWithID->paramID, this);
         }
