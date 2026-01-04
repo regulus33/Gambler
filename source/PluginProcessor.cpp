@@ -69,6 +69,7 @@ PluginProcessor::PluginProcessor()
 // Generate the param layout for the audio processor value tree.
 // remember, createParameterLayout is simply the argument to APVTS() constructor
 APVTS::ParameterLayout PluginProcessor::createParameterLayout() {
+    // build up that whole param map
     return Params::createDefaultParameterLayout();
 }
 
@@ -76,7 +77,7 @@ APVTS::ParameterLayout PluginProcessor::createParameterLayout() {
 PluginProcessor::~PluginProcessor() {
     // Unregister parameter listeners
     for (auto* param : apvts.processor.getParameters()) {
-        
+        // remove listeners
         if (auto* paramWithID = dynamic_cast<juce::RangedAudioParameter*> (param)) {
             apvts.removeParameterListener (paramWithID->paramID, this);
         }
@@ -172,9 +173,8 @@ bool PluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const 
 #endif
 }
 
-void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
-    juce::MidiBuffer& midiMessages) {
-    juce::ScopedNoDenormals noDenormals;
+void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
+    juce::ScopedNoDenormals noDenormals; // this is a precision thing, may not be needed for this
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
