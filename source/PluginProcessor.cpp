@@ -276,23 +276,27 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     }
     // ========================================================
 
-    // Update current sample position
+    // Update current sample position for the midi note off scheduling
     currentSamplePosition += buffer.getNumSamples();
 
     // Process clock based on current mode
     if (clock.getMode() == ClockMode::DAW_SYNC) {
         // DAW sync mode: get timing from host transport (that's the play-head)
         if (auto* playHead = getPlayHead()) {
+            // get the ppqn count
             auto position = playHead->getPosition();
+            // save the latest position into DawSync
             int pulseCount = dawSync.update (position);
+            // send clock the latest pulse count which we calculate by feeding the position to dawSync.update() above.
             clock.updateDawSync (pulseCount);
         }
     } else {
-        // Internal clock mode: process samples for timing
+        // Internal clock mode, accumulate / process samples with sample accurate clock
         clock.processInternalClock (buffer.getNumSamples());
     }
 
-    // Send MIDI clock messages (only in internal clock mode for standalone)
+    // If we are in standalone, we can send the midi clock out to the device.
+    // NOTE: we send clock to all outputs when in internal clock mode.
     if (clock.getMode() == ClockMode::INTERNAL && !midiClockOutputs.empty()) {
         // Get accumulated MIDI clock pulses to send
         int midiClockPulses = clock.getMidiClockPulsesToSend();
@@ -308,9 +312,11 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         }
     }
 
-    // Check if clock triggered a tick
+    // ================ MAIN PART ========================================================================================
     if (clock.shouldTick()) {
         // Accumulate MIDI clock pulses for the next cycle
+        // We need to do this because the normal clock rate is not even close to the ppqn midi uses.
+        // So we accumulate and barrage the midi ticks (we spread them out but all in between 16th note ppqn cycles which is gambler's default timing)
         if (clock.getMode() == ClockMode::INTERNAL && !midiClockOutputs.empty()) {
             clock.accumulateMidiClockPulse();
         }
@@ -319,6 +325,8 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         scheduledNoteOffSample = -1;
         scheduledNoteOffNote = -1;
 
+        // TODO: we are relying on this now to stop stray notes from not being turned
+        // off after we stop the sequence...
         // Send note off for previous note immediately (if any)
         if (lastPlayedNote >= 0) {
             auto noteOff = juce::MidiMessage::noteOff (1, lastPlayedNote, (juce::uint8) 0);
@@ -332,12 +340,13 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         }
 
         // Tick the sequence to get the next note (using APVTS-backed state)
-        auto& state = getState();
-        int note = state.tick();
-        int currentStepIndex = state.getCurrentIndex();
+        auto& state = getState(); // get the avpts wrapper
+        int note = state.tick(); // get next note
+        int currentStepIndex = state.getCurrentIndex(); // get current step index
 
         DBG ("Clock tick! Step: " << currentStepIndex << ", Note: " << note);
 
+        // Make sure it is not a rest
         if (note >= 0) {
             // Get step modulations for this step (using APVTS-backed state)
             auto selectedMods = state.getSelectedModulations (currentStepIndex);
@@ -346,13 +355,17 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
             juce::uint8 velocity = 100;
 
             // Send CC messages and check for velocity modulation
+            // These come from the step modulations panel, 7 slots for each step
             for (const auto& mod : selectedMods) {
+                // if velocity then modulate the note
                 if (mod.getType() == ModulationType::Velocity) {
                     // Use this as the note velocity
                     velocity = static_cast<juce::uint8> (mod.getValue());
+                    // Otherwise it is just a CC, send that
                 } else if (mod.getType() == ModulationType::CC) {
                     // Send CC message
                     auto ccMsg = juce::MidiMessage::controllerEvent (1, mod.getCCNumber(), mod.getValue());
+                    // send the event
                     midiMessages.addEvent (ccMsg, 0);
 
                     // Send directly to MIDI output device (for standalone mode)
@@ -365,17 +378,19 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
 
             // Valid note - send note on with velocity
             auto noteOn = juce::MidiMessage::noteOn (1, note, velocity);
+            // add this note to the messages
             midiMessages.addEvent (noteOn, 0);
 
             // Send directly to MIDI output device (for standalone mode)
             if (midiOutput) {
+                // send the message.
                 midiOutput->sendMessageNow (noteOn);
             }
             DBG ("MIDI Note ON: " << note << " (velocity " << (int) velocity << ", channel 1)");
+            // set the last played note so we can send the note off
             lastPlayedNote = note;
-
-            // Schedule note-off based on note length setting
             // Calculate samples per step based on current clock settings
+            // Now all this stuff is so we know how many samples to wait until we send note off.
             double samplesPerStep = 0.0;
             if (clock.getMode() == ClockMode::INTERNAL) {
                 samplesPerStep = clock.getInternalClock().calculateSamplesPerPulse();
@@ -393,15 +408,17 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
                     }
                 }
             }
-
             if (samplesPerStep > 0.0) {
                 // Calculate note-off time based on note length percentage (using APVTS-backed state)
                 double noteLengthPercent = state.getNoteLength();
+                // delay amount
                 juce::int64 noteOffDelay = static_cast<juce::int64> (samplesPerStep * noteLengthPercent);
+                // which sample we will send not off on for last note.
                 scheduledNoteOffSample = currentSamplePosition + noteOffDelay;
+                // the actual note to send off for
                 scheduledNoteOffNote = note;
+                // TODO: this probably should match the set velocity if available.
                 scheduledNoteOffVelocity = 0; // Standard note-off velocity
-
                 DBG ("Scheduled note-off for note " << note << " at sample " << scheduledNoteOffSample
                                                     << " (delay: " << noteOffDelay << " samples, " << (noteLengthPercent * 100.0) << "% of step)");
             }
@@ -451,6 +468,7 @@ void PluginProcessor::getStateInformation (juce::MemoryBlock& destData) {
     DBG ("State saved: APVTS (sequence data), Clock, and UserPreferences");
 }
 
+// TODO: are we actually using this?
 void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
     // Load XML from binary data
     std::unique_ptr<juce::XmlElement> rootXml (getXmlFromBinary (data, sizeInBytes));
@@ -478,6 +496,7 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
                 userPreferences.fromXml (*prefsXml);
                 DBG ("  - UserPreferences loaded (previewNotesOnEdit: " + juce::String (userPreferences.previewNotesOnEdit ? "true" : "false") + ")");
             }
+
             // Backward compatibility: Load from old "Settings" element
             else if (auto* settingsXml = rootXml->getChildByName ("Settings")) {
                 userPreferences.previewNotesOnEdit = settingsXml->getBoolAttribute ("previewNotesOnEdit", true);
@@ -487,6 +506,8 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
         // Fallback: Old format (just APVTS)
         else if (rootXml->hasTagName (apvts.state.getType())) {
             DBG ("Loading state: Legacy APVTS-only format");
+            // We shouldn't have anything here ideally.
+            jassertfalse;
             apvts.replaceState (juce::ValueTree::fromXml (*rootXml));
         }
     }
@@ -783,6 +804,7 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
         // Send CC messages first (only in standalone mode for now)
         // In DAW mode, CC messages would need to be queued via the audio thread
         if (midiOutput) {
+            // For each
             for (const auto& mod : selectedMods) {
                 if (mod.getType() == ModulationType::CC) {
                     auto ccMsg = juce::MidiMessage::controllerEvent (1, mod.getCCNumber(), mod.getValue());
