@@ -2,6 +2,39 @@
 
 A MIDI sequencer plugin with probabilistic and generative features, inspired by modules like Turing Machine and Music Thing Modular's Turing Machine.
 
+## Platforms
+
+- **macOS**: Standalone, AU, VST3, AUv3
+- **iOS/iPadOS**: Standalone app and AUv3 plugin (iOS 12.0+)
+
+## Quick Start
+
+### macOS
+```bash
+# Build
+/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake -Bcmake-build-debug
+/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake --build cmake-build-debug --target Gambler2_Standalone -j 8
+
+# Run
+./cmake-build-debug/Gambler2_artefacts/Debug/Standalone/Gambler.app/Contents/MacOS/Gambler
+```
+
+### iOS/iPadOS
+```bash
+# Build for simulator
+./build-ios.sh
+
+# Build for device
+./build-ios.sh --device
+
+# Open in Xcode
+./open-xcode.sh
+```
+
+**📱 First-time iOS setup?** See [iOS-First-Time-Setup.md](iOS-First-Time-Setup.md) for a step-by-step guide.
+
+**📚 Full iOS documentation:** [docs/iOS-Build-Guide.md](docs/iOS-Build-Guide.md)
+
 ## Architecture
 
 ### Layered Architecture (Option 3)

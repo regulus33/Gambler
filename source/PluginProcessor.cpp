@@ -26,8 +26,11 @@ PluginProcessor::PluginProcessor()
     }
 
     // Initialize clock settings based on standalone vs plugin mode.
-    juce::PluginHostType hostType; // this tells us we are in standalone if no host.
-    if (hostType.type == juce::PluginHostType::UnknownHost) {
+    // Use wrapperType instead of PluginHostType for more reliable detection,
+    // especially for AUv3 on iOS where PluginHostType may not work correctly.
+    bool isStandalone = (wrapperType == wrapperType_Standalone);
+
+    if (isStandalone) {
         // Standalone app - use internal clock
         clock.setMode (ClockMode::INTERNAL);
         // start the clock
@@ -44,7 +47,7 @@ PluginProcessor::PluginProcessor()
     clock.setSubdivision (Subdivision::SIXTEENTH);
 
     // Open first available MIDI output device for standalone mode
-    if (hostType.type == juce::PluginHostType::UnknownHost) {
+    if (isStandalone) {
         // get the available devices from juce api
         auto midiOutputs = juce::MidiOutput::getAvailableDevices();
         // if we find any
@@ -517,6 +520,7 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
 // APVTS Parameter Listener
 //==============================================================================
 
+// Note all this is pretty straightforward, we are changing the state based on param changes.
 void PluginProcessor::parameterChanged (const juce::String& parameterID, float newValue) {
     // Handle sequencer control button actions
     // These are triggered when the button param transitions to ON (true)

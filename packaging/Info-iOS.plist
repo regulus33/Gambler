@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Basic App Information -->
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    
+    <!-- Privacy Permissions -->
+    <!-- Required for MIDI and audio functionality -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Gambler needs access to audio input for MIDI processing and audio features.</string>
+    
+    <!-- Bluetooth MIDI support -->
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Gambler uses Bluetooth to connect to MIDI devices.</string>
+    <key>NSBluetoothPeripheralUsageDescription</key>
+    <string>Gambler uses Bluetooth to connect to MIDI devices.</string>
+    
+    <!-- Local Network for network MIDI -->
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Gambler uses the local network to connect to network MIDI devices.</string>
+    
+    <!-- Bonjour services for network MIDI discovery -->
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_apple-midi._udp</string>
+    </array>
+    
+    <!-- UI Configuration -->
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
+    
+    <key>UIStatusBarHidden</key>
+    <false/>
+    
+    <key>UIRequiresFullScreen</key>
+    <false/>
+    
+    <!-- File Sharing -->
+    <key>UIFileSharingEnabled</key>
+    <true/>
+    <key>LSSupportsOpeningDocumentsInPlace</key>
+    <true/>
+    <key>UISupportsDocumentBrowser</key>
+    <true/>
+    
+    <!-- Background Modes for Audio -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
+    </array>
+    
+    <!-- Launch Screen -->
+    <key>UILaunchStoryboardName</key>
+    <string>LaunchScreen</string>
+    
+    <!-- High Resolution Support -->
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    
+    <!-- Supported Document Types (for preset files) -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Gambler Preset</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.tonegarden.gambler.preset</string>
+            </array>
+        </dict>
+    </array>
+    
+    <!-- Exported UTI for preset files -->
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+                <string>public.content</string>
+            </array>
+            <key>UTTypeDescription</key>
+            <string>Gambler Preset</string>
+            <key>UTTypeIdentifier</key>
+            <string>com.tonegarden.gambler.preset</string>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>gamblerpreset</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
+</dict>
+</plist>
+

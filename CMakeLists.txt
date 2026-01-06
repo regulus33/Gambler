@@ -14,6 +14,9 @@ include (CPM)
 # Configures universal binaries and decides which version of macOS to support
 include(PamplejuceMacOS)
 
+# iOS-specific configuration (deployment target, architectures, signing)
+include(PamplejuceIOS)
+
 # Couple tweaks that IMO should be JUCE defaults
 include(JUCEDefaults)
 
@@ -96,7 +99,15 @@ juce_add_plugin("${PROJECT_NAME}"
     # This is how it's listed in the DAW
     # This can be different from PROJECT_NAME and can have spaces!
     # You might want to use v${MAJOR_VERSION} here once you go to v2...
-    PRODUCT_NAME "${PRODUCT_NAME}")
+    PRODUCT_NAME "${PRODUCT_NAME}"
+
+    # iOS-specific configuration
+    # Screen orientations - support all orientations for flexibility
+    IPHONE_SCREEN_ORIENTATIONS UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+    IPAD_SCREEN_ORIENTATIONS UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+
+    # Merge custom iOS plist entries
+    PLIST_TO_MERGE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/Info-iOS.plist")
 
 # This lets us use our code in both the JUCE targets and our Test target
 # Without running into ODR violations
