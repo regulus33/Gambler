@@ -10,32 +10,55 @@
 #include <array>
 
 namespace SubsequenceControlsConstants {
-    // Title
+    // Scaling factor to match SequenceGrid height (196px)
+    // Current unscaled height: title(24) + gap(13) + bars(157) + gap(16) + buttons(15) = 225px
+    // To fit in 196px with title fixed: (196 - 24) / (13 + 157 + 16 + 15) = 172 / 201 ≈ 0.856
+    constexpr float heightScaleFactor = 1.1f;
+
+    // Title (not scaled)
     constexpr float titleFontSize = 16.0f;
     constexpr int titleHeight = 24;
-    constexpr int gapBelowTitle = 13;  // Same as SequenceOverviewComponent
-    // Bar dimensions (2.5× SequenceGrid square width)
-    constexpr float barWidth = 50.f;
-    constexpr int barHeight = 17;  // Same as SequenceGrid square height
-    constexpr int barSpacing = 3;  // Same as SequenceGrid spacing
-    constexpr float barCornerRadius = 2.0f;  // Same as SequenceGrid
-    constexpr float borderWidth = 2.0f;
+
+    // Base dimensions (before scaling)
+    constexpr int baseGapBelowTitle = 13;
+    constexpr float baseBarWidth = 50.f;
+    constexpr int baseBarHeight = 17;
+    constexpr int baseBarSpacing = 3;
+    constexpr int baseButtonHeight = 15;
+    constexpr int baseGapAboveButtons = 16;
+
+    // Scaled dimensions
+    constexpr int gapBelowTitle = static_cast<int>(baseGapBelowTitle * heightScaleFactor);  // ~11px
+    constexpr float barWidth = baseBarWidth * heightScaleFactor;  // ~42.8px
+    constexpr int barHeight = static_cast<int>(baseBarHeight * heightScaleFactor);  // ~14px
+    constexpr int barSpacing = static_cast<int>(baseBarSpacing * heightScaleFactor);  // ~2px
+    constexpr int buttonHeight = static_cast<int>(baseButtonHeight * heightScaleFactor);  // ~12px
+    constexpr int gapAboveButtons = static_cast<int>(baseGapAboveButtons * heightScaleFactor);  // ~13px
+
+    // Other dimensions (scaled)
+    constexpr float barCornerRadius = 2.0f * heightScaleFactor;
+    constexpr float borderWidth = 2.0f * heightScaleFactor;
     constexpr int numBars = 8;
+
     // Calculated bar stack dimensions
-    constexpr int barStackHeight = numBars * barHeight + (numBars - 1) * barSpacing;  // 157px
+    constexpr int barStackHeight = numBars * barHeight + (numBars - 1) * barSpacing;  // ~134px
+
     // Buttons
     constexpr float buttonWidthRatio = 0.38f;
-    constexpr float buttonWidth = barWidth * buttonWidthRatio;  // ~16.15px
-    constexpr int buttonHeight = 15;
-    constexpr int gapAboveButtons = 16;
-    constexpr float buttonCornerRadius = 3.0f;
-    constexpr float buttonFontSize = 12.0f;
+    constexpr float buttonWidth = barWidth * buttonWidthRatio;
+    constexpr float buttonCornerRadius = 3.0f * heightScaleFactor;
+    constexpr float buttonFontSize = 12.0f * heightScaleFactor;
+
     // Colors
     constexpr juce::uint32 defaultGreyHex = 0xff484848;  // Same as button background
     constexpr juce::uint32 buttonBgHex = 0xff484848;
+
     // Container
     constexpr int horizontalPadding = 10;  // Padding on each side
-    constexpr int containerWidth = static_cast<int>(barWidth) + 2 * horizontalPadding;  // ~62px
+    constexpr int containerWidth = static_cast<int>(barWidth) + 2 * horizontalPadding;
+
+    // Total height calculation (should equal SequenceGrid height of 196px)
+    constexpr int totalHeight = titleHeight + gapBelowTitle + barStackHeight + gapAboveButtons + buttonHeight;
 }
 
 /**
