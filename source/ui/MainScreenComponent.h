@@ -39,10 +39,12 @@ namespace MainScreenLayout {
     constexpr int subsequenceControlsHeight = 260;
     // Sequencer
     constexpr int sequencerX = 22;
-    constexpr int sequencerStepsY = 312;
+    constexpr int gapAboveSequencerSteps = 20;  // Vertical gap between piano roll area and sequencer steps
+    constexpr int sequencerStepsY = pianoRollY + pianoRollHeight + gapAboveSequencerSteps;
     constexpr int sequencerWidth = 862;
     constexpr int sequencerStepsHeight = 92;
-    constexpr int sequencerControlsY = 422;
+    constexpr int gapBetweenSequencerStepsAndControls = 14;  // Vertical gap between sequencer steps and controls
+    constexpr int sequencerControlsY = sequencerStepsY + sequencerStepsHeight + gapBetweenSequencerStepsAndControls;
     constexpr int sequencerControlsHeight = 92;
     // Note range controls (right of sequencer)
     constexpr int noteRangeControlsGap = 18;
