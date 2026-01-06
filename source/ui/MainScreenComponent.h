@@ -17,9 +17,11 @@
 namespace MainScreenLayout {
     // Background
     constexpr juce::uint32 bgColourHex = 0xFF1E1E1E;
+    // Spacing
+    constexpr int navBarGapFromContent = 25;  // Gap between navbar and content below
     // Piano roll / MIDI data panel
     constexpr int pianoRollX = 22;
-    constexpr int pianoRollY = 95;
+    constexpr int pianoRollY = NavBarConstants::height + navBarGapFromContent;
     constexpr int pianoRollWidth = 422;
     constexpr int pianoRollHeight = 206;
     // Main controls

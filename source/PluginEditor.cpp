@@ -38,7 +38,6 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     };
 
     // Register as keyboard listener to capture hotkeys
-    // TODO: Remove keyboard listener after dev phase (currently used for XML snapshot hotkey)
     addKeyListener (this);
     setWantsKeyboardFocus (true);
 

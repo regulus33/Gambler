@@ -8,7 +8,7 @@
 #include <functional>
 
 namespace NavBarConstants {
-    constexpr int height = 60;  // Height of the navbar
+    constexpr int height = 45;  // Height of the navbar
     constexpr int logoGapFromTop = 10;  // Gap between top and logo
     constexpr int presetSelectorGapFromLogo = 20;  // Gap between logo and preset selector
     constexpr int versionLabelWidth = 60;
