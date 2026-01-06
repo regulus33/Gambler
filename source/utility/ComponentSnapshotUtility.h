@@ -138,4 +138,115 @@ public:
         return false;
 #endif
     }
+
+    /**
+     * Recursively snapshots all components in a hierarchy.
+     * Saves each component with a numbered prefix and type name.
+     * Shows a message box with the result.
+     *
+     * @param rootComponent The root component to start from
+     * @param outputDirectory The directory where snapshots will be saved
+     * @param scale Scale factor for snapshots (default 2.0 for retina)
+     * @return Number of snapshots saved
+     */
+    static int snapshotAllComponentsRecursively(juce::Component* rootComponent,
+                                               const juce::String& outputDirectory,
+                                               float scale = 2.0f)
+    {
+#if defined(TAKE_SNAPSHOTS_OF_COMPONENTS) && TAKE_SNAPSHOTS_OF_COMPONENTS == 1
+        if (!rootComponent)
+        {
+            return 0;
+        }
+
+        // Create the output directory
+        juce::File outputDir(outputDirectory);
+        outputDir.createDirectory();
+
+        // Start recursive snapshot
+        int count = 0;
+        snapshotComponentRecursive(rootComponent, outputDirectory, count, scale);
+
+        // Show result message
+        DBG("Saved " + juce::String(count) + " component snapshots to: " + outputDirectory);
+
+        juce::AlertWindow::showMessageBoxAsync(
+            juce::AlertWindow::InfoIcon,
+            "Snapshots Saved",
+            "Saved " + juce::String(count) + " component snapshots to:\n" + outputDirectory,
+            "OK");
+
+        return count;
+#else
+        juce::ignoreUnused(rootComponent, outputDirectory, scale);
+        return 0;
+#endif
+    }
+
+    /**
+     * Recursively snapshots all components using the compile-time SNAPSHOT_DESTINATION.
+     * Shows a message box with the result.
+     *
+     * @param rootComponent The root component to start from
+     * @param scale Scale factor for snapshots (default 2.0 for retina)
+     * @return Number of snapshots saved
+     */
+    static int snapshotAllComponentsToDestination(juce::Component* rootComponent,
+                                                 float scale = 2.0f)
+    {
+#if defined(TAKE_SNAPSHOTS_OF_COMPONENTS) && TAKE_SNAPSHOTS_OF_COMPONENTS == 1 && defined(SNAPSHOT_DESTINATION)
+        return snapshotAllComponentsRecursively(rootComponent, SNAPSHOT_DESTINATION, scale);
+#else
+        juce::ignoreUnused(rootComponent, scale);
+        DBG("Component snapshots disabled - set TAKE_SNAPSHOTS_OF_COMPONENTS=1 and define SNAPSHOT_DESTINATION");
+        return 0;
+#endif
+    }
+
+private:
+    /**
+     * Internal recursive helper for snapshotting component hierarchies.
+     */
+    static void snapshotComponentRecursive(juce::Component* component,
+                                          const juce::String& basePath,
+                                          int& count,
+                                          float scale)
+    {
+#if defined(TAKE_SNAPSHOTS_OF_COMPONENTS) && TAKE_SNAPSHOTS_OF_COMPONENTS == 1
+        if (!component || component->getWidth() <= 0 || component->getHeight() <= 0)
+        {
+            return;
+        }
+
+        // Get component type name
+        juce::String componentType = juce::String(typeid(*component).name());
+
+        // Clean up the typename
+        componentType = componentType.fromLastOccurrenceOf("::", false, false);  // Remove namespace
+        componentType = componentType.replaceCharacter(' ', '_');
+        componentType = componentType.replaceCharacter('<', '_');
+        componentType = componentType.replaceCharacter('>', '_');
+
+        // Add width and height
+        auto width = component->getWidth();
+        auto height = component->getHeight();
+        juce::String widthHeightString = "__" + juce::String(width) + "X" + juce::String(height);
+
+        // Create filename with count for uniqueness
+        juce::String filename = juce::String(count).paddedLeft('0', 3) + "_" + componentType + widthHeightString;
+
+        // Take the snapshot
+        saveSnapshot(*component, basePath, filename, scale);
+
+        count++;
+
+        // Recursively snapshot all children
+        for (int i = 0; i < component->getNumChildComponents(); ++i)
+        {
+            snapshotComponentRecursive(component->getChildComponent(i), basePath, count, scale);
+        }
+#else
+        juce::ignoreUnused(component, basePath, count, scale);
+#endif
+    }
 };

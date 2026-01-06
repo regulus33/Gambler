@@ -25,9 +25,6 @@ public:
     void componentMovedOrResized (juce::Component& component, bool wasMoved, bool wasResized) override;
 
 private:
-    // Recursive snapshot utility
-    void snapshotAllComponents(juce::Component* root, const juce::String& basePath, int& count);
-
     // Calculate scale factor based on current window size
     float getScaleFactor() const;
 
