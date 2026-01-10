@@ -789,14 +789,14 @@ public:
      * TODO: Replace with proper piano roll icon
      */
     static juce::Path createViewToggleIcon1() {
-        return createKeyboardIcon();
+        return createBarChartIcon();
     }
 
     /**
      * Creates icon 2 for view toggle (bar chart for MIDI data view)
      */
     static juce::Path createViewToggleIcon2() {
-        return createBarChartIcon();
+        return createKeyboardIcon();
     }
 
     /**
