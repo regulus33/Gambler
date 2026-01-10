@@ -53,18 +53,12 @@ public:
 
         // Setup navbar callback for Play button
         mainScreen.getNavBar().onPlayClicked = [this]() {
-            // Reset sequence to beginning and start clock via APVTS-backed state
-            processorRef.getState().reset();
-            processorRef.getClock().start();
-            DBG("Play clicked - sequence reset to index 0, clock started");
+            processorRef.startSequencer();
         };
 
         // Setup navbar callback for Stop button
         mainScreen.getNavBar().onStopClicked = [this]() {
-            processorRef.queueCommand(ProcessorCommand([this]() {
-                processorRef.getClock().stop();
-                DBG("Stop clicked - clock stopped");
-            }));
+            processorRef.stopSequencer();
         };
 
         // Setup preset selector callbacks
@@ -157,18 +151,12 @@ private:
 
             // Setup navbar callback for Play button
             settingsScreen->getNavBar().onPlayClicked = [this]() {
-                // Reset sequence to beginning and start clock via APVTS-backed state
-                processorRef.getState().reset();
-                processorRef.getClock().start();
-                DBG("Play clicked - sequence reset to index 0, clock started");
+                processorRef.startSequencer();
             };
 
             // Setup navbar callback for Stop button
             settingsScreen->getNavBar().onStopClicked = [this]() {
-                processorRef.queueCommand(ProcessorCommand([this]() {
-                    processorRef.getClock().stop();
-                    DBG("Stop clicked - clock stopped");
-                }));
+                processorRef.stopSequencer();
             };
 
             // Wire up settings callbacks to processor's clock

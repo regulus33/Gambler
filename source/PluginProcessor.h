@@ -93,6 +93,26 @@ public:
      */
     void triggerCurrentStepMidi(int noteOverride = -1);
 
+    /**
+     * Start the sequencer playback
+     * Enables the sequencer to respond to clock ticks.
+     * Thread-safe - can be called from any thread.
+     */
+    void startSequencer();
+
+    /**
+     * Stop the sequencer playback
+     * Disables the sequencer from responding to clock ticks and resets to step 0.
+     * Thread-safe - can be called from any thread.
+     */
+    void stopSequencer();
+
+    /**
+     * Check if the sequencer is currently playing
+     * @return true if sequencer is playing, false if stopped
+     */
+    bool isSequencerCurrentlyPlaying() const { return isSequencerPlaying.load(); }
+
     // User preferences (persisted with project)
     UserPreferences& getUserPreferences() noexcept { return userPreferences; }
     const UserPreferences& getUserPreferences() const noexcept { return userPreferences; }
@@ -178,6 +198,12 @@ private:
 
     // Preset manager
     PresetManager presetManager;
+
+    // Sequencer playback state
+    std::atomic<bool> isSequencerPlaying { true };  // Start playing by default
+
+    // Track DAW transport state for auto-resume in external clock mode
+    bool previousDawIsPlaying = false;
 
     // MIDI state
     int lastPlayedNote = -1;  // Track last note for note-off

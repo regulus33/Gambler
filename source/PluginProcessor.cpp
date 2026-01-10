@@ -315,8 +315,26 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         }
     }
 
+    // ================ DAW TRANSPORT DETECTION (for auto-resume in external clock mode) ================================
+    // Detect when DAW transitions from stopped to playing in external clock mode
+    if (clock.getMode() == ClockMode::DAW_SYNC) {
+        if (auto* playHead = getPlayHead()) {
+            auto position = playHead->getPosition();
+            bool dawIsPlaying = position.hasValue() && position->getIsPlaying();
+
+            // Detect transition from stopped to playing
+            if (dawIsPlaying && !previousDawIsPlaying) {
+                // DAW just started - resume sequencer playback
+                isSequencerPlaying.store(true);
+                DBG("DAW started - sequencer auto-resumed");
+            }
+
+            previousDawIsPlaying = dawIsPlaying;
+        }
+    }
+
     // ================ MAIN PART ========================================================================================
-    if (clock.shouldTick()) {
+    if (isSequencerPlaying.load() && clock.shouldTick()) {
         // Accumulate MIDI clock pulses for the next cycle
         // We need to do this because the normal clock rate is not even close to the ppqn midi uses.
         // So we accumulate and barrage the midi ticks (we spread them out but all in between 16th note ppqn cycles which is gambler's default timing)
@@ -841,6 +859,51 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
         DBG ("  No note to play (note < 0)");
     }
     DBG ("=== triggerCurrentStepMidi() complete ===");
+}
+
+//==============================================================================
+// Sequencer Playback Control
+//==============================================================================
+
+void PluginProcessor::startSequencer() {
+    isSequencerPlaying.store(true);
+
+    // Start the internal clock if in internal mode
+    if (clock.getMode() == ClockMode::INTERNAL) {
+        clock.start();
+    }
+
+    DBG("Sequencer started");
+}
+
+void PluginProcessor::stopSequencer() {
+    isSequencerPlaying.store(false);
+
+    // Reset sequence to step 0
+    getState().reset();
+
+    // Stop the internal clock if in internal mode
+    if (clock.getMode() == ClockMode::INTERNAL) {
+        clock.stop();
+    }
+
+    // Send note off for any playing note
+    if (lastPlayedNote >= 0) {
+        auto noteOff = juce::MidiMessage::noteOff(1, lastPlayedNote, (juce::uint8)0);
+
+        // Send to MIDI output if available (standalone mode)
+        if (midiOutput) {
+            midiOutput->sendMessageNow(noteOff);
+        }
+
+        lastPlayedNote = -1;
+    }
+
+    // Clear any scheduled note-offs
+    scheduledNoteOffSample = -1;
+    scheduledNoteOffNote = -1;
+
+    DBG("Sequencer stopped and reset to step 0");
 }
 
 //==============================================================================
