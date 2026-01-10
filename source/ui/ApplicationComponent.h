@@ -51,9 +51,9 @@ public:
             }
         };
 
-        // Setup navbar callback for Play button
+        // Setup navbar callback for Play button (toggles play/pause)
         mainScreen.getNavBar().onPlayClicked = [this]() {
-            processorRef.startSequencer();
+            processorRef.togglePlayPause();
         };
 
         // Setup navbar callback for Stop button
@@ -149,9 +149,9 @@ private:
                 }
             };
 
-            // Setup navbar callback for Play button
+            // Setup navbar callback for Play button (toggles play/pause)
             settingsScreen->getNavBar().onPlayClicked = [this]() {
-                processorRef.startSequencer();
+                processorRef.togglePlayPause();
             };
 
             // Setup navbar callback for Stop button

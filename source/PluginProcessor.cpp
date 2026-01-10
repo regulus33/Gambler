@@ -324,9 +324,12 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
 
             // Detect transition from stopped to playing
             if (dawIsPlaying && !previousDawIsPlaying) {
-                // DAW just started - resume sequencer playback
-                isSequencerPlaying.store(true);
-                DBG("DAW started - sequencer auto-resumed");
+                // DAW just started - resume sequencer playback (to Playing state)
+                auto currentState = sequencerState.load();
+                if (currentState == SequencerState::Stopped || currentState == SequencerState::Paused) {
+                    sequencerState.store(SequencerState::Playing);
+                    DBG("DAW started - sequencer auto-resumed");
+                }
             }
 
             previousDawIsPlaying = dawIsPlaying;
@@ -334,7 +337,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     }
 
     // ================ MAIN PART ========================================================================================
-    if (isSequencerPlaying.load() && clock.shouldTick()) {
+    if (sequencerState.load() == SequencerState::Playing && clock.shouldTick()) {
         // Accumulate MIDI clock pulses for the next cycle
         // We need to do this because the normal clock rate is not even close to the ppqn midi uses.
         // So we accumulate and barrage the midi ticks (we spread them out but all in between 16th note ppqn cycles which is gambler's default timing)
@@ -865,19 +868,42 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
 // Sequencer Playback Control
 //==============================================================================
 
-void PluginProcessor::startSequencer() {
-    isSequencerPlaying.store(true);
+void PluginProcessor::togglePlayPause() {
+    auto currentState = sequencerState.load();
 
-    // Start the internal clock if in internal mode
-    if (clock.getMode() == ClockMode::INTERNAL) {
-        clock.start();
+    if (currentState == SequencerState::Stopped) {
+        // Stopped → Playing: Reset to step 0 and start
+        getState().reset();
+        sequencerState.store(SequencerState::Playing);
+
+        // Start the internal clock if in internal mode
+        if (clock.getMode() == ClockMode::INTERNAL) {
+            clock.start();
+        }
+
+        DBG("Sequencer started from stopped (index reset to 0)");
     }
+    else if (currentState == SequencerState::Playing) {
+        // Playing → Paused: Hold at current index
+        sequencerState.store(SequencerState::Paused);
 
-    DBG("Sequencer started");
+        DBG("Sequencer paused at index " << getState().getCurrentIndex());
+    }
+    else if (currentState == SequencerState::Paused) {
+        // Paused → Playing: Resume from current index
+        sequencerState.store(SequencerState::Playing);
+
+        // Make sure internal clock is running if in internal mode
+        if (clock.getMode() == ClockMode::INTERNAL) {
+            clock.start();
+        }
+
+        DBG("Sequencer resumed from index " << getState().getCurrentIndex());
+    }
 }
 
 void PluginProcessor::stopSequencer() {
-    isSequencerPlaying.store(false);
+    sequencerState.store(SequencerState::Stopped);
 
     // Reset sequence to step 0
     getState().reset();

@@ -94,11 +94,22 @@ public:
     void triggerCurrentStepMidi(int noteOverride = -1);
 
     /**
-     * Start the sequencer playback
-     * Enables the sequencer to respond to clock ticks.
+     * Sequencer playback states
+     */
+    enum class SequencerState {
+        Stopped,  // Not playing, index at 0
+        Playing,  // Advancing through sequence
+        Paused    // Holding at current index
+    };
+
+    /**
+     * Toggle play/pause
+     * - If stopped: starts playing from index 0
+     * - If playing: pauses at current index
+     * - If paused: resumes playing from current index
      * Thread-safe - can be called from any thread.
      */
-    void startSequencer();
+    void togglePlayPause();
 
     /**
      * Stop the sequencer playback
@@ -108,10 +119,10 @@ public:
     void stopSequencer();
 
     /**
-     * Check if the sequencer is currently playing
-     * @return true if sequencer is playing, false if stopped
+     * Get the current sequencer state
+     * @return Current state (Stopped, Playing, or Paused)
      */
-    bool isSequencerCurrentlyPlaying() const { return isSequencerPlaying.load(); }
+    SequencerState getSequencerState() const { return sequencerState.load(); }
 
     // User preferences (persisted with project)
     UserPreferences& getUserPreferences() noexcept { return userPreferences; }
@@ -200,7 +211,7 @@ private:
     PresetManager presetManager;
 
     // Sequencer playback state
-    std::atomic<bool> isSequencerPlaying { true };  // Start playing by default
+    std::atomic<SequencerState> sequencerState { SequencerState::Playing };  // Start playing by default
 
     // Track DAW transport state for auto-resume in external clock mode
     bool previousDawIsPlaying = false;

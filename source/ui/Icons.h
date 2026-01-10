@@ -11,7 +11,7 @@
  * Usage:
  *   auto path = Icons::createDiceIcon();
  *   auto transform = Icons::createTransform(path, targetBounds);
- *   g.setColour(Icons::defaultColor());
+ *   g.setColour(Icons::defaultColoedr());
  *   g.fillPath(path, transform);
  * 
  * Or use the convenience method:
