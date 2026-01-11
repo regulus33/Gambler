@@ -1,0 +1,154 @@
+#include <catch2/catch_test_macros.hpp>
+#include "../source/ui/Icons.h"
+
+/**
+ * UI Component Tests
+ *
+ * Basic tests for UI utilities to verify functionality.
+ * These tests focus on stateless utility functions.
+ */
+
+SCENARIO("Icons path creation", "[ui][icons]") {
+    GIVEN("Icon creation functions") {
+        WHEN("Creating play icon") {
+            auto path = Icons::createPlayIcon();
+
+            THEN("Path is created") {
+                REQUIRE(!path.isEmpty());
+            }
+        }
+
+        WHEN("Creating stop icon") {
+            auto path = Icons::createStopIcon();
+
+            THEN("Path is created") {
+                REQUIRE(!path.isEmpty());
+            }
+        }
+
+        WHEN("Creating save icon") {
+            auto path = Icons::createSaveIcon();
+
+            THEN("Path is created") {
+                REQUIRE(!path.isEmpty());
+            }
+        }
+
+        WHEN("Creating settings icon") {
+            auto path = Icons::createSettingsIcon();
+
+            THEN("Path is created") {
+                REQUIRE(!path.isEmpty());
+            }
+        }
+
+        WHEN("Creating dice icon") {
+            auto path = Icons::createDiceIcon();
+
+            THEN("Path is created") {
+                REQUIRE(!path.isEmpty());
+            }
+        }
+
+        WHEN("Creating shuffle icon") {
+            auto path = Icons::createShuffleIcon();
+
+            THEN("Path is created") {
+                REQUIRE(!path.isEmpty());
+            }
+        }
+
+        WHEN("Creating shift icon") {
+            auto path = Icons::createShiftIcon();
+
+            THEN("Path is created") {
+                REQUIRE(!path.isEmpty());
+            }
+        }
+
+        WHEN("Creating nudge left icon") {
+            auto path = Icons::createNudgeLeftIcon();
+
+            THEN("Path is created") {
+                REQUIRE(!path.isEmpty());
+            }
+        }
+
+        WHEN("Creating nudge right icon") {
+            auto path = Icons::createNudgeRightIcon();
+
+            THEN("Path is created") {
+                REQUIRE(!path.isEmpty());
+            }
+        }
+
+        WHEN("Creating length plus icon") {
+            auto path = Icons::createLengthPlusIcon();
+
+            THEN("Path is created") {
+                REQUIRE(!path.isEmpty());
+            }
+        }
+
+        WHEN("Creating length minus icon") {
+            auto path = Icons::createLengthMinusIcon();
+
+            THEN("Path is created") {
+                REQUIRE(!path.isEmpty());
+            }
+        }
+    }
+}
+
+SCENARIO("Icons bounds calculation", "[ui][icons]") {
+    GIVEN("Icons") {
+        WHEN("Calculating icon bounds") {
+            auto playIcon = Icons::createPlayIcon();
+            auto bounds = playIcon.getBounds();
+
+            THEN("Bounds are non-zero") {
+                REQUIRE(bounds.getWidth() > 0.0f);
+                REQUIRE(bounds.getHeight() > 0.0f);
+            }
+        }
+
+        WHEN("Creating multiple icons") {
+            std::vector<juce::Path> icons = {
+                Icons::createPlayIcon(),
+                Icons::createStopIcon(),
+                Icons::createSaveIcon(),
+                Icons::createSettingsIcon()
+            };
+
+            THEN("All icons have valid bounds") {
+                for (const auto& icon : icons) {
+                    auto bounds = icon.getBounds();
+                    REQUIRE(bounds.getWidth() > 0.0f);
+                    REQUIRE(bounds.getHeight() > 0.0f);
+                }
+            }
+        }
+    }
+}
+
+SCENARIO("Icons utility functions", "[ui][icons]") {
+    GIVEN("Multiple icons") {
+        WHEN("Creating various icons") {
+            std::vector<juce::Path> icons = {
+                Icons::createPlayIcon(),
+                Icons::createStopIcon(),
+                Icons::createSaveIcon(),
+                Icons::createDiceIcon(),
+                Icons::createShuffleIcon(),
+                Icons::createNudgeLeftIcon(),
+                Icons::createNudgeRightIcon()
+            };
+
+            THEN("All icons are created successfully") {
+                for (const auto& icon : icons) {
+                    REQUIRE(!icon.isEmpty());
+                }
+            }
+        }
+    }
+}
