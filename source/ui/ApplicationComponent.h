@@ -51,14 +51,18 @@ public:
             }
         };
 
-        // Setup navbar callback for Play button (toggles play/pause)
-        mainScreen.getNavBar().onPlayClicked = [this]() {
+        // Setup navbar callback for Play/Pause button (toggles play/pause)
+        mainScreen.getNavBar().onPlayPauseClicked = [this]() {
             processorRef.togglePlayPause();
+            // Update button state immediately
+            updatePlayPauseButtonState();
         };
 
         // Setup navbar callback for Stop button
         mainScreen.getNavBar().onStopClicked = [this]() {
             processorRef.stopSequencer();
+            // Update button state immediately
+            updatePlayPauseButtonState();
         };
 
         // Setup preset selector callbacks
@@ -122,6 +126,26 @@ private:
 
         // Update the main screen from sequence state
         mainScreen.updateFromSequence();
+
+        // Update play/pause button state
+        updatePlayPauseButtonState();
+    }
+
+    void updatePlayPauseButtonState() {
+        // Update play/pause button based on sequencer state
+        // When playing: show pause icon (toggled = true) with green color
+        // When stopped/paused: show play icon (toggled = false) with white color
+        auto state = processorRef.getSequencerState();
+        bool isPlaying = (state == PluginProcessor::SequencerState::Playing);
+        bool isStopped = (state == PluginProcessor::SequencerState::Stopped);
+
+        mainScreen.getNavBar().setPlayPauseState(isPlaying);
+        mainScreen.getNavBar().setStopButtonActive(isStopped);
+
+        if (settingsScreen) {
+            settingsScreen->getNavBar().setPlayPauseState(isPlaying);
+            settingsScreen->getNavBar().setStopButtonActive(isStopped);
+        }
     }
 
     void showSettingsScreen() {
@@ -149,14 +173,18 @@ private:
                 }
             };
 
-            // Setup navbar callback for Play button (toggles play/pause)
-            settingsScreen->getNavBar().onPlayClicked = [this]() {
+            // Setup navbar callback for Play/Pause button (toggles play/pause)
+            settingsScreen->getNavBar().onPlayPauseClicked = [this]() {
                 processorRef.togglePlayPause();
+                // Update button state immediately
+                updatePlayPauseButtonState();
             };
 
             // Setup navbar callback for Stop button
             settingsScreen->getNavBar().onStopClicked = [this]() {
                 processorRef.stopSequencer();
+                // Update button state immediately
+                updatePlayPauseButtonState();
             };
 
             // Wire up settings callbacks to processor's clock

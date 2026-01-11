@@ -17,6 +17,11 @@ namespace NavBarConstants {
     constexpr int buttonSize = ToggleIconButtonConstants::totalSize;  // 36px
     constexpr int buttonGap = 10;  // Gap between buttons
     constexpr int settingsButtonOffsetRight = 46;  // Offset from right edge
+
+    // Transport button colors
+    const juce::Colour inactiveColor = juce::Colours::white;
+    const juce::Colour activePlayColor = juce::Colour(0xff4ade80);  // Green-400 for playing state
+    const juce::Colour activeStopColor = juce::Colour(0xfff87171);  // Red-400 for stopped state
 }
 
 /**
@@ -37,7 +42,7 @@ public:
         : viewToggleButton(Icons::createViewToggleIcon1, Icons::createViewToggleIcon2, false, true),
           settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false),
           midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, true),
-          playButton(Icons::createPlayIcon, Icons::createPlayIcon, false, false),
+          playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false)
     {
         // Add logo component
@@ -80,11 +85,11 @@ public:
             }
         };
 
-        // Add play button
-        addAndMakeVisible(playButton);
-        playButton.onClick = [this](bool toggled) {
-            if (onPlayClicked) {
-                onPlayClicked();
+        // Add play/pause button
+        addAndMakeVisible(playPauseButton);
+        playPauseButton.onClick = [this](bool toggled) {
+            if (onPlayPauseClicked) {
+                onPlayPauseClicked();
             }
         };
 
@@ -95,6 +100,15 @@ public:
                 onStopClicked();
             }
         };
+
+        // Set transport button colors
+        // Play/Pause: white when stopped/paused (state 1), green when playing (state 2)
+        playPauseButton.setColor1(NavBarConstants::inactiveColor);
+        playPauseButton.setColor2(NavBarConstants::activePlayColor);
+
+        // Stop: white normally (we'll update this dynamically based on state)
+        stopButton.setColor1(NavBarConstants::inactiveColor);
+        stopButton.setColor2(NavBarConstants::inactiveColor);
     }
 
     void paint(juce::Graphics& g) override {
@@ -145,10 +159,10 @@ public:
         int stopButtonY = (height - buttonSize) / 2;  // Vertically center
         stopButton.setBounds(stopButtonX, stopButtonY, buttonSize, buttonSize);
 
-        // Position play button left of stop button
-        int playButtonX = stopButtonX - buttonSize - buttonGap;
-        int playButtonY = (height - buttonSize) / 2;  // Vertically center
-        playButton.setBounds(playButtonX, playButtonY, buttonSize, buttonSize);
+        // Position play/pause button left of stop button
+        int playPauseButtonX = stopButtonX - buttonSize - buttonGap;
+        int playPauseButtonY = (height - buttonSize) / 2;  // Vertically center
+        playPauseButton.setBounds(playPauseButtonX, playPauseButtonY, buttonSize, buttonSize);
     }
 
     // Callback when settings button is clicked
@@ -162,8 +176,8 @@ public:
     // Parameter: true = MIDI learn mode ON, false = MIDI learn mode OFF
     std::function<void(bool)> onMidiLearnClicked;
 
-    // Callback when play button is clicked
-    std::function<void()> onPlayClicked;
+    // Callback when play/pause button is clicked
+    std::function<void()> onPlayPauseClicked;
 
     // Callback when stop button is clicked
     std::function<void()> onStopClicked;
@@ -178,6 +192,24 @@ public:
         midiLearnButton.setToggled(toggled);
     }
 
+    // Public method to set play/pause button state based on sequencer state
+    // When playing: shows pause icon (toggled = true) with green color
+    // When stopped/paused: shows play icon (toggled = false) with white color
+    void setPlayPauseState(bool isPlaying) {
+        playPauseButton.setToggled(isPlaying);
+    }
+
+    // Public method to set stop button color based on sequencer state
+    // When stopped: shows red color
+    // When playing/paused: shows white color
+    void setStopButtonActive(bool isStopped) {
+        if (isStopped) {
+            stopButton.setColor1(NavBarConstants::activeStopColor);
+        } else {
+            stopButton.setColor1(NavBarConstants::inactiveColor);
+        }
+    }
+
     // Access to preset selector for wiring up callbacks
     PresetSelectorComponent& getPresetSelector() { return presetSelector; }
 
@@ -188,7 +220,7 @@ private:
     ToggleIconButton midiLearnButton;
     ToggleIconButton viewToggleButton;
     ToggleIconButton settingsButton;
-    ToggleIconButton playButton;
+    ToggleIconButton playPauseButton;
     ToggleIconButton stopButton;
 };
 

@@ -1321,86 +1321,62 @@ public:
 
     /**
      * Play Icon (triangle pointing right)
-     * Design: Classic play button triangle
-     * Size: ~18x18 coordinate space
+     * Design: Simple clean play button triangle
+     * Size: ~9x9 coordinate space (half size for compact UI)
      */
     static juce::Path createPlayIcon() {
         Path path;
-        path.startNewSubPath (12.3f, 0.6f);
-        path.lineTo (12.3f, 10.4f);
-        path.cubicTo (12.3f, 10.6f, 12.2f, 10.7f, 12.1f, 10.8f);
-        path.cubicTo (12.0f, 10.9f, 11.9f, 11.0f, 11.7f, 11.0f);
-        path.cubicTo (11.5f, 11.0f, 11.4f, 10.9f, 11.3f, 10.8f);
-        path.cubicTo (11.1f, 10.7f, 11.1f, 10.6f, 11.1f, 10.4f);
-        path.lineTo (11.1f, 0.6f);
-        path.cubicTo (11.1f, 0.4f, 11.1f, 0.3f, 11.3f, 0.2f);
-        path.cubicTo (11.4f, 0.1f, 11.5f, 0.0f, 11.7f, 0.0f);
-        path.cubicTo (11.9f, 0.0f, 12.0f, 0.1f, 12.1f, 0.2f);
-        path.cubicTo (12.2f, 0.3f, 12.3f, 0.4f, 12.3f, 0.6f);
+        // Simple right-pointing triangle
+        path.startNewSubPath (0.5f, 0.5f);
+        path.lineTo (6.5f, 3.5f);
+        path.lineTo (0.5f, 6.5f);
         path.closeSubPath();
-        path.startNewSubPath (15.4f, 0.0f);
-        path.cubicTo (15.2f, 0.0f, 15.1f, 0.1f, 14.9f, 0.2f);
-        path.cubicTo (14.8f, 0.3f, 14.8f, 0.4f, 14.8f, 0.6f);
-        path.lineTo (14.8f, 10.4f);
-        path.cubicTo (14.8f, 10.6f, 14.8f, 10.7f, 14.9f, 10.8f);
-        path.cubicTo (15.1f, 10.9f, 15.2f, 11.0f, 15.4f, 11.0f);
-        path.cubicTo (15.5f, 11.0f, 15.7f, 10.9f, 15.8f, 10.8f);
-        path.cubicTo (15.9f, 10.7f, 16.0f, 10.6f, 16.0f, 10.4f);
-        path.lineTo (16.0f, 0.6f);
-        path.cubicTo (16.0f, 0.4f, 15.9f, 0.3f, 15.8f, 0.2f);
-        path.cubicTo (15.7f, 0.1f, 15.5f, 0.0f, 15.4f, 0.0f);
+        return path;
+    }
+
+    /**
+     * Pause Icon (two vertical bars)
+     * Design: Classic pause button with two parallel vertical bars
+     * Size: ~9x9 coordinate space (half size for compact UI)
+     */
+    static juce::Path createPauseIcon() {
+        Path path;
+        // Left bar
+        path.startNewSubPath (1.0f, 0.5f);
+        path.lineTo (1.0f, 6.5f);
+        path.lineTo (2.5f, 6.5f);
+        path.lineTo (2.5f, 0.5f);
         path.closeSubPath();
-        path.startNewSubPath (9.2f, 5.5f);
-        path.cubicTo (9.2f, 5.7f, 9.2f, 5.9f, 9.1f, 6.1f);
-        path.cubicTo (9.0f, 6.3f, 8.8f, 6.4f, 8.7f, 6.5f);
-        path.lineTo (1.9f, 10.8f);
-        path.cubicTo (1.7f, 10.9f, 1.5f, 11.0f, 1.3f, 11.0f);
-        path.cubicTo (1.0f, 11.0f, 0.8f, 11.0f, 0.6f, 10.9f);
-        path.cubicTo (0.4f, 10.7f, 0.3f, 10.6f, 0.2f, 10.4f);
-        path.cubicTo (0.1f, 10.2f, 0.0f, 10.0f, 0.0f, 9.8f);
-        path.lineTo (0.0f, 1.2f);
-        path.cubicTo (0.0f, 1.0f, 0.1f, 0.8f, 0.2f, 0.6f);
-        path.cubicTo (0.3f, 0.4f, 0.4f, 0.3f, 0.6f, 0.1f);
-        path.cubicTo (0.8f, 0.0f, 1.0f, -0.0f, 1.3f, 0.0f);
-        path.cubicTo (1.5f, 0.0f, 1.7f, 0.1f, 1.9f, 0.2f);
-        path.lineTo (8.7f, 4.5f);
-        path.cubicTo (8.8f, 4.6f, 9.0f, 4.7f, 9.1f, 4.9f);
-        path.cubicTo (9.2f, 5.1f, 9.2f, 5.3f, 9.2f, 5.5f);
-        path.closeSubPath();
-        path.startNewSubPath (8.0f, 5.5f);
-        path.lineTo (1.2f, 1.2f);
-        path.lineTo (1.2f, 9.8f);
-        path.lineTo (8.0f, 5.5f);
+        // Right bar
+        path.startNewSubPath (4.5f, 0.5f);
+        path.lineTo (4.5f, 6.5f);
+        path.lineTo (6.0f, 6.5f);
+        path.lineTo (6.0f, 0.5f);
         path.closeSubPath();
         return path;
     }
 
     /**
      * Stop Icon (square)
-     * Design: Classic stop button square
-     * Size: ~18x18 coordinate space
+     * Design: Classic stop button square with rounded corners
+     * Size: ~9x9 coordinate space (half size for compact UI)
      */
     static juce::Path createStopIcon() {
         Path path;
-        path.startNewSubPath (10.0f, 0.0f);
-        path.lineTo (1.0f, 0.0f);
-        path.cubicTo (0.7f, 0.0f, 0.5f, 0.1f, 0.3f, 0.3f);
-        path.cubicTo (0.1f, 0.5f, 0.0f, 0.7f, 0.0f, 1.0f);
-        path.lineTo (0.0f, 10.0f);
-        path.cubicTo (0.0f, 10.3f, 0.1f, 10.5f, 0.3f, 10.7f);
-        path.cubicTo (0.5f, 10.9f, 0.7f, 11.0f, 1.0f, 11.0f);
-        path.lineTo (10.0f, 11.0f);
-        path.cubicTo (10.3f, 11.0f, 10.5f, 10.9f, 10.7f, 10.7f);
-        path.cubicTo (10.9f, 10.5f, 11.0f, 10.3f, 11.0f, 10.0f);
-        path.lineTo (11.0f, 1.0f);
-        path.cubicTo (11.0f, 0.7f, 10.9f, 0.5f, 10.7f, 0.3f);
-        path.cubicTo (10.5f, 0.1f, 10.3f, 0.0f, 10.0f, 0.0f);
-        path.closeSubPath();
-        path.startNewSubPath (10.0f, 10.0f);
-        path.lineTo (1.0f, 10.0f);
-        path.lineTo (1.0f, 1.0f);
-        path.lineTo (10.0f, 1.0f);
-        path.lineTo (10.0f, 10.0f);
+        // Simple rounded square
+        path.startNewSubPath (5.5f, 0.5f);
+        path.lineTo (1.5f, 0.5f);
+        path.cubicTo (1.2f, 0.5f, 1.0f, 0.6f, 0.8f, 0.8f);
+        path.cubicTo (0.6f, 1.0f, 0.5f, 1.2f, 0.5f, 1.5f);
+        path.lineTo (0.5f, 5.5f);
+        path.cubicTo (0.5f, 5.8f, 0.6f, 6.0f, 0.8f, 6.2f);
+        path.cubicTo (1.0f, 6.4f, 1.2f, 6.5f, 1.5f, 6.5f);
+        path.lineTo (5.5f, 6.5f);
+        path.cubicTo (5.8f, 6.5f, 6.0f, 6.4f, 6.2f, 6.2f);
+        path.cubicTo (6.4f, 6.0f, 6.5f, 5.8f, 6.5f, 5.5f);
+        path.lineTo (6.5f, 1.5f);
+        path.cubicTo (6.5f, 1.2f, 6.4f, 1.0f, 6.2f, 0.8f);
+        path.cubicTo (6.0f, 0.6f, 5.8f, 0.5f, 5.5f, 0.5f);
         path.closeSubPath();
         return path;
     }

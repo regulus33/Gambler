@@ -37,15 +37,18 @@ public:
           iconPath2(iconPathFunc2),
           drawWithStroke(useStroke),
           autoToggleEnabled(autoToggle),
-          isToggled(false)
+          isToggled(false),
+          color1(juce::Colours::white),
+          color2(juce::Colours::white)
     {
     }
 
     void paint (juce::Graphics& g) override {
         using namespace ToggleIconButtonConstants;
 
-        // Get the appropriate icon path based on toggle state
+        // Get the appropriate icon path and color based on toggle state
         juce::Path path = isToggled ? iconPath2() : iconPath1();
+        juce::Colour color = isToggled ? color2 : color1;
 
         // The original path is designed for various bounding boxes
         // We need to scale it to fit within the contentSize (20px)
@@ -61,8 +64,8 @@ public:
                 padding + (contentSize - pathBounds.getHeight() * scale) / 2.0f - (pathBounds.getY() * scale)
             );
 
-        // Draw the icon with white stroke or fill
-        g.setColour(juce::Colours::white);
+        // Draw the icon with the appropriate color
+        g.setColour(color);
         if (drawWithStroke) {
             g.strokePath(path, juce::PathStrokeType(1.5f), transform);
         } else {
@@ -101,6 +104,22 @@ public:
     // Get current toggle state
     bool getToggled() const { return isToggled; }
 
+    // Set the color for state 1 (not toggled)
+    void setColor1(juce::Colour newColor) {
+        if (color1 != newColor) {
+            color1 = newColor;
+            repaint();
+        }
+    }
+
+    // Set the color for state 2 (toggled)
+    void setColor2(juce::Colour newColor) {
+        if (color2 != newColor) {
+            color2 = newColor;
+            repaint();
+        }
+    }
+
     // Callback when button is clicked
     // Parameter: true if toggled on, false if toggled off
     std::function<void(bool)> onClick;
@@ -111,5 +130,7 @@ private:
     bool drawWithStroke;
     bool autoToggleEnabled;
     bool isToggled;
+    juce::Colour color1;  // Color for state 1 (not toggled)
+    juce::Colour color2;  // Color for state 2 (toggled)
 };
 
