@@ -455,16 +455,15 @@ public:
         currentIndex = (currentIndex + 1) % length;
         setCurrentIndex(currentIndex);
 
-        // If random mode (roll) is enabled, check play probability
+        // Always generate a random probability index for UI visualization
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(0, ParamConstants::MAX_STEPS - 1);
+        int probabilityIndex = dis(gen);
+        setLastProbabilityIndex(probabilityIndex);
+
+        // If random mode (roll) is enabled, use the probability for play/rest decisions
         if (getIsRandom()) {
-            // Randomly sample from the probability array
-            static std::random_device rd;
-            static std::mt19937 gen(rd());
-            std::uniform_int_distribution<> dis(0, ParamConstants::MAX_STEPS - 1);
-            int probabilityIndex = dis(gen);
-
-            setLastProbabilityIndex(probabilityIndex);
-
             // Tick the substep first to advance the substep index
             int substepIdx = tickStepSubstepOnly(currentIndex);
 
@@ -478,11 +477,9 @@ public:
             // Probability check passed - randomize the current step's note
             randomizeStepNote(currentIndex);
             return getStepNote(currentIndex, substepIdx);
-        } else {
-            setLastProbabilityIndex(-1);
         }
 
-        // Tick the current step's substep and return its note
+        // Not in random mode - just tick the current step normally
         return tickStep(currentIndex);
     }
 
