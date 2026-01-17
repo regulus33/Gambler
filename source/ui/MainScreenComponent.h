@@ -195,7 +195,6 @@ public:
 
             // Set the clicked step as the selected step for editing
             processorRef.getState().setSelectedStepForEditing(stepIndex);
-            sequencerSteps.setSelectedStep(stepIndex);
 
             // Update the sequence grid to show the new selection
             sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
@@ -277,9 +276,6 @@ public:
 
     // Helper to set active step and update piano roll
     void setActiveStepAndNote(int stepIndex) {
-        // Update the active step in the sequencer steps component
-        sequencerSteps.setActiveStep(stepIndex);
-
         if (stepIndex >= 0 && stepIndex < 64) {
             // Get the note from this step in the sequence state
             int midiNote = processorRef.getState().getCurrentNoteForStep(stepIndex);
@@ -347,9 +343,6 @@ public:
 
         // Update the active step indicator to follow the sequence playback
         setActiveStepAndNote(currentStep);
-
-        // Update the selected step indicator for editing
-        sequencerSteps.setSelectedStep(selectedStep);
 
         // Auto-scroll the sequencer window to follow the active step (if enabled)
         if (processorRef.getUserPreferences().followStep && currentStep >= 0) {
@@ -505,8 +498,9 @@ private:
         int clampedWindow = juce::jlimit(0, 56, windowStart);
 
         // Only update if the window needs to change
-        if (sequencerSteps.getWindowStart() != clampedWindow) {
-            sequencerSteps.setWindowStart(clampedWindow);
+        auto& state = processorRef.getState();
+        if (state.getViewWindowStart() != clampedWindow) {
+            state.setViewWindowStart(clampedWindow);
 
             // Update the sequence grid to highlight the current window row
             int windowRow = clampedWindow / 8;  // Convert window start (0, 8, 16, ..., 56) to row (0-7)
@@ -544,22 +538,23 @@ private:
 
         // Use MessageManager to safely update UI from any thread
         juce::MessageManager::callAsync([this, parameterID]() {
+            auto& state = processorRef.getState();
+
             if (parameterID == Params::Keys::ID::INDEX_LEFT) {
-                int currentWindow = sequencerSteps.getWindowStart();
+                int currentWindow = state.getViewWindowStart();
                 int newWindow = currentWindow - 8;
                 setSequencerWindow(newWindow);
-                DBG("Page left, window now at: " + juce::String(sequencerSteps.getWindowStart()));
+                DBG("Page left, window now at: " + juce::String(state.getViewWindowStart()));
             }
             else if (parameterID == Params::Keys::ID::INDEX_RIGHT) {
-                int currentWindow = sequencerSteps.getWindowStart();
+                int currentWindow = state.getViewWindowStart();
                 int newWindow = currentWindow + 8;
                 setSequencerWindow(newWindow);
-                DBG("Page right, window now at: " + juce::String(sequencerSteps.getWindowStart()));
+                DBG("Page right, window now at: " + juce::String(state.getViewWindowStart()));
             }
             else if (parameterID == Params::Keys::ID::CLEAR_WINDOW) {
                 // Clear: set all steps in current window to rest
-                auto& state = processorRef.getState();
-                int windowStart = sequencerSteps.getWindowStart();
+                int windowStart = state.getViewWindowStart();
                 for (int i = 0; i < 8; i++) {
                     int stepIdx = windowStart + i;
                     for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {

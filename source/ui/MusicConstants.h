@@ -78,5 +78,23 @@ inline juce::Array<T> toJuceArray (const std::array<T, N>& src) {
     return dst;
 }
 
+// --- Helper functions ---
+
+/**
+ * Get the color for a chromatic note (0-11)
+ */
+inline juce::Colour getNoteColor(int chromaticNote) {
+    return NOTE_COLOURS[chromaticNote % NUM_CHROMATIC_NOTES];
+}
+
+/**
+ * Convert MIDI note number to note name (e.g., 60 -> "C4", 67 -> "G4")
+ */
+inline juce::String midiNoteToNoteName(int midiNote) {
+    int chromaticNote = midiNote % NUM_CHROMATIC_NOTES;
+    int octave = (midiNote / 12) - 1; // MIDI note 60 = C4
+    return CHROMATIC_NOTE_NAMES[chromaticNote] + juce::String(octave);
+}
+
 } // namespace MusicConstants
 

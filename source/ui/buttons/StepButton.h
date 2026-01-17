@@ -1,0 +1,218 @@
+#pragma once
+
+#include "../StateListenerComponent.h"
+#include "../MusicConstants.h"
+#include "../../backend/MidiLearnRegistry.h"
+#include "../../data/Params.h"
+#include <juce_gui_basics/juce_gui_basics.h>
+
+namespace StepButtonConstants {
+    constexpr float cornerRadius = 4.4f;
+    constexpr float borderWidthActive = 3.0f;
+    constexpr float fontSize = 13.0f;
+    constexpr float activeCircleRadius = 20.0f;
+
+    // Colors
+    const juce::Colour restStepColor = juce::Colour(0xff505050);      // Lighter grey for rest steps
+    const juce::Colour emptyStepColor = juce::Colour(0xff2a2a2a);     // Darker grey for empty steps
+    const juce::Colour selectedStepColor = juce::Colours::white;      // White for selected step
+    const juce::Colour textColorOnNote = juce::Colours::black;        // Black text on colored notes
+    const juce::Colour textColorOnSelected = juce::Colours::black;    // Black text on white selected
+}
+
+/**
+ * StepButton - Individual step button for MIDI-mappable step selection
+ * 
+ * Represents one of 8 visible steps in the sequencer window.
+ * Each button has a fixed local index (0-7) that maps to STEP_0 through STEP_7
+ * for MIDI learn purposes.
+ * 
+ * The absolute step index is calculated as: windowStart + localIndex
+ * 
+ * Visual States:
+ * - Selected (white fill) - This step is selected for editing
+ * - Active (white border) - This step is currently playing
+ * - Normal (note color fill) - Regular step with note color
+ * - Rest (grey fill) - Step contains a rest (-1)
+ * 
+ * Observer Pattern:
+ * - Listens to step note parameters for this step
+ * - Listens to sequence metadata (currentIndex, selectedStep, windowStart)
+ * - Automatically repaints when subscribed parameters change
+ */
+class StepButton : public StateListenerComponent {
+public:
+    StepButton(PluginProcessor& processor, int localIndex)
+        : StateListenerComponent(processor)
+        , localIndex_(localIndex)
+    {
+        // Subscribe to all step notes (we might display any step depending on window)
+        listenToStepNotes(0, 63);
+        listenToStepNotesLength(0, 63);
+
+        // Subscribe to sequence metadata
+        listenToSequenceMetadata();
+
+        // Enable mouse clicks
+        setInterceptsMouseClicks(true, false);
+    }
+    
+    ~StepButton() override = default;
+    
+    /**
+     * Set the MIDI control ID for this button (STEP_0 through STEP_7)
+     */
+    void setMidiControlId(MidiControlId controlId) {
+        midiControlId_ = controlId;
+    }
+    
+    /**
+     * Get the local index (0-7)
+     */
+    int getLocalIndex() const {
+        return localIndex_;
+    }
+    
+    /**
+     * Get the absolute step index based on current window position
+     */
+    int getAbsoluteStepIndex() const {
+        int windowStart = getState().getViewWindowStart();
+        return windowStart + localIndex_;
+    }
+    
+    /**
+     * Callback when this step button is clicked
+     * Receives the absolute step index (0-63)
+     */
+    std::function<void(int absoluteStepIndex)> onStepClicked;
+    
+    void paint(juce::Graphics& g) override {
+        using namespace StepButtonConstants;
+        auto& state = getState();
+        
+        int absoluteStepIndex = getAbsoluteStepIndex();
+        
+        // Check if this step is within the active sequence length
+        bool isWithinSequence = absoluteStepIndex < state.getLength();
+        
+        // Check if this is the active step (playback position)
+        bool isActive = isWithinSequence && (absoluteStepIndex == state.getCurrentIndex());
+        
+        // Check if this is the selected step for editing
+        bool isSelected = (absoluteStepIndex == state.getSelectedStepForEditing());
+        
+        auto bounds = getLocalBounds().toFloat();
+        
+        if (isWithinSequence) {
+            // Check if this step's current note is a rest (-1)
+            bool isRest = state.stepHasRest(absoluteStepIndex);
+
+            // Get the current note for this step
+            int midiNote = state.getCurrentNoteForStep(absoluteStepIndex);
+
+            // Determine the fill color
+            juce::Colour fillColor;
+            if (isSelected) {
+                fillColor = StepButtonConstants::selectedStepColor;
+            } else if (isRest) {
+                fillColor = StepButtonConstants::restStepColor;
+            } else {
+                int chromaticNote = midiNote % 12;
+                fillColor = MusicConstants::getNoteColor(chromaticNote);
+            }
+
+            // Fill background
+            g.setColour(fillColor);
+            g.fillRoundedRectangle(bounds, cornerRadius);
+
+            // Draw white border on active step (playback position)
+            if (isActive) {
+                g.setColour(juce::Colours::white);
+                float inset = borderWidthActive * 0.5f;
+                juce::Rectangle<float> borderBounds = bounds.reduced(inset);
+                float borderRadiusInner = juce::jmax(0.0f, cornerRadius - inset);
+                g.drawRoundedRectangle(borderBounds, borderRadiusInner, borderWidthActive);
+            }
+
+            // Draw note text (only for non-rest steps)
+            if (!isRest) {
+                drawNoteText(g, bounds, midiNote, isSelected);
+            }
+
+            // Draw active circle indicator if this is the playing step
+            if (isActive) {
+                drawActiveCircle(g, bounds, absoluteStepIndex);
+            }
+        } else {
+            // Step is beyond sequence length - draw as empty/inactive
+            g.setColour(StepButtonConstants::emptyStepColor);
+            g.fillRoundedRectangle(bounds, cornerRadius);
+        }
+    }
+
+    void mouseDown(const juce::MouseEvent& event) override {
+        if (event.mods.isLeftButtonDown()) {
+            int absoluteStepIndex = getAbsoluteStepIndex();
+            if (absoluteStepIndex < 64 && onStepClicked) {
+                onStepClicked(absoluteStepIndex);
+            }
+        }
+    }
+
+    void onStateChanged() override {
+        // Repaint when any subscribed parameter changes
+        repaint();
+    }
+
+private:
+    void drawNoteText(juce::Graphics& g, const juce::Rectangle<float>& bounds, int midiNote, bool isSelected) {
+        using namespace StepButtonConstants;
+
+        // Convert MIDI note to note name (e.g., "C4", "Gb3")
+        juce::String noteName = MusicConstants::midiNoteToNoteName(midiNote);
+
+        // Text color: always black (works on both white selected and colored note backgrounds)
+        g.setColour(isSelected ? textColorOnSelected : textColorOnNote);
+
+        // Load Inter font
+        auto interFont = juce::Typeface::createSystemTypefaceFor(
+            BinaryData::InterVariableFont_ttf,
+            BinaryData::InterVariableFont_ttfSize);
+        g.setFont(juce::FontOptions(interFont).withHeight(fontSize));
+
+        // Center the text
+        g.drawText(noteName, bounds, juce::Justification::centred, false);
+    }
+
+    void drawActiveCircle(juce::Graphics& g, const juce::Rectangle<float>& bounds, int stepIndex) {
+        using namespace StepButtonConstants;
+
+        // Draw black circle with white text showing step number
+        float circleDiameter = activeCircleRadius * 2.0f;
+        float circleX = bounds.getCentreX() - activeCircleRadius;
+        float circleY = bounds.getCentreY() - activeCircleRadius;
+
+        juce::Rectangle<float> circleBounds(circleX, circleY, circleDiameter, circleDiameter);
+
+        // Draw black circle
+        g.setColour(juce::Colours::black);
+        g.fillEllipse(circleBounds);
+
+        // Draw white text (step number 1-64)
+        g.setColour(juce::Colours::white);
+
+        // Load Inter font
+        auto interFont = juce::Typeface::createSystemTypefaceFor(
+            BinaryData::InterVariableFont_ttf,
+            BinaryData::InterVariableFont_ttfSize);
+        g.setFont(juce::FontOptions(interFont).withHeight(fontSize));
+
+        g.drawText(juce::String(stepIndex + 1), circleBounds, juce::Justification::centred, false);
+    }
+
+    int localIndex_;  // 0-7 (fixed, never changes)
+    MidiControlId midiControlId_ = MidiControlId::COUNT;
+};
+
+
