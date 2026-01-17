@@ -501,6 +501,267 @@ All we are doing is loading and saving state as xml.
 ...
 
 
+## MIDI Mapping System
+
+The MIDI mapping system allows users to control any UI element via MIDI CC or Note messages through a "MIDI Learn" interface.
+
+### Architecture Overview
+
+```mermaid
+classDiagram
+    class PluginProcessor {
+        -MidiLearnRegistry midiLearnRegistry
+        -SequenceState state
+        -Sequence sequence
+        +processBlock(buffer, midiMessages)
+        +processMidiInput(midiMessages)
+        +handleMidiMapping(mapping, value, isOn)
+    }
+
+    class MidiLearnRegistry {
+        -unordered_map~MidiMessageIdentifier, MidiControlId~ userMappings
+        -unordered_map~MidiControlId, MappableControlInfo~ controls
+        -bool isInLearnMode
+        -MidiControlId currentLearningControlId
+        +enterLearnMode()
+        +exitLearnMode()
+        +setLearningControl(controlId)
+        +learnMidiMessage(type, channel, number) bool
+        +findUserMapping(type, channel, number) MidiControlId
+        +toXml() XmlElement
+        +fromXml(xml)
+    }
+
+    class MidiMapping {
+        <<struct>>
+        +MidiMessageType type
+        +int midiNumber
+        +MidiControlId controlId
+        +float minValue
+        +float maxValue
+        +bool invert
+    }
+
+    class MidiControlId {
+        <<enum>>
+        SCALE_NOTE_C
+        SCALE_NOTE_Db
+        OCTAVE_SLIDER
+        NOTE_SLIDER
+        PROBABILITY_SLIDER
+        STEP_0 to STEP_7
+        BUTTON_ROLL
+        BUTTON_PAGE_LEFT
+        SUBSEQ_BAR_0 to SUBSEQ_BAR_7
+        CC_LANE_0_VALUE to CC_LANE_6_VALUE
+        GRID_STEP_0 to GRID_STEP_63
+        COUNT
+    }
+
+    class MidiMessageIdentifier {
+        <<struct>>
+        +MidiMessageType type
+        +int channel
+        +int number
+        +toString() String
+        +operator==(other) bool
+    }
+
+    class MidiValueConverter {
+        <<utility>>
+        +midiToNormalized(value) float
+        +midiToScaled(value, min, max, invert) float
+        +midiToBoolean(value) bool
+        +midiToDiscreteIndex(value, numSteps) int
+    }
+
+    class SequenceState {
+        -AudioProcessorValueTreeState& apvts
+        +getSelectedStepForEditing() int
+        +setSelectedStepForEditing(step)
+        +getCurrentNoteForStep(step) int
+        +updateCurrentNoteForStep(step, note)
+        +setProbabilityPercentage(percent)
+        +getScaleNoteState(noteIndex) bool
+        +setScaleNoteState(noteIndex, enabled)
+    }
+
+    class MappableControlInfo {
+        <<struct>>
+        +MidiControlId controlId
+        +Rectangle~int~ bounds
+        +String displayName
+        +bool isActive
+    }
+
+    PluginProcessor *-- MidiLearnRegistry
+    PluginProcessor *-- SequenceState
+    MidiLearnRegistry o-- MidiMapping
+    MidiLearnRegistry o-- MidiMessageIdentifier
+    MidiLearnRegistry o-- MappableControlInfo
+    MidiMapping --> MidiControlId
+    MidiMapping --> MidiValueConverter
+    PluginProcessor --> MidiValueConverter
+```
+
+### MIDI Learn Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as UI Component
+    participant Registry as MidiLearnRegistry
+    participant Processor as PluginProcessor
+    participant State as SequenceState
+
+    Note over User,State: MIDI Learn Setup Phase
+    User->>UI: Clicks "MIDI Learn" button
+    UI->>Registry: enterLearnMode()
+    Registry->>Registry: isInLearnMode = true
+
+    User->>UI: Clicks on Octave Slider
+    UI->>Registry: setLearningControl(OCTAVE_SLIDER)
+    Registry->>Registry: currentLearningControlId = OCTAVE_SLIDER
+
+    User->>Processor: Wiggles MIDI controller (CC 10)
+    Note over Processor: Audio Thread
+    Processor->>Processor: processBlock() receives MIDI
+    Processor->>Processor: processMidiInput(midiMessages)
+    Processor->>Registry: isLearning()?
+    Registry-->>Processor: true
+    Processor->>Registry: learnMidiMessage(CC, 1, 10)
+    Registry->>Registry: userMappings[{CC,1,10}] = OCTAVE_SLIDER
+    Registry-->>Processor: true (learned)
+    Processor->>UI: onMidiLearned callback
+    UI->>UI: Update UI to show mapping
+
+    Note over User,State: MIDI Control Phase
+    User->>Processor: Turns MIDI controller (CC 10 = 64)
+    Note over Processor: Audio Thread
+    Processor->>Processor: processBlock() receives MIDI
+    Processor->>Processor: processMidiInput(midiMessages)
+    Processor->>Registry: findUserMapping(CC, 1, 10)
+    Registry-->>Processor: OCTAVE_SLIDER
+    Processor->>Processor: handleMidiMapping(mapping, 64, true)
+    Processor->>State: updateCurrentNoteForStep(step, newNote)
+    State->>State: Update APVTS parameter
+    Processor->>UI: onSequenceTick callback
+    UI->>UI: Read state and repaint
+```
+
+### MIDI Input Processing Flow
+
+```mermaid
+flowchart TD
+    Start([MIDI Message Arrives]) --> ProcessBlock[processBlock called]
+    ProcessBlock --> ProcessInput[processMidiInput]
+
+    ProcessInput --> CheckType{Message Type?}
+    CheckType -->|CC| ParseCC[Parse CC number & value]
+    CheckType -->|Note| ParseNote[Parse note number & on/off]
+
+    ParseCC --> LearnModeCC{In Learn Mode?}
+    ParseNote --> LearnModeNote{In Learn Mode?}
+
+    LearnModeCC -->|Yes| LearnCC[learnMidiMessage]
+    LearnModeCC -->|No| LookupCC[findUserMapping]
+
+    LearnModeNote -->|Yes| LearnNote[learnMidiMessage]
+    LearnModeNote -->|No| LookupNote[findUserMapping]
+
+    LearnCC --> StoreMapping[Store in userMappings map]
+    LearnNote --> StoreMapping
+    StoreMapping --> CallbackLearn[Call onMidiLearned]
+    CallbackLearn --> End([Done])
+
+    LookupCC --> FoundCC{Mapping Found?}
+    LookupNote --> FoundNote{Mapping Found?}
+
+    FoundCC -->|No| End
+    FoundNote -->|No| End
+
+    FoundCC -->|Yes| CreateMapping[Create MidiMapping struct]
+    FoundNote -->|Yes| CreateMapping
+
+    CreateMapping --> HandleMapping[handleMidiMapping]
+
+    HandleMapping --> Switch{Switch on controlId}
+
+    Switch -->|OCTAVE_SLIDER| ConvertOctave[Convert MIDI to octave 0-9]
+    Switch -->|NOTE_SLIDER| ConvertNote[Convert MIDI to pitch class 0-11]
+    Switch -->|PROBABILITY_SLIDER| ConvertProb[Convert MIDI to 0-100%]
+    Switch -->|STEP_0-7| SelectStep[Calculate absolute step index]
+    Switch -->|BUTTON_ROLL| ToggleRandom[Toggle random mode]
+    Switch -->|SCALE_NOTE_*| ToggleScale[Toggle scale note on/off]
+    Switch -->|CC_LANE_*| UpdateCC[Update CC lane value]
+    Switch -->|Other| OtherControl[Handle other controls...]
+
+    ConvertOctave --> UpdateState[Update SequenceState]
+    ConvertNote --> UpdateState
+    ConvertProb --> UpdateState
+    SelectStep --> UpdateState
+    ToggleRandom --> UpdateState
+    ToggleScale --> UpdateState
+    UpdateCC --> UpdateState
+    OtherControl --> UpdateState
+
+    UpdateState --> TriggerUI[Call onSequenceTick]
+    TriggerUI --> UIUpdate[UI reads state & repaints]
+    UIUpdate --> End
+
+    style Start fill:#e1f5ff
+    style End fill:#e1f5ff
+    style LearnCC fill:#fff4e1
+    style LearnNote fill:#fff4e1
+    style StoreMapping fill:#fff4e1
+    style UpdateState fill:#e1ffe1
+    style UIUpdate fill:#e1ffe1
+```
+
+### Data Structures
+
+**User Mappings Storage:**
+```cpp
+// Key: MIDI message identifier (type, channel, number)
+// Value: Control ID to trigger
+std::unordered_map<MidiMessageIdentifier, MidiControlId> userMappings;
+
+// Example entries:
+// { {CC, 1, 10} → OCTAVE_SLIDER }
+// { {CC, 1, 11} → NOTE_SLIDER }
+// { {NOTE, 1, 36} → BUTTON_ROLL }
+```
+
+**Reverse Lookup (for UI display):**
+```cpp
+// Key: Control ID
+// Value: MIDI message assigned to it
+std::unordered_map<MidiControlId, MidiMessageIdentifier> controlToMidi;
+```
+
+### Thread Safety
+
+- **MIDI Learn State**: Modified on audio thread, read on UI thread
+- **User Mappings**: Written during learn (audio thread), read during playback (audio thread)
+- **UI Updates**: `onMidiLearned` callback uses `AsyncUpdater` for thread-safe UI updates
+- **State Changes**: All state modifications go through `SequenceState` which wraps APVTS (thread-safe)
+
+### Persistence
+
+User mappings are saved to XML in the plugin state:
+
+```xml
+<MidiLearnRegistry>
+  <Mapping type="0" channel="1" number="10" controlId="45"/>
+  <Mapping type="0" channel="1" number="11" controlId="46"/>
+  <Mapping type="1" channel="1" number="36" controlId="55"/>
+</MidiLearnRegistry>
+```
+
+This is automatically saved/loaded via `getStateInformation()` / `setStateInformation()`.
+
+---
+
 ## Source Code Review Checklist
 
 ### Main Plugin Files
