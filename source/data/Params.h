@@ -42,6 +42,7 @@ namespace Params
             inline const String SEQ_IS_RANDOM = "seq_is_random";
             inline const String SEQ_IS_SHIFT = "seq_is_shift";
             inline const String SEQ_LAST_PROB_INDEX = "seq_last_prob_index";
+            inline const String SEQ_VIEW_WINDOW_START = "seq_view_window_start";
 
             // Play probability array (64 bools)
             inline String playProbability(int index) {
@@ -168,6 +169,7 @@ namespace Params
             inline const String SEQ_SELECTED_STEP = "Selected Step";
             inline const String SEQ_IS_RANDOM = "Random Mode";
             inline const String SEQ_IS_SHIFT = "Shift Mode";
+            inline const String SEQ_VIEW_WINDOW_START = "View Window Start";
 
             inline String playProbability(int index) {
                 return "Probability " + String(index);
@@ -286,6 +288,7 @@ namespace Params
         params.push_back(createBoolParam(Keys::ID::SEQ_IS_RANDOM, Keys::LABEL::SEQ_IS_RANDOM, false));
         params.push_back(createBoolParam(Keys::ID::SEQ_IS_SHIFT, Keys::LABEL::SEQ_IS_SHIFT, false));
         params.push_back(createIntParam(Keys::ID::SEQ_LAST_PROB_INDEX, "Last Prob Index", -1, 63, -1));
+        params.push_back(createIntParam(Keys::ID::SEQ_VIEW_WINDOW_START, Keys::LABEL::SEQ_VIEW_WINDOW_START, 0, 56, 0));
 
         // Play probability array (64 bools, default all true = 100% probability)
         for (int i = 0; i < ParamConstants::MAX_STEPS; ++i) {

@@ -68,9 +68,12 @@ public:
     void paint (juce::Graphics& g) override {
         using namespace SequencerStepsConstants;
 
+        // Get window start from APVTS
+        int windowStart = getState().getViewWindowStart();
+
         // Draw each visible step
         for (int i = 0; i < numVisibleSteps; i++) {
-            int stepIndex = windowStartIndex + i;
+            int stepIndex = windowStart + i;
             if (stepIndex >= 64) break; // Don't draw beyond sequence length
 
             drawStep (g, i, stepIndex, stepSize, gap);
@@ -115,19 +118,17 @@ public:
 
     /**
      * Set the window start position (0-56, to show steps 0-7 through 56-63)
+     * This writes to APVTS - the observer pattern will trigger repaint automatically.
      */
     void setWindowStart (int startIndex) {
-        if (startIndex >= 0 && startIndex <= 56 && windowStartIndex != startIndex) {
-            windowStartIndex = startIndex;
-            repaint();
-        }
+        getState().setViewWindowStart(startIndex);
     }
 
     /**
      * Get the window start index
      */
     int getWindowStart() const {
-        return windowStartIndex;
+        return getState().getViewWindowStart();
     }
 
     /**
@@ -283,7 +284,8 @@ private:
 
         int visibleIndex = static_cast<int>(event.position.x / stepPlusGap);
         if (visibleIndex >= 0 && visibleIndex < numVisibleSteps) {
-            int stepIndex = windowStartIndex + visibleIndex;
+            int windowStart = getState().getViewWindowStart();
+            int stepIndex = windowStart + visibleIndex;
             if (stepIndex < 64 && onStepClicked) {
                 onStepClicked (stepIndex);
             }
@@ -310,7 +312,6 @@ private:
     juce::Typeface::Ptr interFont;
     int activeStepIndex = -1; // -1 means no active step (playback position), 0-63 for sequence steps
     int selectedStepIndex = 0; // Which step is selected for editing (0-63)
-    int windowStartIndex = 0; // Which step is at the left edge of the window (0-56)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SequencerStepsComponent)
 };

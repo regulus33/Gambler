@@ -874,36 +874,34 @@ void PluginProcessor::togglePlayPause() {
     if (currentState == SequencerState::Stopped) {
         // Stopped → Playing: Reset to step 0 and start
         getState().reset();
-        sequencerState.store(SequencerState::Playing);
+        sequencerState.store (SequencerState::Playing);
 
         // Start the internal clock if in internal mode
         if (clock.getMode() == ClockMode::INTERNAL) {
             clock.start();
         }
 
-        DBG("Sequencer started from stopped (index reset to 0)");
-    }
-    else if (currentState == SequencerState::Playing) {
+        DBG ("Sequencer started from stopped (index reset to 0)");
+    } else if (currentState == SequencerState::Playing) {
         // Playing → Paused: Hold at current index
-        sequencerState.store(SequencerState::Paused);
+        sequencerState.store (SequencerState::Paused);
 
-        DBG("Sequencer paused at index " << getState().getCurrentIndex());
-    }
-    else if (currentState == SequencerState::Paused) {
+        DBG ("Sequencer paused at index " << getState().getCurrentIndex());
+    } else if (currentState == SequencerState::Paused) {
         // Paused → Playing: Resume from current index
-        sequencerState.store(SequencerState::Playing);
+        sequencerState.store (SequencerState::Playing);
 
         // Make sure internal clock is running if in internal mode
         if (clock.getMode() == ClockMode::INTERNAL) {
             clock.start();
         }
 
-        DBG("Sequencer resumed from index " << getState().getCurrentIndex());
+        DBG ("Sequencer resumed from index " << getState().getCurrentIndex());
     }
 }
 
 void PluginProcessor::stopSequencer() {
-    sequencerState.store(SequencerState::Stopped);
+    sequencerState.store (SequencerState::Stopped);
 
     // Reset sequence to step 0
     getState().reset();
@@ -915,11 +913,11 @@ void PluginProcessor::stopSequencer() {
 
     // Send note off for any playing note
     if (lastPlayedNote >= 0) {
-        auto noteOff = juce::MidiMessage::noteOff(1, lastPlayedNote, (juce::uint8)0);
+        auto noteOff = juce::MidiMessage::noteOff (1, lastPlayedNote, (juce::uint8) 0);
 
         // Send to MIDI output if available (standalone mode)
         if (midiOutput) {
-            midiOutput->sendMessageNow(noteOff);
+            midiOutput->sendMessageNow (noteOff);
         }
 
         lastPlayedNote = -1;
@@ -929,7 +927,7 @@ void PluginProcessor::stopSequencer() {
     scheduledNoteOffSample = -1;
     scheduledNoteOffNote = -1;
 
-    DBG("Sequencer stopped and reset to step 0");
+    DBG ("Sequencer stopped and reset to step 0");
 }
 
 //==============================================================================
@@ -1029,29 +1027,22 @@ void PluginProcessor::processMidiInput (const juce::MidiBuffer& midiMessages) {
                 }
             }
 
-            // Check user mappings first (higher priority than defaults)
-            MidiControlId userControlId = midiLearnRegistry.findUserMapping (
+            // Look up user mapping
+            MidiControlId controlId = midiLearnRegistry.findUserMapping (
                 MidiMessageType::CC, channel, ccNumber);
 
-            if (userControlId != MidiControlId::COUNT) {
+            if (controlId != MidiControlId::COUNT) {
                 // User mapping found - create temporary mapping struct
-                MidiMapping userMapping;
-                userMapping.type = MidiMessageType::CC;
-                userMapping.midiNumber = ccNumber;
-                userMapping.controlId = userControlId;
-                userMapping.minValue = 0.0f;
-                userMapping.maxValue = 1.0f;
-                userMapping.invert = false;
+                MidiMapping mapping;
+                mapping.type = MidiMessageType::CC;
+                mapping.midiNumber = ccNumber;
+                mapping.controlId = controlId;
+                mapping.minValue = 0.0f;
+                mapping.maxValue = 1.0f;
+                mapping.invert = false;
 
-                DBG ("MIDI CC " << ccNumber << " (user) = " << ccValue << " → " << getMidiControlName (userControlId));
-                handleMidiMapping (userMapping, ccValue, ccValue >= 64);
-            } else {
-                // Fall back to hardcoded default mappings
-                const MidiMapping* mapping = midiMappingManager.findCCMapping (ccNumber);
-                if (mapping) {
-                    DBG ("MIDI CC " << ccNumber << " (default) = " << ccValue << " → " << getMidiControlName (mapping->controlId));
-                    handleMidiMapping (*mapping, ccValue, ccValue >= 64);
-                }
+                DBG ("MIDI CC " << ccNumber << " = " << ccValue << " → " << getMidiControlName (controlId));
+                handleMidiMapping (mapping, ccValue, ccValue >= 64);
             }
         }
         // Process Note On/Off messages
@@ -1077,31 +1068,23 @@ void PluginProcessor::processMidiInput (const juce::MidiBuffer& midiMessages) {
                 }
             }
 
-            // Check user mappings first (higher priority than defaults)
-            MidiControlId userControlId = midiLearnRegistry.findUserMapping (
+            // Look up user mapping
+            MidiControlId controlId = midiLearnRegistry.findUserMapping (
                 MidiMessageType::NOTE, channel, noteNumber);
 
-            if (userControlId != MidiControlId::COUNT) {
+            if (controlId != MidiControlId::COUNT) {
                 // User mapping found
-                MidiMapping userMapping;
-                userMapping.type = MidiMessageType::NOTE;
-                userMapping.midiNumber = noteNumber;
-                userMapping.controlId = userControlId;
-                userMapping.minValue = 0.0f;
-                userMapping.maxValue = 1.0f;
-                userMapping.invert = false;
+                MidiMapping mapping;
+                mapping.type = MidiMessageType::NOTE;
+                mapping.midiNumber = noteNumber;
+                mapping.controlId = controlId;
+                mapping.minValue = 0.0f;
+                mapping.maxValue = 1.0f;
+                mapping.invert = false;
 
-                DBG ("MIDI Note " << noteNumber << " (user) " << (isNoteOn ? "ON" : "OFF") << " → " << getMidiControlName (userControlId));
+                DBG ("MIDI Note " << noteNumber << " " << (isNoteOn ? "ON" : "OFF") << " → " << getMidiControlName (controlId));
                 int value = isNoteOn ? 127 : 0;
-                handleMidiMapping (userMapping, value, isNoteOn);
-            } else {
-                // Fall back to hardcoded default mappings
-                const MidiMapping* mapping = midiMappingManager.findNoteMapping (noteNumber);
-                if (mapping) {
-                    DBG ("MIDI Note " << noteNumber << " (default) " << (isNoteOn ? "ON" : "OFF") << " → " << getMidiControlName (mapping->controlId));
-                    int value = isNoteOn ? 127 : 0;
-                    handleMidiMapping (*mapping, value, isNoteOn);
-                }
+                handleMidiMapping (mapping, value, isNoteOn);
             }
         }
     }
@@ -1112,7 +1095,10 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
 
     // Convert MIDI value using the mapping's conversion settings
     float normalizedValue = MidiValueConverter::midiToScaled (
-        midiValue, mapping.minValue, mapping.maxValue, mapping.invert);
+        midiValue,
+        mapping.minValue,
+        mapping.maxValue,
+        mapping.invert);
 
     // Handle each control type
     switch (mapping.controlId) {
@@ -1239,7 +1225,14 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
         case MidiControlId::STEP_7: {
             if (isNoteOnOrCCPositive) {
                 int localStepIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::STEP_0);
-                DBG ("  → Step " << localStepIndex << " clicked");
+                int windowStart = state.getViewWindowStart();
+                int absoluteStep = windowStart + localStepIndex;
+                if (absoluteStep < state.getLength()) {
+                    state.setSelectedStepForEditing (absoluteStep);
+                    DBG ("  → Step " << absoluteStep << " selected for editing (window " << localStepIndex << ")");
+                }
+                if (onSequenceTick)
+                    onSequenceTick();
             }
             break;
         }

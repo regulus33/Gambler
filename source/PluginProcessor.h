@@ -3,7 +3,7 @@
 #include "backend/Clock.h"
 #include "backend/DawSync.h"
 #include "backend/MidiLearnRegistry.h"
-#include "backend/MidiMappingManager.h"
+
 #include "backend/MidiUIUpdateCallbacks.h"
 #include "backend/PresetManager.h"
 #include "backend/ProcessorCommand.h"
@@ -247,9 +247,6 @@ private:
 
     // Command queue for thread-safe UI → Audio communication
     ProcessorCommandQueue commandQueue;
-
-    // MIDI mapping manager for MIDI input control
-    MidiMappingManager midiMappingManager;
 
     // MIDI learn registry for user-configurable mappings
     MidiLearnRegistry midiLearnRegistry;

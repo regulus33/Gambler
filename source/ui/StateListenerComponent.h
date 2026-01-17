@@ -125,6 +125,7 @@ protected:
         listenToParameter(Params::Keys::ID::SEQ_LENGTH);
         listenToParameter(Params::Keys::ID::SEQ_CURRENT_INDEX);
         listenToParameter(Params::Keys::ID::SEQ_SELECTED_STEP);
+        listenToParameter(Params::Keys::ID::SEQ_VIEW_WINDOW_START);
     }
 
     /**

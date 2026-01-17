@@ -102,7 +102,16 @@ public:
     void setLastProbabilityIndex(int index) {
         setIntParam(Params::Keys::ID::SEQ_LAST_PROB_INDEX, index);
     }
-    
+
+    int getViewWindowStart() const {
+        return getIntParam(Params::Keys::ID::SEQ_VIEW_WINDOW_START);
+    }
+
+    void setViewWindowStart(int startIndex) {
+        setIntParam(Params::Keys::ID::SEQ_VIEW_WINDOW_START,
+            juce::jlimit(0, 56, startIndex));
+    }
+
     // ========================================
     // PLAY PROBABILITY
     // ========================================
