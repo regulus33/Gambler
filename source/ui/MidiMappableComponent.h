@@ -76,21 +76,21 @@ public:
         // Determine if this control is currently being learned
         bool isLearningThisControl = (registry->getLearningControl() == controlId);
 
-        // Semi-transparent blue rectangle
-        auto overlayColor = juce::Colour(0x4080CCFF);  // Blue with ~25% opacity
+        // Semi-transparent blue rectangle (40% opacity)
+        auto overlayColor = juce::Colour(0x6680CCFF);  // Blue with ~40% opacity (was 25%)
         g.setColour(overlayColor);
         g.fillRect(bounds);
 
-        // White border if actively learning
+        // Yellow/gold border if actively learning (thick stroke)
         if (isLearningThisControl) {
-            g.setColour(juce::Colours::white);
-            g.drawRect(bounds, 3);  // 3px stroke
+            g.setColour(juce::Colour(0xFFFFD700));  // Yellow/gold
+            g.drawRect(bounds, 4);  // 4px stroke (was 3px)
         }
 
-        // Display MIDI mapping info (if mapped)
+        // Display MIDI mapping info (if mapped) in yellow
         const auto* midiId = registry->getMidiForControl(controlId);
         if (midiId) {
-            g.setColour(juce::Colours::white);
+            g.setColour(juce::Colour(0xFFFFD700));  // Yellow/gold (was white)
             g.setFont(9.0f);
             g.drawText(midiId->toString(),
                       bounds,

@@ -439,6 +439,9 @@ private:
         // Add sequencer steps component
         addAndMakeVisible(sequencerSteps);
 
+        // Wire up MIDI learn registry for step buttons
+        sequencerSteps.setRegistry(&processorRef.getMidiLearnRegistry());
+
         // Setup callback for step clicks - set current index and trigger MIDI
         sequencerSteps.onStepClicked = [this](int stepIndex) {
             // Trigger MIDI for this step (also sets current index via queued command)

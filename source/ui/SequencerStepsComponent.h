@@ -110,6 +110,16 @@ public:
         return nullptr;
     }
 
+    /**
+     * Set the MIDI learn registry for all step buttons
+     */
+    void setRegistry(MidiLearnRegistry* registry) {
+        using namespace SequencerStepsConstants;
+        for (int i = 0; i < numVisibleSteps; i++) {
+            stepButtons_[i]->setRegistry(registry);
+        }
+    }
+
 private:
     // ========================================
     // StateListenerComponent implementation
