@@ -88,32 +88,34 @@ private:
 
 SCENARIO("User clicks a step button and state updates", "[e2e][steps]") {
     GamblerTestInitialiser juceInit;
-
+    // Plugin
     GIVEN("A fresh plugin instance") {
         PluginTestFixture fixture;
         auto& state = fixture.getState();
+        auto& mainScreen = fixture.getMainScreen();
 
         // Initial state: selected step should be 0
         REQUIRE(state.getSelectedStepForEditing() == 0);
 
         WHEN("User clicks step button at index 3") {
-            // Get the sequencer steps component
-            auto& mainScreen = fixture.getMainScreen();
-            // The step buttons are inside SequencerStepsComponent
-            // We simulate the click by calling the callback directly
+            // Get the actual step button component from the UI hierarchy
+            auto& sequencerSteps = mainScreen.getSequencerSteps();
+            auto* stepButton = sequencerSteps.getStepButton(3); // Local index 3 = absolute step 3 (window starts at 0)
+            REQUIRE(stepButton != nullptr);
 
-            // First, we need to access the step button's click handler
-            // In the real UI, clicking triggers onStepClicked callback
-            // which calls processorRef.triggerStepMidi(stepIndex)
-
-            // Simulate what happens when step 3 is clicked:
-            fixture.getProcessor().triggerStepMidi(3);
+            // Simulate a click by invoking the button's onStepClicked callback
+            // This is what mouseDown() does internally after checking for MIDI learn mode
+            // The callback is wired up in SequencerStepsComponent to forward to MainScreenComponent
+            REQUIRE(stepButton->onStepClicked != nullptr);
+            stepButton->onStepClicked(stepButton->getAbsoluteStepIndex());
 
             // Process messages to let async updates propagate
             fixture.processMessages();
 
             THEN("The selected step for editing should be 3") {
-                // Note: triggerStepMidi sets the selected step
+                // The click flows through: StepButton.onStepClicked callback
+                // -> SequencerStepsComponent.onStepClicked -> MainScreenComponent.setupSequencerCallbacks
+                // -> processorRef.triggerStepMidi(stepIndex) -> state.setSelectedStepForEditing(stepIndex)
                 REQUIRE(state.getSelectedStepForEditing() == 3);
             }
         }
@@ -125,27 +127,47 @@ SCENARIO("User changes note via note controls", "[e2e][notes]") {
 
     GIVEN("A plugin with step 0 selected") {
         PluginTestFixture fixture;
-        auto& state = fixture.getState();
+        auto& processor = fixture.getProcessor();
+        auto& state = processor.getState();
+        auto& mainScreen = fixture.getMainScreen();
 
-        // Set initial note to C4 (MIDI 60)
+        // Ensure step 0 is selected and set initial note to C5 (MIDI 60)
+        state.setSelectedStepForEditing(0);
         state.setStepNote(0, 0, 60);
-        REQUIRE(state.getStepNote(0, 0) == 60);
+        fixture.processMessages();
 
-        WHEN("User changes the note to E (pitch class 4) via note controls callback") {
-            // Simulate what the NoteControlsComponent callback does:
-            // It calculates new note = currentOctave * 12 + pitchClass
-            int selectedStep = state.getSelectedStepForEditing();
-            int currentNote = state.getCurrentNoteForStep(selectedStep);
-            int currentOctave = currentNote / 12;  // 60 / 12 = 5
-            int newPitchClass = 4;  // E
-            int newNote = currentOctave * 12 + newPitchClass;  // 5 * 12 + 4 = 64
+        int initialNote = state.getCurrentNoteForStep(0);
+        int initialOctave = initialNote / 12;
+        INFO("Initial note: " << initialNote << " (octave " << initialOctave << ")");
 
-            state.updateCurrentNoteForStep(selectedStep, newNote);
+        WHEN("User changes the note slider to E (index 4)") {
+            // Get the actual note slider from the UI hierarchy
+            auto& noteControls = mainScreen.getMainControls().getNoteControls();
 
+            // Set the note slider value - this triggers onValueChange -> onNoteChanged callback
+            // which flows through MainScreenComponent to update the state
+            noteControls.getNoteSlider().getSlider().setValue(4.0, juce::sendNotification);
             fixture.processMessages();
 
-            THEN("The note should be E4 (MIDI 64)") {
-                REQUIRE(state.getCurrentNoteForStep(0) == 64);
+            THEN("The note should be E at the same octave") {
+                int resultNote = state.getCurrentNoteForStep(0);
+                REQUIRE(resultNote % 12 == 4); // Pitch class E
+                REQUIRE(resultNote / 12 == initialOctave); // Same octave
+            }
+        }
+
+        WHEN("User changes the octave slider to octave 6") {
+            auto& noteControls = mainScreen.getMainControls().getNoteControls();
+            int initialPitchClass = initialNote % 12;
+
+            // Set the octave slider value - this triggers onValueChange -> onOctaveChanged callback
+            noteControls.getOctaveSlider().getSlider().setValue(6.0, juce::sendNotification);
+            fixture.processMessages();
+
+            THEN("The note should be at octave 6 with the same pitch class") {
+                int resultNote = state.getCurrentNoteForStep(0);
+                REQUIRE(resultNote / 12 == 6); // Octave 6
+                REQUIRE(resultNote % 12 == initialPitchClass); // Same pitch class
             }
         }
     }

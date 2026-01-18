@@ -173,6 +173,10 @@ public:
         noteSlider.setBounds (rightColumn);
     }
 
+    // Accessors for testing
+    NotchedSlider& getNoteSlider() { return noteSlider; }
+    NotchedSlider& getOctaveSlider() { return octaveSlider; }
+
 private:
     NotchedSlider octaveSlider;
     NotchedSlider noteSlider;

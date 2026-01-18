@@ -274,6 +274,9 @@ public:
         noteRangeControls.setBounds(noteRangeControlsX, noteRangeControlsY, noteRangeControlsWidth, noteRangeControlsHeight);
     }
 
+    // Accessor for testing
+    MainControlsComponent& getMainControls() { return mainControls; }
+
     // Helper to set active step and update piano roll
     void setActiveStepAndNote(int stepIndex) {
         if (stepIndex >= 0 && stepIndex < 64) {
@@ -384,6 +387,9 @@ public:
 
     // Accessors for navbar
     NavBarComponent& getNavBar() { return navBar; }
+
+    // Accessors for sequencer steps (for testing)
+    SequencerStepsComponent& getSequencerSteps() { return sequencerSteps; }
 
     // Callback for when async update is needed
     std::function<void()> onAsyncUpdateNeeded;
