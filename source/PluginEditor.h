@@ -24,6 +24,9 @@ public:
     // ComponentListener override - for constraining aspect ratio
     void componentMovedOrResized (juce::Component& component, bool wasMoved, bool wasResized) override;
 
+    // Access to the application component (for testing)
+    ApplicationComponent& getApplicationComponent() { return applicationComponent; }
+
 private:
     // Calculate scale factor based on current window size
     float getScaleFactor() const;

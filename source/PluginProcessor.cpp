@@ -1006,12 +1006,16 @@ void PluginProcessor::processMidiInput (const juce::MidiBuffer& midiMessages) {
 
         // Process CC messages
         if (msg.isController()) {
+            // get the control number
             int ccNumber = msg.getControllerNumber();
+            // get the control value
             int ccValue = msg.getControllerValue();
+            // get the channel
             int channel = msg.getChannel();
 
             // Check if we're in MIDI learn mode first
             if (midiLearnRegistry.isLearning()) {
+                // if we are learning then we need to assign this message to a "command"
                 bool learned = midiLearnRegistry.learnMidiMessage (
                     MidiMessageType::CC, channel, ccNumber);
                 if (learned) {
