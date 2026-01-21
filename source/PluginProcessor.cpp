@@ -680,13 +680,13 @@ void PluginProcessor::triggerStepMidi (int stepIndex) {
     int note = state.getCurrentNoteForStep (stepIndex);
 
     // Get step modulations from APVTS-backed state
-    std::vector<StepModulation> selectedMods;
+    std::vector<StepModulationData> selectedMods;
     for (int i = 0; i < ParamConstants::NUM_MODULATIONS; i++) {
         if (state.getStepModSelected (stepIndex, i)) {
-            StepModulation mod;
-            mod.setType (static_cast<ModulationType> (state.getStepModType (stepIndex, i)));
-            mod.setCCNumber (state.getStepModCCNum (stepIndex, i));
-            mod.setValue (state.getStepModValue (stepIndex, i));
+            StepModulationData mod;
+            mod.type = state.getStepModType (stepIndex, i);
+            mod.ccNumber = state.getStepModCCNum (stepIndex, i);
+            mod.value = state.getStepModValue (stepIndex, i);
             selectedMods.push_back (mod);
         }
     }
@@ -773,13 +773,13 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
     }
 
     // Get step modulations from APVTS-backed state
-    std::vector<StepModulation> selectedMods;
+    std::vector<StepModulationData> selectedMods;
     for (int i = 0; i < ParamConstants::NUM_MODULATIONS; i++) {
         if (state.getStepModSelected (selectedStep, i)) {
-            StepModulation mod;
-            mod.setType (static_cast<ModulationType> (state.getStepModType (selectedStep, i)));
-            mod.setCCNumber (state.getStepModCCNum (selectedStep, i));
-            mod.setValue (state.getStepModValue (selectedStep, i));
+            StepModulationData mod;
+            mod.type = state.getStepModType (selectedStep, i);
+            mod.ccNumber = state.getStepModCCNum (selectedStep, i);
+            mod.value = state.getStepModValue (selectedStep, i);
             selectedMods.push_back (mod);
         }
     }

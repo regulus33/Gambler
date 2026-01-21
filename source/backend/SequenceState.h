@@ -2,11 +2,27 @@
 
 #include "../data/Params.h"
 #include "Scale.h"
-#include "StepModulation.h"
+#include "ModulationType.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <array>
 #include <vector>
 #include <random>
+
+/**
+ * StepModulationData - Lightweight struct for step modulation data
+ * Used by SequenceState::getSelectedModulations()
+ */
+struct StepModulationData {
+    ModulationType type = ModulationType::CC;
+    int ccNumber = 1;
+    int value = 64;
+    bool selected = false;
+
+    ModulationType getType() const { return type; }
+    int getCCNumber() const { return ccNumber; }
+    int getValue() const { return value; }
+    bool isSelected() const { return selected; }
+};
 
 /**
  * SequenceState - APVTS-backed sequencer state accessor
@@ -245,11 +261,11 @@ public:
     /**
      * Get all selected modulations for a step
      */
-    std::vector<StepModulation> getSelectedModulations(int stepIndex) const {
-        std::vector<StepModulation> result;
+    std::vector<StepModulationData> getSelectedModulations(int stepIndex) const {
+        std::vector<StepModulationData> result;
         for (int i = 0; i < ParamConstants::NUM_MODULATIONS; i++) {
             if (getStepModSelected(stepIndex, i)) {
-                StepModulation mod;
+                StepModulationData mod;
                 mod.type = getStepModType(stepIndex, i);
                 mod.ccNumber = getStepModCCNum(stepIndex, i);
                 mod.value = getStepModValue(stepIndex, i);
