@@ -113,13 +113,8 @@ juce_add_plugin("${PROJECT_NAME}"
 # Without running into ODR violations
 add_library(SharedCode INTERFACE
         source/data/Params.h
-        source/backend/StepNote.h
-        source/backend/StepNotes.h
-        source/backend/StepModulation.h
-        source/backend/StepModulations.h
+        source/backend/ModulationType.h
         source/backend/Scale.h
-        source/backend/Step.h
-        source/backend/Sequence.h
         source/backend/ClockMode.h
         source/backend/InternalClock.h
         source/backend/Clock.h
