@@ -16,6 +16,7 @@
 
 #include "../source/PluginEditor.h"
 #include "../source/PluginProcessor.h"
+#include "helpers/test_helpers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -197,6 +198,147 @@ SCENARIO ("User toggles play/pause", "[e2e][transport]") {
                 THEN ("Sequencer should resume playing") {
                     REQUIRE (processor.getSequencerState() == PluginProcessor::SequencerState::Playing);
                 }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// NEW TEST: Sequence Length Change with Visual Snapshot
+// ============================================================================
+//
+// This test demonstrates:
+// 1. How to simulate a button click via APVTS parameter
+// 2. How to verify state changes
+// 3. How to use snapshot testing for visual regression
+//
+// The mental model:
+//
+//   User clicks "Length +" button
+//            ↓
+//   Button's mouseDown() sets LENGTH_PLUS param to 1.0
+//            ↓
+//   PluginProcessor::parameterChanged() receives callback
+//            ↓
+//   Processor calls state.increaseLength()
+//            ↓
+//   SequenceState updates SEQ_LENGTH param
+//            ↓
+//   UI components listening to SEQ_LENGTH repaint
+//            ↓
+//   We verify: state changed AND visual changed
+//
+// ============================================================================
+
+SCENARIO ("User clicks Length+ and sequence grows", "[e2e][length]") {
+    // ========================================================================
+    // LINE 1: Initialize JUCE's MessageManager
+    // ========================================================================
+    // JUCE UI components need the MessageManager to exist. This RAII class
+    // creates it on construction and destroys it when the test ends.
+    // Without this, any UI component creation will crash.
+    GamblerTestInitialiser juceInit;
+
+    GIVEN ("A plugin with default sequence length of 8") {
+        // ====================================================================
+        // LINE 2: Create the test fixture
+        // ====================================================================
+        // PluginTestFixture creates:
+        //   - A PluginProcessor (owns all state, APVTS, audio processing)
+        //   - A PluginEditor (owns all UI components)
+        // This mimics what happens when a DAW loads the plugin.
+        PluginTestFixture fixture;
+
+        // ====================================================================
+        // LINE 3: Get references to things we'll interact with
+        // ====================================================================
+        // We grab references to:
+        //   - processor: to access APVTS parameters (simulating button clicks)
+        //   - state: to verify state changes happened
+        //   - mainScreen: to access UI components for snapshots
+        auto& processor = fixture.getProcessor();
+        auto& state = fixture.getState();
+        auto& mainScreen = fixture.getMainScreen();
+
+        // ====================================================================
+        // LINE 4: Verify our starting assumption
+        // ====================================================================
+        // Always verify the precondition! If default length isn't 8,
+        // our test logic would be wrong.
+        int initialLength = state.getLength();
+        REQUIRE (initialLength == 8);  // Default sequence length
+
+        WHEN ("User clicks the Length+ button") {
+            // ================================================================
+            // LINE 5: Take a "before" snapshot for visual comparison
+            // ================================================================
+            // We snapshot the sequence overview grid (8x8 cells showing all 64 steps).
+            // This grid visually shows which steps are "active" (within length).
+            // After increasing length, more cells should be highlighted.
+            SnapshotTester snapshot ("length_plus_sequence_overview");
+            auto& sequenceOverview = mainScreen.getSequenceOverview();
+
+            // ================================================================
+            // LINE 6: Simulate the button click via APVTS parameter
+            // ================================================================
+            // Instead of calling button.mouseDown(), we set the parameter directly.
+            // This is actually MORE realistic because:
+            //   - It tests the same code path as MIDI controller input
+            //   - It tests the same code path as DAW automation
+            //   - The button's mouseDown() does exactly this internally
+            //
+            // getParameter() returns a RangedAudioParameter*
+            // setValueNotifyingHost(1.0f) = "button pressed" (true)
+            // setValueNotifyingHost(0.0f) = "button released" (false)
+            auto* lengthPlusParam = processor.getAPVTS().getParameter (
+                Params::Keys::ID::LENGTH_PLUS
+            );
+            REQUIRE (lengthPlusParam != nullptr);  // Param must exist
+
+            // Simulate press (this triggers the length increase)
+            lengthPlusParam->setValueNotifyingHost (1.0f);
+
+            // Simulate release (good practice, matches real button behavior)
+            lengthPlusParam->setValueNotifyingHost (0.0f);
+
+            // ================================================================
+            // LINE 7: Process pending messages
+            // ================================================================
+            // JUCE uses async message passing for UI updates. When a parameter
+            // changes, it posts a message to repaint components. We need to
+            // "pump" the message loop to let those updates happen.
+            // 50ms is usually enough for UI to settle.
+            fixture.processMessages (50);
+
+            THEN ("The sequence length should be 9") {
+                // ============================================================
+                // LINE 8: Verify the state change
+                // ============================================================
+                // This is the primary assertion: did the length actually increase?
+                REQUIRE (state.getLength() == initialLength + 1);
+            }
+
+            AND_THEN ("The sequence overview grid should visually update") {
+                // ============================================================
+                // LINE 9: Take "after" snapshot and compare
+                // ============================================================
+                // Capture the current visual state of the component.
+                // The grid should now show 9 active steps instead of 8.
+                snapshot.capture (sequenceOverview);
+
+                // Compare against the golden reference image.
+                // First run: creates the golden (test passes)
+                // Later runs: compares against golden (fails if different)
+                bool visuallyCorrect = snapshot.matches();
+
+                if (!visuallyCorrect) {
+                    // Save debug artifacts when test fails
+                    snapshot.saveFailureArtifacts();
+                    INFO ("Snapshot mismatch! Check tests/snapshots/ for diff images");
+                    INFO ("Pixels different: " << snapshot.getDifferenceCount());
+                }
+
+                REQUIRE (visuallyCorrect);
             }
         }
     }

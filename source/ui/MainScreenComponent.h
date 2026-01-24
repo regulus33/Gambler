@@ -388,8 +388,9 @@ public:
     // Accessors for navbar
     NavBarComponent& getNavBar() { return navBar; }
 
-    // Accessors for sequencer steps (for testing)
+    // Accessors for testing
     SequencerStepsComponent& getSequencerSteps() { return sequencerSteps; }
+    SequenceOverviewComponent& getSequenceOverview() { return sequenceOverview; }
 
     // Callback for when async update is needed
     std::function<void()> onAsyncUpdateNeeded;

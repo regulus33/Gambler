@@ -272,6 +272,45 @@ cmake --build build
 ./build/Gambler_artefacts/Standalone/Gambler.app/Contents/MacOS/Gambler
 ```
 
+#### VS Code Setup
+
+For a CLion-like experience in VS Code, install these extensions:
+
+- **CMake Tools** (`ms-vscode.cmake-tools`) - GUI building, target selection, debugging
+- **clangd** (`llvm-vs-code-extensions.vscode-clangd`) - Fast indexing and Go to Definition
+
+System dependencies (Ubuntu/Debian):
+```bash
+sudo apt install clangd ninja-build
+```
+
+**First-time setup:**
+```bash
+cmake -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+```
+
+**Building from the GUI:**
+- Use the status bar at the bottom of VS Code:
+  - Click the **Build** button (or press `F7`)
+  - Click the **target selector** to choose `Gambler2_Standalone`, `Gambler2_VST3`, etc.
+  - Click the **build variant** to switch between Debug/Release
+- Or use Command Palette (`Ctrl+Shift+P`):
+  - "CMake: Build" - build current target
+  - "CMake: Build Target" - pick a specific target
+  - "CMake: Set Build Target" - change default target
+
+**Go to Definition / Indexing:**
+- clangd uses `build/compile_commands.json` for indexing
+- First indexing may take a few minutes (JUCE is large)
+- Subsequent loads are fast due to background indexing
+- If intellisense breaks, run "CMake: Configure" to regenerate compile_commands.json
+
+**Tips:**
+- Disable Microsoft C++ IntelliSense when using clangd (VS Code should prompt you)
+- Use `Ctrl+Click` or `F12` for Go to Definition
+- Use `Ctrl+Shift+O` for symbol search in current file
+- Use `Ctrl+T` for workspace-wide symbol search
+
 ---
 
 ### File Organization
