@@ -33,9 +33,12 @@ class SequenceOverviewComponent : public StateListenerComponent {
 public:
     explicit SequenceOverviewComponent(PluginProcessor& processor)
         : StateListenerComponent(processor),
-          interBoldFont (juce::Typeface::createSystemTypefaceFor (
-              BinaryData::Inter_24ptBold_ttf,
-              BinaryData::Inter_24ptBold_ttfSize))
+          titleFont (juce::FontOptions (
+              juce::Typeface::createSystemTypefaceFor (
+                  BinaryData::Inter_24ptBold_ttf,
+                  BinaryData::Inter_24ptBold_ttfSize))
+              .withHeight (SequenceOverviewConstants::titleFontSize)
+              .withStyle ("Bold"))
     {
         addAndMakeVisible (sequenceGrid);
 
@@ -50,12 +53,6 @@ public:
     void paint (juce::Graphics& g) override {
         using namespace SequenceOverviewConstants;
         g.fillAll (juce::Colours::transparentBlack);
-
-        juce::Font titleFont;
-        if (interBoldFont != nullptr)
-            titleFont = juce::Font (interBoldFont);
-
-        titleFont.setHeight (titleFontSize);
 
         g.setFont (titleFont);
         g.setColour (juce::Colours::white);
@@ -97,7 +94,7 @@ protected:
     }
 
 private:
-    juce::Typeface::Ptr interBoldFont;
+    juce::Font titleFont;
     SequenceGrid sequenceGrid;
 };
 
