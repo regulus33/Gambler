@@ -86,6 +86,112 @@ private:
 // E2E Test Scenarios
 // ============================================================================
 
+SCENARIO ("User clicks piano keys to modify scale", "[e2e][piano-roll]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN ("A fresh plugin with default chromatic scale") {
+        PluginTestFixture fixture;
+        auto& state = fixture.getState();
+        auto& mainScreen = fixture.getMainScreen();
+        auto& pianoRoll = mainScreen.getPianoRoll();
+
+        // All 12 notes should be enabled by default (chromatic scale)
+        REQUIRE (pianoRoll.getSelectedNoteIndices().size() == 12);
+
+        WHEN ("User clicks C# to disable it") {
+            bool wasToggled = pianoRoll.TEST_simulateKeyClick(1);  // Db/C# is index 1
+            fixture.processMessages();
+
+            THEN ("C# is disabled and scale is updated in state") {
+                REQUIRE (wasToggled == true);
+
+                // Check UI state
+                auto* dbKey = pianoRoll.getKeyData(1);
+                REQUIRE (dbKey != nullptr);
+                REQUIRE (dbKey->isToggled == false);
+                REQUIRE (pianoRoll.getSelectedNoteIndices().size() == 11);
+
+                // Check backend state (APVTS)
+                auto scale = state.getScale();
+                REQUIRE (scale.getScaleNotes()[1] == 0);  // C# disabled
+            }
+        }
+
+        WHEN ("User creates a C major scale by disabling all black keys") {
+            // Disable: Db, Eb, Gb, Ab, Bb (indices 1, 3, 6, 8, 10)
+            pianoRoll.TEST_simulateKeyClick(1);
+            pianoRoll.TEST_simulateKeyClick(3);
+            pianoRoll.TEST_simulateKeyClick(6);
+            pianoRoll.TEST_simulateKeyClick(8);
+            pianoRoll.TEST_simulateKeyClick(10);
+            fixture.processMessages();
+
+            THEN ("Only white keys remain enabled") {
+                auto selectedNames = pianoRoll.getSelectedNoteNames();
+                REQUIRE (selectedNames.size() == 7);
+
+                // White keys should be present
+                REQUIRE (selectedNames.contains("C"));
+                REQUIRE (selectedNames.contains("D"));
+                REQUIRE (selectedNames.contains("E"));
+                REQUIRE (selectedNames.contains("F"));
+                REQUIRE (selectedNames.contains("G"));
+                REQUIRE (selectedNames.contains("A"));
+                REQUIRE (selectedNames.contains("B"));
+
+                // Black keys should not be present
+                REQUIRE_FALSE (selectedNames.contains("Db"));
+                REQUIRE_FALSE (selectedNames.contains("Eb"));
+                REQUIRE_FALSE (selectedNames.contains("Gb"));
+                REQUIRE_FALSE (selectedNames.contains("Ab"));
+                REQUIRE_FALSE (selectedNames.contains("Bb"));
+
+                // Backend state should match
+                auto scale = state.getScale();
+                auto scaleNotes = scale.getScaleNotes();
+                REQUIRE (scaleNotes[0] == 1);   // C
+                REQUIRE (scaleNotes[1] == 0);   // Db
+                REQUIRE (scaleNotes[2] == 1);   // D
+                REQUIRE (scaleNotes[3] == 0);   // Eb
+                REQUIRE (scaleNotes[4] == 1);   // E
+                REQUIRE (scaleNotes[5] == 1);   // F
+                REQUIRE (scaleNotes[6] == 0);   // Gb
+                REQUIRE (scaleNotes[7] == 1);   // G
+                REQUIRE (scaleNotes[8] == 0);   // Ab
+                REQUIRE (scaleNotes[9] == 1);   // A
+                REQUIRE (scaleNotes[10] == 0);  // Bb
+                REQUIRE (scaleNotes[11] == 1);  // B
+            }
+        }
+
+        WHEN ("User tries to disable the last remaining note") {
+            // Disable all notes except C
+            for (int i = 1; i < 12; i++) {
+                pianoRoll.TEST_simulateKeyClick(i);
+            }
+            fixture.processMessages();
+
+            // Verify only C remains
+            REQUIRE (pianoRoll.getSelectedNoteIndices().size() == 1);
+            REQUIRE (pianoRoll.getKeyData(0)->isToggled == true);
+
+            // Try to disable C (should be prevented)
+            bool wasToggled = pianoRoll.TEST_simulateKeyClick(0);
+            fixture.processMessages();
+
+            THEN ("Action is prevented and C remains enabled") {
+                REQUIRE (wasToggled == false);
+                REQUIRE (pianoRoll.getKeyData(0)->isToggled == true);
+                REQUIRE (pianoRoll.getSelectedNoteIndices().size() == 1);
+
+                // Backend state should still have C enabled
+                auto scale = state.getScale();
+                REQUIRE (scale.getScaleNotes()[0] == 1);
+            }
+        }
+    }
+}
+
 SCENARIO ("User clicks a step button and state updates", "[e2e][steps]") {
     GamblerTestInitialiser juceInit;
     // Plugin

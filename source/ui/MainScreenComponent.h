@@ -274,8 +274,9 @@ public:
         noteRangeControls.setBounds(noteRangeControlsX, noteRangeControlsY, noteRangeControlsWidth, noteRangeControlsHeight);
     }
 
-    // Accessor for testing
+    // Accessors for testing
     MainControlsComponent& getMainControls() { return mainControls; }
+    PianoRollComponent& getPianoRoll() { return pianoRoll; }
 
     // Helper to set active step and update piano roll
     void setActiveStepAndNote(int stepIndex) {

@@ -233,6 +233,36 @@ public:
     }
 
     /**
+     * Simulate clicking a key (for testing)
+     * @param keyIndex The index of the key to click (0-11)
+     * @return true if the key was toggled, false if action was prevented
+     */
+    bool TEST_simulateKeyClick(int keyIndex) {
+        if (keyIndex < 0 || keyIndex >= 12) return false;
+
+        bool wasToggled = tryToggleKey(keyIndex);
+        if (wasToggled) {
+            repaint();
+            if (onNoteChanged) {
+                onNoteChanged();
+            }
+        }
+        return wasToggled;
+    }
+
+    /**
+     * Get key data for testing/inspection
+     * @param keyIndex The index of the key (0-11)
+     * @return Pointer to KeyData, or nullptr if invalid index
+     */
+    const KeyData* getKeyData(int keyIndex) const {
+        if (keyIndex >= 0 && keyIndex < 12) {
+            return keys[keyIndex];
+        }
+        return nullptr;
+    }
+
+    /**
      * Callback when a note is toggled
      */
     std::function<void()> onNoteChanged;

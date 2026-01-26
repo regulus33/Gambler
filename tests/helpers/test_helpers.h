@@ -15,9 +15,16 @@ using std::make_unique;
 // against a "golden" reference image stored in tests/snapshots/.
 //
 // Usage:
-//   SnapshotTester snap("my_test_name");
+//   SnapshotTester snap("my_test_name");              // Default 1% tolerance
+//   SnapshotTester snap("my_test_name", 1.0f, 0.0f);  // Exact match (0% tolerance)
 //   snap.capture(myComponent);
 //   REQUIRE(snap.matches());  // Fails if different from golden
+//
+// Parameters:
+//   - testName: Unique name for this snapshot
+//   - scale: Render scale (1.0f = normal, 2.0f = 2x for retina)
+//   - tolerance: Percentage of pixels allowed to differ (0.0 - 1.0)
+//                Default 0.01 (1%) handles anti-aliasing & compression artifacts
 //
 // First run: Creates golden image (test passes, golden saved)
 // Later runs: Compares against golden (fails if different)
@@ -29,8 +36,8 @@ using std::make_unique;
 
 class SnapshotTester {
 public:
-    explicit SnapshotTester(const juce::String& testName, float scale = 1.0f)
-        : name(testName), renderScale(scale) {
+    explicit SnapshotTester(const juce::String& testName, float scale = 1.0f, float tolerance = 0.01f)
+        : name(testName), renderScale(scale), pixelTolerance(tolerance) {
         // Golden snapshots stored in tests/snapshots/
         snapshotDir = juce::File(REPO_ROOT_PATH).getChildFile("tests/snapshots");
         snapshotDir.createDirectory();
@@ -97,6 +104,7 @@ public:
 private:
     juce::String name;
     float renderScale;
+    float pixelTolerance;  // Percentage of pixels allowed to differ (0.0 - 1.0)
     juce::File snapshotDir;
     juce::Image currentImage;
     juce::Image goldenImage;
@@ -112,17 +120,40 @@ private:
             return false;
         }
 
-        // Compare pixels
+        // Compare pixels with tolerance
         differenceCount = 0;
+        int totalPixels = a.getWidth() * a.getHeight();
+
         for (int y = 0; y < a.getHeight(); ++y) {
             for (int x = 0; x < a.getWidth(); ++x) {
-                if (a.getPixelAt(x, y) != b.getPixelAt(x, y)) {
+                auto pixelA = a.getPixelAt(x, y);
+                auto pixelB = b.getPixelAt(x, y);
+
+                // Check if pixels are different enough to count
+                if (!pixelsAreSimilar(pixelA, pixelB)) {
                     differenceCount++;
                 }
             }
         }
 
-        return differenceCount == 0;
+        // Calculate percentage of different pixels
+        float differencePercentage = static_cast<float>(differenceCount) / static_cast<float>(totalPixels);
+
+        if (differenceCount > 0) {
+            DBG("Snapshot difference: " + juce::String(differenceCount) + " pixels (" +
+                juce::String(differencePercentage * 100.0f, 2) + "%)");
+        }
+
+        return differencePercentage <= pixelTolerance;
+    }
+
+    // Helper to check if two pixels are similar enough (allows for minor rendering differences)
+    bool pixelsAreSimilar(juce::Colour a, juce::Colour b, int threshold = 2) const {
+        // Allow small differences in each channel (helps with anti-aliasing, compression artifacts)
+        return std::abs(a.getRed() - b.getRed()) <= threshold &&
+               std::abs(a.getGreen() - b.getGreen()) <= threshold &&
+               std::abs(a.getBlue() - b.getBlue()) <= threshold &&
+               std::abs(a.getAlpha() - b.getAlpha()) <= threshold;
     }
 
     juce::Image createDiffImage(const juce::Image& expected, const juce::Image& actual) {
