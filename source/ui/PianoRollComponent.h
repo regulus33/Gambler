@@ -20,6 +20,9 @@ namespace PianoRollConstants {
     // Black key positioning
     constexpr float blackKeyWidth = 40.0f;
     constexpr float blackKeyShift = 30.0f;
+    // Unselected key colors
+    const juce::Colour unselectedWhiteKeyColor = juce::Colours::white;
+    const juce::Colour unselectedBlackKeyColor = juce::Colour (186, 186, 186);
 }
 
 /**
@@ -317,8 +320,14 @@ private:
     void drawKey (juce::Graphics& g, const KeyData& key, int keyIndex) {
         using namespace PianoRollConstants;
 
-        // Fill the key with color (dimmed if not toggled)
-        g.setColour (key.isToggled ? key.color : key.color.darker (0.6f));
+        // Fill the key with color
+        if (key.isToggled) {
+            // Selected keys: use their assigned color
+            g.setColour (key.color);
+        } else {
+            // Unselected keys: white for white keys, grey for black keys
+            g.setColour (key.isBlack ? unselectedBlackKeyColor : unselectedWhiteKeyColor);
+        }
         g.fillPath (key.path);
 
         // Draw border

@@ -4,7 +4,41 @@ A 64-step MIDI sequencer plugin with probability-based note generation, substep 
 
 ## Architecture Overview
 
-The application follows a clean separation between backend domain logic, UI components, and the JUCE plugin framework. State is backed by JUCE's AudioProcessorValueTreeState (APVTS) for thread-safe access and DAW automation support.
+READ THIS THIS IS ALL YOU NEED TO KNOW.
+Note: I'm speaking about the ideal architecture here, not all components follow this.
+
+The app is built around APVTS and most of the state is stored in apvts. This means all state changes trigger listeners
+if we define them.
+
+All of our callbacks are defined in `MainScreenComponent`
+Think of this component like the ApplicationComponent in react. It's basically a higher order component.
+
+Now for example, noteSlider in MainControlsComponent works like this:
+In `MainScreenComponent`
+```c++
+// MainControls.h
+ mainControls.getNoteControls().onNoteChanged = [this](int pitchClass) {
+    // do something with pitchClass
+ }
+```
+
+Note that we are setting onNoteChanged 2x indirection.
+Its in `MainScreenComponent/NoteControls`.
+
+Because this is a lambda we can pass this function as far into the component tree as we want.
+So `MainControlsComponent` gets a reference to it and then since the note slider at the time of writing is
+not a separate component, just an instance variable that we save a `juce::Slider` in.
+Then we tell the slider, hey when someone changes you do this:
+
+```c++
+ noteSlider.getSlider().onValueChange = [this] {
+        noteSlider.repaint();
+        if (onNoteChanged)
+            onNoteChanged(getChromaticPitchClass());
+  };
+```
+
+
 
 ---
 
