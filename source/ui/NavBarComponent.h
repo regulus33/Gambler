@@ -101,6 +101,11 @@ public:
             }
         };
 
+        // Set MIDI learn button colors and stroke width
+        // White when OFF (state 1), grey when ON/active (state 2)
+        midiLearnButton.setColor1(NavBarConstants::inactiveColor);
+        midiLearnButton.setColor2(juce::Colours::grey);
+
         // Set transport button colors
         // Play/Pause: white when stopped/paused (state 1), green when playing (state 2)
         playPauseButton.setColor1(NavBarConstants::inactiveColor);

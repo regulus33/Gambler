@@ -1291,32 +1291,7 @@ public:
      * Size: ~18x18 coordinate space
      */
     static juce::Path createMidiLearnIcon() {
-        juce::Path path;
-
-        // Musical note (eighth note on left side)
-        // Note head (filled circle)
-        path.addEllipse (2.0f, 12.0f, 4.0f, 3.0f);
-
-        // Note stem
-        path.startNewSubPath (6.0f, 13.5f);
-        path.lineTo (6.0f, 3.0f);
-
-        // Note flag
-        path.startNewSubPath (6.0f, 3.0f);
-        path.cubicTo (8.0f, 3.0f, 9.0f, 4.5f, 9.0f, 6.5f);
-        path.cubicTo (9.0f, 7.5f, 8.5f, 8.5f, 7.5f, 9.0f);
-
-        // Connection symbol (lightning bolt / link on right side)
-        // Top part of bolt
-        path.startNewSubPath (12.0f, 2.0f);
-        path.lineTo (14.0f, 8.0f);
-        path.lineTo (11.5f, 8.0f);
-        path.lineTo (14.0f, 16.0f);
-        path.lineTo (11.0f, 10.0f);
-        path.lineTo (13.0f, 10.0f);
-        path.closeSubPath();
-
-        return path;
+        return createCrossHairIcon();
     }
 
     /**
@@ -1377,6 +1352,103 @@ public:
         path.lineTo (6.5f, 1.5f);
         path.cubicTo (6.5f, 1.2f, 6.4f, 1.0f, 6.2f, 0.8f);
         path.cubicTo (6.0f, 0.6f, 5.8f, 0.5f, 5.5f, 0.5f);
+        path.closeSubPath();
+        return path;
+    }
+
+    static juce::Path createCrossHairIcon() {
+        Path path;
+        path.startNewSubPath (13.5f, 6.5f);
+        path.lineTo (13.0f, 6.5f);
+        path.cubicTo (12.9f, 5.1f, 12.2f, 3.8f, 11.2f, 2.8f);
+        path.cubicTo (10.2f, 1.8f, 8.9f, 1.1f, 7.5f, 1.0f);
+        path.lineTo (7.5f, 0.5f);
+        path.cubicTo (7.5f, 0.4f, 7.4f, 0.2f, 7.4f, 0.1f);
+        path.cubicTo (7.3f, 0.1f, 7.1f, 0.0f, 7.0f, 0.0f);
+        path.cubicTo (6.9f, 0.0f, 6.7f, 0.1f, 6.6f, 0.1f);
+        path.cubicTo (6.6f, 0.2f, 6.5f, 0.4f, 6.5f, 0.5f);
+        path.lineTo (6.5f, 1.0f);
+        path.cubicTo (5.1f, 1.1f, 3.8f, 1.8f, 2.8f, 2.8f);
+        path.cubicTo (1.8f, 3.8f, 1.1f, 5.1f, 1.0f, 6.5f);
+        path.lineTo (0.5f, 6.5f);
+        path.cubicTo (0.4f, 6.5f, 0.2f, 6.6f, 0.1f, 6.6f);
+        path.cubicTo (0.1f, 6.7f, 0.0f, 6.9f, 0.0f, 7.0f);
+        path.cubicTo (0.0f, 7.1f, 0.1f, 7.3f, 0.1f, 7.4f);
+        path.cubicTo (0.2f, 7.4f, 0.4f, 7.5f, 0.5f, 7.5f);
+        path.lineTo (1.0f, 7.5f);
+        path.cubicTo (1.1f, 8.9f, 1.8f, 10.2f, 2.8f, 11.2f);
+        path.cubicTo (3.8f, 12.2f, 5.1f, 12.9f, 6.5f, 13.0f);
+        path.lineTo (6.5f, 13.5f);
+        path.cubicTo (6.5f, 13.6f, 6.6f, 13.8f, 6.6f, 13.9f);
+        path.cubicTo (6.7f, 13.9f, 6.9f, 14.0f, 7.0f, 14.0f);
+        path.cubicTo (7.1f, 14.0f, 7.3f, 13.9f, 7.4f, 13.9f);
+        path.cubicTo (7.4f, 13.8f, 7.5f, 13.6f, 7.5f, 13.5f);
+        path.lineTo (7.5f, 13.0f);
+        path.cubicTo (8.9f, 12.9f, 10.2f, 12.2f, 11.2f, 11.2f);
+        path.cubicTo (12.2f, 10.2f, 12.9f, 8.9f, 13.0f, 7.5f);
+        path.lineTo (13.5f, 7.5f);
+        path.cubicTo (13.6f, 7.5f, 13.8f, 7.4f, 13.9f, 7.4f);
+        path.cubicTo (13.9f, 7.3f, 14.0f, 7.1f, 14.0f, 7.0f);
+        path.cubicTo (14.0f, 6.9f, 13.9f, 6.7f, 13.9f, 6.6f);
+        path.cubicTo (13.8f, 6.6f, 13.6f, 6.5f, 13.5f, 6.5f);
+        path.closeSubPath();
+        path.startNewSubPath (7.5f, 12.0f);
+        path.lineTo (7.5f, 11.5f);
+        path.cubicTo (7.5f, 11.4f, 7.4f, 11.2f, 7.4f, 11.1f);
+        path.cubicTo (7.3f, 11.1f, 7.1f, 11.0f, 7.0f, 11.0f);
+        path.cubicTo (6.9f, 11.0f, 6.7f, 11.1f, 6.6f, 11.1f);
+        path.cubicTo (6.6f, 11.2f, 6.5f, 11.4f, 6.5f, 11.5f);
+        path.lineTo (6.5f, 12.0f);
+        path.cubicTo (5.4f, 11.9f, 4.3f, 11.3f, 3.5f, 10.5f);
+        path.cubicTo (2.7f, 9.7f, 2.1f, 8.6f, 2.0f, 7.5f);
+        path.lineTo (2.5f, 7.5f);
+        path.cubicTo (2.6f, 7.5f, 2.8f, 7.4f, 2.9f, 7.4f);
+        path.cubicTo (2.9f, 7.3f, 3.0f, 7.1f, 3.0f, 7.0f);
+        path.cubicTo (3.0f, 6.9f, 2.9f, 6.7f, 2.9f, 6.6f);
+        path.cubicTo (2.8f, 6.6f, 2.6f, 6.5f, 2.5f, 6.5f);
+        path.lineTo (2.0f, 6.5f);
+        path.cubicTo (2.1f, 5.4f, 2.7f, 4.3f, 3.5f, 3.5f);
+        path.cubicTo (4.3f, 2.7f, 5.4f, 2.1f, 6.5f, 2.0f);
+        path.lineTo (6.5f, 2.5f);
+        path.cubicTo (6.5f, 2.6f, 6.6f, 2.8f, 6.6f, 2.9f);
+        path.cubicTo (6.7f, 2.9f, 6.9f, 3.0f, 7.0f, 3.0f);
+        path.cubicTo (7.1f, 3.0f, 7.3f, 2.9f, 7.4f, 2.9f);
+        path.cubicTo (7.4f, 2.8f, 7.5f, 2.6f, 7.5f, 2.5f);
+        path.lineTo (7.5f, 2.0f);
+        path.cubicTo (8.6f, 2.1f, 9.7f, 2.7f, 10.5f, 3.5f);
+        path.cubicTo (11.3f, 4.3f, 11.9f, 5.4f, 12.0f, 6.5f);
+        path.lineTo (11.5f, 6.5f);
+        path.cubicTo (11.4f, 6.5f, 11.2f, 6.6f, 11.1f, 6.6f);
+        path.cubicTo (11.1f, 6.7f, 11.0f, 6.9f, 11.0f, 7.0f);
+        path.cubicTo (11.0f, 7.1f, 11.1f, 7.3f, 11.1f, 7.4f);
+        path.cubicTo (11.2f, 7.4f, 11.4f, 7.5f, 11.5f, 7.5f);
+        path.lineTo (12.0f, 7.5f);
+        path.cubicTo (11.9f, 8.6f, 11.3f, 9.7f, 10.5f, 10.5f);
+        path.cubicTo (9.7f, 11.3f, 8.6f, 11.9f, 7.5f, 12.0f);
+        path.closeSubPath();
+        path.startNewSubPath (7.0f, 4.5f);
+        path.cubicTo (6.5f, 4.5f, 6.0f, 4.6f, 5.6f, 4.9f);
+        path.cubicTo (5.2f, 5.2f, 4.9f, 5.6f, 4.7f, 6.0f);
+        path.cubicTo (4.5f, 6.5f, 4.5f, 7.0f, 4.5f, 7.5f);
+        path.cubicTo (4.6f, 8.0f, 4.9f, 8.4f, 5.2f, 8.8f);
+        path.cubicTo (5.6f, 9.1f, 6.0f, 9.4f, 6.5f, 9.5f);
+        path.cubicTo (7.0f, 9.5f, 7.5f, 9.5f, 8.0f, 9.3f);
+        path.cubicTo (8.4f, 9.1f, 8.8f, 8.8f, 9.1f, 8.4f);
+        path.cubicTo (9.4f, 8.0f, 9.5f, 7.5f, 9.5f, 7.0f);
+        path.cubicTo (9.5f, 6.3f, 9.2f, 5.7f, 8.8f, 5.2f);
+        path.cubicTo (8.3f, 4.8f, 7.7f, 4.5f, 7.0f, 4.5f);
+        path.closeSubPath();
+        path.startNewSubPath (7.0f, 8.5f);
+        path.cubicTo (6.7f, 8.5f, 6.4f, 8.4f, 6.2f, 8.2f);
+        path.cubicTo (5.9f, 8.1f, 5.7f, 7.8f, 5.6f, 7.6f);
+        path.cubicTo (5.5f, 7.3f, 5.5f, 7.0f, 5.5f, 6.7f);
+        path.cubicTo (5.6f, 6.4f, 5.7f, 6.1f, 5.9f, 5.9f);
+        path.cubicTo (6.1f, 5.7f, 6.4f, 5.6f, 6.7f, 5.5f);
+        path.cubicTo (7.0f, 5.5f, 7.3f, 5.5f, 7.6f, 5.6f);
+        path.cubicTo (7.8f, 5.7f, 8.1f, 5.9f, 8.2f, 6.2f);
+        path.cubicTo (8.4f, 6.4f, 8.5f, 6.7f, 8.5f, 7.0f);
+        path.cubicTo (8.5f, 7.4f, 8.3f, 7.8f, 8.1f, 8.1f);
+        path.cubicTo (7.8f, 8.3f, 7.4f, 8.5f, 7.0f, 8.5f);
         path.closeSubPath();
         return path;
     }
