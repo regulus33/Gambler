@@ -2,13 +2,14 @@
 
 #include "../NotchedSlider.h"
 #include "../MusicConstants.h"
+#include "../MidiLearnOverlayPainter.h"
 #include "../../backend/MidiLearnRegistry.h"
 #include "../../backend/MidiMapping.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /**
  * NoteSlider
- * 
+ *
  * Discrete component for note/pitch class selection (0-11, C to B).
  * Wraps NotchedSlider and can be individually MIDI mapped.
  * Supports scale filtering - can display only notes from the selected scale.
@@ -18,7 +19,8 @@ public:
     NoteSlider()
         : slider_("Note",
                  MusicConstants::toJuceArray(MusicConstants::CHROMATIC_NOTE_NAMES),
-                 MusicConstants::toJuceArray(MusicConstants::NOTE_COLOURS))
+                 MusicConstants::toJuceArray(MusicConstants::NOTE_COLOURS)),
+          midiControlId_(MidiControlId::NOTE_SLIDER)
     {
         // Initialize with full chromatic scale (0-11)
         for (int i = 0; i < 12; i++) {
@@ -26,7 +28,20 @@ public:
         }
 
         addAndMakeVisible(slider_);
-        
+
+        // Add invisible overlay for MIDI learn mode (sits on top, initially hidden)
+        addAndMakeVisible(midiLearnOverlay_);
+        midiLearnOverlay_.setVisible(false);
+        midiLearnOverlay_.setInterceptsMouseClicks(true, false);
+        midiLearnOverlay_.onMouseDown = [this]() {
+            if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT) {
+                DBG("NoteSlider overlay clicked: Setting learning control to " << static_cast<int>(midiControlId_));
+                registry_->setLearningControl(midiControlId_);
+                DBG("NoteSlider: Learning control is now " << static_cast<int>(registry_->getLearningControl()));
+                repaint();
+            }
+        };
+
         // Wire up slider callback
         slider_.getSlider().onValueChange = [this] {
             slider_.repaint();
@@ -34,6 +49,13 @@ public:
                 onNoteChanged(getChromaticPitchClass());
             }
         };
+    }
+
+    /**
+     * Set the MIDI learn registry for this slider
+     */
+    void setMidiLearnRegistry(MidiLearnRegistry* registry) {
+        registry_ = registry;
     }
 
     /**
@@ -103,18 +125,87 @@ public:
         slider_.updateOptions(noteNames, noteColours);
     }
 
+    void paint(juce::Graphics& g) override {
+        // Paint MIDI learn overlay if in learn mode
+        if (registry_ && registry_->isLearning()) {
+            bool isLearningThis = (registry_->getLearningControl() == midiControlId_);
+            DBG("NoteSlider paint: isLearning=" << (int)registry_->isLearning()
+                << " isLearningThis=" << (int)isLearningThis
+                << " controlId=" << static_cast<int>(midiControlId_));
+
+            // Show the overlay when in learn mode
+            midiLearnOverlay_.setVisible(true);
+        } else {
+            // Hide the overlay when not in learn mode
+            midiLearnOverlay_.setVisible(false);
+        }
+        paintMidiLearnOverlay(g);
+    }
+
     void resized() override {
         slider_.setBounds(getLocalBounds());
+        midiLearnOverlay_.setBounds(getLocalBounds());
+    }
+
+    void mouseDown(const juce::MouseEvent& event) override {
+        // Handle MIDI learn mode
+        if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT) {
+            DBG("NoteSlider: Setting learning control to " << static_cast<int>(midiControlId_));
+            registry_->setLearningControl(midiControlId_);
+            DBG("NoteSlider: Learning control is now " << static_cast<int>(registry_->getLearningControl()));
+            repaint();
+            return;
+        }
+
+        // Forward to slider
+        slider_.mouseDown(event.withNewPosition(event.position - slider_.getPosition().toFloat()));
+    }
+
+    void mouseDrag(const juce::MouseEvent& event) override {
+        // Forward to slider (unless in MIDI learn mode)
+        if (registry_ && registry_->isLearning()) return;
+        slider_.mouseDrag(event.withNewPosition(event.position - slider_.getPosition().toFloat()));
+    }
+
+    void mouseUp(const juce::MouseEvent& event) override {
+        // Forward to slider (unless in MIDI learn mode)
+        if (registry_ && registry_->isLearning()) return;
+        slider_.mouseUp(event.withNewPosition(event.position - slider_.getPosition().toFloat()));
     }
 
     // Accessor for testing
     NotchedSlider& getSlider() { return slider_; }
 
 private:
+    void paintMidiLearnOverlay(juce::Graphics& g) {
+        // No corner radius for sliders (they're circular knobs)
+        MidiLearnOverlayPainter::paint(g, getLocalBounds(), registry_, midiControlId_, 0.0f);
+    }
+
+    // Transparent overlay component that sits on top of the slider in MIDI learn mode
+    class MidiLearnOverlay : public juce::Component {
+    public:
+        std::function<void()> onMouseDown;
+
+        void mouseDown(const juce::MouseEvent&) override {
+            if (onMouseDown) {
+                onMouseDown();
+            }
+        }
+
+        void paint(juce::Graphics&) override {
+            // Transparent - the parent will paint the overlay visuals
+        }
+    };
+
     NotchedSlider slider_;
-    
+    MidiLearnOverlay midiLearnOverlay_;
+
     // Mapping from note slider index to chromatic pitch class (0-11)
     // This allows the slider to show only scale notes while maintaining correct pitch mapping
     juce::Array<int> scaleNoteIndices_;
+
+    MidiControlId midiControlId_ = MidiControlId::COUNT;
+    MidiLearnRegistry* registry_ = nullptr;
 };
 

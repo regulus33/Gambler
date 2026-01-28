@@ -42,12 +42,16 @@ public:
                 DBG("MIDI Learn mode ENABLED");
                 // Trigger UI refresh to show overlays
                 mainScreen.repaint();
+                // Explicitly repaint components with MIDI learn overlays
+                repaintMidiLearnComponents();
             } else {
                 // Exit MIDI learn mode
                 processorRef.getMidiLearnRegistry().exitLearnMode();
                 DBG("MIDI Learn mode DISABLED");
                 // Trigger UI refresh to hide overlays
                 mainScreen.repaint();
+                // Explicitly repaint components with MIDI learn overlays
+                repaintMidiLearnComponents();
             }
         };
 
@@ -129,6 +133,17 @@ private:
 
         // Update play/pause button state
         updatePlayPauseButtonState();
+
+        // Repaint MIDI learn components to show updated mappings
+        repaintMidiLearnComponents();
+    }
+
+    void repaintMidiLearnComponents() {
+        // Repaint all components that have MIDI learn overlays
+        mainScreen.getMainControls().getNoteControls().getOctaveSlider().repaint();
+        mainScreen.getMainControls().getNoteControls().getNoteSlider().repaint();
+        mainScreen.getSequencerControls().repaint();
+        mainScreen.getSequencerSteps().repaint();
     }
 
     void updatePlayPauseButtonState() {

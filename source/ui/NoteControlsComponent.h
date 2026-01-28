@@ -96,6 +96,14 @@ public:
         noteSlider_.updateNoteOptions(noteNames, noteColours, noteIndices);
     }
 
+    /**
+     * Set the MIDI learn registry for both sliders
+     */
+    void setRegistry(MidiLearnRegistry* registry) {
+        octaveSlider_.setMidiLearnRegistry(registry);
+        noteSlider_.setMidiLearnRegistry(registry);
+    }
+
     void paint (juce::Graphics& g) override {
         using namespace NoteControlsConstants;
         g.fillAll (juce::Colours::transparentBlack);

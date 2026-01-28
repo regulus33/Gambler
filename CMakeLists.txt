@@ -147,7 +147,7 @@ include(XcodePrettify)
 # This is where you can set preprocessor definitions for JUCE and your plugin
 target_compile_definitions(SharedCode
     INTERFACE
-    TAKE_SNAPSHOTS_OF_COMPONENTS=1  # Set to 0 to disable
+    TAKE_SNAPSHOTS_OF_COMPONENTS=0  # Set to 1 enable hitting s snapshots every component in tree...
     SNAPSHOT_DESTINATION="${CMAKE_SOURCE_DIR}/component_snapshots"
     # JUCE_WEB_BROWSER and JUCE_USE_CURL off by default
     JUCE_WEB_BROWSER=0  # If you set this to 1, add `NEEDS_WEB_BROWSER TRUE` to the `juce_add_plugin` call

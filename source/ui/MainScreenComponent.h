@@ -277,6 +277,8 @@ public:
     // Accessors for testing
     MainControlsComponent& getMainControls() { return mainControls; }
     PianoRollComponent& getPianoRoll() { return pianoRoll; }
+    SequencerControlsComponent& getSequencerControls() { return sequencerControls; }
+    SequencerStepsComponent& getSequencerSteps() { return sequencerSteps; }
 
     // Helper to set active step and update piano roll
     void setActiveStepAndNote(int stepIndex) {
@@ -390,7 +392,6 @@ public:
     NavBarComponent& getNavBar() { return navBar; }
 
     // Accessors for testing
-    SequencerStepsComponent& getSequencerSteps() { return sequencerSteps; }
     SequenceOverviewComponent& getSequenceOverview() { return sequenceOverview; }
 
     // Callback for when async update is needed
@@ -471,6 +472,9 @@ private:
 
         // Wire up MIDI learn registry for sequencer controls
         sequencerControls.setRegistry(&processorRef.getMidiLearnRegistry());
+
+        // Wire up MIDI learn registry for main controls (note/octave sliders)
+        mainControls.setRegistry(&processorRef.getMidiLearnRegistry());
 
         // Note: Button actions are now handled via the observer pattern:
         // - Each button sets its APVTS param on mouseDown/mouseUp

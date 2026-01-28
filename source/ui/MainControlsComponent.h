@@ -4,6 +4,7 @@
 #include "NoteControlsComponent.h"
 #include "ProbabilityControlsComponent.h"
 #include "UIConstants.h"
+#include "../backend/MidiLearnRegistry.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 // Forward declaration
@@ -73,6 +74,14 @@ public:
             noteControls.getBottom() + gapBetweenContainers,
             containerWidth,
             ProbabilityControlsConstants::containerHeight);
+    }
+
+    /**
+     * Set the MIDI learn registry for child components
+     */
+    void setRegistry(MidiLearnRegistry* registry) {
+        noteControls.setRegistry(registry);
+        // probabilityControls.setRegistry(registry); // TODO: Add when probability slider is MIDI mappable
     }
 
     // Accessors for child components
