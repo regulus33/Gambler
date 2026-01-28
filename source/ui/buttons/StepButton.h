@@ -2,6 +2,7 @@
 
 #include "../StateListenerComponent.h"
 #include "../MusicConstants.h"
+#include "../MidiLearnOverlayPainter.h"
 #include "../../backend/MidiLearnRegistry.h"
 #include "../../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -18,13 +19,6 @@ namespace StepButtonConstants {
     const juce::Colour selectedStepColor = juce::Colours::white;      // White for selected step
     const juce::Colour textColorOnNote = juce::Colours::black;        // Black text on colored notes
     const juce::Colour textColorOnSelected = juce::Colours::black;    // Black text on white selected
-
-    // MIDI Learn overlay colors
-    const juce::Colour midiLearnOverlay = juce::Colour(0x6680CCFF).darker(2) ;   // Blue with ~40% opacity (was 25%)
-    const juce::Colour midiLearnStroke = juce::Colour(0xFFFFD700);    // Yellow/gold stroke
-    const juce::Colour midiLearnText = juce::Colour(0xFFFFD700);      // Yellow/gold text
-    constexpr float midiLearnStrokeWidth = 4.0f;                      // Thick stroke
-    constexpr float midiLearnTextSize = 9.0f;
 }
 
 /**
@@ -237,32 +231,8 @@ private:
     }
 
     void paintMidiLearnOverlay(juce::Graphics& g) {
-        using namespace StepButtonConstants;
-
-        if (!registry_ || !registry_->isLearning()) return;
-        if (midiControlId_ == MidiControlId::COUNT) return;
-
-        auto bounds = getLocalBounds().toFloat();
-        bool isLearningThis = (registry_->getLearningControl() == midiControlId_);
-
-        // Semi-transparent blue overlay (40% opacity)
-        g.setColour(midiLearnOverlay);
-        g.fillRoundedRectangle(bounds, cornerRadius);
-
-        // Yellow stroke if actively learning this control
-        if (isLearningThis) {
-            g.setColour(midiLearnStroke);
-            g.drawRoundedRectangle(bounds.reduced(midiLearnStrokeWidth * 0.5f),
-                                   cornerRadius,
-                                   midiLearnStrokeWidth);
-        }
-
-        // Display MIDI mapping info (if mapped) in yellow
-        if (const auto* midiId = registry_->getMidiForControl(midiControlId_)) {
-            g.setColour(midiLearnText);
-            g.setFont(midiLearnTextSize);
-            g.drawText(midiId->toString(), bounds.toNearestInt(), juce::Justification::centred);
-        }
+        MidiLearnOverlayPainter::paint(g, getLocalBounds(), registry_, midiControlId_,
+                                      StepButtonConstants::cornerRadius);
     }
 
     int localIndex_;  // 0-7 (fixed, never changes)

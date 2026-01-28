@@ -2,6 +2,7 @@
 
 #include "../StateListenerComponent.h"
 #include "../Icons.h"
+#include "../MidiLearnOverlayPainter.h"
 #include "../../backend/MidiLearnRegistry.h"
 #include "../../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -154,28 +155,8 @@ protected:
 
 private:
     void paintMidiLearnOverlay(juce::Graphics& g) {
-        if (!registry_ || !registry_->isLearning()) return;
-        if (midiControlId_ == MidiControlId::COUNT) return;
-
-        auto bounds = getLocalBounds();
-        bool isLearningThis = (registry_->getLearningControl() == midiControlId_);
-
-        // Semi-transparent blue overlay (40% opacity)
-        g.setColour(juce::Colour(0x6680CCFF));  // Blue with ~40% opacity (was 25%)
-        g.fillRoundedRectangle(bounds.toFloat(), SequencerButtonConstants::cornerRadius);
-
-        // Yellow/gold stroke if actively learning (thick stroke)
-        if (isLearningThis) {
-            g.setColour(juce::Colour(0xFFFFD700));  // Yellow/gold (was white)
-            g.drawRoundedRectangle(bounds.toFloat().reduced(2.0f), SequencerButtonConstants::cornerRadius, 4.0f);  // 4px stroke (was 3px)
-        }
-
-        // Display MIDI mapping info (if mapped) in yellow
-        if (const auto* midiId = registry_->getMidiForControl(midiControlId_)) {
-            g.setColour(juce::Colour(0xFFFFD700));  // Yellow/gold (was white)
-            g.setFont(9.0f);
-            g.drawText(midiId->toString(), bounds, juce::Justification::centred);
-        }
+        MidiLearnOverlayPainter::paint(g, getLocalBounds(), registry_, midiControlId_,
+                                      SequencerButtonConstants::cornerRadius);
     }
 
     juce::String paramId_;
