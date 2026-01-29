@@ -81,7 +81,7 @@ public:
      */
     void setRegistry(MidiLearnRegistry* registry) {
         noteControls.setRegistry(registry);
-        // probabilityControls.setRegistry(registry); // TODO: Add when probability slider is MIDI mappable
+        probabilityControls.setRegistry(registry);
     }
 
     /**
@@ -89,6 +89,7 @@ public:
      */
     void setMidiLearnSelectedCallback(std::function<void()> callback) {
         noteControls.setMidiLearnSelectedCallback(callback);
+        probabilityControls.setMidiLearnSelectedCallback(callback);
     }
 
     // Accessors for child components

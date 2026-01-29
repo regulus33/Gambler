@@ -142,6 +142,7 @@ private:
         // Repaint all components that have MIDI learn overlays
         mainScreen.getMainControls().getNoteControls().getOctaveSlider().repaint();
         mainScreen.getMainControls().getNoteControls().getNoteSlider().repaint();
+        mainScreen.getMainControls().getProbabilityControls().getProbabilitySlider().repaint();
         mainScreen.getSequencerControls().repaint();
         mainScreen.getSequencerSteps().repaint();
     }

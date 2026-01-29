@@ -1,6 +1,9 @@
 #pragma once
 
 #include "BinaryData.h"
+#include "MidiLearnOverlayPainter.h"
+#include "../backend/MidiLearnRegistry.h"
+#include "../backend/MidiMapping.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
@@ -44,7 +47,8 @@ public:
      * @param labelText The text to display vertically on the left (e.g., "Prob")
      */
     explicit AnalogueSlider (const juce::String& labelText)
-        : labelText (labelText) {
+        : labelText (labelText),
+          midiControlId_(MidiControlId::PROBABILITY_SLIDER) {
         interFont = juce::Typeface::createSystemTypefaceFor (
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
@@ -57,6 +61,23 @@ public:
 
         addAndMakeVisible (slider);
 
+        // Add invisible overlay for MIDI learn mode (sits on top, initially hidden)
+        addAndMakeVisible(midiLearnOverlay_);
+        midiLearnOverlay_.setVisible(false);
+        midiLearnOverlay_.setInterceptsMouseClicks(true, false);
+        midiLearnOverlay_.onMouseDown = [this]() {
+            if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT) {
+                DBG("AnalogueSlider overlay clicked: Setting learning control to " << static_cast<int>(midiControlId_));
+                registry_->setLearningControl(midiControlId_);
+                DBG("AnalogueSlider: Learning control is now " << static_cast<int>(registry_->getLearningControl()));
+
+                // Notify that this control was selected (triggers repaint of all MIDI learn components)
+                if (onMidiLearnSelected) {
+                    onMidiLearnSelected();
+                }
+            }
+        };
+
         slider.onValueChange = [this] {
             repaint();
             if (onValueChange)
@@ -67,6 +88,19 @@ public:
     ~AnalogueSlider() override {
         slider.setLookAndFeel (nullptr);
     }
+
+    /**
+     * Set the MIDI learn registry for this slider
+     */
+    void setMidiLearnRegistry(MidiLearnRegistry* registry) {
+        registry_ = registry;
+    }
+
+    /**
+     * Callback when this control is selected for MIDI learning
+     * Use this to trigger repainting of all MIDI learn components
+     */
+    std::function<void()> onMidiLearnSelected;
 
     juce::Slider& getSlider() { return slider; }
     const juce::Slider& getSlider() const { return slider; }
@@ -92,6 +126,20 @@ public:
 
     void paint (juce::Graphics& g) override {
         using namespace AnalogueSliderConstants;
+
+        // Paint MIDI learn overlay if in learn mode
+        if (registry_ && registry_->isLearning()) {
+            bool isLearningThis = (registry_->getLearningControl() == midiControlId_);
+            DBG("AnalogueSlider paint: isLearning=" << (int)registry_->isLearning()
+                << " isLearningThis=" << (int)isLearningThis
+                << " controlId=" << static_cast<int>(midiControlId_));
+
+            // Show the overlay when in learn mode
+            midiLearnOverlay_.setVisible(true);
+        } else {
+            // Hide the overlay when not in learn mode
+            midiLearnOverlay_.setVisible(false);
+        }
 
         // Draw label on the left (rotated 90° counterclockwise - bottom to top)
         if (! labelBounds.isEmpty()) {
@@ -131,6 +179,9 @@ public:
             g.setColour (juce::Colour (0xFFE57373)); // Salmon/coral color
             g.drawText (getPercentageString(), gaugeBounds, juce::Justification::centred, false);
         }
+
+        // Paint MIDI learn overlay border
+        paintMidiLearnOverlay(g);
     }
 
     void resized() override {
@@ -154,9 +205,33 @@ public:
         auto gaugeRect = juce::Rectangle<int> (0, 0, gaugeWidth, gaugeHeight);
         auto centreY = sliderVisualBottom + gaugeGap + gaugeHeight / 2;
         gaugeBounds = gaugeRect.withCentre ({ sliderBounds.getCentreX(), centreY });
+
+        // Position MIDI learn overlay to cover the entire component
+        midiLearnOverlay_.setBounds(getLocalBounds());
     }
 
 private:
+    void paintMidiLearnOverlay(juce::Graphics& g) {
+        // No corner radius for sliders (they're circular knobs)
+        MidiLearnOverlayPainter::paint(g, getLocalBounds(), registry_, midiControlId_, 0.0f);
+    }
+
+    // Transparent overlay component that sits on top of the slider in MIDI learn mode
+    class MidiLearnOverlay : public juce::Component {
+    public:
+        std::function<void()> onMouseDown;
+
+        void mouseDown(const juce::MouseEvent&) override {
+            if (onMouseDown) {
+                onMouseDown();
+            }
+        }
+
+        void paint(juce::Graphics&) override {
+            // Transparent - the parent will paint the overlay visuals
+        }
+    };
+
     class LookAndFeel : public juce::LookAndFeel_V4 {
     public:
         explicit LookAndFeel (AnalogueSlider* parent) : parent (parent) {}
@@ -201,5 +276,8 @@ private:
     LookAndFeel lookAndFeel { this };
     juce::Rectangle<int> labelBounds;
     juce::Rectangle<int> gaugeBounds;
+    MidiLearnOverlay midiLearnOverlay_;
+    MidiControlId midiControlId_ = MidiControlId::COUNT;
+    MidiLearnRegistry* registry_ = nullptr;
 };
 
