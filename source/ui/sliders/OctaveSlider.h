@@ -32,7 +32,11 @@ public:
                 DBG("OctaveSlider overlay clicked: Setting learning control to " << static_cast<int>(midiControlId_));
                 registry_->setLearningControl(midiControlId_);
                 DBG("OctaveSlider: Learning control is now " << static_cast<int>(registry_->getLearningControl()));
-                repaint();
+
+                // Notify that this control was selected (triggers repaint of all MIDI learn components)
+                if (onMidiLearnSelected) {
+                    onMidiLearnSelected();
+                }
             }
         };
 
@@ -51,6 +55,12 @@ public:
     void setMidiLearnRegistry(MidiLearnRegistry* registry) {
         registry_ = registry;
     }
+
+    /**
+     * Callback when this control is selected for MIDI learning
+     * Use this to trigger repainting of all MIDI learn components
+     */
+    std::function<void()> onMidiLearnSelected;
 
     /**
      * Callback when octave changes

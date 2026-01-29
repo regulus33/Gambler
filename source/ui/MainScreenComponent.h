@@ -476,6 +476,14 @@ private:
         // Wire up MIDI learn registry for main controls (note/octave sliders)
         mainControls.setRegistry(&processorRef.getMidiLearnRegistry());
 
+        // Wire up callback for when a control is selected for MIDI learning
+        // This triggers a repaint of all MIDI learn components to update borders
+        mainControls.setMidiLearnSelectedCallback([this]() {
+            if (onAsyncUpdateNeeded) {
+                onAsyncUpdateNeeded();  // Trigger repaint via ApplicationComponent
+            }
+        });
+
         // Note: Button actions are now handled via the observer pattern:
         // - Each button sets its APVTS param on mouseDown/mouseUp
         // - PluginProcessor::parameterChanged handles the action

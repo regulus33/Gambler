@@ -84,6 +84,13 @@ public:
         // probabilityControls.setRegistry(registry); // TODO: Add when probability slider is MIDI mappable
     }
 
+    /**
+     * Set the callback for when a control is selected for MIDI learning
+     */
+    void setMidiLearnSelectedCallback(std::function<void()> callback) {
+        noteControls.setMidiLearnSelectedCallback(callback);
+    }
+
     // Accessors for child components
     NoteControlsComponent& getNoteControls() { return noteControls; }
     const NoteControlsComponent& getNoteControls() const { return noteControls; }

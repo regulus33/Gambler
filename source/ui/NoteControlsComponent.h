@@ -104,6 +104,15 @@ public:
         noteSlider_.setMidiLearnRegistry(registry);
     }
 
+    /**
+     * Set the callback for when a slider is selected for MIDI learning
+     * This should trigger a repaint of all MIDI learn components
+     */
+    void setMidiLearnSelectedCallback(std::function<void()> callback) {
+        octaveSlider_.onMidiLearnSelected = callback;
+        noteSlider_.onMidiLearnSelected = callback;
+    }
+
     void paint (juce::Graphics& g) override {
         using namespace NoteControlsConstants;
         g.fillAll (juce::Colours::transparentBlack);
