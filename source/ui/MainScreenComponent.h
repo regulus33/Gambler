@@ -476,6 +476,9 @@ private:
         // Wire up MIDI learn registry for main controls (note/octave sliders)
         mainControls.setRegistry(&processorRef.getMidiLearnRegistry());
 
+        // Wire up MIDI learn registry for piano roll keys
+        pianoRoll.setRegistry(&processorRef.getMidiLearnRegistry());
+
         // Wire up callback for when a control is selected for MIDI learning
         // This triggers a repaint of all MIDI learn components to update borders
         mainControls.setMidiLearnSelectedCallback([this]() {

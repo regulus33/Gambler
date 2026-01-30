@@ -1,7 +1,9 @@
 #pragma once
 
 #include "../backend/Scale.h"
+#include "../backend/MidiLearnRegistry.h"
 #include "BinaryData.h"
+#include "MidiLearnOverlayPainter.h"
 #include "StateListenerComponent.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -88,6 +90,12 @@ public:
             keys.add (new KeyData (keyInfos[i].name, keyInfos[i].color, keyInfos[i].isBlack));
         }
 
+        // Initialize MIDI control IDs for each key (SCALE_NOTE_C through SCALE_NOTE_B)
+        for (int i = 0; i < 12; i++) {
+            keyMidiControlIds_[i] = static_cast<MidiControlId>(
+                static_cast<int>(MidiControlId::SCALE_NOTE_C) + i);
+        }
+
         // Set up paths with proper positioning
         setupKeyPaths();
 
@@ -124,6 +132,14 @@ public:
         // Check white keys first (they're on top visually)
         for (int i = 0; i < 12; i++) {
             if (!keys[i]->isBlack && keys[i]->path.contains (event.position)) {
+                // Handle MIDI learn mode first
+                if (registry_ && registry_->isLearning() && keyMidiControlIds_[i] != MidiControlId::COUNT) {
+                    registry_->setLearningControl(keyMidiControlIds_[i]);
+                    repaint();
+                    return;
+                }
+
+                // Normal toggle behavior
                 if (tryToggleKey(i)) {
                     repaint();
                     if (onNoteChanged)
@@ -136,6 +152,14 @@ public:
         // Then check black keys (only if click wasn't on a white key)
         for (int i = 0; i < 12; i++) {
             if (keys[i]->isBlack && keys[i]->path.contains (event.position)) {
+                // Handle MIDI learn mode first
+                if (registry_ && registry_->isLearning() && keyMidiControlIds_[i] != MidiControlId::COUNT) {
+                    registry_->setLearningControl(keyMidiControlIds_[i]);
+                    repaint();
+                    return;
+                }
+
+                // Normal toggle behavior
                 if (tryToggleKey(i)) {
                     repaint();
                     if (onNoteChanged)
@@ -270,6 +294,13 @@ public:
      */
     std::function<void()> onNoteChanged;
 
+    /**
+     * Set the MIDI learn registry for this component
+     */
+    void setRegistry(MidiLearnRegistry* registry) {
+        registry_ = registry;
+    }
+
 protected:
     /**
      * Called on message thread when any subscribed parameter changes.
@@ -366,6 +397,9 @@ private:
 
         // Draw the text
         g.drawText (key.name, textArea.toNearestInt(), juce::Justification::centred);
+
+        // Draw MIDI learn overlay on top of everything
+        paintMidiLearnOverlayForKey(g, key.path.getBounds(), keyIndex);
     }
 
     /**
@@ -543,9 +577,21 @@ private:
         return path;
     }
 
+    /**
+     * Paint MIDI learn overlay for a specific key
+     */
+    void paintMidiLearnOverlayForKey(juce::Graphics& g, juce::Rectangle<float> keyBounds, int keyIndex) {
+        // No corner radius for piano keys (they have custom shapes)
+        MidiLearnOverlayPainter::paint(g, keyBounds, registry_, keyMidiControlIds_[keyIndex], 0.0f);
+    }
+
     juce::OwnedArray<KeyData> keys;
     juce::Typeface::Ptr interFont;
     int activeNoteIndex = -1; // -1 means no active note, 0-11 for chromatic scale
+
+    // MIDI learn support
+    MidiLearnRegistry* registry_ = nullptr;
+    std::array<MidiControlId, 12> keyMidiControlIds_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
 };
