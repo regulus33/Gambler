@@ -1,11 +1,11 @@
 #pragma once
 
+#include "../../backend/MidiLearnRegistry.h"
+#include "../../backend/MidiMapping.h"
+#include "../MidiLearnOverlayPainter.h"
 #include "BinaryData.h"
-#include "MidiLearnOverlayPainter.h"
-#include "../backend/MidiLearnRegistry.h"
-#include "../backend/MidiMapping.h"
-#include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
+#include <juce_gui_basics/juce_gui_basics.h>
 
 /**
  * AnalogueSlider

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../NotchedSlider.h"
-#include "../MusicConstants.h"
-#include "../MidiLearnOverlayPainter.h"
 #include "../../backend/MidiLearnRegistry.h"
 #include "../../backend/MidiMapping.h"
+#include "../MidiLearnOverlayPainter.h"
+#include "../MusicConstants.h"
+#include "NotchedSlider.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /**

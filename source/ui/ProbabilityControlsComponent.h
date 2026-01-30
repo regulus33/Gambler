@@ -1,8 +1,8 @@
 #pragma once
 
-#include "AnalogueSlider.h"
 #include "ProbabilityGauge.h"
 #include "StateListenerComponent.h"
+#include "sliders/ProbabilitySlider.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 // Forward declaration
