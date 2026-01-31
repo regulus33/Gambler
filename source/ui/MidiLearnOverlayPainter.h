@@ -24,18 +24,20 @@ public:
 
     /**
      * Paint MIDI learn overlay on a component
-     * 
+     *
      * @param g Graphics context
      * @param bounds Bounds to paint overlay in (usually getLocalBounds())
      * @param registry Pointer to MidiLearnRegistry (can be null)
      * @param controlId The MidiControlId for this component
      * @param cornerRadius Corner radius for rounded rectangle (0 for sharp corners)
+     * @param textAreaFraction Fraction of bounds to use for text (0.0-1.0). If < 1.0, text is positioned in bottom portion. Default 1.0 = full bounds.
      */
     static void paint(juce::Graphics& g,
                      juce::Rectangle<float> bounds,
                      MidiLearnRegistry* registry,
                      MidiControlId controlId,
-                     float cornerRadius = 0.0f) {
+                     float cornerRadius = 0.0f,
+                     float textAreaFraction = 1.0f) {
         // Early exit if not in learn mode
         if (!registry || !registry->isLearning()) return;
         if (controlId == MidiControlId::COUNT) return;
@@ -66,7 +68,16 @@ public:
         if (const auto* midiId = registry->getMidiForControl(controlId)) {
             g.setColour(textColor);
             g.setFont(textSize);
-            g.drawText(midiId->toString(), bounds.toNearestInt(), juce::Justification::centred);
+
+            // Calculate text area based on textAreaFraction
+            auto textBounds = bounds;
+            if (textAreaFraction < 1.0f) {
+                // Position text in the bottom portion (similar to piano key note names)
+                float topTrim = bounds.getHeight() * (1.0f - textAreaFraction);
+                textBounds = bounds.withTrimmedTop(topTrim);
+            }
+
+            g.drawText(midiId->toString(), textBounds.toNearestInt(), juce::Justification::centred);
         }
     }
 
@@ -77,8 +88,9 @@ public:
                      juce::Rectangle<int> bounds,
                      MidiLearnRegistry* registry,
                      MidiControlId controlId,
-                     float cornerRadius = 0.0f) {
-        paint(g, bounds.toFloat(), registry, controlId, cornerRadius);
+                     float cornerRadius = 0.0f,
+                     float textAreaFraction = 1.0f) {
+        paint(g, bounds.toFloat(), registry, controlId, cornerRadius, textAreaFraction);
     }
 };
 

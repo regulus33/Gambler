@@ -586,7 +586,8 @@ private:
      */
     void paintMidiLearnOverlayForKey(juce::Graphics& g, juce::Rectangle<float> keyBounds, int keyIndex) {
         // No corner radius for piano keys (they have custom shapes)
-        MidiLearnOverlayPainter::paint(g, keyBounds, registry_, keyMidiControlIds_[keyIndex], 0.0f);
+        // Position MIDI mapping text in bottom 30% of key (same area as note names)
+        MidiLearnOverlayPainter::paint(g, keyBounds, registry_, keyMidiControlIds_[keyIndex], 0.0f, 0.3f);
     }
 
     juce::OwnedArray<KeyData> keys;
