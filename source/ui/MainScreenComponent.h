@@ -109,8 +109,8 @@ public:
             // Update scale via APVTS-backed state (thread-safe, no command queue needed)
             auto& state = processorRef.getState();
             state.setScaleNotes(newScale.getScaleNotes());
-            state.quantizeAllNotesToScale();
-            DBG("Piano roll scale changed - updated backend Scale and quantized all notes");
+            // NOTE: No need to quantize all notes - quantization happens on-the-fly during playback/display
+            DBG("Piano roll scale changed - updated backend Scale (notes will be quantized on-the-fly)");
 
             // Update the note controls to only show selected scale notes
             auto selectedIndices = pianoRoll.getSelectedNoteIndices();
@@ -120,7 +120,7 @@ public:
             // Update the note slider options
             mainControls.getNoteControls().updateNoteOptions(selectedNames, selectedColours, selectedIndices);
 
-            // Trigger async update to refresh all UI components after quantization
+            // Trigger async update to refresh all UI components with new quantization
             if (onAsyncUpdateNeeded)
                 onAsyncUpdateNeeded();
         };
@@ -313,8 +313,8 @@ public:
         // Update all 8 bars based on the current step's StepNotes
         for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
             if (i < length) {
-                // Active substep - color based on note value
-                int midiNote = state.getStepNote(selectedStep, i);
+                // Active substep - color based on note value (quantized for display)
+                int midiNote = state.getQuantizedStepNote(selectedStep, i);
                 int chromaticNote = midiNote % 12;
                 juce::Colour noteColor;
                 // if note is rest, chromatic note colour won't work/

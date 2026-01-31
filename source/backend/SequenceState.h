@@ -191,16 +191,48 @@ public:
     }
 
     /**
-     * Get the current note for a step (based on its current substep index)
+     * Get the RAW stored note for a step (based on its current substep index)
+     * This returns the unquantized value as stored in APVTS
+     * Use getQuantizedCurrentNoteForStep() for display/playback
      */
-    int getCurrentNoteForStep(int stepIndex) const {
+    int getRawCurrentNoteForStep(int stepIndex) const {
         int substepIdx = getStepNotesCurrentIndex(stepIndex);
         if (substepIdx < 0) substepIdx = 0;
         return getStepNote(stepIndex, substepIdx);
     }
 
     /**
+     * Get the quantized version of a step's note
+     * This applies the current scale quantization on-the-fly without modifying stored data
+     */
+    int getQuantizedStepNote(int stepIndex, int substepIndex) const {
+        int note = getStepNote(stepIndex, substepIndex);
+        if (note < 0) return note;  // Don't quantize rests
+        return quantizeNote(note);
+    }
+
+    /**
+     * Get the quantized current note for a step (based on its current substep index)
+     * This is what should be displayed and played
+     */
+    int getQuantizedCurrentNoteForStep(int stepIndex) const {
+        int substepIdx = getStepNotesCurrentIndex(stepIndex);
+        if (substepIdx < 0) substepIdx = 0;
+        return getQuantizedStepNote(stepIndex, substepIdx);
+    }
+
+    /**
+     * Get the current note for a step (based on its current substep index)
+     * Returns the QUANTIZED note for display/editing purposes
+     * This is the main accessor that UI components should use
+     */
+    int getCurrentNoteForStep(int stepIndex) const {
+        return getQuantizedCurrentNoteForStep(stepIndex);
+    }
+
+    /**
      * Update the current note for a step (at its current substep index)
+     * Stores the exact value provided (typically from manual user edits)
      */
     void updateCurrentNoteForStep(int stepIndex, int noteNumber) {
         int substepIdx = getStepNotesCurrentIndex(stepIndex);
@@ -210,9 +242,10 @@ public:
 
     /**
      * Check if a step's current note is a rest (-1)
+     * Checks the RAW stored value (before quantization)
      */
     bool stepHasRest(int stepIndex) const {
-        return getCurrentNoteForStep(stepIndex) < 0;
+        return getRawCurrentNoteForStep(stepIndex) < 0;
     }
 
     // ========================================
@@ -454,7 +487,7 @@ public:
      * Advance the sequencer to the next step and return the note to play.
      * This is the main tick function called from processBlock.
      *
-     * @return MIDI note number to play, or -1 for rest
+     * @return MIDI note number to play (quantized), or -1 for rest
      */
     int tick() {
         int length = getLength();
@@ -483,9 +516,10 @@ public:
                 return -1;
             }
 
-            // Probability check passed - randomize the current step's note
+            // Probability check passed - randomize the current step's note (stores unquantized)
             randomizeStepNote(currentIndex);
-            return getStepNote(currentIndex, substepIdx);
+            // Return the quantized version for playback
+            return getQuantizedStepNote(currentIndex, substepIdx);
         }
 
         // Not in random mode - just tick the current step normally
@@ -508,7 +542,7 @@ public:
     }
 
     /**
-     * Tick a step's substep sequence and return the note
+     * Tick a step's substep sequence and return the note (quantized)
      */
     int tickStep(int stepIndex) {
         int substepLength = getStepNotesLength(stepIndex);
@@ -518,11 +552,14 @@ public:
         substepIndex = (substepIndex + 1) % substepLength;
         setStepNotesCurrentIndex(stepIndex, substepIndex);
 
-        return getStepNote(stepIndex, substepIndex);
+        // Return quantized note for playback
+        return getQuantizedStepNote(stepIndex, substepIndex);
     }
 
     /**
      * Randomize a step's current note within scale and range
+     * NOTE: Stores UNQUANTIZED random value. Quantization happens on-the-fly during playback/display.
+     * This allows changing scales without losing the underlying random data.
      */
     void randomizeStepNote(int stepIndex) {
         static std::random_device rd;
@@ -533,11 +570,12 @@ public:
         std::uniform_int_distribution<> dis(rangeMin, rangeMax);
 
         int randomNote = dis(gen);
-        int quantized = quantizeNote(randomNote);
+        // Store the unquantized random note
+        // Quantization will happen on-the-fly when reading for playback/display
 
         int substepIdx = getStepNotesCurrentIndex(stepIndex);
         if (substepIdx < 0) substepIdx = 0;
-        setStepNote(stepIndex, substepIdx, quantized);
+        setStepNote(stepIndex, substepIdx, randomNote);
     }
 
     /**

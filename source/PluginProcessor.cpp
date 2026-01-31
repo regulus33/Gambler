@@ -1357,7 +1357,7 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
 
                 if (activeNotes > 1 || !currentState) {
                     state.setScaleNote (noteIndex, !currentState);
-                    state.quantizeAllNotesToScale();
+                    // NOTE: No need to quantize all notes - quantization happens on-the-fly during playback/display
                     DBG ("  → Scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
                 } else {
                     DBG ("  → Cannot disable last scale note");

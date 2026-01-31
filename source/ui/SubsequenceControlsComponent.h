@@ -371,8 +371,8 @@ protected:
         // Update bar colors and borders based on substep data
         for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
             if (i < substepLength) {
-                // Get the note for this substep and determine its color
-                int noteNumber = state.getStepNote(selectedStep, i);
+                // Get the quantized note for this substep and determine its color
+                int noteNumber = state.getQuantizedStepNote(selectedStep, i);
 
                 // Check for rest before calculating pitch class
                 if (noteNumber == -1) {
