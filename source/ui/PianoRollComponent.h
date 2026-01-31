@@ -126,6 +126,13 @@ public:
                 drawKey (g, *keys[i], i);
             }
         }
+
+        // Draw MIDI learn overlays on top of everything (so borders are fully visible)
+        if (registry_ && registry_->isLearning()) {
+            for (int i = 0; i < 12; i++) {
+                paintMidiLearnOverlayForKey(g, keys[i]->path.getBounds(), i);
+            }
+        }
     }
 
     void mouseDown (const juce::MouseEvent& event) override {
@@ -397,9 +404,6 @@ private:
 
         // Draw the text
         g.drawText (key.name, textArea.toNearestInt(), juce::Justification::centred);
-
-        // Draw MIDI learn overlay on top of everything
-        paintMidiLearnOverlayForKey(g, key.path.getBounds(), keyIndex);
     }
 
     /**
