@@ -145,6 +145,7 @@ private:
         mainScreen.getMainControls().getProbabilityControls().getProbabilitySlider().repaint();
         mainScreen.getSequencerControls().repaint();
         mainScreen.getSequencerSteps().repaint();
+        mainScreen.getPianoRoll().repaint();
     }
 
     void updatePlayPauseButtonState() {
