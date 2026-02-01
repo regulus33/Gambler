@@ -6,7 +6,7 @@ namespace PluginEditorLayout {
     constexpr juce::uint32 bgColourHex = 0xFF1E1E1E;
     // Editor size
     constexpr int editorWidth = 1012;
-    constexpr int editorHeight = 560;
+    constexpr int editorHeight = 514;  // Reduced from 560 to eliminate bottom gap (content ends at ~494px + 20px margin)
     // Inspector button
     constexpr int inspectorButtonWidth = 100;
     constexpr int inspectorButtonHeight = 25;
@@ -24,7 +24,8 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     // Add application component
     addAndMakeVisible (applicationComponent);
 
-    // Add inspector button
+#if SHOW_INSPECTOR
+    // Add inspector button (only when SHOW_INSPECTOR=1)
     addAndMakeVisible (inspectButton);
 
     // this chunk of code instantiates and opens the melatonin inspector
@@ -36,6 +37,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
         inspector->setVisible (true);
     };
+#endif
 
     // Register as keyboard listener to capture hotkeys
     addKeyListener (this);
@@ -88,6 +90,7 @@ void PluginEditor::resized() {
                                                           .translated (static_cast<float>(offsetX),
                                                                       static_cast<float>(offsetY)));
 
+#if SHOW_INSPECTOR
     // Inspector button in bottom right corner (uses scaled coordinates)
     inspectButton.setBounds (editorWidth - inspectorButtonMarginRight,
                              editorHeight - inspectorButtonMarginBottom,
@@ -97,6 +100,7 @@ void PluginEditor::resized() {
     inspectButton.setTransform (juce::AffineTransform::scale (scale)
                                                      .translated (static_cast<float>(offsetX),
                                                                  static_cast<float>(offsetY)));
+#endif
 }
 
 

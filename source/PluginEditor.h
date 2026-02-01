@@ -38,9 +38,11 @@ private:
     // UI Components
     ApplicationComponent applicationComponent;
 
-    // Inspector
+#if SHOW_INSPECTOR
+    // Inspector (only included when SHOW_INSPECTOR=1)
     std::unique_ptr<melatonin::Inspector> inspector;
     juce::TextButton inspectButton { "Inspect the UI" };
+#endif
 
     // Track if we're currently adjusting size (to prevent recursion)
     bool isAdjustingSize = false;
