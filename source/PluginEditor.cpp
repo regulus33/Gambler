@@ -71,20 +71,32 @@ void PluginEditor::resized() {
     // Calculate scale factor
     float scale = getScaleFactor();
 
+        // Calculate the scaled dimensions
+    int scaledWidth = juce::roundToInt (editorWidth * scale);
+    int scaledHeight = juce::roundToInt (editorHeight * scale);
+
+    // Center the scaled content within the available space
+    int offsetX = (getWidth() - scaledWidth) / 2;
+    int offsetY = (getHeight() - scaledHeight) / 2;
+
     // Set the application component to the design size
     // It will be scaled by the transform
     applicationComponent.setBounds (0, 0, editorWidth, editorHeight);
 
-    // Apply scaling transform to the application component
-    applicationComponent.setTransform (juce::AffineTransform::scale (scale));
+    // Apply scaling transform with centering offset to the application component
+    applicationComponent.setTransform (juce::AffineTransform::scale (scale)
+                                                          .translated (static_cast<float>(offsetX),
+                                                                      static_cast<float>(offsetY)));
 
     // Inspector button in bottom right corner (uses scaled coordinates)
     inspectButton.setBounds (editorWidth - inspectorButtonMarginRight,
                              editorHeight - inspectorButtonMarginBottom,
                              inspectorButtonWidth, inspectorButtonHeight);
 
-    // Apply same scaling transform to inspector button
-    inspectButton.setTransform (juce::AffineTransform::scale (scale));
+    // Apply same scaling transform with centering offset to inspector button
+    inspectButton.setTransform (juce::AffineTransform::scale (scale)
+                                                     .translated (static_cast<float>(offsetX),
+                                                                 static_cast<float>(offsetY)));
 }
 
 
@@ -120,6 +132,10 @@ void PluginEditor::componentMovedOrResized (juce::Component& component, bool was
         return;
     }
 
+#if !JUCE_IOS
+    // On desktop: enforce aspect ratio by adjusting window size
+    // On iOS: let the host control the size (hosts won't allow size changes)
+
     // Calculate aspect ratio
     const float aspectRatio = static_cast<float>(editorWidth) / static_cast<float>(editorHeight);
 
@@ -136,4 +152,5 @@ void PluginEditor::componentMovedOrResized (juce::Component& component, bool was
         setSize (currentWidth, targetHeight);
         isAdjustingSize = false;
     }
+#endif
 }
