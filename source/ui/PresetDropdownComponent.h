@@ -159,7 +159,7 @@ public:
                 static_cast<float>(deleteIconSize));
 
             auto deletePath = Icons::createCloseIcon();
-            Icons::strokeIcon(g, deletePath, deleteBounds, juce::Colours::white.withAlpha(0.6f), 1.5f);
+            Icons::strokeIcon(g, deletePath, deleteBounds, juce::Colours::white.withAlpha(0.6f), 1.5f, true, Icons::closeIconScale);
         } else {
             // Delete X goes where checkmark would be (far right)
             auto deleteBounds = juce::Rectangle<float>(
@@ -169,7 +169,7 @@ public:
                 static_cast<float>(deleteIconSize));
 
             auto deletePath = Icons::createCloseIcon();
-            Icons::strokeIcon(g, deletePath, deleteBounds, juce::Colours::white.withAlpha(0.6f), 1.5f);
+            Icons::strokeIcon(g, deletePath, deleteBounds, juce::Colours::white.withAlpha(0.6f), 1.5f, true, Icons::closeIconScale);
         }
     }
 
@@ -264,7 +264,7 @@ public:
 
             auto deletePath = Icons::createCloseIcon();
             float alpha = isMouseOverDelete ? 1.0f : 0.5f;
-            Icons::strokeIcon(g, deletePath, deleteBounds, juce::Colours::white.withAlpha(alpha), 1.5f);
+            Icons::strokeIcon(g, deletePath, deleteBounds, juce::Colours::white.withAlpha(alpha), 1.5f, true, Icons::closeIconScale);
         } else {
             // Delete X goes where checkmark would be (far right)
             deleteButtonBounds = juce::Rectangle<int>(
@@ -281,7 +281,7 @@ public:
 
             auto deletePath = Icons::createCloseIcon();
             float alpha = isMouseOverDelete ? 1.0f : 0.5f;
-            Icons::strokeIcon(g, deletePath, deleteBounds, juce::Colours::white.withAlpha(alpha), 1.5f);
+            Icons::strokeIcon(g, deletePath, deleteBounds, juce::Colours::white.withAlpha(alpha), 1.5f, true, Icons::closeIconScale);
         }
     }
 

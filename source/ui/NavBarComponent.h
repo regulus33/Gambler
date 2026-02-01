@@ -40,7 +40,7 @@ class NavBarComponent : public juce::Component {
 public:
     NavBarComponent()
         : viewToggleButton(Icons::createViewToggleIcon1, Icons::createViewToggleIcon2, false, true),
-          settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false),
+          settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false, 0.75f, Icons::closeIconScale),
           midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, true),
           playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false)

@@ -22,18 +22,29 @@ public:
     // Default icon color
     static juce::Colour defaultColor() { return juce::Colours::white; }
 
+    // Scale factor for close icon (adjustable constant)
+    static constexpr float closeIconScale = 0.75f;
+
     /**
      * Create a transform to fit an icon path into target bounds
      * Centers the icon and scales it to fit within the bounds
+     * @param iconPath The path to transform
+     * @param targetBounds The bounds to fit the icon into
+     * @param maintainAspectRatio Whether to maintain aspect ratio
+     * @param scaleFactor Additional scale factor (1.0 = normal, 0.75 = 75% size, etc.)
      */
     static juce::AffineTransform createTransform (const juce::Path& iconPath,
         const juce::Rectangle<float>& targetBounds,
-        bool maintainAspectRatio = true) {
+        bool maintainAspectRatio = true,
+        float scaleFactor = 1.0f) {
         auto pathBounds = iconPath.getBounds();
 
         float scaleX = targetBounds.getWidth() / pathBounds.getWidth();
         float scaleY = targetBounds.getHeight() / pathBounds.getHeight();
         float scale = maintainAspectRatio ? juce::jmin (scaleX, scaleY) : scaleX;
+
+        // Apply additional scale factor
+        scale *= scaleFactor;
 
         // Calculate centered position
         float scaledWidth = pathBounds.getWidth() * scale;
@@ -53,8 +64,9 @@ public:
         const juce::Path& iconPath,
         const juce::Rectangle<float>& targetBounds,
         const juce::Colour& color = juce::Colours::white,
-        bool maintainAspectRatio = true) {
-        auto transform = createTransform (iconPath, targetBounds, maintainAspectRatio);
+        bool maintainAspectRatio = true,
+        float scaleFactor = 1.0f) {
+        auto transform = createTransform (iconPath, targetBounds, maintainAspectRatio, scaleFactor);
         g.setColour (color);
         g.fillPath (iconPath, transform);
     }
@@ -67,8 +79,9 @@ public:
         const juce::Rectangle<float>& targetBounds,
         const juce::Colour& color = juce::Colours::white,
         float strokeWidth = 1.5f,
-        bool maintainAspectRatio = true) {
-        auto transform = createTransform (iconPath, targetBounds, maintainAspectRatio);
+        bool maintainAspectRatio = true,
+        float scaleFactor = 0.75f) {
+        auto transform = createTransform (iconPath, targetBounds, maintainAspectRatio, scaleFactor);
         g.setColour (color);
         g.strokePath (iconPath, juce::PathStrokeType (strokeWidth), transform);
     }
@@ -768,11 +781,11 @@ public:
         return path;
     }
 
-    /**
-     * Creates the close (X) icon path
-     * Original SVG viewBox: 0 0 18 18
-     * Simple X shape for close/cancel actions
-     */
+    // /**
+    //  * Creates the close (X) icon path
+    //  * Original SVG viewBox: 0 0 18 18
+    //  * Simple X shape for close/cancel actions
+    //  */
     static juce::Path createCloseIcon() {
         juce::Path path;
         // Top-left to bottom-right diagonal

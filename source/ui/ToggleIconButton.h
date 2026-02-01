@@ -28,27 +28,34 @@ public:
      * @param iconPathFunc2 Function that returns the path for state 2 (toggled)
      * @param useStroke If true, draws icons with stroke; if false, fills icons
      * @param autoToggle If true, button toggles itself on click; if false, external code must control state
+     * @param scaleIcon1 Scale factor for icon 1 (1.0 = normal, 0.75 = 75% size)
+     * @param scaleIcon2 Scale factor for icon 2 (1.0 = normal, 0.75 = 75% size)
      */
     ToggleIconButton(std::function<juce::Path()> iconPathFunc1,
                      std::function<juce::Path()> iconPathFunc2,
                      bool useStroke = true,
-                     bool autoToggle = true)
+                     bool autoToggle = true,
+                     float scaleIcon1 = 1.0f,
+                     float scaleIcon2 = 1.0f)
         : iconPath1(iconPathFunc1),
           iconPath2(iconPathFunc2),
           drawWithStroke(useStroke),
           autoToggleEnabled(autoToggle),
           isToggled(false),
           color1(juce::Colours::white),
-          color2(juce::Colours::white)
+          color2(juce::Colours::white),
+          iconScale1(scaleIcon1),
+          iconScale2(scaleIcon2)
     {
     }
 
     void paint (juce::Graphics& g) override {
         using namespace ToggleIconButtonConstants;
 
-        // Get the appropriate icon path and color based on toggle state
+        // Get the appropriate icon path, color, and scale based on toggle state
         juce::Path path = isToggled ? iconPath2() : iconPath1();
         juce::Colour color = isToggled ? color2 : color1;
+        float iconScale = isToggled ? iconScale2 : iconScale1;
 
         // The original path is designed for various bounding boxes
         // We need to scale it to fit within the contentSize (20px)
@@ -56,6 +63,9 @@ public:
 
         // Calculate scale factor to fit path into content area
         float scale = static_cast<float>(contentSize) / juce::jmax(pathBounds.getWidth(), pathBounds.getHeight());
+
+        // Apply additional icon scale
+        scale *= iconScale;
 
         // Apply transform: scale and translate to center in content area with padding
         juce::AffineTransform transform = juce::AffineTransform::scale(scale)
@@ -132,5 +142,7 @@ private:
     bool isToggled;
     juce::Colour color1;  // Color for state 1 (not toggled)
     juce::Colour color2;  // Color for state 2 (toggled)
+    float iconScale1;     // Scale factor for icon 1
+    float iconScale2;     // Scale factor for icon 2
 };
 
