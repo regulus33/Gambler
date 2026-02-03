@@ -1,5 +1,6 @@
 # TODO
 
+-----
 # preset dropdown
 We need to create a new apvts param that
 will change the current preset.
@@ -25,12 +26,6 @@ is not being properly set, something with quant?
 # Midi maps are not saving to pref!
 Midi mapping does not persist through app runs
 
-# Note range slider
-Note range slider needs to be midi mappable
-
-It also needs to space the knobs further apart
-
-Drag note range should shift range up or down
 
 # CC modulation
 The cc modulation panel, we need buttons:
@@ -53,6 +48,18 @@ midi clock output
 don't show preset browser on this screen
 
 Either make all prefs apvts params or none.
+
+# DONE
+
+----- 
+
+
+# Note range slider
+Note range slider needs to be midi mappable
+
+It also needs to space the knobs further apart
+
+Drag note range should shift range up or down
 
 
 

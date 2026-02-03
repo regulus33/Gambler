@@ -2,6 +2,7 @@
 
 #include "BinaryData.h"
 #include "NavBarComponent.h"
+#include "SettingsGroup.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <functional>
@@ -14,6 +15,9 @@ namespace SettingsScreenConstants {
     constexpr juce::uint32 bgColourHex = 0xFF1E1E1E;  // Match main app background
     constexpr float labelFontSize = 14.0f;
     constexpr float sliderTextBoxWidth = 60.0f;
+    constexpr int groupSpacing = 20;  // Spacing between groups
+    constexpr int groupHorizontalSpacing = 20;  // Spacing between groups horizontally
+    constexpr int maxGroupWidth = 500;  // Maximum width for each group
 }
 
 /**
@@ -21,9 +25,14 @@ namespace SettingsScreenConstants {
  *
  * A full-screen settings view that displays:
  * - NavBarComponent at the top
- * - Settings controls in the center (play/stop, internal clock, tempo, note length, preview notes)
+ * - Settings organized into logical groups with headers in a 3x2 grid:
+ *   - Clock & Timing: Internal clock, tempo, MIDI clock output
+ *   - Playback: Note length, preview notes, follow step, follow playback
+ *   - MIDI: (placeholder for future MIDI settings)
+ *   - Group 4, 5, 6: (placeholders for future settings)
  *
- * This replaces the popup SettingsWindow with an inbuilt screen.
+ * Uses a 3-column grid layout that displays all groups in a 3x2 arrangement.
+ * Groups are displayed in boxes with rounded corners and lighter backgrounds.
  */
 class SettingsScreenComponent : public juce::Component {
 public:
@@ -46,7 +55,6 @@ public:
             if (onInternalClockChanged)
                 onInternalClockChanged(internalClockToggle.getToggleState());
         };
-        addAndMakeVisible(internalClockToggle);
 
         // Setup tempo slider
         tempoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
@@ -65,59 +73,22 @@ public:
             if (onTempoChanged)
                 onTempoChanged(tempoSlider.getValue());
         };
-        addAndMakeVisible(tempoSlider);
 
         // Setup tempo label
         tempoLabel.setText("Tempo", juce::dontSendNotification);
         tempoLabel.setColour(juce::Label::textColourId, juce::Colours::white);
         tempoLabel.setJustificationType(juce::Justification::centredLeft);
-        addAndMakeVisible(tempoLabel);
 
-        // Setup preview notes on edit checkbox (enabled by default)
-        previewNotesToggle.setButtonText("Preview notes on edit");
-        previewNotesToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
-        previewNotesToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
-        previewNotesToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
-        previewNotesToggle.setToggleState(true, juce::dontSendNotification); // Enabled by default
-        previewNotesToggle.onClick = [this] {
-            if (onPreviewNotesChanged)
-                onPreviewNotesChanged(previewNotesToggle.getToggleState());
+        // Setup MIDI clock output checkbox (standalone only)
+        midiClockOutputToggle.setButtonText("MIDI Clock Output");
+        midiClockOutputToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        midiClockOutputToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
+        midiClockOutputToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+        midiClockOutputToggle.setToggleState(false, juce::dontSendNotification);
+        midiClockOutputToggle.onClick = [this] {
+            if (onMidiClockOutputChanged)
+                onMidiClockOutputChanged(midiClockOutputToggle.getToggleState());
         };
-        addAndMakeVisible(previewNotesToggle);
-
-        // Setup follow step checkbox (enabled by default)
-        followStepToggle.setButtonText("Follow step");
-        followStepToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
-        followStepToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
-        followStepToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
-        followStepToggle.setToggleState(true, juce::dontSendNotification); // Enabled by default
-        followStepToggle.onClick = [this] {
-            if (onFollowStepChanged)
-                onFollowStepChanged(followStepToggle.getToggleState());
-        };
-        addAndMakeVisible(followStepToggle);
-
-        // Setup follow playback checkbox (enabled by default)
-        followPlaybackToggle.setButtonText("Follow playback");
-        followPlaybackToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
-        followPlaybackToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
-        followPlaybackToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
-        followPlaybackToggle.setToggleState(true, juce::dontSendNotification); // Enabled by default
-        followPlaybackToggle.onClick = [this] {
-            if (onFollowPlaybackChanged)
-                onFollowPlaybackChanged(followPlaybackToggle.getToggleState());
-        };
-        addAndMakeVisible(followPlaybackToggle);
-
-        // Setup Clear MIDI Mappings button
-        clearMidiMappingsButton.setButtonText("Clear MIDI Mappings");
-        clearMidiMappingsButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFFFF9800)); // Orange
-        clearMidiMappingsButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
-        clearMidiMappingsButton.onClick = [this] {
-            if (onClearMidiMappings)
-                onClearMidiMappings();
-        };
-        addAndMakeVisible(clearMidiMappingsButton);
 
         // Setup note length slider
         noteLengthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
@@ -143,25 +114,90 @@ public:
         noteLengthSlider.valueFromTextFunction = [](const juce::String& text) {
             return text.getDoubleValue() / 100.0;
         };
-        addAndMakeVisible(noteLengthSlider);
 
         // Setup note length label
         noteLengthLabel.setText("Note Length", juce::dontSendNotification);
         noteLengthLabel.setColour(juce::Label::textColourId, juce::Colours::white);
         noteLengthLabel.setJustificationType(juce::Justification::centredLeft);
-        addAndMakeVisible(noteLengthLabel);
 
-        // Setup MIDI clock output checkbox (standalone only)
-        midiClockOutputToggle.setButtonText("MIDI Clock Output");
-        midiClockOutputToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
-        midiClockOutputToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
-        midiClockOutputToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
-        midiClockOutputToggle.setToggleState(false, juce::dontSendNotification);
-        midiClockOutputToggle.onClick = [this] {
-            if (onMidiClockOutputChanged)
-                onMidiClockOutputChanged(midiClockOutputToggle.getToggleState());
+        // Setup preview notes on edit checkbox (enabled by default)
+        previewNotesToggle.setButtonText("Preview notes on edit");
+        previewNotesToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        previewNotesToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
+        previewNotesToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+        previewNotesToggle.setToggleState(true, juce::dontSendNotification); // Enabled by default
+        previewNotesToggle.onClick = [this] {
+            if (onPreviewNotesChanged)
+                onPreviewNotesChanged(previewNotesToggle.getToggleState());
         };
-        addAndMakeVisible(midiClockOutputToggle);
+
+        // Setup follow step checkbox (enabled by default)
+        followStepToggle.setButtonText("Follow step");
+        followStepToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        followStepToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
+        followStepToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+        followStepToggle.setToggleState(true, juce::dontSendNotification); // Enabled by default
+        followStepToggle.onClick = [this] {
+            if (onFollowStepChanged)
+                onFollowStepChanged(followStepToggle.getToggleState());
+        };
+
+        // Setup follow playback checkbox (enabled by default)
+        followPlaybackToggle.setButtonText("Follow playback");
+        followPlaybackToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        followPlaybackToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
+        followPlaybackToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+        followPlaybackToggle.setToggleState(true, juce::dontSendNotification); // Enabled by default
+        followPlaybackToggle.onClick = [this] {
+            if (onFollowPlaybackChanged)
+                onFollowPlaybackChanged(followPlaybackToggle.getToggleState());
+        };
+
+        // Create settings groups
+        clockTimingGroup = std::make_unique<SettingsGroup>("Clock & Timing");
+        clockTimingGroup->addControl(internalClockToggle);
+        clockTimingGroup->addLabeledControl(tempoLabel, tempoSlider);
+        clockTimingGroup->addControl(midiClockOutputToggle);
+        addAndMakeVisible(*clockTimingGroup);
+
+        playbackGroup = std::make_unique<SettingsGroup>("Playback");
+        playbackGroup->addLabeledControl(noteLengthLabel, noteLengthSlider);
+        playbackGroup->addControl(previewNotesToggle);
+        playbackGroup->addControl(followStepToggle);
+        playbackGroup->addControl(followPlaybackToggle);
+        addAndMakeVisible(*playbackGroup);
+
+        // TODO: Replace placeholder text with actual MIDI settings/controls
+        midiGroup = std::make_unique<SettingsGroup>("MIDI");
+        midiPlaceholderLabel.setText("MIDI settings coming soon...", juce::dontSendNotification);
+        midiPlaceholderLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.5f));
+        midiPlaceholderLabel.setJustificationType(juce::Justification::centred);
+        midiGroup->addControl(midiPlaceholderLabel);
+        addAndMakeVisible(*midiGroup);
+
+        // TODO: Replace placeholder text with actual Group 4 settings/controls
+        group4 = std::make_unique<SettingsGroup>("Group 4");
+        group4PlaceholderLabel.setText("Group 4 settings coming soon...", juce::dontSendNotification);
+        group4PlaceholderLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.5f));
+        group4PlaceholderLabel.setJustificationType(juce::Justification::centred);
+        group4->addControl(group4PlaceholderLabel);
+        addAndMakeVisible(*group4);
+
+        // TODO: Replace placeholder text with actual Group 5 settings/controls
+        group5 = std::make_unique<SettingsGroup>("Group 5");
+        group5PlaceholderLabel.setText("Group 5 settings coming soon...", juce::dontSendNotification);
+        group5PlaceholderLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.5f));
+        group5PlaceholderLabel.setJustificationType(juce::Justification::centred);
+        group5->addControl(group5PlaceholderLabel);
+        addAndMakeVisible(*group5);
+
+        // TODO: Replace placeholder text with actual Group 6 settings/controls
+        group6 = std::make_unique<SettingsGroup>("Group 6");
+        group6PlaceholderLabel.setText("Group 6 settings coming soon...", juce::dontSendNotification);
+        group6PlaceholderLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.5f));
+        group6PlaceholderLabel.setJustificationType(juce::Justification::centred);
+        group6->addControl(group6PlaceholderLabel);
+        addAndMakeVisible(*group6);
     }
 
     void paint(juce::Graphics& g) override {
@@ -180,61 +216,51 @@ public:
         navBar.setBounds(area.removeFromTop(NavBarConstants::height));
 
         // Add some vertical spacing after navbar
-        area.removeFromTop(20);
+        area.removeFromTop(30);
 
-        // Center the settings controls horizontally
-        int contentWidth = 400;  // Fixed width for settings content
-        auto contentArea = area.withSizeKeepingCentre(contentWidth, area.getHeight());
-        contentArea = contentArea.reduced(padding, 0);
+        // Create content area with padding
+        auto contentArea = area.reduced(padding, 0);
 
-        // Internal clock checkbox row
-        auto checkboxRow = contentArea.removeFromTop(controlHeight);
-        internalClockToggle.setBounds(checkboxRow);
+        // Calculate group heights
+        int clockTimingHeight = clockTimingGroup->getMinimumHeight();
+        int playbackHeight = playbackGroup->getMinimumHeight();
+        int midiHeight = midiGroup->getMinimumHeight();
+        int group4Height = group4->getMinimumHeight();
+        int group5Height = group5->getMinimumHeight();
+        int group6Height = group6->getMinimumHeight();
 
-        contentArea.removeFromTop(controlSpacing);
+        // 3x2 Grid layout using Grid
+        juce::Grid grid;
 
-        // Tempo slider row
-        auto tempoRow = contentArea.removeFromTop(controlHeight);
-        tempoLabel.setBounds(tempoRow.removeFromLeft(labelWidth));
-        tempoSlider.setBounds(tempoRow);
+        using Track = juce::Grid::TrackInfo;
+        using Fr = juce::Grid::Fr;
+        using Px = juce::Grid::Px;
 
-        contentArea.removeFromTop(controlSpacing);
+        // Three equal columns
+        grid.templateColumns = { Track(Fr(1)), Track(Fr(1)), Track(Fr(1)) };
 
-        // Note length slider row
-        auto noteLengthRow = contentArea.removeFromTop(controlHeight);
-        noteLengthLabel.setBounds(noteLengthRow.removeFromLeft(labelWidth));
-        noteLengthSlider.setBounds(noteLengthRow);
+        // Two rows with heights based on max height in each row
+        int row1Height = juce::jmax(clockTimingHeight, juce::jmax(playbackHeight, midiHeight));
+        int row2Height = juce::jmax(group4Height, juce::jmax(group5Height, group6Height));
+        grid.templateRows = { Track(Px(row1Height)), Track(Px(row2Height)) };
 
-        contentArea.removeFromTop(controlSpacing);
+        // Set gaps
+        grid.columnGap = Px(groupHorizontalSpacing);
+        grid.rowGap = Px(groupSpacing);
 
-        // Preview notes on edit checkbox row
-        auto previewRow = contentArea.removeFromTop(controlHeight);
-        previewNotesToggle.setBounds(previewRow);
+        // Add items in 3x2 grid
+        // Row 1
+        grid.items.add(juce::GridItem(*clockTimingGroup).withArea(1, 1));
+        grid.items.add(juce::GridItem(*playbackGroup).withArea(1, 2));
+        grid.items.add(juce::GridItem(*midiGroup).withArea(1, 3));
 
-        contentArea.removeFromTop(controlSpacing);
+        // Row 2
+        grid.items.add(juce::GridItem(*group4).withArea(2, 1));
+        grid.items.add(juce::GridItem(*group5).withArea(2, 2));
+        grid.items.add(juce::GridItem(*group6).withArea(2, 3));
 
-        // Follow step checkbox row
-        auto followStepRow = contentArea.removeFromTop(controlHeight);
-        followStepToggle.setBounds(followStepRow);
-
-        contentArea.removeFromTop(controlSpacing);
-
-        // Follow playback checkbox row
-        auto followPlaybackRow = contentArea.removeFromTop(controlHeight);
-        followPlaybackToggle.setBounds(followPlaybackRow);
-
-        contentArea.removeFromTop(controlSpacing * 2);  // Extra spacing before button
-
-        // Clear MIDI Mappings button row
-        auto clearMidiRow = contentArea.removeFromTop(controlHeight);
-        constexpr int clearButtonWidth = 200;
-        clearMidiMappingsButton.setBounds(clearMidiRow.removeFromLeft(clearButtonWidth));
-
-        contentArea.removeFromTop(controlSpacing);
-
-        // MIDI clock output toggle row
-        auto midiClockRow = contentArea.removeFromTop(controlHeight);
-        midiClockOutputToggle.setBounds(midiClockRow);
+        // Perform layout
+        grid.performLayout(contentArea);
     }
 
     // Accessors for navbar
@@ -247,7 +273,6 @@ public:
     std::function<void(bool)> onPreviewNotesChanged;
     std::function<void(bool)> onFollowStepChanged;
     std::function<void(bool)> onFollowPlaybackChanged;
-    std::function<void()> onClearMidiMappings;
     std::function<void(bool)> onMidiClockOutputChanged;
 
     // Accessors for current values
@@ -287,15 +312,32 @@ private:
     juce::Typeface::Ptr interTypeface;
 
     NavBarComponent navBar;
+
+    // Settings groups
+    std::unique_ptr<SettingsGroup> clockTimingGroup;
+    std::unique_ptr<SettingsGroup> playbackGroup;
+    std::unique_ptr<SettingsGroup> midiGroup;
+    std::unique_ptr<SettingsGroup> group4;
+    std::unique_ptr<SettingsGroup> group5;
+    std::unique_ptr<SettingsGroup> group6;
+
+    // Clock & Timing controls
     juce::ToggleButton internalClockToggle;
     juce::Label tempoLabel;
     juce::Slider tempoSlider;
+    juce::ToggleButton midiClockOutputToggle;
+
+    // Playback controls
     juce::Label noteLengthLabel;
     juce::Slider noteLengthSlider;
     juce::ToggleButton previewNotesToggle;
     juce::ToggleButton followStepToggle;
     juce::ToggleButton followPlaybackToggle;
-    juce::TextButton clearMidiMappingsButton;
-    juce::ToggleButton midiClockOutputToggle;
+
+    // Placeholder labels (TODO: replace with actual controls)
+    juce::Label midiPlaceholderLabel;
+    juce::Label group4PlaceholderLabel;
+    juce::Label group5PlaceholderLabel;
+    juce::Label group6PlaceholderLabel;
 };
 

@@ -258,17 +258,6 @@ private:
                 DBG("Follow playback: " + juce::String(enabled ? "enabled" : "disabled"));
             };
 
-            // Clear MIDI Mappings button callback
-            settingsScreen->onClearMidiMappings = [this]() {
-                processorRef.queueCommand(ProcessorCommand([this]() {
-                    processorRef.getMidiLearnRegistry().clearUserMappings();
-                    DBG("Cleared all user MIDI mappings");
-                }, [this]() {
-                    // Trigger UI update to refresh overlay text
-                    mainScreen.repaint();
-                }));
-            };
-
             // MIDI Clock Output toggle callback (standalone only)
             settingsScreen->setMidiClockOutputEnabled(processorRef.getUserPreferences().midiClockOutputEnabled);
             settingsScreen->onMidiClockOutputChanged = [this](bool enabled) {
