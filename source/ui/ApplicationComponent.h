@@ -229,13 +229,12 @@ private:
                 }));
             };
 
-            // Sync note length setting from processor
-            settingsScreen->setNoteLength(processorRef.getUserPreferences().defaultNoteLength);
+            // Sync note length setting from APVTS-backed state
+            float currentNoteLength = processorRef.getState().getNoteLength();
+            settingsScreen->setNoteLength(currentNoteLength);
             settingsScreen->onNoteLengthChanged = [this](double length) {
-                processorRef.queueCommand(ProcessorCommand([this, length]() {
-                    processorRef.getUserPreferences().defaultNoteLength = length;
-                    DBG("Note length changed to: " + juce::String(length * 100.0) + "%");
-                }));
+                // Update via APVTS-backed state (thread-safe)
+                processorRef.getState().setNoteLength(static_cast<float>(length));
             };
 
             // Sync preview notes setting from processor

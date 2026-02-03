@@ -257,25 +257,38 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
 
     // Check if scheduled note-off should be sent, this is necessary to allow length adjustments.
     // Since this is mono and always will be we can just save the next note off number every time we just do a note on for that note.
-    if (scheduledNoteOffSample >= 0 && currentSamplePosition >= scheduledNoteOffSample) {
-        // make the note off message
-        // TODO: again we need to make channel configurable, this will need to be changed.
-        auto noteOff = juce::MidiMessage::noteOff (1, scheduledNoteOffNote, scheduledNoteOffVelocity);
-        // add the event...
-        midiMessages.addEvent (noteOff, 0);
+    // Sample-accurate implementation: calculate exact offset within buffer
+    if (scheduledNoteOffSample >= 0) {
+        juce::int64 bufferEndSample = currentSamplePosition + buffer.getNumSamples();
 
-        // Send directly to MIDI output device (for standalone mode)
-        if (midiOutput) {
-            // Because there is no host we simply move over USB midi.
-            // TODO: we will eventually allow the user to select multiple ways to send midi, from network midi to ble midi and possibly even OSC instead of midi.
-            midiOutput->sendMessageNow (noteOff);
+        // Check if note-off should occur within this buffer
+        if (scheduledNoteOffSample >= currentSamplePosition && scheduledNoteOffSample < bufferEndSample) {
+            // Calculate sample-accurate offset within the buffer
+            int sampleOffset = static_cast<int>(scheduledNoteOffSample - currentSamplePosition);
+
+            // Clamp to buffer bounds for safety
+            sampleOffset = juce::jlimit(0, buffer.getNumSamples() - 1, sampleOffset);
+
+            // make the note off message
+            // TODO: again we need to make channel configurable, this will need to be changed.
+            auto noteOff = juce::MidiMessage::noteOff (1, scheduledNoteOffNote, scheduledNoteOffVelocity);
+            // add the event at the precise sample offset
+            midiMessages.addEvent (noteOff, sampleOffset);
+
+            // Send directly to MIDI output device (for standalone mode)
+            if (midiOutput) {
+                // Because there is no host we simply move over USB midi.
+                // TODO: we will eventually allow the user to select multiple ways to send midi, from network midi to ble midi and possibly even OSC instead of midi.
+                midiOutput->sendMessageNow (noteOff);
+            }
+            // Note scheduled at
+            DBG ("Scheduled MIDI Note OFF: " << scheduledNoteOffNote << " at sample " << scheduledNoteOffSample
+                 << " (offset " << sampleOffset << " in buffer)");
+
+            // Clear scheduled note-off
+            scheduledNoteOffSample = -1;
+            scheduledNoteOffNote = -1;
         }
-        // Note scheduled at
-        DBG ("Scheduled MIDI Note OFF: " << scheduledNoteOffNote << " at sample " << currentSamplePosition);
-
-        // Clear scheduled note-off
-        scheduledNoteOffSample = -1;
-        scheduledNoteOffNote = -1;
     }
     // ========================================================
 
@@ -413,25 +426,22 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
             DBG ("MIDI Note ON: " << note << " (velocity " << (int) velocity << ", channel 1)");
             // set the last played note so we can send the note off
             lastPlayedNote = note;
+
             // Calculate samples per step based on current clock settings
-            // Now all this stuff is so we know how many samples to wait until we send note off.
-            double samplesPerStep = 0.0;
-            if (clock.getMode() == ClockMode::INTERNAL) {
-                samplesPerStep = clock.getInternalClock().calculateSamplesPerPulse();
-            } else {
-                // For DAW sync, we need to calculate based on DAW tempo
-                // Get tempo from play head if available
+            // Get DAW BPM if in DAW_SYNC mode
+            double dawBpm = 0.0;
+            if (clock.getMode() == ClockMode::DAW_SYNC) {
                 if (auto* playHead = getPlayHead()) {
                     auto position = playHead->getPosition();
                     if (position.hasValue() && position->getBpm().hasValue()) {
-                        double bpm = *position->getBpm();
-                        double sampleRate = getSampleRate();
-                        int pulsesPerQuarterNote = getPulsesPerQuarterNote (clock.getSubdivision());
-                        double pulsesPerSecond = (bpm * pulsesPerQuarterNote) / 60.0;
-                        samplesPerStep = sampleRate / pulsesPerSecond;
+                        dawBpm = *position->getBpm();
                     }
                 }
             }
+
+            // Use unified calculation method from Clock
+            double samplesPerStep = clock.calculateSamplesPerStep(dawBpm, getSampleRate());
+
             if (samplesPerStep > 0.0) {
                 // Calculate note-off time based on note length percentage (using APVTS-backed state)
                 double noteLengthPercent = state.getNoteLength();

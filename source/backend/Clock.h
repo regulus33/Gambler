@@ -101,13 +101,42 @@ public:
     
     /**
      * Set the sample rate (for internal clock)
-     * 
+     *
      * @param sampleRate Sample rate in Hz
      */
     void setSampleRate(double sampleRate) {
         internalClock.setSampleRate(sampleRate);
     }
-    
+
+    /**
+     * Calculate the number of samples per step based on current clock settings
+     *
+     * This method handles both INTERNAL and DAW_SYNC modes, providing a unified
+     * way to calculate step duration in samples.
+     *
+     * Formula:
+     * Pulses per second = (BPM × pulses_per_quarter_note) / 60
+     * Samples per pulse = sample_rate / pulses_per_second
+     *
+     * @param dawBpm BPM from DAW (only used in DAW_SYNC mode, ignored in INTERNAL mode)
+     * @param sampleRate Current audio sample rate
+     * @return Number of samples per step, or 0.0 if calculation is not possible
+     */
+    double calculateSamplesPerStep(double dawBpm, double sampleRate) const {
+        if (mode == ClockMode::INTERNAL) {
+            // Use internal clock's calculation
+            return internalClock.calculateSamplesPerPulse();
+        } else {
+            // DAW_SYNC mode: calculate based on DAW tempo
+            if (dawBpm <= 0.0 || sampleRate <= 0.0) {
+                return 0.0;  // Invalid parameters
+            }
+            int pulsesPerQuarterNote = getPulsesPerQuarterNote(subdivision);
+            double pulsesPerSecond = (dawBpm * pulsesPerQuarterNote) / 60.0;
+            return sampleRate / pulsesPerSecond;
+        }
+    }
+
     /**
      * Start the clock
      */

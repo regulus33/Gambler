@@ -378,7 +378,7 @@ namespace Params
         params.push_back(createBoolParam(Keys::ID::PREF_PREVIEW_NOTES, Keys::LABEL::PREF_PREVIEW_NOTES, true));
         params.push_back(createBoolParam(Keys::ID::PREF_FOLLOW_STEP, Keys::LABEL::PREF_FOLLOW_STEP, true));
         params.push_back(createBoolParam(Keys::ID::PREF_FOLLOW_PLAYBACK, Keys::LABEL::PREF_FOLLOW_PLAYBACK, true));
-        params.push_back(createFloatParam(Keys::ID::PREF_NOTE_LENGTH, Keys::LABEL::PREF_NOTE_LENGTH, 0.1f, 2.0f, 0.5f));
+        params.push_back(createFloatParam(Keys::ID::PREF_NOTE_LENGTH, Keys::LABEL::PREF_NOTE_LENGTH, 0.1f, 2.0f, 0.9f));
 
         // ========================================
         // LEGACY UI STATE (for backward compatibility)
