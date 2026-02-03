@@ -9,11 +9,11 @@
 #include <functional>
 
 namespace PresetSelectorConstants {
-    constexpr int height = 24;
-    constexpr int dropdownWidth = 140;
-    constexpr int saveButtonSize = 24;
-    constexpr int gapBetweenDropdownAndButton = 8;
-    constexpr int saveIconSize = 13;
+    constexpr int height = 31;  // 24 * 1.3
+    constexpr int dropdownWidth = 182;  // 140 * 1.3
+    constexpr int saveButtonSize = 31;  // 24 * 1.3
+    constexpr int gapBetweenDropdownAndButton = 10;  // 8 * 1.3
+    constexpr int saveIconSize = 17;  // 13 * 1.3
 }
 
 /**
@@ -29,12 +29,17 @@ public:
 
     void paint(juce::Graphics& g) override {
         using namespace PresetSelectorConstants;
-        
+        using namespace PresetDropdownConstants;
+
+        // Draw border with rounded corners
+        g.setColour(borderColor);
+        g.drawRoundedRectangle(getLocalBounds().toFloat(), borderRadius, borderWidth);
+
         // Draw save icon centered
         auto iconBounds = getLocalBounds().toFloat().reduced(
             (getWidth() - saveIconSize) / 2.0f,
             (getHeight() - saveIconSize) / 2.0f);
-        
+
         Icons::drawIcon(g, saveIcon, iconBounds, juce::Colours::white);
     }
 
