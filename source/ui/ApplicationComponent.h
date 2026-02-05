@@ -237,31 +237,48 @@ private:
                 processorRef.getState().setNoteLength(static_cast<float>(length));
             };
 
-            // Sync preview notes setting from processor
-            settingsScreen->setPreviewNotesEnabled(processorRef.getUserPreferences().previewNotesOnEdit);
+            // Sync preview notes setting from APVTS
+            if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
+                processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_PREVIEW_NOTES))) {
+                settingsScreen->setPreviewNotesEnabled(param->get());
+            }
             settingsScreen->onPreviewNotesChanged = [this](bool enabled) {
-                processorRef.getUserPreferences().previewNotesOnEdit = enabled;
-                DBG("Preview notes on edit: " + juce::String(enabled ? "enabled" : "disabled"));
+                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_PREVIEW_NOTES)) {
+                    param->setValueNotifyingHost(enabled ? 1.0f : 0.0f);
+                    DBG("Preview notes on edit: " + juce::String(enabled ? "enabled" : "disabled"));
+                }
             };
 
-            // Sync follow step setting from processor
-            settingsScreen->setFollowStepEnabled(processorRef.getUserPreferences().followStep);
+            // Sync follow step setting from APVTS
+            if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
+                processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_FOLLOW_STEP))) {
+                settingsScreen->setFollowStepEnabled(param->get());
+            }
             settingsScreen->onFollowStepChanged = [this](bool enabled) {
-                processorRef.getUserPreferences().followStep = enabled;
-                DBG("Follow step: " + juce::String(enabled ? "enabled" : "disabled"));
+                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_FOLLOW_STEP)) {
+                    param->setValueNotifyingHost(enabled ? 1.0f : 0.0f);
+                    DBG("Follow step: " + juce::String(enabled ? "enabled" : "disabled"));
+                }
             };
 
-            // Sync follow playback setting from processor
-            settingsScreen->setFollowPlaybackEnabled(processorRef.getUserPreferences().followPlayback);
+            // Sync follow playback setting from APVTS
+            if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
+                processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_FOLLOW_PLAYBACK))) {
+                settingsScreen->setFollowPlaybackEnabled(param->get());
+            }
             settingsScreen->onFollowPlaybackChanged = [this](bool enabled) {
-                processorRef.getUserPreferences().followPlayback = enabled;
-                DBG("Follow playback: " + juce::String(enabled ? "enabled" : "disabled"));
+                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_FOLLOW_PLAYBACK)) {
+                    param->setValueNotifyingHost(enabled ? 1.0f : 0.0f);
+                    DBG("Follow playback: " + juce::String(enabled ? "enabled" : "disabled"));
+                }
             };
 
             // MIDI Clock Output toggle callback (standalone only)
-            settingsScreen->setMidiClockOutputEnabled(processorRef.getUserPreferences().midiClockOutputEnabled);
+            // Note: MIDI clock output is NOT stored in APVTS - it's a runtime setting only
+            // We'll keep track of it in a local variable for now
+            // TODO: Consider if this should be persisted or remain runtime-only
+            settingsScreen->setMidiClockOutputEnabled(false); // Default to disabled
             settingsScreen->onMidiClockOutputChanged = [this](bool enabled) {
-                processorRef.getUserPreferences().midiClockOutputEnabled = enabled;
                 if (enabled) {
                     processorRef.openAllMidiClockOutputs();
                     DBG("MIDI clock output enabled - opened all devices");

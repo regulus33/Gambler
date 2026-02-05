@@ -6,7 +6,6 @@
 #include "backend/PresetManager.h"
 #include "backend/ProcessorCommand.h"
 #include "backend/SequenceState.h"
-#include "backend/UserPreferences.h"
 #include "data/Params.h"
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -122,10 +121,6 @@ public:
      */
     SequencerState getSequencerState() const { return sequencerState.load(); }
 
-    // User preferences (persisted with project)
-    UserPreferences& getUserPreferences() noexcept { return userPreferences; }
-    const UserPreferences& getUserPreferences() const noexcept { return userPreferences; }
-
     // Preset manager
     PresetManager& getPresetManager() noexcept { return presetManager; }
     const PresetManager& getPresetManager() const noexcept { return presetManager; }
@@ -197,9 +192,6 @@ private:
     // Clock and DAW synchronization
     Clock clock; // clock just tells us if we shouldTick()
     DawSync dawSync; // daw sing
-
-    // User preferences (persisted with project)
-    UserPreferences userPreferences;
 
     // Preset manager
     PresetManager presetManager;

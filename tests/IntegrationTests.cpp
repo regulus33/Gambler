@@ -2,7 +2,6 @@
 #include <catch2/catch_approx.hpp>
 #include "../source/backend/Clock.h"
 #include "../source/backend/ProcessorCommand.h"
-#include "../source/backend/UserPreferences.h"
 #include "../source/backend/Scale.h"
 
 /**
@@ -42,28 +41,6 @@ SCENARIO("Clock mode switching integration", "[integration]") {
             THEN("Can process samples again") {
                 clock.processInternalClock(6000);  // Enough for one tick at 120 BPM
                 REQUIRE(clock.shouldTick() == true);
-            }
-        }
-    }
-}
-
-SCENARIO("UserPreferences serialization", "[integration]") {
-    GIVEN("UserPreferences with custom values") {
-        UserPreferences prefs;
-
-        // Configure preferences
-        prefs.defaultNoteLength = 0.8;
-        prefs.previewNotesOnEdit = true;
-
-        WHEN("Preferences are accessed") {
-            double noteLength = prefs.defaultNoteLength;
-
-            THEN("Note length preference is accessible") {
-                REQUIRE(noteLength == Catch::Approx(0.8));
-            }
-
-            THEN("Preview preference is accessible") {
-                REQUIRE(prefs.previewNotesOnEdit == true);
             }
         }
     }

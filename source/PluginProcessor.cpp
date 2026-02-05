@@ -486,20 +486,20 @@ void PluginProcessor::getStateInformation (juce::MemoryBlock& destData) {
     // Create root XML element to hold all state
     auto rootXml = std::make_unique<juce::XmlElement> ("GamblerState");
 
-    // Save APVTS parameters (contains all sequence data now)
+    // Save APVTS parameters (contains all sequence data and user preferences)
     auto apvtsXml = apvts.copyState().createXml();
     rootXml->addChildElement (apvtsXml.release());
 
     // Save Clock settings (mode, BPM, subdivision)
     rootXml->addChildElement (clock.toXml().release());
 
-    // Save User Preferences
-    rootXml->addChildElement (userPreferences.toXml().release());
+    // Save MIDI Learn Mappings
+    rootXml->addChildElement (midiLearnRegistry.toXml().release());
 
     // Convert to binary and save
     copyXmlToBinary (*rootXml, destData);
 
-    DBG ("State saved: APVTS (sequence data), Clock, and UserPreferences");
+    DBG ("State saved: APVTS (sequence data and preferences), Clock, and MIDI Learn Mappings");
 }
 
 // TODO: are we actually using this?
@@ -525,16 +525,37 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
                 DBG ("  - Clock loaded (mode: " + modeStr + ", BPM: " + juce::String (clock.getBpm()) + ")");
             }
 
-            // Load User Preferences
-            if (auto* prefsXml = rootXml->getChildByName ("UserPreferences")) {
-                userPreferences.fromXml (*prefsXml);
-                DBG ("  - UserPreferences loaded (previewNotesOnEdit: " + juce::String (userPreferences.previewNotesOnEdit ? "true" : "false") + ")");
+            // Load MIDI Learn Mappings
+            if (auto* midiLearnXml = rootXml->getChildByName ("MidiLearnMappings")) {
+                midiLearnRegistry.fromXml (*midiLearnXml);
+                DBG ("  - MIDI Learn Mappings loaded");
             }
 
-            // Backward compatibility: Load from old "Settings" element
+            // Backward compatibility: Load from old "UserPreferences" or "Settings" element
+            // These are now stored in APVTS, but we need to migrate old saves
+            if (auto* prefsXml = rootXml->getChildByName ("UserPreferences")) {
+                // Migrate old UserPreferences to APVTS
+                if (auto* param = apvts.getParameter(Params::Keys::ID::PREF_PREVIEW_NOTES)) {
+                    param->setValueNotifyingHost(prefsXml->getBoolAttribute("previewNotesOnEdit", true) ? 1.0f : 0.0f);
+                }
+                if (auto* param = apvts.getParameter(Params::Keys::ID::PREF_FOLLOW_STEP)) {
+                    param->setValueNotifyingHost(prefsXml->getBoolAttribute("followStep", true) ? 1.0f : 0.0f);
+                }
+                if (auto* param = apvts.getParameter(Params::Keys::ID::PREF_FOLLOW_PLAYBACK)) {
+                    param->setValueNotifyingHost(prefsXml->getBoolAttribute("followPlayback", true) ? 1.0f : 0.0f);
+                }
+                if (auto* param = apvts.getParameter(Params::Keys::ID::PREF_NOTE_LENGTH)) {
+                    float noteLength = static_cast<float>(prefsXml->getDoubleAttribute("defaultNoteLength", 0.9));
+                    param->setValueNotifyingHost(param->convertTo0to1(noteLength));
+                }
+                DBG ("  - Migrated legacy UserPreferences to APVTS");
+            }
             else if (auto* settingsXml = rootXml->getChildByName ("Settings")) {
-                userPreferences.previewNotesOnEdit = settingsXml->getBoolAttribute ("previewNotesOnEdit", true);
-                DBG ("  - UserPreferences loaded from legacy Settings format");
+                // Migrate even older Settings format
+                if (auto* param = apvts.getParameter(Params::Keys::ID::PREF_PREVIEW_NOTES)) {
+                    param->setValueNotifyingHost(settingsXml->getBoolAttribute("previewNotesOnEdit", true) ? 1.0f : 0.0f);
+                }
+                DBG ("  - Migrated legacy Settings to APVTS");
             }
         }
         // Fallback: Old format (just APVTS)
@@ -948,15 +969,12 @@ std::unique_ptr<juce::XmlElement> PluginProcessor::getStateAsXml() {
     // Create root XML element to hold all state (same format as getStateInformation)
     auto rootXml = std::make_unique<juce::XmlElement> ("GamblerState");
 
-    // Save APVTS parameters (contains all sequence data)
+    // Save APVTS parameters (contains all sequence data and user preferences)
     auto apvtsXml = apvts.copyState().createXml();
     rootXml->addChildElement (apvtsXml.release());
 
     // Save Clock settings (mode, BPM, subdivision)
     rootXml->addChildElement (clock.toXml().release());
-
-    // Save User Preferences
-    rootXml->addChildElement (userPreferences.toXml().release());
 
     // Save MIDI Learn Mappings
     rootXml->addChildElement (midiLearnRegistry.toXml().release());
@@ -989,12 +1007,6 @@ void PluginProcessor::loadStateFromXml (const juce::XmlElement& xml) {
                 clock.fromXml (*clockXml);
                 juce::String modeStr = (clock.getMode() == ClockMode::INTERNAL) ? "INTERNAL" : "DAW_SYNC";
                 DBG ("  - Clock loaded (mode: " + modeStr + ", BPM: " + juce::String (clock.getBpm()) + ")");
-            }
-
-            // Load User Preferences
-            if (auto* prefsXml = xmlCopy->getChildByName ("UserPreferences")) {
-                userPreferences.fromXml (*prefsXml);
-                DBG ("  - UserPreferences loaded");
             }
 
             // Load MIDI Learn Mappings

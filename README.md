@@ -261,15 +261,11 @@ for state changes.
 Registry of UI update callbacks for MIDI-controlled elements. When MIDI changes state, these callbacks update UI to
 reflect changes (button animations, slider positions).
 
-#### `UserPreferences`
-
-Stores user customization settings (preview notes on edit, follow step, note length, MIDI clock output). Persisted with
-plugin state but separate from domain model.
-
 #### `Params` (namespace)
 
-Comprehensive APVTS parameter definitions. Contains ~2500 parameter IDs and labels for all sequencer state. Provides
-createDefaultParameterLayout() for APVTS initialization.
+Comprehensive APVTS parameter definitions. Contains ~2500 parameter IDs and labels for all sequencer state and user
+preferences (preview notes, follow step, follow playback, note length). Provides createDefaultParameterLayout() for APVTS
+initialization. All state is thread-safe and automatically persisted.
 
 ---
 

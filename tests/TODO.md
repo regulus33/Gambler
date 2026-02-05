@@ -1,6 +1,12 @@
 # TODO
 
 -----
+# Make by default all note on off events
+map to keys on scale. B~UT~ if any note on off on any channel
+is explicitly assigned to any other control, ignore it for scale.
+
+This setting should be disable-able
+
 # preset dropdown
 We need to create a new apvts param that
 will change the current preset.
@@ -33,22 +39,6 @@ The cc modulation panel, we need buttons:
 2. select one
 3. randomize selected
 
-# Settings screen
-organize info:
-
-internal clock
-tempo 
-note length (doesn't work)
-preview notes on edit
-follow step
-follow playback
-clear midi mappings
-midi clock output
-
-don't show preset browser on this screen
-
-Either make all prefs apvts params or none.
-
 # DONE
 
 ----- 
@@ -64,4 +54,18 @@ Drag note range should shift range up or down
 
 
 
+# Settings screen
+organize info:
 
+internal clock
+tempo
+note length (doesn't work)
+preview notes on edit
+follow step
+follow playback
+clear midi mappings
+midi clock output
+
+don't show preset browser on this screen
+
+Either make all prefs apvts params or none.

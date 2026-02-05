@@ -152,10 +152,12 @@ public:
             state.updateCurrentNoteForStep(selectedStep, newNote);
             DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote);
 
-            // Trigger MIDI preview if enabled
-            bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
-            if (previewEnabled) {
-                processorRef.triggerCurrentStepMidi(newNote);
+            // Trigger MIDI preview if enabled (read from APVTS)
+            if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
+                processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_PREVIEW_NOTES))) {
+                if (param->get()) {
+                    processorRef.triggerCurrentStepMidi(newNote);
+                }
             }
         };
 
@@ -171,10 +173,12 @@ public:
             state.updateCurrentNoteForStep(selectedStep, newNote);
             DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote);
 
-            // Trigger MIDI preview if enabled
-            bool previewEnabled = processorRef.getUserPreferences().previewNotesOnEdit;
-            if (previewEnabled) {
-                processorRef.triggerCurrentStepMidi(newNote);
+            // Trigger MIDI preview if enabled (read from APVTS)
+            if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
+                processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_PREVIEW_NOTES))) {
+                if (param->get()) {
+                    processorRef.triggerCurrentStepMidi(newNote);
+                }
             }
         };
 
@@ -341,21 +345,27 @@ public:
         int currentStep = state.getCurrentIndex();
         int selectedStep = state.getSelectedStepForEditing();
 
-        // If followPlayback is enabled, update the selected step to match playback position
-        if (processorRef.getUserPreferences().followPlayback && currentStep >= 0) {
-            state.setSelectedStepForEditing(currentStep);
-            selectedStep = currentStep; // Update local copy for UI rendering
+        // If followPlayback is enabled, update the selected step to match playback position (read from APVTS)
+        if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
+            processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_FOLLOW_PLAYBACK))) {
+            if (param->get() && currentStep >= 0) {
+                state.setSelectedStepForEditing(currentStep);
+                selectedStep = currentStep; // Update local copy for UI rendering
+            }
         }
 
         // Update the active step indicator to follow the sequence playback
         setActiveStepAndNote(currentStep);
 
-        // Auto-scroll the sequencer window to follow the active step (if enabled)
-        if (processorRef.getUserPreferences().followStep && currentStep >= 0) {
-            // Calculate which "row" (0-7) the current step is in (8 steps per row)
-            int rowIndex = currentStep / 8;
-            int windowStart = rowIndex * 8;
-            setSequencerWindow(windowStart);
+        // Auto-scroll the sequencer window to follow the active step (if enabled, read from APVTS)
+        if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
+            processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_FOLLOW_STEP))) {
+            if (param->get() && currentStep >= 0) {
+                // Calculate which "row" (0-7) the current step is in (8 steps per row)
+                int rowIndex = currentStep / 8;
+                int windowStart = rowIndex * 8;
+                setSequencerWindow(windowStart);
+            }
         }
 
         // Repaint the sequencer steps to show updated note values
