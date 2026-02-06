@@ -1,12 +1,6 @@
 # TODO
 
 -----
-# Make by default all note on off events
-map to keys on scale. B~UT~ if any note on off on any channel
-is explicitly assigned to any other control, ignore it for scale.
-
-This setting should be disable-able
-
 # preset dropdown
 We need to create a new apvts param that
 will change the current preset.
@@ -49,9 +43,6 @@ Note range slider needs to be midi mappable
 It also needs to space the knobs further apart
 
 Drag note range should shift range up or down
-
-
-
 
 # Settings screen
 organize info:
