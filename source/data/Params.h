@@ -109,6 +109,7 @@ namespace Params
             inline const String PREF_FOLLOW_STEP = "pref_follow_step";
             inline const String PREF_FOLLOW_PLAYBACK = "pref_follow_playback";
             inline const String PREF_NOTE_LENGTH = "pref_note_length";
+            inline const String PREF_PIANO_KEY_MOMENTARY = "pref_piano_key_momentary";
 
             // ========================================
             // UI STATE (kept for backward compatibility)
@@ -218,6 +219,7 @@ namespace Params
             inline const String PREF_FOLLOW_STEP = "Follow Step";
             inline const String PREF_FOLLOW_PLAYBACK = "Follow Playback";
             inline const String PREF_NOTE_LENGTH = "Note Length";
+            inline const String PREF_PIANO_KEY_MOMENTARY = "Piano Key Momentary";
 
             // Legacy UI labels - Primary row
             inline const String ROLL = "Roll";
@@ -379,6 +381,7 @@ namespace Params
         params.push_back(createBoolParam(Keys::ID::PREF_FOLLOW_STEP, Keys::LABEL::PREF_FOLLOW_STEP, true));
         params.push_back(createBoolParam(Keys::ID::PREF_FOLLOW_PLAYBACK, Keys::LABEL::PREF_FOLLOW_PLAYBACK, true));
         params.push_back(createFloatParam(Keys::ID::PREF_NOTE_LENGTH, Keys::LABEL::PREF_NOTE_LENGTH, 0.1f, 2.0f, 0.9f));
+        params.push_back(createBoolParam(Keys::ID::PREF_PIANO_KEY_MOMENTARY, Keys::LABEL::PREF_PIANO_KEY_MOMENTARY, false));
 
         // ========================================
         // LEGACY UI STATE (for backward compatibility)

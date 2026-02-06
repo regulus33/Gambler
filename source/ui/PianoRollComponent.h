@@ -6,6 +6,7 @@
 #include "MidiLearnOverlayPainter.h"
 #include "StateListenerComponent.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <set>
 
 namespace PianoRollConstants {
     // Scale factor to match 4 sequencer steps (4×92px) + 3 gaps (3×18px) = 422px
@@ -136,6 +137,9 @@ public:
     }
 
     void mouseDown (const juce::MouseEvent& event) override {
+        // Check if we're in momentary mode
+        bool isMomentary = getProcessor().getState().getPianoKeyMomentary();
+
         // Check white keys first (they're on top visually)
         for (int i = 0; i < 12; i++) {
             if (!keys[i]->isBlack && keys[i]->path.contains (event.position)) {
@@ -146,11 +150,23 @@ public:
                     return;
                 }
 
-                // Normal toggle behavior
-                if (tryToggleKey(i)) {
-                    repaint();
-                    if (onNoteChanged)
-                        onNoteChanged();
+                // Handle key press based on mode
+                if (isMomentary) {
+                    // Momentary mode: turn on key if not already on
+                    if (!keys[i]->isToggled) {
+                        keys[i]->isToggled = true;
+                        momentaryPressedKeys_.insert(i);
+                        repaint();
+                        if (onNoteChanged)
+                            onNoteChanged();
+                    }
+                } else {
+                    // Toggle mode: normal toggle behavior
+                    if (tryToggleKey(i)) {
+                        repaint();
+                        if (onNoteChanged)
+                            onNoteChanged();
+                    }
                 }
                 return;
             }
@@ -166,14 +182,48 @@ public:
                     return;
                 }
 
-                // Normal toggle behavior
-                if (tryToggleKey(i)) {
-                    repaint();
-                    if (onNoteChanged)
-                        onNoteChanged();
+                // Handle key press based on mode
+                if (isMomentary) {
+                    // Momentary mode: turn on key if not already on
+                    if (!keys[i]->isToggled) {
+                        keys[i]->isToggled = true;
+                        momentaryPressedKeys_.insert(i);
+                        repaint();
+                        if (onNoteChanged)
+                            onNoteChanged();
+                    }
+                } else {
+                    // Toggle mode: normal toggle behavior
+                    if (tryToggleKey(i)) {
+                        repaint();
+                        if (onNoteChanged)
+                            onNoteChanged();
+                    }
                 }
                 return;
             }
+        }
+    }
+
+    void mouseUp (const juce::MouseEvent& event) override {
+        // Check if we're in momentary mode
+        bool isMomentary = getProcessor().getState().getPianoKeyMomentary();
+
+        if (!isMomentary) {
+            return; // In toggle mode, mouseUp does nothing
+        }
+
+        // In momentary mode, turn off any keys that were pressed
+        if (!momentaryPressedKeys_.empty()) {
+            for (int keyIndex : momentaryPressedKeys_) {
+                if (keyIndex >= 0 && keyIndex < 12) {
+                    keys[keyIndex]->isToggled = false;
+                }
+            }
+            momentaryPressedKeys_.clear();
+            repaint();
+            if (onNoteChanged)
+                onNoteChanged();
         }
     }
 
@@ -597,6 +647,9 @@ private:
     // MIDI learn support
     MidiLearnRegistry* registry_ = nullptr;
     std::array<MidiControlId, 12> keyMidiControlIds_;
+
+    // Momentary mode support - tracks which keys are currently pressed
+    std::set<int> momentaryPressedKeys_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
 };

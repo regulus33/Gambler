@@ -479,6 +479,14 @@ public:
         setFloatParam(Params::Keys::ID::PREF_NOTE_LENGTH, juce::jlimit(0.0f, 1.0f, length));
     }
 
+    bool getPianoKeyMomentary() const {
+        return getBoolParam(Params::Keys::ID::PREF_PIANO_KEY_MOMENTARY);
+    }
+
+    void setPianoKeyMomentary(bool momentary) {
+        setBoolParam(Params::Keys::ID::PREF_PIANO_KEY_MOMENTARY, momentary);
+    }
+
     // ========================================
     // SEQUENCER OPERATIONS
     // ========================================

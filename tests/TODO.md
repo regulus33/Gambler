@@ -29,10 +29,6 @@ with a white border, neither of these states are clear.
 Seems to be an occasional bug where note selection
 is not being properly set, something with quant?
 
-# Midi maps are not saving to pref!
-Midi mapping does not persist through app runs
-
-
 # CC modulation
 The cc modulation panel, we need buttons:
 1. enable all
@@ -42,6 +38,9 @@ The cc modulation panel, we need buttons:
 # DONE
 
 ----- 
+
+# Midi maps are not saving to pref!
+Midi mapping does not persist through app runs
 
 
 # Note range slider

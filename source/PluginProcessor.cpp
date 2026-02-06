@@ -1384,26 +1384,60 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
         case MidiControlId::SCALE_NOTE_A:
         case MidiControlId::SCALE_NOTE_Bb:
         case MidiControlId::SCALE_NOTE_B: {
-            if (isNoteOnOrCCPositive) {
-                int noteIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::SCALE_NOTE_C);
-                bool currentState = state.getScaleNote (noteIndex);
+            int noteIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::SCALE_NOTE_C);
+            bool currentState = state.getScaleNote (noteIndex);
 
-                // Only toggle if there's more than one note in the scale
-                int activeNotes = 0;
-                for (int i = 0; i < 12; i++) {
-                    if (state.getScaleNote (i))
-                        activeNotes++;
-                }
+            // Check if we're in momentary mode
+            bool isMomentary = state.getPianoKeyMomentary();
 
-                if (activeNotes > 1 || !currentState) {
-                    state.setScaleNote (noteIndex, !currentState);
-                    // NOTE: No need to quantize all notes - quantization happens on-the-fly during playback/display
-                    DBG ("  → Scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
+            if (isMomentary) {
+                // Momentary mode: Note ON turns key on, Note OFF turns key off
+                if (isNoteOnOrCCPositive) {
+                    // Turn on the key if not already on
+                    if (!currentState) {
+                        state.setScaleNote (noteIndex, true);
+                        DBG ("  → Scale note " << noteIndex << " turned ON (momentary)");
+                        if (onSequenceTick)
+                            onSequenceTick();
+                    }
                 } else {
-                    DBG ("  → Cannot disable last scale note");
+                    // Turn off the key (Note OFF)
+                    // Only allow turning off if there's more than one note in the scale
+                    int activeNotes = 0;
+                    for (int i = 0; i < 12; i++) {
+                        if (state.getScaleNote (i))
+                            activeNotes++;
+                    }
+
+                    if (activeNotes > 1) {
+                        state.setScaleNote (noteIndex, false);
+                        DBG ("  → Scale note " << noteIndex << " turned OFF (momentary)");
+                        if (onSequenceTick)
+                            onSequenceTick();
+                    } else {
+                        DBG ("  → Cannot disable last scale note");
+                    }
                 }
-                if (onSequenceTick)
-                    onSequenceTick();
+            } else {
+                // Toggle mode: Note ON toggles, Note OFF does nothing
+                if (isNoteOnOrCCPositive) {
+                    // Only toggle if there's more than one note in the scale
+                    int activeNotes = 0;
+                    for (int i = 0; i < 12; i++) {
+                        if (state.getScaleNote (i))
+                            activeNotes++;
+                    }
+
+                    if (activeNotes > 1 || !currentState) {
+                        state.setScaleNote (noteIndex, !currentState);
+                        // NOTE: No need to quantize all notes - quantization happens on-the-fly during playback/display
+                        DBG ("  → Scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
+                        if (onSequenceTick)
+                            onSequenceTick();
+                    } else {
+                        DBG ("  → Cannot disable last scale note");
+                    }
+                }
             }
             break;
         }

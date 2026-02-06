@@ -288,6 +288,18 @@ private:
                 }
             };
 
+            // Sync piano key momentary setting from APVTS
+            if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
+                processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_PIANO_KEY_MOMENTARY))) {
+                settingsScreen->setPianoKeyMomentaryEnabled(param->get());
+            }
+            settingsScreen->onPianoKeyMomentaryChanged = [this](bool enabled) {
+                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_PIANO_KEY_MOMENTARY)) {
+                    param->setValueNotifyingHost(enabled ? 1.0f : 0.0f);
+                    DBG("Piano key momentary: " + juce::String(enabled ? "enabled" : "disabled"));
+                }
+            };
+
             addAndMakeVisible(*settingsScreen);
             settingsScreen->setBounds(getLocalBounds());
         }
