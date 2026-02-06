@@ -52,23 +52,26 @@ enum class MidiControlId {
     // ========== SEQUENCER STEPS (8 visible steps in window) ==========
     STEP_0, STEP_1, STEP_2, STEP_3, STEP_4, STEP_5, STEP_6, STEP_7,
 
-    // ========== SEQUENCER CONTROLS - PRIMARY ROW (8 buttons, always visible) ==========
-    BUTTON_ROLL,           // Momentary: enable random mode
-    BUTTON_PAGE_LEFT,      // Scroll view window left by 8 steps
-    BUTTON_PAGE_RIGHT,     // Scroll view window right by 8 steps
-    BUTTON_LENGTH_PLUS,    // Increase sequence length
-    BUTTON_LENGTH_MINUS,   // Decrease sequence length
-    BUTTON_NUDGE_LEFT,     // Shift all notes left
-    BUTTON_NUDGE_RIGHT,    // Shift all notes right
-    BUTTON_SHIFT,          // Toggle to show/hide secondary row
-
-    // ========== SEQUENCER CONTROLS - SECONDARY ROW (6 buttons, visible when Shift active) ==========
-    BUTTON_DUPLICATE,      // Duplicate sequence (double length, copy content)
-    BUTTON_CLEAR_WINDOW,   // Clear current 8-step window
-    BUTTON_CLEAR_STEP,     // Clear current step to rest
-    BUTTON_RANDOMIZE_STEP, // Randomize current step
-    BUTTON_RANDOMIZE_ALL,  // Randomize all steps
-    BUTTON_SHUFFLE,        // Shuffle step order
+    // ========== SEQUENCER CONTROLS (8 buttons) ==========
+    // Note: Buttons at positions 1-6 are shift-aware and trigger different actions
+    // based on the shift state. MIDI mappings are shared between primary and shift functions.
+    //
+    // Position 0: BUTTON_ROLL (always Roll)
+    // Position 1: BUTTON_PAGE_LEFT (Page Left / Duplicate when shift active)
+    // Position 2: BUTTON_PAGE_RIGHT (Page Right / Clear Window when shift active)
+    // Position 3: BUTTON_LENGTH_PLUS (Length+ / Clear Step when shift active)
+    // Position 4: BUTTON_LENGTH_MINUS (Length- / Randomize All when shift active)
+    // Position 5: BUTTON_NUDGE_LEFT (Nudge Left / Randomize Step when shift active)
+    // Position 6: BUTTON_NUDGE_RIGHT (Nudge Right / Shuffle when shift active)
+    // Position 7: BUTTON_SHIFT (always Shift)
+    BUTTON_ROLL,           // Position 0: Momentary: enable random mode
+    BUTTON_PAGE_LEFT,      // Position 1: Scroll view window left / Duplicate (shift)
+    BUTTON_PAGE_RIGHT,     // Position 2: Scroll view window right / Clear Window (shift)
+    BUTTON_LENGTH_PLUS,    // Position 3: Increase sequence length / Clear Step (shift)
+    BUTTON_LENGTH_MINUS,   // Position 4: Decrease sequence length / Randomize All (shift)
+    BUTTON_NUDGE_LEFT,     // Position 5: Shift all notes left / Randomize Step (shift)
+    BUTTON_NUDGE_RIGHT,    // Position 6: Shift all notes right / Shuffle (shift)
+    BUTTON_SHIFT,          // Position 7: Toggle to show/hide secondary row
 
     // ========== SUBSEQUENCE CONTROLS (10 controls) ==========
     SUBSEQ_BAR_0, SUBSEQ_BAR_1, SUBSEQ_BAR_2, SUBSEQ_BAR_3,
@@ -205,23 +208,15 @@ inline std::string getMidiControlName(MidiControlId id) {
         case MidiControlId::STEP_6: return "Step 6";
         case MidiControlId::STEP_7: return "Step 7";
 
-        // Sequencer Controls - Primary Row
+        // Sequencer Controls (shift-aware buttons share MIDI mappings)
         case MidiControlId::BUTTON_ROLL:           return "Roll Button";
-        case MidiControlId::BUTTON_PAGE_LEFT:      return "Page Left";
-        case MidiControlId::BUTTON_PAGE_RIGHT:     return "Page Right";
-        case MidiControlId::BUTTON_LENGTH_PLUS:    return "Length +";
-        case MidiControlId::BUTTON_LENGTH_MINUS:   return "Length -";
-        case MidiControlId::BUTTON_NUDGE_LEFT:     return "Nudge Left";
-        case MidiControlId::BUTTON_NUDGE_RIGHT:    return "Nudge Right";
+        case MidiControlId::BUTTON_PAGE_LEFT:      return "Page Left / Duplicate";
+        case MidiControlId::BUTTON_PAGE_RIGHT:     return "Page Right / Clear Window";
+        case MidiControlId::BUTTON_LENGTH_PLUS:    return "Length + / Clear Step";
+        case MidiControlId::BUTTON_LENGTH_MINUS:   return "Length - / Randomize All";
+        case MidiControlId::BUTTON_NUDGE_LEFT:     return "Nudge Left / Randomize Step";
+        case MidiControlId::BUTTON_NUDGE_RIGHT:    return "Nudge Right / Shuffle";
         case MidiControlId::BUTTON_SHIFT:          return "Shift Button";
-
-        // Sequencer Controls - Secondary Row
-        case MidiControlId::BUTTON_DUPLICATE:      return "Duplicate";
-        case MidiControlId::BUTTON_CLEAR_WINDOW:   return "Clear Window";
-        case MidiControlId::BUTTON_CLEAR_STEP:     return "Clear Step";
-        case MidiControlId::BUTTON_RANDOMIZE_STEP: return "Randomize Step";
-        case MidiControlId::BUTTON_RANDOMIZE_ALL:  return "Randomize All";
-        case MidiControlId::BUTTON_SHUFFLE:        return "Shuffle";
 
         // Subsequence Controls
         case MidiControlId::SUBSEQ_BAR_0: return "Subseq Bar 0";

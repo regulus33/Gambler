@@ -4,19 +4,22 @@
 
 /**
  * ClearWindowButton - Clears all notes in the current 8-step view window
- * 
+ *
  * Observer pattern implementation:
  * - mouseDown sets CLEAR_WINDOW param to true
  * - mouseUp sets CLEAR_WINDOW param to false
  * - Visual state reflects param value (white when true, grey when false)
  * - PluginProcessor::parameterChanged handles the actual clear window action
+ *
+ * MIDI Mapping:
+ * - Shares BUTTON_PAGE_RIGHT MIDI mapping (shift-aware routing in PluginProcessor)
  */
 class ClearWindowButton : public SequencerControlButton {
 public:
     explicit ClearWindowButton(PluginProcessor& processor)
-        : SequencerControlButton(processor, 
+        : SequencerControlButton(processor,
                                   Params::Keys::ID::CLEAR_WINDOW,
-                                  MidiControlId::BUTTON_CLEAR_WINDOW)
+                                  MidiControlId::BUTTON_PAGE_RIGHT)  // Shares mapping with PageRight
     {
         setIcon(Icons::createTrashIcon());
         setLabel("Clear");

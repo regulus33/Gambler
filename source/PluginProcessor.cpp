@@ -1180,50 +1180,68 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             break;
         }
 
+        // ========== POSITION 1: PAGE_LEFT / DUPLICATE (shift-aware) ==========
         case MidiControlId::BUTTON_PAGE_LEFT: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::INDEX_LEFT)) {
+            bool isShiftActive = state.getIsShift();
+            juce::String paramId = isShiftActive ? Params::Keys::ID::DUPLICATE : Params::Keys::ID::INDEX_LEFT;
+            if (auto* param = apvts.getParameter (paramId)) {
                 param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → INDEX_LEFT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+                DBG ("  → " << (isShiftActive ? "DUPLICATE" : "INDEX_LEFT") << " param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
+        // ========== POSITION 2: PAGE_RIGHT / CLEAR_WINDOW (shift-aware) ==========
         case MidiControlId::BUTTON_PAGE_RIGHT: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::INDEX_RIGHT)) {
+            bool isShiftActive = state.getIsShift();
+            juce::String paramId = isShiftActive ? Params::Keys::ID::CLEAR_WINDOW : Params::Keys::ID::INDEX_RIGHT;
+            if (auto* param = apvts.getParameter (paramId)) {
                 param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → INDEX_RIGHT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+                DBG ("  → " << (isShiftActive ? "CLEAR_WINDOW" : "INDEX_RIGHT") << " param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
+        // ========== POSITION 3: LENGTH_PLUS / CLEAR_STEP (shift-aware) ==========
         case MidiControlId::BUTTON_LENGTH_PLUS: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::LENGTH_PLUS)) {
+            bool isShiftActive = state.getIsShift();
+            juce::String paramId = isShiftActive ? Params::Keys::ID::CLEAR_STEP : Params::Keys::ID::LENGTH_PLUS;
+            if (auto* param = apvts.getParameter (paramId)) {
                 param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → LENGTH_PLUS param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+                DBG ("  → " << (isShiftActive ? "CLEAR_STEP" : "LENGTH_PLUS") << " param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
+        // ========== POSITION 4: LENGTH_MINUS / RANDOMIZE_ALL (shift-aware) ==========
         case MidiControlId::BUTTON_LENGTH_MINUS: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::LENGTH_MINUS)) {
+            bool isShiftActive = state.getIsShift();
+            juce::String paramId = isShiftActive ? Params::Keys::ID::RANDOMIZE_ALL : Params::Keys::ID::LENGTH_MINUS;
+            if (auto* param = apvts.getParameter (paramId)) {
                 param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → LENGTH_MINUS param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+                DBG ("  → " << (isShiftActive ? "RANDOMIZE_ALL" : "LENGTH_MINUS") << " param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
+        // ========== POSITION 5: NUDGE_LEFT / RANDOMIZE_STEP (shift-aware) ==========
         case MidiControlId::BUTTON_NUDGE_LEFT: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::NUDGE_LEFT)) {
+            bool isShiftActive = state.getIsShift();
+            juce::String paramId = isShiftActive ? Params::Keys::ID::RANDOMIZE_STEP : Params::Keys::ID::NUDGE_LEFT;
+            if (auto* param = apvts.getParameter (paramId)) {
                 param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → NUDGE_LEFT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+                DBG ("  → " << (isShiftActive ? "RANDOMIZE_STEP" : "NUDGE_LEFT") << " param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
 
+        // ========== POSITION 6: NUDGE_RIGHT / SHUFFLE (shift-aware) ==========
         case MidiControlId::BUTTON_NUDGE_RIGHT: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::NUDGE_RIGHT)) {
+            bool isShiftActive = state.getIsShift();
+            juce::String paramId = isShiftActive ? Params::Keys::ID::SHUFFLE : Params::Keys::ID::NUDGE_RIGHT;
+            if (auto* param = apvts.getParameter (paramId)) {
                 param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → NUDGE_RIGHT param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+                DBG ("  → " << (isShiftActive ? "SHUFFLE" : "NUDGE_RIGHT") << " param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }
@@ -1390,56 +1408,7 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             break;
         }
 
-            // ========== SEQUENCER CONTROL BUTTONS - SECONDARY ROW ==========
-            // All buttons use param-based approach
 
-        case MidiControlId::BUTTON_DUPLICATE: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::DUPLICATE)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → DUPLICATE param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
-            break;
-        }
-
-        case MidiControlId::BUTTON_CLEAR_WINDOW: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::CLEAR_WINDOW)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → CLEAR_WINDOW param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
-            break;
-        }
-
-        case MidiControlId::BUTTON_CLEAR_STEP: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::CLEAR_STEP)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → CLEAR_STEP param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
-            break;
-        }
-
-        case MidiControlId::BUTTON_RANDOMIZE_STEP: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::RANDOMIZE_STEP)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → RANDOMIZE_STEP param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
-            break;
-        }
-
-        case MidiControlId::BUTTON_RANDOMIZE_ALL: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::RANDOMIZE_ALL)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → RANDOMIZE_ALL param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
-            break;
-        }
-
-        case MidiControlId::BUTTON_SHUFFLE: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::SHUFFLE)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → SHUFFLE param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
-            break;
-        }
 
         // ========== CC LANE TOGGLES ==========
         case MidiControlId::CC_LANE_0_TOGGLE:
