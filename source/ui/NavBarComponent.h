@@ -4,6 +4,7 @@
 #include "LogoComponent.h"
 #include "PresetSelectorComponent.h"
 #include "ToggleIconButton.h"
+#include "WriteScaleButton.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
@@ -43,7 +44,8 @@ public:
           settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false, 0.75f, Icons::closeIconScale),
           midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, true),
           playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
-          stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false)
+          stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
+          writeScaleButton()
     {
         // Add logo component
         addAndMakeVisible(logo);
@@ -100,6 +102,10 @@ public:
                 onStopClicked();
             }
         };
+
+        // Add write scale button
+        addAndMakeVisible(writeScaleButton);
+        // Note: No callback needed - MainScreenComponent checks button state directly
 
         // Set MIDI learn button colors and stroke width
         // White when OFF (state 1), grey when ON/active (state 2)
@@ -168,6 +174,11 @@ public:
         int playPauseButtonX = stopButtonX - buttonSize - buttonGap;
         int playPauseButtonY = (height - buttonSize) / 2;  // Vertically center
         playPauseButton.setBounds(playPauseButtonX, playPauseButtonY, buttonSize, buttonSize);
+
+        // Position write scale button left of play/pause button
+        int writeScaleButtonX = playPauseButtonX - buttonSize - buttonGap;
+        int writeScaleButtonY = (height - buttonSize) / 2;  // Vertically center
+        writeScaleButton.setBounds(writeScaleButtonX, writeScaleButtonY, buttonSize, buttonSize);
     }
 
     // Callback when settings button is clicked
@@ -186,6 +197,8 @@ public:
 
     // Callback when stop button is clicked
     std::function<void()> onStopClicked;
+
+    // Note: WriteScale button doesn't need a callback - MainScreenComponent checks state directly
 
     // Public method to set settings button toggle state (for ApplicationComponent)
     void setSettingsToggled(bool toggled) {
@@ -218,6 +231,9 @@ public:
     // Access to preset selector for wiring up callbacks
     PresetSelectorComponent& getPresetSelector() { return presetSelector; }
 
+    // Access to write scale button for checking state
+    WriteScaleButton& getWriteScaleButton() { return writeScaleButton; }
+
 private:
     LogoComponent logo;
     PresetSelectorComponent presetSelector;
@@ -227,5 +243,6 @@ private:
     ToggleIconButton settingsButton;
     ToggleIconButton playPauseButton;
     ToggleIconButton stopButton;
+    WriteScaleButton writeScaleButton;
 };
 

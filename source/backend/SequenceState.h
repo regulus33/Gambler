@@ -203,12 +203,12 @@ public:
 
     /**
      * Get the quantized version of a step's note
-     * This applies the current scale quantization on-the-fly without modifying stored data
+     * This applies the step's scale quantization on-the-fly without modifying stored data
      */
     int getQuantizedStepNote(int stepIndex, int substepIndex) const {
         int note = getStepNote(stepIndex, substepIndex);
         if (note < 0) return note;  // Don't quantize rests
-        return quantizeNote(note);
+        return quantizeNoteToStepScale(stepIndex, note);
     }
 
     /**
@@ -364,7 +364,7 @@ public:
     }
 
     /**
-     * Get a Scale object populated from the current state
+     * Get a Scale object populated from the current state (global template)
      */
     Scale getScale() const {
         Scale scale;
@@ -374,8 +374,62 @@ public:
         return scale;
     }
 
+    // ========================================
+    // PER-STEP SCALE
+    // ========================================
+
     /**
-     * Check if a note is in the current scale
+     * Get a specific note's enabled state for a step's scale
+     */
+    bool getStepScaleNote(int stepIndex, int noteIndex) const {
+        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return true;
+        if (noteIndex < 0 || noteIndex >= ParamConstants::NUM_SCALE_NOTES) return true;
+        return getBoolParam(Params::Keys::ID::stepScaleNote(stepIndex, noteIndex));
+    }
+
+    /**
+     * Set a specific note's enabled state for a step's scale
+     */
+    void setStepScaleNote(int stepIndex, int noteIndex, bool enabled) {
+        if (stepIndex >= 0 && stepIndex < ParamConstants::MAX_STEPS &&
+            noteIndex >= 0 && noteIndex < ParamConstants::NUM_SCALE_NOTES) {
+            setBoolParam(Params::Keys::ID::stepScaleNote(stepIndex, noteIndex), enabled);
+        }
+    }
+
+    /**
+     * Get all scale notes for a specific step
+     */
+    std::array<int, 12> getStepScaleNotes(int stepIndex) const {
+        std::array<int, 12> notes;
+        for (int i = 0; i < 12; i++) {
+            notes[i] = getStepScaleNote(stepIndex, i) ? 1 : 0;
+        }
+        return notes;
+    }
+
+    /**
+     * Set all scale notes for a specific step
+     */
+    void setStepScaleNotes(int stepIndex, const std::array<int, 12>& notes) {
+        for (int i = 0; i < 12; i++) {
+            setStepScaleNote(stepIndex, i, notes[i] != 0);
+        }
+    }
+
+    /**
+     * Get a Scale object for a specific step
+     */
+    Scale getStepScale(int stepIndex) const {
+        Scale scale;
+        scale.setScaleNotes(getStepScaleNotes(stepIndex));
+        scale.setRangeMin(getScaleRangeMin());  // Range is still global
+        scale.setRangeMax(getScaleRangeMax());
+        return scale;
+    }
+
+    /**
+     * Check if a note is in the current scale (global template)
      */
     bool isNoteInScale(int noteNumber) const {
         if (noteNumber < 0 || noteNumber > 127) return false;
@@ -384,7 +438,16 @@ public:
     }
 
     /**
-     * Quantize a note to the current scale
+     * Check if a note is in a specific step's scale
+     */
+    bool isNoteInStepScale(int stepIndex, int noteNumber) const {
+        if (noteNumber < 0 || noteNumber > 127) return false;
+        int pitchClass = noteNumber % 12;
+        return getStepScaleNote(stepIndex, pitchClass);
+    }
+
+    /**
+     * Quantize a note to the current scale (global template)
      * Returns -1 (rest) if no scale notes are enabled
      */
     int quantizeNote(int noteNumber) const {
@@ -412,6 +475,40 @@ public:
 
             int upNote = noteNumber + distance;
             if (upNote <= 127 && isNoteInScale(upNote)) return upNote;
+        }
+
+        return noteNumber;
+    }
+
+    /**
+     * Quantize a note to a specific step's scale
+     * Returns -1 (rest) if no scale notes are enabled
+     */
+    int quantizeNoteToStepScale(int stepIndex, int noteNumber) const {
+        if (noteNumber < 0) noteNumber = 0;
+        if (noteNumber > 127) noteNumber = 127;
+
+        // Check if any notes are enabled in this step's scale
+        bool anyEnabled = false;
+        for (int i = 0; i < 12; i++) {
+            if (getStepScaleNote(stepIndex, i)) {
+                anyEnabled = true;
+                break;
+            }
+        }
+        // If no notes are enabled, return -1 (rest) to indicate "no note should play"
+        if (!anyEnabled) return -1;
+
+        // If already in scale, return it
+        if (isNoteInStepScale(stepIndex, noteNumber)) return noteNumber;
+
+        // Find nearest note in scale (prefer lower when equidistant)
+        for (int distance = 1; distance <= 12; distance++) {
+            int downNote = noteNumber - distance;
+            if (downNote >= 0 && isNoteInStepScale(stepIndex, downNote)) return downNote;
+
+            int upNote = noteNumber + distance;
+            if (upNote <= 127 && isNoteInStepScale(stepIndex, upNote)) return upNote;
         }
 
         return noteNumber;

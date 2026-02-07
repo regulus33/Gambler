@@ -86,7 +86,15 @@ namespace Params
             }
 
             // ========================================
-            // SCALE
+            // PER-STEP SCALE DATA (64 steps × 12 notes)
+            // ========================================
+            // Per-step scale notes (each step has its own scale configuration)
+            inline String stepScaleNote(int stepIndex, int noteIndex) {
+                return "step_" + String(stepIndex) + "_scale_note_" + String(noteIndex);
+            }
+
+            // ========================================
+            // SCALE (Global - used as template for writing to steps)
             // ========================================
             // Scale note enabled (12 chromatic notes)
             inline String scaleNote(int noteIndex) {
@@ -200,7 +208,13 @@ namespace Params
                 return "Step " + String(stepIndex) + " Mod " + String(modIndex) + " Active";
             }
 
-            // Scale
+            // Per-step scale
+            inline String stepScaleNote(int stepIndex, int noteIndex) {
+                static const char* noteNames[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
+                return "Step " + String(stepIndex) + " Scale " + noteNames[noteIndex];
+            }
+
+            // Scale (global template)
             inline String scaleNote(int noteIndex) {
                 static const char* noteNames[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
                 return String("Scale ") + noteNames[noteIndex];
@@ -353,7 +367,19 @@ namespace Params
         }
 
         // ========================================
-        // SCALE
+        // PER-STEP SCALE DATA (64 steps × 12 notes)
+        // ========================================
+        for (int step = 0; step < ParamConstants::MAX_STEPS; ++step) {
+            for (int note = 0; note < ParamConstants::NUM_SCALE_NOTES; ++note) {
+                params.push_back(createBoolParam(
+                    Keys::ID::stepScaleNote(step, note),
+                    Keys::LABEL::stepScaleNote(step, note),
+                    true));  // All notes enabled by default (chromatic)
+            }
+        }
+
+        // ========================================
+        // SCALE (Global - used as template for writing to steps)
         // ========================================
         // 12 chromatic notes (default: all enabled = chromatic scale)
         for (int i = 0; i < ParamConstants::NUM_SCALE_NOTES; ++i) {

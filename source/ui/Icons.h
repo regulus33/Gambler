@@ -839,6 +839,17 @@ public:
     }
 
     /**
+     * Creates a record icon (filled circle)
+     * ViewBox: 0 0 20 20
+     * Simple circle that can be filled or stroked
+     */
+    static juce::Path createRecordIcon() {
+        juce::Path path;
+        path.addEllipse(2.0f, 2.0f, 16.0f, 16.0f);
+        return path;
+    }
+
+    /**
      * Creates the duplicate icon (two overlapping rectangles)
      * Original SVG viewBox: 0 0 21 21
      * Represents duplication/copy action

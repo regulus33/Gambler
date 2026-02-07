@@ -69,6 +69,9 @@ public:
             updatePlayPauseButtonState();
         };
 
+        // Note: WriteScale button doesn't need a callback - the logic is handled
+        // in MainScreenComponent::updateFromSequence() which checks button state directly
+
         // Setup preset selector callbacks
         setupPresetSelector();
 
@@ -203,6 +206,9 @@ private:
                 // Update button state immediately
                 updatePlayPauseButtonState();
             };
+
+            // Note: WriteScale button doesn't need a callback - the logic is handled
+            // in MainScreenComponent::updateFromSequence() which checks button state directly
 
             // Wire up settings callbacks to processor's clock
             // Sync initial state from processor
