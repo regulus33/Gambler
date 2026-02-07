@@ -29,11 +29,6 @@ public:
 
     void paint(juce::Graphics& g) override {
         using namespace PresetSelectorConstants;
-        using namespace PresetDropdownConstants;
-
-        // Draw border with rounded corners
-        g.setColour(borderColor);
-        g.drawRoundedRectangle(getLocalBounds().toFloat(), borderRadius, borderWidth);
 
         // Draw save icon centered
         auto iconBounds = getLocalBounds().toFloat().reduced(

@@ -18,8 +18,8 @@ namespace PresetDropdownConstants {
     constexpr int deleteIconSize = 10;
     constexpr int iconSpacing = 6;  // Space between delete X and checkmark
     constexpr int iconsRightPadding = 6;
-    constexpr float borderWidth = 1.0f;
-    constexpr float borderRadius = 3.0f;
+    constexpr float borderWidth = 2.0f;
+    constexpr float borderRadius = 4.0f;
     const juce::Colour borderColor = juce::Colours::white;
 }
 
