@@ -375,9 +375,10 @@ protected:
                 int noteNumber = state.getQuantizedStepNote(selectedStep, i);
 
                 // Check for rest before calculating pitch class
-                if (noteNumber == -1) {
-                    // Rest - use grey
-                    subsequenceBar.setBarColor(i, juce::Colours::red);
+                // This happens when: 1) stored note is a rest, or 2) no scale notes are selected
+                if (noteNumber < 0) {
+                    // Rest or quantized to rest - use grey
+                    subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::defaultGreyHex));
                 } else {
                     // Normal note - use chromatic color
                     int pitchClass = noteNumber % 12;

@@ -319,12 +319,14 @@ public:
             if (i < length) {
                 // Active substep - color based on note value (quantized for display)
                 int midiNote = state.getQuantizedStepNote(selectedStep, i);
-                int chromaticNote = midiNote % 12;
                 juce::Colour noteColor;
-                // if note is rest, chromatic note colour won't work/
-                if (midiNote == -1) {
+                // Check if note is rest or quantized to rest
+                // This happens when: 1) stored note is a rest, or 2) no scale notes are selected
+                if (midiNote < 0) {
+                    // TODO centralize rest ui presentation
                     noteColor = juce::Colour(SequenceGridConstants::defaultGreyHex);
                 } else {
+                    int chromaticNote = midiNote % 12;
                     noteColor = MusicConstants::NOTE_COLOURS[chromaticNote];
                 }
 

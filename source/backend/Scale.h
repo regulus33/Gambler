@@ -109,16 +109,16 @@ public:
     
     /**
      * Quantize a MIDI note to the nearest note in the scale
-     * If no notes are in the scale, returns the original note
-     * 
+     * If no notes are in the scale, returns -1 (rest)
+     *
      * @param noteNumber MIDI note to quantize (0-127)
-     * @return Quantized MIDI note
+     * @return Quantized MIDI note, or -1 if no scale notes are enabled
      */
     int quantize(int noteNumber) const {
         // Clamp to valid MIDI range first
         if (noteNumber < MIN_MIDI_NOTE) noteNumber = MIN_MIDI_NOTE;
         if (noteNumber > MAX_MIDI_NOTE) noteNumber = MAX_MIDI_NOTE;
-        
+
         // Check if any notes are enabled in scale
         bool anyEnabled = false;
         for (int i = 0; i < NUM_CHROMATIC_NOTES; i++) {
@@ -127,17 +127,17 @@ public:
                 break;
             }
         }
-        
-        // If no scale is set, return original note
+
+        // If no scale is set, return -1 (rest) to indicate "no note should play"
         if (!anyEnabled) {
-            return noteNumber;
+            return -1;
         }
-        
+
         // If note is already in scale, return it
         if (isNoteInScale(noteNumber)) {
             return noteNumber;
         }
-        
+
         // Find nearest note in scale
         // When equidistant, prefer going down (lower note)
         int searchRadius = NUM_CHROMATIC_NOTES;
@@ -154,7 +154,7 @@ public:
                 return upNote;
             }
         }
-        
+
         // Fallback (shouldn't reach here if anyEnabled is true)
         return noteNumber;
     }

@@ -229,13 +229,16 @@ public:
 
             if (stepIndex < sequenceLength) {
                 // Step is within bounds
-                // Check if this step's current note is a rest (-1)
-                if (state.stepHasRest(stepIndex)) {
-                    // Step is a rest - show grey
+                // Get the quantized note (accounts for scale quantization)
+                int midiNote = state.getCurrentNoteForStep(stepIndex);
+
+                // Check if quantized note is a rest (-1)
+                // This happens when: 1) stored note is a rest, or 2) no scale notes are selected
+                if (midiNote < 0) {
+                    // Step is a rest or quantized to rest - show grey
                     squareStates[row][col].color = juce::Colour (defaultGreyHex);
                 } else {
                     // Normal step - show note color
-                    int midiNote = state.getCurrentNoteForStep(stepIndex);
                     int chromaticNote = midiNote % 12;
                     squareStates[row][col].color = getNoteColor (chromaticNote);
                 }

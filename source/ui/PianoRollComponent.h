@@ -391,13 +391,8 @@ private:
 
     /**
      * Try to toggle a key - returns true if toggle was successful
-     * Prevents toggling off the last remaining note
      */
     bool tryToggleKey(int keyIndex) {
-        // If key is currently ON and it's the last one, don't allow toggle off
-        if (keys[keyIndex]->isToggled && countToggledNotes() <= 1) {
-            return false;
-        }
         keys[keyIndex]->isToggled = !keys[keyIndex]->isToggled;
         return true;
     }

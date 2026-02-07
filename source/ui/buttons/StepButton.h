@@ -113,11 +113,12 @@ public:
         auto bounds = getLocalBounds().toFloat();
         
         if (isWithinSequence) {
-            // Check if this step's current note is a rest (-1)
-            bool isRest = state.stepHasRest(absoluteStepIndex);
-
-            // Get the current note for this step
+            // Get the quantized current note for this step (accounts for scale quantization)
             int midiNote = state.getCurrentNoteForStep(absoluteStepIndex);
+
+            // Check if quantized note is a rest (-1)
+            // This happens when: 1) stored note is a rest, or 2) no scale notes are selected
+            bool isRest = (midiNote < 0);
 
             // Determine the fill color
             juce::Colour fillColor;

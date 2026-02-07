@@ -1399,41 +1399,21 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
                     }
                 } else {
                     // Turn off the key (Note OFF)
-                    // Only allow turning off if there's more than one note in the scale
-                    int activeNotes = 0;
-                    for (int i = 0; i < 12; i++) {
-                        if (state.getScaleNote (i))
-                            activeNotes++;
-                    }
-
-                    if (activeNotes > 1) {
-                        state.setScaleNote (noteIndex, false);
-                        DBG ("  → Scale note " << noteIndex << " turned OFF (momentary)");
-                        if (onSequenceTick)
-                            onSequenceTick();
-                    } else {
-                        DBG ("  → Cannot disable last scale note");
-                    }
+                    // Now allows turning off all notes (empty scale = quantize to rest)
+                    state.setScaleNote (noteIndex, false);
+                    DBG ("  → Scale note " << noteIndex << " turned OFF (momentary)");
+                    if (onSequenceTick)
+                        onSequenceTick();
                 }
             } else {
                 // Toggle mode: Note ON toggles, Note OFF does nothing
                 if (isNoteOnOrCCPositive) {
-                    // Only toggle if there's more than one note in the scale
-                    int activeNotes = 0;
-                    for (int i = 0; i < 12; i++) {
-                        if (state.getScaleNote (i))
-                            activeNotes++;
-                    }
-
-                    if (activeNotes > 1 || !currentState) {
-                        state.setScaleNote (noteIndex, !currentState);
-                        // NOTE: No need to quantize all notes - quantization happens on-the-fly during playback/display
-                        DBG ("  → Scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
-                        if (onSequenceTick)
-                            onSequenceTick();
-                    } else {
-                        DBG ("  → Cannot disable last scale note");
-                    }
+                    // Now allows toggling off all notes (empty scale = quantize to rest)
+                    state.setScaleNote (noteIndex, !currentState);
+                    // NOTE: No need to quantize all notes - quantization happens on-the-fly during playback/display
+                    DBG ("  → Scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
+                    if (onSequenceTick)
+                        onSequenceTick();
                 }
             }
             break;

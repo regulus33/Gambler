@@ -385,6 +385,7 @@ public:
 
     /**
      * Quantize a note to the current scale
+     * Returns -1 (rest) if no scale notes are enabled
      */
     int quantizeNote(int noteNumber) const {
         if (noteNumber < 0) noteNumber = 0;
@@ -398,7 +399,8 @@ public:
                 break;
             }
         }
-        if (!anyEnabled) return noteNumber;
+        // If no notes are enabled, return -1 (rest) to indicate "no note should play"
+        if (!anyEnabled) return -1;
 
         // If already in scale, return it
         if (isNoteInScale(noteNumber)) return noteNumber;
