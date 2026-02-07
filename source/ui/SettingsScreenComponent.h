@@ -27,7 +27,7 @@ namespace SettingsScreenConstants {
  * - NavBarComponent at the top
  * - Settings organized into logical groups with headers in a 3x2 grid:
  *   - Clock & Timing: Internal clock, tempo, MIDI clock output
- *   - Playback: Note length, preview notes, follow step, follow playback
+ *   - Playback: Note length, preview notes, follow step
  *   - MIDI: (placeholder for future MIDI settings)
  *   - Group 4, 5, 6: (placeholders for future settings)
  *
@@ -142,16 +142,7 @@ public:
                 onFollowStepChanged(followStepToggle.getToggleState());
         };
 
-        // Setup follow playback checkbox (enabled by default)
-        followPlaybackToggle.setButtonText("Follow playback");
-        followPlaybackToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
-        followPlaybackToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
-        followPlaybackToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
-        followPlaybackToggle.setToggleState(true, juce::dontSendNotification); // Enabled by default
-        followPlaybackToggle.onClick = [this] {
-            if (onFollowPlaybackChanged)
-                onFollowPlaybackChanged(followPlaybackToggle.getToggleState());
-        };
+
 
         // Setup piano key momentary checkbox (disabled by default = toggle mode)
         pianoKeyMomentaryToggle.setButtonText("Piano keys momentary");
@@ -175,7 +166,6 @@ public:
         playbackGroup->addLabeledControl(noteLengthLabel, noteLengthSlider);
         playbackGroup->addControl(previewNotesToggle);
         playbackGroup->addControl(followStepToggle);
-        playbackGroup->addControl(followPlaybackToggle);
         addAndMakeVisible(*playbackGroup);
 
         // TODO: Replace placeholder text with actual MIDI settings/controls
@@ -280,7 +270,6 @@ public:
     std::function<void(double)> onNoteLengthChanged;
     std::function<void(bool)> onPreviewNotesChanged;
     std::function<void(bool)> onFollowStepChanged;
-    std::function<void(bool)> onFollowPlaybackChanged;
     std::function<void(bool)> onMidiClockOutputChanged;
     std::function<void(bool)> onPianoKeyMomentaryChanged;
 
@@ -290,7 +279,6 @@ public:
     double getNoteLength() const { return noteLengthSlider.getValue(); }
     bool isPreviewNotesEnabled() const { return previewNotesToggle.getToggleState(); }
     bool isFollowStepEnabled() const { return followStepToggle.getToggleState(); }
-    bool isFollowPlaybackEnabled() const { return followPlaybackToggle.getToggleState(); }
     bool isPianoKeyMomentaryEnabled() const { return pianoKeyMomentaryToggle.getToggleState(); }
 
     // Setters for external state sync
@@ -305,9 +293,6 @@ public:
     }
     void setFollowStepEnabled(bool enabled) {
         followStepToggle.setToggleState(enabled, juce::dontSendNotification);
-    }
-    void setFollowPlaybackEnabled(bool enabled) {
-        followPlaybackToggle.setToggleState(enabled, juce::dontSendNotification);
     }
 
     void setMidiClockOutputEnabled(bool enabled) {
@@ -346,7 +331,6 @@ private:
     juce::Slider noteLengthSlider;
     juce::ToggleButton previewNotesToggle;
     juce::ToggleButton followStepToggle;
-    juce::ToggleButton followPlaybackToggle;
 
     // Piano Roll controls
     juce::ToggleButton pianoKeyMomentaryToggle;

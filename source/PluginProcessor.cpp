@@ -541,9 +541,6 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
                 if (auto* param = apvts.getParameter(Params::Keys::ID::PREF_FOLLOW_STEP)) {
                     param->setValueNotifyingHost(prefsXml->getBoolAttribute("followStep", true) ? 1.0f : 0.0f);
                 }
-                if (auto* param = apvts.getParameter(Params::Keys::ID::PREF_FOLLOW_PLAYBACK)) {
-                    param->setValueNotifyingHost(prefsXml->getBoolAttribute("followPlayback", true) ? 1.0f : 0.0f);
-                }
                 if (auto* param = apvts.getParameter(Params::Keys::ID::PREF_NOTE_LENGTH)) {
                     float noteLength = static_cast<float>(prefsXml->getDoubleAttribute("defaultNoteLength", 0.9));
                     param->setValueNotifyingHost(param->convertTo0to1(noteLength));

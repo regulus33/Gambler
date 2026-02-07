@@ -261,17 +261,7 @@ private:
                 }
             };
 
-            // Sync follow playback setting from APVTS
-            if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
-                processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_FOLLOW_PLAYBACK))) {
-                settingsScreen->setFollowPlaybackEnabled(param->get());
-            }
-            settingsScreen->onFollowPlaybackChanged = [this](bool enabled) {
-                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_FOLLOW_PLAYBACK)) {
-                    param->setValueNotifyingHost(enabled ? 1.0f : 0.0f);
-                    DBG("Follow playback: " + juce::String(enabled ? "enabled" : "disabled"));
-                }
-            };
+
 
             // MIDI Clock Output toggle callback (standalone only)
             // Note: MIDI clock output is NOT stored in APVTS - it's a runtime setting only

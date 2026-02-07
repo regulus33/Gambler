@@ -345,15 +345,6 @@ public:
         int currentStep = state.getCurrentIndex();
         int selectedStep = state.getSelectedStepForEditing();
 
-        // If followPlayback is enabled, update the selected step to match playback position (read from APVTS)
-        if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
-            processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_FOLLOW_PLAYBACK))) {
-            if (param->get() && currentStep >= 0) {
-                state.setSelectedStepForEditing(currentStep);
-                selectedStep = currentStep; // Update local copy for UI rendering
-            }
-        }
-
         // Update the active step indicator to follow the sequence playback
         setActiveStepAndNote(currentStep);
 

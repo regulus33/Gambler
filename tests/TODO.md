@@ -1,22 +1,11 @@
 # TODO
 
 -----
-# preset dropdown
-We need to create a new apvts param that
-will change the current preset.
-Similar to how buttons work in SequencerControls
-if the preset change flag is on then
-we immediately change presets.
 
-We also need to move the browser down
-
-We also need to make the border thicker
-
-We also need to remove save button border
 
 # Step selection
 Currently when you select a step, the step is white
-but the activer step (sequence index) is just a step
+but the active step (sequence index) is just a step
 with a white border, neither of these states are clear.
 
 # Step selection Bug?
@@ -29,33 +18,31 @@ The cc modulation panel, we need buttons:
 2. select one
 3. randomize selected
 
-# DONE
+# navigation 
+clicking a step in overview should make that step the active step
+
+double clicking a step should make that step the current index
+
+remove the follow playback
+
+make current step white!
+
+active step should be red or white border
+
+make the steps and the piano keys color.lighten() on current step
+
+{} have an option where when pressing one or more keys (or toggling)
+other keys that would be in key light up, always factoring the whole selected group.
+
+saveable keyboard settings, stack them all up as rectangles atop the piano
+
+a setting that listens for any non mapped midi input and makes the scale quantized to that momentarily
+
+
+# Standalone 
+
+We haven't tested standalone much in master clock mode and we also haven't 
+implemented slave mode for standalone.
 
 ----- 
 
-# Midi maps are not saving to pref!
-Midi mapping does not persist through app runs
-
-
-# Note range slider
-Note range slider needs to be midi mappable
-
-It also needs to space the knobs further apart
-
-Drag note range should shift range up or down
-
-# Settings screen
-organize info:
-
-internal clock
-tempo
-note length (doesn't work)
-preview notes on edit
-follow step
-follow playback
-clear midi mappings
-midi clock output
-
-don't show preset browser on this screen
-
-Either make all prefs apvts params or none.

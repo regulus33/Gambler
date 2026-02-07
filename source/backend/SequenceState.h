@@ -463,14 +463,6 @@ public:
         setBoolParam(Params::Keys::ID::PREF_FOLLOW_STEP, follow);
     }
 
-    bool getFollowPlayback() const {
-        return getBoolParam(Params::Keys::ID::PREF_FOLLOW_PLAYBACK);
-    }
-
-    void setFollowPlayback(bool follow) {
-        setBoolParam(Params::Keys::ID::PREF_FOLLOW_PLAYBACK, follow);
-    }
-
     float getNoteLength() const {
         return getFloatParam(Params::Keys::ID::PREF_NOTE_LENGTH);
     }
