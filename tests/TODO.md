@@ -40,6 +40,9 @@ a setting that listens for any non mapped midi input and makes the scale quantiz
 
 If you click another row in seqeuncer overview that isn't active row in follow step mode you get pushed back to active...
 
+Strange thing happening with scales, I'm moving the note range sliders and then seeing piano roll component change state.
+Seems like a problem with global scale. We should probably get rid of it as well as the record button. 
+
 # Standalone 
 
 We haven't tested standalone much in master clock mode and we also haven't 
