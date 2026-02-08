@@ -378,7 +378,24 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
 
         // Tick the sequence to get the next note (using APVTS-backed state)
         auto& state = getState(); // get the avpts wrapper
-        int note = state.tick(); // get next note
+
+        // IMPORTANT: Check WriteScale BEFORE ticking (before quantization happens)
+        // If WriteScale is enabled, copy the selected step's scale to the next step
+        // This ensures the note is quantized with the correct scale
+        if (auto* writeScaleParam = apvts.getParameter(Params::Keys::ID::WRITE_SCALE)) {
+            if (writeScaleParam->getValue() > 0.5f) {
+                int selectedStep = state.getSelectedStepForEditing();
+                int nextStepIndex = (state.getCurrentIndex() + 1) % state.getLength();
+
+                if (selectedStep >= 0 && nextStepIndex >= 0) {
+                    auto selectedScale = state.getStepScaleNotes(selectedStep);
+                    state.setStepScaleNotes(nextStepIndex, selectedScale);
+                    DBG("WriteScale: Copied scale from step " << selectedStep << " to step " << nextStepIndex);
+                }
+            }
+        }
+
+        int note = state.tick(); // get next note (now quantized with the correct scale)
         int currentStepIndex = state.getCurrentIndex(); // get current step index
 
         DBG ("Clock tick! Step: " << currentStepIndex << ", Note: " << note);
@@ -1382,36 +1399,15 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
         case MidiControlId::SCALE_NOTE_Bb:
         case MidiControlId::SCALE_NOTE_B: {
             int noteIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::SCALE_NOTE_C);
-            bool currentState = state.getScaleNote (noteIndex);
+            int selectedStep = state.getSelectedStepForEditing();
 
-            // Check if we're in momentary mode
-            bool isMomentary = state.getPianoKeyMomentary();
+            if (selectedStep >= 0) {
+                bool currentState = state.getStepScaleNote(selectedStep, noteIndex);
 
-            if (isMomentary) {
-                // Momentary mode: Note ON turns key on, Note OFF turns key off
-                if (isNoteOnOrCCPositive) {
-                    // Turn on the key if not already on
-                    if (!currentState) {
-                        state.setScaleNote (noteIndex, true);
-                        DBG ("  → Scale note " << noteIndex << " turned ON (momentary)");
-                        if (onSequenceTick)
-                            onSequenceTick();
-                    }
-                } else {
-                    // Turn off the key (Note OFF)
-                    // Now allows turning off all notes (empty scale = quantize to rest)
-                    state.setScaleNote (noteIndex, false);
-                    DBG ("  → Scale note " << noteIndex << " turned OFF (momentary)");
-                    if (onSequenceTick)
-                        onSequenceTick();
-                }
-            } else {
                 // Toggle mode: Note ON toggles, Note OFF does nothing
                 if (isNoteOnOrCCPositive) {
-                    // Now allows toggling off all notes (empty scale = quantize to rest)
-                    state.setScaleNote (noteIndex, !currentState);
-                    // NOTE: No need to quantize all notes - quantization happens on-the-fly during playback/display
-                    DBG ("  → Scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
+                    state.setStepScaleNote(selectedStep, noteIndex, !currentState);
+                    DBG ("  → Step " << selectedStep << " scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
                     if (onSequenceTick)
                         onSequenceTick();
                 }

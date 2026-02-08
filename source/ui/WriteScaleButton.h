@@ -1,8 +1,12 @@
 #pragma once
 
 #include "Icons.h"
+#include "StateListenerComponent.h"
+#include "../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
+
+class PluginProcessor;
 
 namespace WriteScaleButtonConstants {
     constexpr int buttonSize = 36;  // 36x36px button
@@ -18,16 +22,24 @@ namespace WriteScaleButtonConstants {
  * is written to the current step whenever the step changes.
  * When toggled off (white stroke circle), no writing occurs.
  *
+ * Observer Pattern:
+ * - Syncs with WRITE_SCALE APVTS parameter
+ * - Visual state reflects parameter value
+ * - PluginProcessor reads parameter in audio thread before quantization
+ *
  * Size: 36×36px (20px icon + 8px padding all around)
  * Background: Transparent
  * Icon: Circle - filled red when on, white stroke when off
  */
-class WriteScaleButton : public juce::Component {
+class WriteScaleButton : public StateListenerComponent {
 public:
-    WriteScaleButton()
-        : isToggled(false)
+    explicit WriteScaleButton(PluginProcessor& processor)
+        : StateListenerComponent(processor)
     {
         setSize(WriteScaleButtonConstants::buttonSize, WriteScaleButtonConstants::buttonSize);
+
+        // Listen to the WRITE_SCALE parameter
+        listenToParameter(Params::Keys::ID::WRITE_SCALE);
     }
 
     void paint(juce::Graphics& g) override {
@@ -47,7 +59,10 @@ public:
                 padding + (iconSize - pathBounds.getHeight() * scale) / 2.0f - (pathBounds.getY() * scale)
             );
 
-        if (isToggled) {
+        // Read toggle state from APVTS parameter
+        bool isOn = isParamOn();
+
+        if (isOn) {
             // Toggled ON: filled red circle
             g.setColour(juce::Colour(0xFFFF0000));  // Red
             g.fillPath(path, transform);
@@ -59,12 +74,9 @@ public:
     }
 
     void mouseDown(const juce::MouseEvent& /*event*/) override {
-        isToggled = !isToggled;
-        repaint();
-
-        if (onClick) {
-            onClick(isToggled);
-        }
+        // Toggle the APVTS parameter
+        bool currentState = isParamOn();
+        setParamOn(!currentState);
     }
 
     void mouseEnter(const juce::MouseEvent& /*event*/) override {
@@ -75,23 +87,28 @@ public:
         setMouseCursor(juce::MouseCursor::NormalCursor);
     }
 
-    // Set the toggle state programmatically (without triggering callback)
-    void setToggled(bool toggled) {
-        if (isToggled != toggled) {
-            isToggled = toggled;
-            repaint();
-        }
+    // Get current toggle state from APVTS
+    bool getToggled() const { return isParamOn(); }
+
+protected:
+    void onStateChanged() override {
+        // Parameter changed - repaint to reflect new state
+        repaint();
     }
 
-    // Get current toggle state
-    bool getToggled() const { return isToggled; }
-
-    // Callback when button is clicked
-    // Parameter: true if toggled on, false if toggled off
-    std::function<void(bool)> onClick;
-
 private:
-    bool isToggled;
+    bool isParamOn() const {
+        if (auto* param = getProcessor().getAPVTS().getParameter(Params::Keys::ID::WRITE_SCALE)) {
+            return param->getValue() > 0.5f;
+        }
+        return false;
+    }
+
+    void setParamOn(bool on) {
+        if (auto* param = getProcessor().getAPVTS().getParameter(Params::Keys::ID::WRITE_SCALE)) {
+            param->setValueNotifyingHost(on ? 1.0f : 0.0f);
+        }
+    }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WriteScaleButton)
 };

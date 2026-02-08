@@ -8,6 +8,8 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
+class PluginProcessor;
+
 namespace NavBarConstants {
     constexpr int height = 45;  // Height of the navbar
     constexpr int logoGapFromTop = 10;  // Gap between top and logo
@@ -39,13 +41,13 @@ namespace NavBarConstants {
  */
 class NavBarComponent : public juce::Component {
 public:
-    NavBarComponent()
+    explicit NavBarComponent(PluginProcessor& processor)
         : viewToggleButton(Icons::createViewToggleIcon1, Icons::createViewToggleIcon2, false, true),
           settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false, 0.75f, Icons::closeIconScale),
           midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, true),
           playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
-          writeScaleButton()
+          writeScaleButton(processor)
     {
         // Add logo component
         addAndMakeVisible(logo);

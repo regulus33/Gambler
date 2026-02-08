@@ -74,6 +74,7 @@ class MainScreenComponent : public juce::Component,
 public:
     explicit MainScreenComponent(PluginProcessor& processor)
         : processorRef(processor),
+          navBar(processor),
           pianoRoll(processor),
           midiDataPerStep(processor),
           sequencerSteps(processor),
@@ -98,17 +99,14 @@ public:
         // Add piano roll component (visible by default)
         addAndMakeVisible(pianoRoll);
 
-        // Initialize piano roll with the selected step's scale (or global scale if no step selected)
-        // TODO: Note that global scale is whatever the state is when record is not pressed. We will need a way to remove scale from step, probably clear.
+        // Initialize piano roll with the selected step's scale
         auto& state = processorRef.getState();
         int selectedStep = state.getSelectedStepForEditing();
         if (selectedStep >= 0) {
             pianoRoll.setScale(state.getStepScale(selectedStep));
-        } else {
-            pianoRoll.setScale(state.getScale());
         }
 
-        // Setup callback for scale changes - update backend Scale when user toggles notes
+        // Setup callback for scale changes - update selected step's scale when user toggles notes
         pianoRoll.onNoteChanged = [this]() {
             // Get the scale from the piano roll
             Scale newScale = pianoRoll.getScale();
@@ -116,19 +114,12 @@ public:
             // Update scale via APVTS-backed state (thread-safe, no command queue needed)
             auto& state = processorRef.getState();
 
-            // Update both the global scale template AND the selected step's scale
-            state.setScaleNotes(newScale.getScaleNotes());
-
-            // Also update the selected step's scale
+            // Update the selected step's scale
             int selectedStep = state.getSelectedStepForEditing();
             if (selectedStep >= 0) {
                 state.setStepScaleNotes(selectedStep, newScale.getScaleNotes());
-                DBG("Piano roll scale changed - updated global scale and step " << selectedStep << " scale");
-            } else {
-                DBG("Piano roll scale changed - updated global scale only (no step selected)");
+                DBG("Piano roll scale changed - updated step: " << selectedStep << " scale");
             }
-
-            // NOTE: No need to quantize all notes - quantization happens on-the-fly during playback/display
 
             // Update the note controls to only show selected scale notes
             auto selectedIndices = pianoRoll.getSelectedNoteIndices();
@@ -384,12 +375,7 @@ public:
         int currentStep = state.getCurrentIndex();
         int selectedStep = state.getSelectedStepForEditing();
 
-        // If WriteScale is enabled, write the current global scale to the current step
-        if (navBar.getWriteScaleButton().getToggled() && currentStep >= 0) {
-            auto currentScale = state.getScaleNotes();
-            state.setStepScaleNotes(currentStep, currentScale);
-            DBG("WriteScale: Wrote scale to step " << currentStep);
-        }
+        // Note: WriteScale is now handled in audio thread before quantization (see PluginProcessor::processBlock)
 
         // Update the active step indicator to follow the sequence playback
         setActiveStepAndNote(currentStep);

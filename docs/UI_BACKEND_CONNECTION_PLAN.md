@@ -76,31 +76,22 @@ if (sequenceNeedsRepaint.exchange(false)) {
 
 ## Component Action Plans
 
-### 1. PianoRollComponent → Scale
+### 1. PianoRollComponent → Per-Step Scales
 
-**Current State**: UI-only, `onNoteChanged` callback logs to DBG
+**Current State**: Connected to APVTS via per-step scale parameters
 
 **Backend Connection**:
-- PianoRoll toggles affect `Sequence::scale.scaleNotes[0-11]`
-- Scale is NOT an APVTS parameter (too complex, stored in Sequence XML)
+- PianoRoll toggles affect selected step's scale via `state.setStepScaleNotes(stepIndex, notes)`
+- Each step has 12 scale note parameters stored in APVTS
+- Scale range (min/max MIDI notes) is global and stored in APVTS
 
-**Action Items**:
-1. Add `Scale& getScale()` accessor to Sequence (already exists)
-2. In PluginEditor constructor, wire up callback:
-   ```cpp
-   pianoRoll.onNoteChanged = [this]() {
-       auto toggleStates = pianoRoll.getToggleStates();  // Add this method
-       auto& scale = processorRef.getSequence().getScale();
-       for (int i = 0; i < 12; i++) {
-           scale.setScaleNote(i, toggleStates[i] ? 1 : 0);
-       }
-   };
-   ```
-3. Add `std::array<bool, 12> getToggleStates()` to PianoRollComponent
-4. Add `void setToggleStates(const std::array<bool, 12>&)` for loading presets
-5. On preset load, sync Scale → PianoRoll UI
+**Implementation Status**: ✅ Complete
+- Piano roll updates selected step's scale via APVTS parameters
+- Scale changes trigger async UI updates via StateListenerComponent
+- Quantization happens on-the-fly during playback (non-destructive)
+- MIDI learn support for scale notes writes to selected step's scale
 
-**Thread Safety**: Scale is only modified from message thread (UI), read from audio thread during `tick()`. Use SpinLock for reads during randomization.
+**Thread Safety**: All scale data is stored in APVTS parameters (thread-safe atomics). UI updates are marshaled to message thread via AsyncUpdater.
 
 ---
 

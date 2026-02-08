@@ -319,33 +319,8 @@ public:
     }
 
     // ========================================
-    // SCALE
+    // SCALE RANGE (Global - applies to all steps)
     // ========================================
-
-    bool getScaleNote(int noteIndex) const {
-        if (noteIndex < 0 || noteIndex >= ParamConstants::NUM_SCALE_NOTES) return true;
-        return getBoolParam(Params::Keys::ID::scaleNote(noteIndex));
-    }
-
-    void setScaleNote(int noteIndex, bool enabled) {
-        if (noteIndex >= 0 && noteIndex < ParamConstants::NUM_SCALE_NOTES) {
-            setBoolParam(Params::Keys::ID::scaleNote(noteIndex), enabled);
-        }
-    }
-
-    std::array<int, 12> getScaleNotes() const {
-        std::array<int, 12> notes;
-        for (int i = 0; i < 12; i++) {
-            notes[i] = getScaleNote(i) ? 1 : 0;
-        }
-        return notes;
-    }
-
-    void setScaleNotes(const std::array<int, 12>& notes) {
-        for (int i = 0; i < 12; i++) {
-            setScaleNote(i, notes[i] != 0);
-        }
-    }
 
     int getScaleRangeMin() const {
         return getIntParam(Params::Keys::ID::SCALE_RANGE_MIN);
@@ -361,17 +336,6 @@ public:
 
     void setScaleRangeMax(int max) {
         setIntParam(Params::Keys::ID::SCALE_RANGE_MAX, juce::jlimit(0, 127, max));
-    }
-
-    /**
-     * Get a Scale object populated from the current state (global template)
-     */
-    Scale getScale() const {
-        Scale scale;
-        scale.setScaleNotes(getScaleNotes());
-        scale.setRangeMin(getScaleRangeMin());
-        scale.setRangeMax(getScaleRangeMax());
-        return scale;
     }
 
     // ========================================
@@ -429,55 +393,12 @@ public:
     }
 
     /**
-     * Check if a note is in the current scale (global template)
-     */
-    bool isNoteInScale(int noteNumber) const {
-        if (noteNumber < 0 || noteNumber > 127) return false;
-        int pitchClass = noteNumber % 12;
-        return getScaleNote(pitchClass);
-    }
-
-    /**
      * Check if a note is in a specific step's scale
      */
     bool isNoteInStepScale(int stepIndex, int noteNumber) const {
         if (noteNumber < 0 || noteNumber > 127) return false;
         int pitchClass = noteNumber % 12;
         return getStepScaleNote(stepIndex, pitchClass);
-    }
-
-    /**
-     * Quantize a note to the current scale (global template)
-     * Returns -1 (rest) if no scale notes are enabled
-     */
-    int quantizeNote(int noteNumber) const {
-        if (noteNumber < 0) noteNumber = 0;
-        if (noteNumber > 127) noteNumber = 127;
-
-        // Check if any notes are enabled
-        bool anyEnabled = false;
-        for (int i = 0; i < 12; i++) {
-            if (getScaleNote(i)) {
-                anyEnabled = true;
-                break;
-            }
-        }
-        // If no notes are enabled, return -1 (rest) to indicate "no note should play"
-        if (!anyEnabled) return -1;
-
-        // If already in scale, return it
-        if (isNoteInScale(noteNumber)) return noteNumber;
-
-        // Find nearest note in scale (prefer lower when equidistant)
-        for (int distance = 1; distance <= 12; distance++) {
-            int downNote = noteNumber - distance;
-            if (downNote >= 0 && isNoteInScale(downNote)) return downNote;
-
-            int upNote = noteNumber + distance;
-            if (upNote <= 127 && isNoteInScale(upNote)) return upNote;
-        }
-
-        return noteNumber;
     }
 
     /**
@@ -570,13 +491,7 @@ public:
         setFloatParam(Params::Keys::ID::PREF_NOTE_LENGTH, juce::jlimit(0.0f, 1.0f, length));
     }
 
-    bool getPianoKeyMomentary() const {
-        return getBoolParam(Params::Keys::ID::PREF_PIANO_KEY_MOMENTARY);
-    }
 
-    void setPianoKeyMomentary(bool momentary) {
-        setBoolParam(Params::Keys::ID::PREF_PIANO_KEY_MOMENTARY, momentary);
-    }
 
     // ========================================
     // SEQUENCER OPERATIONS
@@ -677,20 +592,7 @@ public:
         setStepNote(stepIndex, substepIdx, randomNote);
     }
 
-    /**
-     * Quantize all notes in the sequence to the current scale
-     */
-    void quantizeAllNotesToScale() {
-        for (int step = 0; step < ParamConstants::MAX_STEPS; step++) {
-            for (int substep = 0; substep < ParamConstants::MAX_SUBSTEPS; substep++) {
-                int note = getStepNote(step, substep);
-                if (note >= 0) {  // Don't quantize rests
-                    int quantized = quantizeNote(note);
-                    setStepNote(step, substep, quantized);
-                }
-            }
-        }
-    }
+
 
     /**
      * Increase sequence length by 1

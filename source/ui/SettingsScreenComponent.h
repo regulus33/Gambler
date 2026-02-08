@@ -7,6 +7,8 @@
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <functional>
 
+class PluginProcessor;
+
 namespace SettingsScreenConstants {
     constexpr int padding = 40;  // Padding around settings content
     constexpr int controlHeight = 30;
@@ -36,7 +38,9 @@ namespace SettingsScreenConstants {
  */
 class SettingsScreenComponent : public juce::Component {
 public:
-    SettingsScreenComponent() {
+    explicit SettingsScreenComponent(PluginProcessor& processor)
+        : navBar(processor)
+    {
         interTypeface = juce::Typeface::createSystemTypefaceFor(
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
@@ -144,17 +148,6 @@ public:
 
 
 
-        // Setup piano key momentary checkbox (disabled by default = toggle mode)
-        pianoKeyMomentaryToggle.setButtonText("Piano keys momentary");
-        pianoKeyMomentaryToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
-        pianoKeyMomentaryToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
-        pianoKeyMomentaryToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
-        pianoKeyMomentaryToggle.setToggleState(false, juce::dontSendNotification); // Disabled by default (toggle mode)
-        pianoKeyMomentaryToggle.onClick = [this] {
-            if (onPianoKeyMomentaryChanged)
-                onPianoKeyMomentaryChanged(pianoKeyMomentaryToggle.getToggleState());
-        };
-
         // Create settings groups
         clockTimingGroup = std::make_unique<SettingsGroup>("Clock & Timing");
         clockTimingGroup->addControl(internalClockToggle);
@@ -192,9 +185,12 @@ public:
         group5->addControl(group5PlaceholderLabel);
         addAndMakeVisible(*group5);
 
-        // Group 6: Piano Roll Settings
-        group6 = std::make_unique<SettingsGroup>("Piano Roll");
-        group6->addControl(pianoKeyMomentaryToggle);
+        // TODO: Replace placeholder text with actual Group 6 settings/controls
+        group6 = std::make_unique<SettingsGroup>("Group 6");
+        group6PlaceholderLabel.setText("Group 6 settings coming soon...", juce::dontSendNotification);
+        group6PlaceholderLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.5f));
+        group6PlaceholderLabel.setJustificationType(juce::Justification::centred);
+        group6->addControl(group6PlaceholderLabel);
         addAndMakeVisible(*group6);
     }
 
@@ -271,7 +267,6 @@ public:
     std::function<void(bool)> onPreviewNotesChanged;
     std::function<void(bool)> onFollowStepChanged;
     std::function<void(bool)> onMidiClockOutputChanged;
-    std::function<void(bool)> onPianoKeyMomentaryChanged;
 
     // Accessors for current values
     bool isInternalClockEnabled() const { return internalClockToggle.getToggleState(); }
@@ -279,7 +274,6 @@ public:
     double getNoteLength() const { return noteLengthSlider.getValue(); }
     bool isPreviewNotesEnabled() const { return previewNotesToggle.getToggleState(); }
     bool isFollowStepEnabled() const { return followStepToggle.getToggleState(); }
-    bool isPianoKeyMomentaryEnabled() const { return pianoKeyMomentaryToggle.getToggleState(); }
 
     // Setters for external state sync
     void setInternalClockEnabled(bool enabled) {
@@ -301,10 +295,6 @@ public:
 
     bool isMidiClockOutputEnabled() const {
         return midiClockOutputToggle.getToggleState();
-    }
-
-    void setPianoKeyMomentaryEnabled(bool enabled) {
-        pianoKeyMomentaryToggle.setToggleState(enabled, juce::dontSendNotification);
     }
 
 private:
@@ -332,12 +322,10 @@ private:
     juce::ToggleButton previewNotesToggle;
     juce::ToggleButton followStepToggle;
 
-    // Piano Roll controls
-    juce::ToggleButton pianoKeyMomentaryToggle;
-
     // Placeholder labels (TODO: replace with actual controls)
     juce::Label midiPlaceholderLabel;
     juce::Label group4PlaceholderLabel;
     juce::Label group5PlaceholderLabel;
+    juce::Label group6PlaceholderLabel;
 };
 

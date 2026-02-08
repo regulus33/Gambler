@@ -100,22 +100,22 @@ protected:
     }
 
     /**
-     * Listen to all scale parameters (notes + range)
+     * Listen to scale range parameters (min/max)
      */
-    void listenToScale() {
-        for (int i = 0; i < ParamConstants::NUM_SCALE_NOTES; i++) {
-            listenToParameter(Params::Keys::ID::scaleNote(i));
-        }
+    void listenToScaleRange() {
         listenToParameter(Params::Keys::ID::SCALE_RANGE_MIN);
         listenToParameter(Params::Keys::ID::SCALE_RANGE_MAX);
     }
 
     /**
-     * Listen to scale range parameters only (min/max)
+     * Listen to all scale note parameters for a range of steps
      */
-    void listenToScaleRange() {
-        listenToParameter(Params::Keys::ID::SCALE_RANGE_MIN);
-        listenToParameter(Params::Keys::ID::SCALE_RANGE_MAX);
+    void listenToStepScaleNotes(int startStep, int endStep) {
+        for (int step = startStep; step <= endStep && step < ParamConstants::MAX_STEPS; step++) {
+            for (int note = 0; note < ParamConstants::NUM_SCALE_NOTES; note++) {
+                listenToParameter(Params::Keys::ID::stepScaleNote(step, note));
+            }
+        }
     }
 
     /**

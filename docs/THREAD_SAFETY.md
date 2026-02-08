@@ -65,8 +65,8 @@ All these UI callbacks now use the command queue:
 - **Substep length** - `stepNotes.increaseLength()`, `stepNotes.decreaseLength()`
 
 ### Scale Controls
-- **Piano roll** - `scale.setScaleNotes()`
-- **Note range** - `scale.setRangeMin()`, `scale.setRangeMax()`
+- **Piano roll** - `state.setStepScaleNotes()` (per-step scales)
+- **Note range** - `state.setScaleRangeMin()`, `state.setScaleRangeMax()` (global range)
 
 ### Clock Controls
 - **Mode changes** - `clock.setMode()`

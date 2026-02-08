@@ -94,12 +94,8 @@ namespace Params
             }
 
             // ========================================
-            // SCALE (Global - used as template for writing to steps)
+            // SCALE RANGE (Global - applies to all steps)
             // ========================================
-            // Scale note enabled (12 chromatic notes)
-            inline String scaleNote(int noteIndex) {
-                return "scale_note_" + String(noteIndex);
-            }
             inline const String SCALE_RANGE_MIN = "scale_range_min";
             inline const String SCALE_RANGE_MAX = "scale_range_max";
 
@@ -116,7 +112,6 @@ namespace Params
             inline const String PREF_PREVIEW_NOTES = "pref_preview_notes";
             inline const String PREF_FOLLOW_STEP = "pref_follow_step";
             inline const String PREF_NOTE_LENGTH = "pref_note_length";
-            inline const String PREF_PIANO_KEY_MOMENTARY = "pref_piano_key_momentary";
 
             // ========================================
             // UI STATE (kept for backward compatibility)
@@ -167,6 +162,9 @@ namespace Params
             // CC controls (7 slots - legacy, now use stepModValue)
             inline String ccNumber(int slot) { return "cc_number_" + String(slot); }
             inline String ccValue(int slot) { return "cc_value_" + String(slot); }
+
+            // Write Scale mode
+            inline const String WRITE_SCALE = "write_scale";
         }
 
         namespace LABEL
@@ -213,12 +211,6 @@ namespace Params
                 static const char* noteNames[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
                 return "Step " + String(stepIndex) + " Scale " + noteNames[noteIndex];
             }
-
-            // Scale (global template)
-            inline String scaleNote(int noteIndex) {
-                static const char* noteNames[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
-                return String("Scale ") + noteNames[noteIndex];
-            }
             inline const String SCALE_RANGE_MIN = "Scale Range Min";
             inline const String SCALE_RANGE_MAX = "Scale Range Max";
 
@@ -231,7 +223,9 @@ namespace Params
             inline const String PREF_PREVIEW_NOTES = "Preview Notes";
             inline const String PREF_FOLLOW_STEP = "Follow Step";
             inline const String PREF_NOTE_LENGTH = "Note Length";
-            inline const String PREF_PIANO_KEY_MOMENTARY = "Piano Key Momentary";
+
+            // Write Scale mode
+            inline const String WRITE_SCALE = "Write Scale";
 
             // Legacy UI labels - Primary row
             inline const String ROLL = "Roll";
@@ -379,15 +373,8 @@ namespace Params
         }
 
         // ========================================
-        // SCALE (Global - used as template for writing to steps)
+        // SCALE RANGE (Global - applies to all steps)
         // ========================================
-        // 12 chromatic notes (default: all enabled = chromatic scale)
-        for (int i = 0; i < ParamConstants::NUM_SCALE_NOTES; ++i) {
-            params.push_back(createBoolParam(
-                Keys::ID::scaleNote(i),
-                Keys::LABEL::scaleNote(i),
-                true));  // All notes enabled by default
-        }
         params.push_back(createIntParam(Keys::ID::SCALE_RANGE_MIN, Keys::LABEL::SCALE_RANGE_MIN, 0, 127, 0));
         params.push_back(createIntParam(Keys::ID::SCALE_RANGE_MAX, Keys::LABEL::SCALE_RANGE_MAX, 0, 127, 127));
 
@@ -404,7 +391,6 @@ namespace Params
         params.push_back(createBoolParam(Keys::ID::PREF_PREVIEW_NOTES, Keys::LABEL::PREF_PREVIEW_NOTES, true));
         params.push_back(createBoolParam(Keys::ID::PREF_FOLLOW_STEP, Keys::LABEL::PREF_FOLLOW_STEP, true));
         params.push_back(createFloatParam(Keys::ID::PREF_NOTE_LENGTH, Keys::LABEL::PREF_NOTE_LENGTH, 0.1f, 2.0f, 0.9f));
-        params.push_back(createBoolParam(Keys::ID::PREF_PIANO_KEY_MOMENTARY, Keys::LABEL::PREF_PIANO_KEY_MOMENTARY, false));
 
         // ========================================
         // LEGACY UI STATE (for backward compatibility)
@@ -448,6 +434,9 @@ namespace Params
             params.push_back(createIntParam(Keys::ID::ccNumber(i), Keys::LABEL::ccNumber(i), 0, 127, i + 1));
             params.push_back(createIntParam(Keys::ID::ccValue(i), Keys::LABEL::ccValue(i), 0, 127, 64));
         }
+
+        // Write Scale mode
+        params.push_back(createBoolParam(Keys::ID::WRITE_SCALE, Keys::LABEL::WRITE_SCALE, false));
 
         return { params.begin(), params.end() };
     }
