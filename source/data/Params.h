@@ -165,6 +165,12 @@ namespace Params
 
             // Write Scale mode
             inline const String WRITE_SCALE = "write_scale";
+
+            // Scale Latch mode (false = momentary, true = latched)
+            inline const String SCALE_LATCH = "scale_latch";
+
+            // Clear Scale trigger
+            inline const String CLEAR_SCALE = "clear_scale";
         }
 
         namespace LABEL
@@ -226,6 +232,12 @@ namespace Params
 
             // Write Scale mode
             inline const String WRITE_SCALE = "Write Scale";
+
+            // Scale Latch mode
+            inline const String SCALE_LATCH = "Scale Latch";
+
+            // Clear Scale trigger
+            inline const String CLEAR_SCALE = "Clear Scale";
 
             // Legacy UI labels - Primary row
             inline const String ROLL = "Roll";
@@ -437,6 +449,12 @@ namespace Params
 
         // Write Scale mode
         params.push_back(createBoolParam(Keys::ID::WRITE_SCALE, Keys::LABEL::WRITE_SCALE, false));
+
+        // Scale Latch mode (false = momentary, true = latched)
+        params.push_back(createBoolParam(Keys::ID::SCALE_LATCH, Keys::LABEL::SCALE_LATCH, false));
+
+        // Clear Scale trigger
+        params.push_back(createBoolParam(Keys::ID::CLEAR_SCALE, Keys::LABEL::CLEAR_SCALE, false));
 
         return { params.begin(), params.end() };
     }

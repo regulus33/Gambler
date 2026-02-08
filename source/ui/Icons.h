@@ -1476,4 +1476,91 @@ public:
         path.closeSubPath();
         return path;
     }
+
+    /**
+     * Creates lock (closed) icon for scale latch
+     * Simple padlock shape - closed/locked state
+     * Original viewBox: 0 0 16 20
+     */
+    static juce::Path createLockClosedIcon() {
+        juce::Path path;
+        // Shackle (top arc)
+        path.startNewSubPath(4.0f, 8.0f);
+        path.lineTo(4.0f, 5.0f);
+        path.cubicTo(4.0f, 3.7f, 4.5f, 2.5f, 5.5f, 1.5f);
+        path.cubicTo(6.5f, 0.5f, 7.7f, 0.0f, 9.0f, 0.0f);
+        path.cubicTo(10.3f, 0.0f, 11.5f, 0.5f, 12.5f, 1.5f);
+        path.cubicTo(13.5f, 2.5f, 14.0f, 3.7f, 14.0f, 5.0f);
+        path.lineTo(14.0f, 8.0f);
+
+        // Body (rectangle with rounded corners)
+        path.startNewSubPath(2.0f, 8.0f);
+        path.lineTo(16.0f, 8.0f);
+        path.cubicTo(16.5f, 8.0f, 17.0f, 8.2f, 17.4f, 8.6f);
+        path.cubicTo(17.8f, 9.0f, 18.0f, 9.5f, 18.0f, 10.0f);
+        path.lineTo(18.0f, 18.0f);
+        path.cubicTo(18.0f, 18.5f, 17.8f, 19.0f, 17.4f, 19.4f);
+        path.cubicTo(17.0f, 19.8f, 16.5f, 20.0f, 16.0f, 20.0f);
+        path.lineTo(2.0f, 20.0f);
+        path.cubicTo(1.5f, 20.0f, 1.0f, 19.8f, 0.6f, 19.4f);
+        path.cubicTo(0.2f, 19.0f, 0.0f, 18.5f, 0.0f, 18.0f);
+        path.lineTo(0.0f, 10.0f);
+        path.cubicTo(0.0f, 9.5f, 0.2f, 9.0f, 0.6f, 8.6f);
+        path.cubicTo(1.0f, 8.2f, 1.5f, 8.0f, 2.0f, 8.0f);
+        path.closeSubPath();
+
+        // Keyhole
+        path.startNewSubPath(9.0f, 12.0f);
+        path.addEllipse(8.0f, 12.0f, 2.0f, 2.0f);
+        path.startNewSubPath(8.5f, 14.0f);
+        path.lineTo(9.5f, 14.0f);
+        path.lineTo(9.5f, 17.0f);
+        path.lineTo(8.5f, 17.0f);
+        path.closeSubPath();
+
+        return path;
+    }
+
+    /**
+     * Creates unlock (open) icon for scale latch
+     * Simple padlock shape - open/unlocked state
+     * Original viewBox: 0 0 16 20
+     */
+    static juce::Path createLockOpenIcon() {
+        juce::Path path;
+        // Shackle (top arc - open on right side)
+        path.startNewSubPath(4.0f, 8.0f);
+        path.lineTo(4.0f, 5.0f);
+        path.cubicTo(4.0f, 3.7f, 4.5f, 2.5f, 5.5f, 1.5f);
+        path.cubicTo(6.5f, 0.5f, 7.7f, 0.0f, 9.0f, 0.0f);
+        path.cubicTo(10.3f, 0.0f, 11.5f, 0.5f, 12.5f, 1.5f);
+        path.cubicTo(13.5f, 2.5f, 14.0f, 3.7f, 14.0f, 5.0f);
+        path.lineTo(14.0f, 6.0f);
+        path.lineTo(16.0f, 6.0f);
+        path.lineTo(16.0f, 5.0f);
+        path.cubicTo(16.0f, 3.1f, 15.2f, 1.4f, 13.9f, 0.1f);
+        path.cubicTo(12.6f, -1.2f, 10.9f, -2.0f, 9.0f, -2.0f);
+        path.cubicTo(7.1f, -2.0f, 5.4f, -1.2f, 4.1f, 0.1f);
+        path.cubicTo(2.8f, 1.4f, 2.0f, 3.1f, 2.0f, 5.0f);
+        path.lineTo(2.0f, 8.0f);
+
+        // Body (rectangle with rounded corners)
+        path.startNewSubPath(2.0f, 8.0f);
+        path.lineTo(16.0f, 8.0f);
+        path.cubicTo(16.5f, 8.0f, 17.0f, 8.2f, 17.4f, 8.6f);
+        path.cubicTo(17.8f, 9.0f, 18.0f, 9.5f, 18.0f, 10.0f);
+        path.lineTo(18.0f, 18.0f);
+        path.cubicTo(18.0f, 18.5f, 17.8f, 19.0f, 17.4f, 19.4f);
+        path.cubicTo(17.0f, 19.8f, 16.5f, 20.0f, 16.0f, 20.0f);
+        path.lineTo(2.0f, 20.0f);
+        path.cubicTo(1.5f, 20.0f, 1.0f, 19.8f, 0.6f, 19.4f);
+        path.cubicTo(0.2f, 19.0f, 0.0f, 18.5f, 0.0f, 18.0f);
+        path.lineTo(0.0f, 10.0f);
+        path.cubicTo(0.0f, 9.5f, 0.2f, 9.0f, 0.6f, 8.6f);
+        path.cubicTo(1.0f, 8.2f, 1.5f, 8.0f, 2.0f, 8.0f);
+        path.closeSubPath();
+
+        return path;
+    }
+
 };

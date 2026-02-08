@@ -5,6 +5,8 @@
 #include "PresetSelectorComponent.h"
 #include "ToggleIconButton.h"
 #include "WriteScaleButton.h"
+#include "ScaleLatchButton.h"
+#include "ScaleClearButton.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
@@ -47,7 +49,9 @@ public:
           midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, true),
           playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
-          writeScaleButton(processor)
+          writeScaleButton(processor),
+          scaleLatchButton(processor),
+          scaleClearButton(processor)
     {
         // Add logo component
         addAndMakeVisible(logo);
@@ -107,7 +111,15 @@ public:
 
         // Add write scale button
         addAndMakeVisible(writeScaleButton);
-        // Note: No callback needed - MainScreenComponent checks button state directly
+        // Note: No callback needed - logic is handled in audio thread
+
+        // Add scale latch button
+        addAndMakeVisible(scaleLatchButton);
+        // Note: No callback needed - syncs with APVTS parameter
+
+        // Add scale clear button
+        addAndMakeVisible(scaleClearButton);
+        // Note: No callback needed - triggers clear action via APVTS parameter
 
         // Set MIDI learn button colors and stroke width
         // White when OFF (state 1), grey when ON/active (state 2)
@@ -181,6 +193,16 @@ public:
         int writeScaleButtonX = playPauseButtonX - buttonSize - buttonGap;
         int writeScaleButtonY = (height - buttonSize) / 2;  // Vertically center
         writeScaleButton.setBounds(writeScaleButtonX, writeScaleButtonY, buttonSize, buttonSize);
+
+        // Position scale latch button left of write scale button
+        int scaleLatchButtonX = writeScaleButtonX - buttonSize - buttonGap;
+        int scaleLatchButtonY = (height - buttonSize) / 2;  // Vertically center
+        scaleLatchButton.setBounds(scaleLatchButtonX, scaleLatchButtonY, buttonSize, buttonSize);
+
+        // Position scale clear button left of scale latch button
+        int scaleClearButtonX = scaleLatchButtonX - buttonSize - buttonGap;
+        int scaleClearButtonY = (height - buttonSize) / 2;  // Vertically center
+        scaleClearButton.setBounds(scaleClearButtonX, scaleClearButtonY, buttonSize, buttonSize);
     }
 
     // Callback when settings button is clicked
@@ -246,5 +268,7 @@ private:
     ToggleIconButton playPauseButton;
     ToggleIconButton stopButton;
     WriteScaleButton writeScaleButton;
+    ScaleLatchButton scaleLatchButton;
+    ScaleClearButton scaleClearButton;
 };
 

@@ -706,6 +706,19 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
         }
         DBG ("SHUFFLE triggered");
     }
+
+    // ========== SCALE CLEAR BUTTON ==========
+    if (parameterID == Params::Keys::ID::CLEAR_SCALE && isOn) {
+        auto& state = getState();
+        int selectedStep = state.getSelectedStepForEditing();
+
+        // Clear the scale by disabling all notes (empty scale)
+        for (int note = 0; note < ParamConstants::NUM_SCALE_NOTES; note++) {
+            state.setStepScaleNote(selectedStep, note, false);
+        }
+
+        DBG("CLEAR_SCALE triggered - cleared scale for step " << selectedStep);
+    }
 }
 
 //==============================================================================

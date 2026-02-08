@@ -138,6 +138,9 @@ public:
     }
 
     void mouseDown (const juce::MouseEvent& event) override {
+        // Check if scale latch is enabled
+        bool isLatched = isScaleLatchEnabled();
+
         // Check white keys first (they're on top visually)
         for (int i = 0; i < 12; i++) {
             if (!keys[i]->isBlack && keys[i]->path.contains (event.position)) {
@@ -148,11 +151,23 @@ public:
                     return;
                 }
 
-                // Toggle the key
-                if (tryToggleKey(i)) {
-                    repaint();
-                    if (onNoteChanged)
-                        onNoteChanged();
+                // Store the pressed key for momentary mode
+                pressedKeyIndex_ = i;
+
+                if (isLatched) {
+                    // Latched mode: toggle the key on/off
+                    if (tryToggleKey(i)) {
+                        repaint();
+                        if (onNoteChanged)
+                            onNoteChanged();
+                    }
+                } else {
+                    // Momentary mode: turn the key ON
+                    if (trySetKey(i, true)) {
+                        repaint();
+                        if (onNoteChanged)
+                            onNoteChanged();
+                    }
                 }
                 return;
             }
@@ -168,11 +183,23 @@ public:
                     return;
                 }
 
-                // Toggle the key
-                if (tryToggleKey(i)) {
-                    repaint();
-                    if (onNoteChanged)
-                        onNoteChanged();
+                // Store the pressed key for momentary mode
+                pressedKeyIndex_ = i;
+
+                if (isLatched) {
+                    // Latched mode: toggle the key on/off
+                    if (tryToggleKey(i)) {
+                        repaint();
+                        if (onNoteChanged)
+                            onNoteChanged();
+                    }
+                } else {
+                    // Momentary mode: turn the key ON
+                    if (trySetKey(i, true)) {
+                        repaint();
+                        if (onNoteChanged)
+                            onNoteChanged();
+                    }
                 }
                 return;
             }
@@ -180,7 +207,15 @@ public:
     }
 
     void mouseUp (const juce::MouseEvent& event) override {
-        // Nothing to do - keys are toggled on mouseDown
+        // In momentary mode, turn the key OFF when mouse is released
+        if (!isScaleLatchEnabled() && pressedKeyIndex_ >= 0) {
+            if (trySetKey(pressedKeyIndex_, false)) {
+                repaint();
+                if (onNoteChanged)
+                    onNoteChanged();
+            }
+            pressedKeyIndex_ = -1;
+        }
     }
 
     void resized() override {
@@ -355,6 +390,27 @@ private:
     bool tryToggleKey(int keyIndex) {
         keys[keyIndex]->isToggled = !keys[keyIndex]->isToggled;
         return true;
+    }
+
+    /**
+     * Try to set a key to a specific state - returns true if state was changed
+     */
+    bool trySetKey(int keyIndex, bool enabled) {
+        if (keys[keyIndex]->isToggled != enabled) {
+            keys[keyIndex]->isToggled = enabled;
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if scale latch mode is enabled
+     */
+    bool isScaleLatchEnabled() const {
+        if (auto* param = getProcessor().getAPVTS().getParameter(Params::Keys::ID::SCALE_LATCH)) {
+            return param->getValue() > 0.5f;
+        }
+        return false;  // Default to momentary mode
     }
 
     /**
@@ -602,6 +658,9 @@ private:
     // MIDI learn support
     MidiLearnRegistry* registry_ = nullptr;
     std::array<MidiControlId, 12> keyMidiControlIds_;
+
+    // Momentary key press tracking
+    int pressedKeyIndex_ = -1;  // -1 means no key is pressed, 0-11 for chromatic scale
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
 };
