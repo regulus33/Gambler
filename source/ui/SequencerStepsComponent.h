@@ -19,13 +19,6 @@ namespace SequencerStepsConstants {
     constexpr int numVisibleSteps = 8;
     constexpr float stepSize = 92.0f;
     constexpr float gap = 18.0f;
-    // Border (only for active step)
-    constexpr float borderWidthActive = 3.0f;
-    constexpr float cornerRadius = 4.4f;
-    // Text
-    constexpr float fontSize = 13.0f;
-    // Active circle
-    constexpr float activeCircleRadius = 20.0f;
 }
 
 /**
@@ -35,7 +28,8 @@ namespace SequencerStepsConstants {
  * Each step displays:
  * - Background color from the note's scale color
  * - Note number (MIDI note 0-127)
- * - Active step indicator: black circle (40px diameter) with white text
+ * - Current step indicator: white fill + black circle (40px diameter) with white text
+ * - Selected step indicator: white border
  *
  * The window can be moved through the sequence to view different sections.
  *

@@ -216,10 +216,12 @@ public:
             setSequencerWindow(windowStart);
 
             // Set the clicked step as the selected step for editing
-            processorRef.getState().setSelectedStepForEditing(stepIndex);
+            auto& state = processorRef.getState();
+            state.setSelectedStepForEditing(stepIndex);
 
-            // Update the sequence grid to show the new selection
-            sequenceOverview.getSequenceGrid().updateFromState(processorRef.getState());
+            // Update the sequence grid to show the new selection (preserve current step indicator)
+            int currentStep = state.getCurrentIndex();
+            sequenceOverview.getSequenceGrid().updateFromState(state, currentStep);
 
             // Update the MIDI data per step component to show the selected step's data
             midiDataPerStep.updateFromSequence();
@@ -228,9 +230,22 @@ public:
             Scale stepScale = processorRef.getState().getStepScale(stepIndex);
             pianoRoll.setScale(stepScale);
 
+            // Update the active step and note
+            setActiveStepAndNote(stepIndex);
+
             DBG("Sequence grid clicked: step " + juce::String(stepIndex) +
                 " -> navigating to row " + juce::String(rowIndex) +
                 " (window " + juce::String(windowStart) + "), selected for editing");
+        };
+
+        // Setup callback for sequence grid double-clicks - force jump to that step
+        sequenceOverview.getSequenceGrid().onSquareDoubleClicked = [this](int stepIndex) {
+            auto& state = processorRef.getState();
+            // Only allow jumping to steps within the sequence length
+            if (stepIndex < state.getLength()) {
+                state.setCurrentIndex(stepIndex);
+                DBG("Sequence grid double-clicked: forcing jump to step " + juce::String(stepIndex));
+            }
         };
 
         // Add subsequence controls component
@@ -407,8 +422,8 @@ public:
         mainControls.getNoteControls().setFromMidiNote(selectedNote);
 
         // Update the sequence overview grid to show all 64 steps
-        // - Border indicates playback position (currentStep)
-        // - White fill indicates selected step for editing (selectedStep)
+        // - White fill indicates current step (playback position)
+        // - White border indicates selected step for editing
         sequenceOverview.getSequenceGrid().updateFromState(state, currentStep);
 
         // Update the subsequence bar to reflect selected step's substep state

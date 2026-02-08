@@ -3,39 +3,39 @@
 #include "../StateListenerComponent.h"
 #include "../MusicConstants.h"
 #include "../MidiLearnOverlayPainter.h"
+#include "../UIConstants.h"
 #include "../../backend/MidiLearnRegistry.h"
 #include "../../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace StepButtonConstants {
     constexpr float cornerRadius = 4.4f;
-    constexpr float borderWidthActive = 3.0f;
+    constexpr float borderWidthSelected = 3.0f;  // Border width for selected step
     constexpr float fontSize = 13.0f;
     constexpr float activeCircleRadius = 20.0f;
 
     // Colors
     const juce::Colour restStepColor = juce::Colour(0xff505050);      // Lighter grey for rest steps
     const juce::Colour emptyStepColor = juce::Colour(0xff2a2a2a);     // Darker grey for empty steps
-    const juce::Colour selectedStepColor = juce::Colours::white;      // White for selected step
     const juce::Colour textColorOnNote = juce::Colours::black;        // Black text on colored notes
-    const juce::Colour textColorOnSelected = juce::Colours::black;    // Black text on white selected
+    const juce::Colour textColorOnCurrent = juce::Colours::black;     // Black text on white current step
 }
 
 /**
  * StepButton - Individual step button for MIDI-mappable step selection
- * 
+ *
  * Represents one of 8 visible steps in the sequencer window.
  * Each button has a fixed local index (0-7) that maps to STEP_0 through STEP_7
  * for MIDI learn purposes.
- * 
+ *
  * The absolute step index is calculated as: windowStart + localIndex
- * 
+ *
  * Visual States:
- * - Selected (white fill) - This step is selected for editing
- * - Active (white border) - This step is currently playing
+ * - Current (white fill) - This step is currently playing (playback position)
+ * - Selected (white border) - This step is selected for editing
  * - Normal (note color fill) - Regular step with note color
  * - Rest (grey fill) - Step contains a rest (-1)
- * 
+ *
  * Observer Pattern:
  * - Listens to step note parameters for this step
  * - Listens to sequence metadata (currentIndex, selectedStep, windowStart)
@@ -98,20 +98,20 @@ public:
     void paint(juce::Graphics& g) override {
         using namespace StepButtonConstants;
         auto& state = getState();
-        
+
         int absoluteStepIndex = getAbsoluteStepIndex();
-        
+
         // Check if this step is within the active sequence length
         bool isWithinSequence = absoluteStepIndex < state.getLength();
-        
-        // Check if this is the active step (playback position)
-        bool isActive = isWithinSequence && (absoluteStepIndex == state.getCurrentIndex());
-        
+
+        // Check if this is the current step (playback position)
+        bool isCurrent = isWithinSequence && (absoluteStepIndex == state.getCurrentIndex());
+
         // Check if this is the selected step for editing
         bool isSelected = (absoluteStepIndex == state.getSelectedStepForEditing());
-        
+
         auto bounds = getLocalBounds().toFloat();
-        
+
         if (isWithinSequence) {
             // Get the quantized current note for this step (accounts for scale quantization)
             int midiNote = state.getCurrentNoteForStep(absoluteStepIndex);
@@ -122,8 +122,9 @@ public:
 
             // Determine the fill color
             juce::Colour fillColor;
-            if (isSelected) {
-                fillColor = StepButtonConstants::selectedStepColor;
+            if (isCurrent) {
+                // Current step (playback position) - white fill
+                fillColor = UIConstants::stepIndicatorWhite;
             } else if (isRest) {
                 fillColor = StepButtonConstants::restStepColor;
             } else {
@@ -135,22 +136,22 @@ public:
             g.setColour(fillColor);
             g.fillRoundedRectangle(bounds, cornerRadius);
 
-            // Draw white border on active step (playback position)
-            if (isActive) {
-                g.setColour(juce::Colours::white);
-                float inset = borderWidthActive * 0.5f;
+            // Draw white border on selected step (for editing)
+            if (isSelected) {
+                g.setColour(UIConstants::stepIndicatorWhite);
+                float inset = borderWidthSelected * 0.5f;
                 juce::Rectangle<float> borderBounds = bounds.reduced(inset);
                 float borderRadiusInner = juce::jmax(0.0f, cornerRadius - inset);
-                g.drawRoundedRectangle(borderBounds, borderRadiusInner, borderWidthActive);
+                g.drawRoundedRectangle(borderBounds, borderRadiusInner, borderWidthSelected);
             }
 
             // Draw note text (only for non-rest steps)
             if (!isRest) {
-                drawNoteText(g, bounds, midiNote, isSelected);
+                drawNoteText(g, bounds, midiNote, isCurrent);
             }
 
             // Draw active circle indicator if this is the playing step
-            if (isActive) {
+            if (isCurrent) {
                 drawActiveCircle(g, bounds, absoluteStepIndex);
             }
         } else {
@@ -180,20 +181,34 @@ public:
         }
     }
 
+    void mouseDoubleClick(const juce::MouseEvent& event) override {
+        if (event.mods.isLeftButtonDown()) {
+            // Double-click forces the current step to jump to this step
+            int absoluteStepIndex = getAbsoluteStepIndex();
+            if (absoluteStepIndex < 64) {
+                auto& state = getState();
+                // Only allow jumping to steps within the sequence length
+                if (absoluteStepIndex < state.getLength()) {
+                    state.setCurrentIndex(absoluteStepIndex);
+                }
+            }
+        }
+    }
+
     void onStateChanged() override {
         // Repaint when any subscribed parameter changes
         repaint();
     }
 
 private:
-    void drawNoteText(juce::Graphics& g, const juce::Rectangle<float>& bounds, int midiNote, bool isSelected) {
+    void drawNoteText(juce::Graphics& g, const juce::Rectangle<float>& bounds, int midiNote, bool isCurrent) {
         using namespace StepButtonConstants;
 
         // Convert MIDI note to note name (e.g., "C4", "Gb3")
         juce::String noteName = MusicConstants::midiNoteToNoteName(midiNote);
 
-        // Text color: always black (works on both white selected and colored note backgrounds)
-        g.setColour(isSelected ? textColorOnSelected : textColorOnNote);
+        // Text color: always black (works on both white current step and colored note backgrounds)
+        g.setColour(isCurrent ? textColorOnCurrent : textColorOnNote);
 
         // Load Inter font
         auto interFont = juce::Typeface::createSystemTypefaceFor(

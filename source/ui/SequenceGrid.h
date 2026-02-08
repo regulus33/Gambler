@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../backend/SequenceState.h"
+#include "UIConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <array>
 
@@ -27,12 +28,12 @@ namespace SequenceGridConstants {
  */
 struct SquareState {
     juce::Colour color { juce::Colour (SequenceGridConstants::defaultGreyHex) };
-    bool hasBorder { false };      // Border indicates playback position
-    bool isSelected { false };     // Selected step for editing (white fill)
+    bool hasBorder { false };      // Border indicates selected step for editing
+    bool isCurrent { false };      // Current step (playback position) - white fill
 
     SquareState() = default;
-    SquareState (juce::Colour c, bool border = false, bool selected = false)
-        : color (c), hasBorder (border), isSelected (selected) {}
+    SquareState (juce::Colour c, bool border = false, bool current = false)
+        : color (c), hasBorder (border), isCurrent (current) {}
 };
 
 /**
@@ -75,25 +76,25 @@ public:
 
                 // Determine the fill color
                 juce::Colour displayColor;
-                if (state.isSelected) {
-                    // Selected step for editing - white fill
-                    displayColor = juce::Colours::white;
+                if (state.isCurrent) {
+                    // Current step (playback position) - white fill (always full opacity)
+                    displayColor = UIConstants::stepIndicatorWhite;
                 } else {
                     displayColor = state.color;
-                }
 
-                // Reduce opacity if outside current window row
-                if (currentWindowRow >= 0 && row != currentWindowRow) {
-                    displayColor = displayColor.withAlpha(nonVisibleRowOpacity);
+                    // Reduce opacity if outside current window row (but not for current step)
+                    if (currentWindowRow >= 0 && row != currentWindowRow) {
+                        displayColor = displayColor.withAlpha(nonVisibleRowOpacity);
+                    }
                 }
 
                 // Fill square with color
                 g.setColour (displayColor);
                 g.fillRoundedRectangle (squareBounds, squareCornerRadius);
 
-                // Draw white border if enabled (playback position)
+                // Draw white border if enabled (selected step for editing)
                 if (state.hasBorder) {
-                    g.setColour (juce::Colours::white);
+                    g.setColour (UIConstants::stepIndicatorWhite);
                     g.drawRoundedRectangle (squareBounds.reduced (0.5f), squareCornerRadius, borderWidth);
                 }
             }
@@ -212,8 +213,8 @@ public:
      * Update the grid from a SequenceState object (APVTS-backed)
      * - Each square shows the note color for that step
      * - Steps outside the sequence length are shown in grey
-     * - The current playback step has a white border
-     * - The selected step for editing has a white fill
+     * - The current playback step has a white fill
+     * - The selected step for editing has a white border
      * @param state The SequenceState to display
      * @param playbackStep The current playback position (-1 if not playing)
      */
@@ -247,11 +248,11 @@ public:
                 squareStates[row][col].color = juce::Colour (outOfBoundsGreyHex);
             }
 
-            // Set border for playback position
-            squareStates[row][col].hasBorder = (stepIndex == playbackStep);
+            // Set border for selected step (for editing)
+            squareStates[row][col].hasBorder = (stepIndex == selectedStep);
 
-            // Set selected state for editing position (white fill)
-            squareStates[row][col].isSelected = (stepIndex == selectedStep);
+            // Set current state for playback position (white fill)
+            squareStates[row][col].isCurrent = (stepIndex == playbackStep);
         }
 
         repaint();
@@ -306,8 +307,41 @@ public:
         }
     }
 
+    /**
+     * Mouse double-click handler - detects which square was double-clicked
+     */
+    void mouseDoubleClick(const juce::MouseEvent& event) override {
+        using namespace SequenceGridConstants;
+
+        auto pos = event.getPosition();
+
+        // Calculate which square was double-clicked
+        for (int row = 0; row < gridRows; ++row) {
+            for (int col = 0; col < gridCols; ++col) {
+                int x = col * (squareSize + squareSpacing);
+                int y = row * (squareSize + squareSpacing);
+
+                auto squareBounds = juce::Rectangle<int>(x, y, squareSize, squareSize);
+
+                if (squareBounds.contains(pos)) {
+                    // Calculate step index (0-63)
+                    int stepIndex = row * gridCols + col;
+
+                    // Trigger callback if set
+                    if (onSquareDoubleClicked) {
+                        onSquareDoubleClicked(stepIndex);
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
     // Callback for when a square is clicked
     std::function<void(int)> onSquareClicked;
+
+    // Callback for when a square is double-clicked (to force jump to that step)
+    std::function<void(int)> onSquareDoubleClicked;
 
 private:
     std::array<std::array<SquareState, SequenceGridConstants::gridCols>,

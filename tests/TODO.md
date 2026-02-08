@@ -38,6 +38,7 @@ saveable keyboard settings, stack them all up as rectangles atop the piano
 
 a setting that listens for any non mapped midi input and makes the scale quantized to that momentarily
 
+If you click another row in seqeuncer overview that isn't active row in follow step mode you get pushed back to active...
 
 # Standalone 
 
