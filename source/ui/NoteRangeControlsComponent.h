@@ -2,6 +2,7 @@
 
 #include "BinaryData.h"
 #include "StateListenerComponent.h"
+#include "../backend/Scale.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace NoteRangeControlsConstants {
@@ -148,11 +149,16 @@ private:
  * NoteRangeControlsComponent
  *
  * Panel displayed to the right of the sequencer steps/controls.
- * Contains controls for note range settings (min/max range sliders).
+ * Contains controls for note range settings using a window-based approach:
+ * - Window Size (bottom slider): How many notes are in the valid range (1-128)
+ * - Window Offset (top slider): Starting position of the window (0-127)
+ *
+ * Example: size=45, offset=54 → valid notes are [54, 98] (54 + 45 - 1)
  *
  * Observer Pattern:
- * - Listens to scale range parameters (rangeMin, rangeMax)
- * - Automatically updates UI when range parameters change
+ * - Listens to scale window parameters (offset, size)
+ * - Automatically updates UI when window parameters change
+ * - Directly maps to backend window parameters (no conversion needed)
  */
 class NoteRangeControlsComponent : public StateListenerComponent {
 public:
@@ -163,23 +169,31 @@ public:
             BinaryData::Inter_24ptBold_ttf,
             BinaryData::Inter_24ptBold_ttfSize);
 
-        // Setup min range slider
-        minRangeSlider.setSliderStyle (juce::Slider::RotaryVerticalDrag);
-        minRangeSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-        minRangeSlider.setRange (0.0, 127.0, 1.0);
-        minRangeSlider.setValue (0.0);
-        minRangeSlider.setLookAndFeel (&sliderLookAndFeel);
-        minRangeSlider.onValueChange = [this] { updateGaugeRange(); };
-        addAndMakeVisible (minRangeSlider);
+        // Setup window width slider (bottom slider)
+        // Range: 1 to 128 (minimum window width is 1 note)
+        windowWidthSlider.setSliderStyle (juce::Slider::RotaryVerticalDrag);
+        windowWidthSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+        windowWidthSlider.setRange (1.0, 128.0, 1.0);
+        windowWidthSlider.setValue (128.0);  // Default: full range
+        windowWidthSlider.setLookAndFeel (&sliderLookAndFeel);
+        windowWidthSlider.onValueChange = [this] {
+            clampAndUpdateValues();
+            updateBackendAndGauge();
+        };
+        addAndMakeVisible (windowWidthSlider);
 
-        // Setup max range slider
-        maxRangeSlider.setSliderStyle (juce::Slider::RotaryVerticalDrag);
-        maxRangeSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-        maxRangeSlider.setRange (0.0, 127.0, 1.0);
-        maxRangeSlider.setValue (127.0);
-        maxRangeSlider.setLookAndFeel (&sliderLookAndFeel);
-        maxRangeSlider.onValueChange = [this] { updateGaugeRange(); };
-        addAndMakeVisible (maxRangeSlider);
+        // Setup window offset slider (top slider)
+        // Range: 0 to 127 (starting position of the window)
+        windowOffsetSlider.setSliderStyle (juce::Slider::RotaryVerticalDrag);
+        windowOffsetSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+        windowOffsetSlider.setRange (0.0, 127.0, 1.0);
+        windowOffsetSlider.setValue (0.0);  // Default: start at note 0
+        windowOffsetSlider.setLookAndFeel (&sliderLookAndFeel);
+        windowOffsetSlider.onValueChange = [this] {
+            clampAndUpdateValues();
+            updateBackendAndGauge();
+        };
+        addAndMakeVisible (windowOffsetSlider);
 
         // Setup range gauge
         addAndMakeVisible (rangeGauge);
@@ -189,32 +203,16 @@ public:
     }
 
     /**
-     * Callback when range changes (min or max slider moved)
-     * Parameters: minNote, maxNote
+     * Set the current window values (for initialization from backend)
      */
-    std::function<void(int, int)> onRangeChanged;
+    void setWindow(int offset, int size) {
+        windowOffsetSlider.setValue(static_cast<double>(offset), juce::dontSendNotification);
+        windowWidthSlider.setValue(static_cast<double>(size), juce::dontSendNotification);
 
-    /**
-     * Set the current range values (for initialization from backend)
-     */
-    void setRange(int minNote, int maxNote) {
-        minRangeSlider.setValue(static_cast<double>(minNote), juce::dontSendNotification);
-        maxRangeSlider.setValue(static_cast<double>(maxNote), juce::dontSendNotification);
+        // Update gauge with computed min/max
+        int minNote = Scale::computeMinFromWindow(offset, size);
+        int maxNote = Scale::computeMaxFromWindow(offset, size);
         rangeGauge.setRange(minNote, maxNote);
-    }
-
-    /**
-     * Get the current min range value
-     */
-    int getMinRange() const {
-        return static_cast<int>(minRangeSlider.getValue());
-    }
-
-    /**
-     * Get the current max range value
-     */
-    int getMaxRange() const {
-        return static_cast<int>(maxRangeSlider.getValue());
     }
 
     /**
@@ -225,8 +223,8 @@ public:
     }
 
     ~NoteRangeControlsComponent() override {
-        minRangeSlider.setLookAndFeel (nullptr);
-        maxRangeSlider.setLookAndFeel (nullptr);
+        windowWidthSlider.setLookAndFeel (nullptr);
+        windowOffsetSlider.setLookAndFeel (nullptr);
     }
 
     void paint (juce::Graphics& g) override {
@@ -241,7 +239,7 @@ public:
         g.drawRoundedRectangle (borderBounds, borderRadius, borderWidth);
 
         // Draw rotated "Note Range" label in the left half, above the sliders
-        // Calculate the available space: from top to just above maxRangeSlider
+        // Calculate the available space: from top to just above windowOffsetSlider (top slider)
         float labelAreaTop = static_cast<float>(sliderPadding);
         float labelAreaBottom = static_cast<float>(getHeight() - sliderPadding - sliderDiameter - sliderVerticalSpacing - sliderDiameter - labelGapFromSlider);
         float labelAreaHeight = labelAreaBottom - labelAreaTop;
@@ -274,15 +272,15 @@ public:
     void resized() override {
         using namespace NoteRangeControlsConstants;
 
-        // Position MinRangeSlider at bottom-left with padding
-        int minSliderX = sliderPadding + contentPaddingLeft;
-        int minSliderY = getHeight() - sliderPadding - sliderDiameter;
-        minRangeSlider.setBounds (minSliderX, minSliderY, sliderDiameter, sliderDiameter);
+        // Position WindowWidthSlider at bottom-left with padding
+        int widthSliderX = sliderPadding + contentPaddingLeft;
+        int widthSliderY = getHeight() - sliderPadding - sliderDiameter;
+        windowWidthSlider.setBounds (widthSliderX, widthSliderY, sliderDiameter, sliderDiameter);
 
-        // Position MaxRangeSlider directly above MinRangeSlider with vertical spacing
-        int maxSliderX = sliderPadding + contentPaddingLeft;
-        int maxSliderY = minSliderY - sliderVerticalSpacing - sliderDiameter;
-        maxRangeSlider.setBounds (maxSliderX, maxSliderY, sliderDiameter, sliderDiameter);
+        // Position WindowOffsetSlider directly above WindowWidthSlider with vertical spacing
+        int offsetSliderX = sliderPadding + contentPaddingLeft;
+        int offsetSliderY = widthSliderY - sliderVerticalSpacing - sliderDiameter;
+        windowOffsetSlider.setBounds (offsetSliderX, offsetSliderY, sliderDiameter, sliderDiameter);
 
         // Position range gauge in the right half with margins
         int halfWidth = getWidth() / 2;
@@ -296,35 +294,72 @@ public:
 protected:
     /**
      * Called on message thread when any subscribed parameter changes.
-     * Updates the sliders and gauge to reflect the current range state.
+     * Updates the sliders and gauge to reflect the current window state.
      */
     void onStateChanged() override {
         auto& state = getState();
-        int minNote = state.getScaleRangeMin();
-        int maxNote = state.getScaleRangeMax();
+        int offset = state.getScaleWindowOffset();
+        int size = state.getScaleWindowSize();
 
-        minRangeSlider.setValue(static_cast<double>(minNote), juce::dontSendNotification);
-        maxRangeSlider.setValue(static_cast<double>(maxNote), juce::dontSendNotification);
+        // Update sliders directly from window parameters
+        windowOffsetSlider.setValue(static_cast<double>(offset), juce::dontSendNotification);
+        windowWidthSlider.setValue(static_cast<double>(size), juce::dontSendNotification);
+
+        // Update gauge with computed min/max
+        int minNote = Scale::computeMinFromWindow(offset, size);
+        int maxNote = Scale::computeMaxFromWindow(offset, size);
         rangeGauge.setRange(minNote, maxNote);
+
+        // Force immediate repaint of the gauge to ensure visual feedback
+        rangeGauge.repaint();
     }
 
 private:
-    void updateGaugeRange() {
-        int minNote = static_cast<int>(minRangeSlider.getValue());
-        int maxNote = static_cast<int>(maxRangeSlider.getValue());
-        rangeGauge.setRange (minNote, maxNote);
+    /**
+     * Clamp slider values to ensure offset + width - 1 <= 127
+     * Called whenever either slider changes
+     * Keeps slider ranges static but clamps the actual values
+     */
+    void clampAndUpdateValues() {
+        constexpr int MAX_MIDI_NOTE = 127;
 
-        // Notify listener of range change
-        if (onRangeChanged) {
-            onRangeChanged(minNote, maxNote);
+        int currentOffset = static_cast<int>(windowOffsetSlider.getValue());
+        int currentWidth = static_cast<int>(windowWidthSlider.getValue());
+
+        // Calculate maximum allowed offset for current width
+        // If width is 20, max offset is 127 - 20 + 1 = 108
+        // This ensures offset + width - 1 <= 127
+        int maxAllowedOffset = MAX_MIDI_NOTE - currentWidth + 1;
+
+        // Clamp offset if it exceeds the limit
+        if (currentOffset > maxAllowedOffset) {
+            windowOffsetSlider.setValue(static_cast<double>(maxAllowedOffset), juce::dontSendNotification);
         }
+    }
+
+    void updateBackendAndGauge() {
+        // Get current window values from sliders
+        int offset = static_cast<int>(windowOffsetSlider.getValue());
+        int size = static_cast<int>(windowWidthSlider.getValue());
+
+        // Compute min/max for gauge display
+        int minNote = Scale::computeMinFromWindow(offset, size);
+        int maxNote = Scale::computeMaxFromWindow(offset, size);
+
+        // Update gauge
+        rangeGauge.setRange(minNote, maxNote);
+
+        // Update backend parameters directly
+        auto& state = getState();
+        state.setScaleWindowOffset(offset);
+        state.setScaleWindowSize(size);
     }
 
 
     juce::Typeface::Ptr interBoldFont;
     NoteRangeSliderLookAndFeel sliderLookAndFeel;
-    juce::Slider minRangeSlider;
-    juce::Slider maxRangeSlider;
+    juce::Slider windowWidthSlider;   // Bottom slider: window width (1-128)
+    juce::Slider windowOffsetSlider;  // Top slider: window offset (0-127)
     NoteRangeGauge rangeGauge;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NoteRangeControlsComponent)

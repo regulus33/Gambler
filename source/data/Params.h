@@ -94,10 +94,10 @@ namespace Params
             }
 
             // ========================================
-            // SCALE RANGE (Global - applies to all steps)
+            // SCALE WINDOW (Global - applies to all steps)
             // ========================================
-            inline const String SCALE_RANGE_MIN = "scale_range_min";
-            inline const String SCALE_RANGE_MAX = "scale_range_max";
+            inline const String SCALE_WINDOW_OFFSET = "scale_window_offset";  // 0-127: starting MIDI note
+            inline const String SCALE_WINDOW_SIZE = "scale_window_size";      // 1-128: number of notes in window
 
             // ========================================
             // CLOCK
@@ -217,8 +217,8 @@ namespace Params
                 static const char* noteNames[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
                 return "Step " + String(stepIndex) + " Scale " + noteNames[noteIndex];
             }
-            inline const String SCALE_RANGE_MIN = "Scale Range Min";
-            inline const String SCALE_RANGE_MAX = "Scale Range Max";
+            inline const String SCALE_WINDOW_OFFSET = "Scale Window Offset";
+            inline const String SCALE_WINDOW_SIZE = "Scale Window Size";
 
             // Clock
             inline const String CLOCK_MODE = "Clock Mode";
@@ -385,10 +385,10 @@ namespace Params
         }
 
         // ========================================
-        // SCALE RANGE (Global - applies to all steps)
+        // SCALE WINDOW (Global - applies to all steps)
         // ========================================
-        params.push_back(createIntParam(Keys::ID::SCALE_RANGE_MIN, Keys::LABEL::SCALE_RANGE_MIN, 0, 127, 0));
-        params.push_back(createIntParam(Keys::ID::SCALE_RANGE_MAX, Keys::LABEL::SCALE_RANGE_MAX, 0, 127, 127));
+        params.push_back(createIntParam(Keys::ID::SCALE_WINDOW_OFFSET, Keys::LABEL::SCALE_WINDOW_OFFSET, 0, 127, 0));
+        params.push_back(createIntParam(Keys::ID::SCALE_WINDOW_SIZE, Keys::LABEL::SCALE_WINDOW_SIZE, 1, 128, 128));
 
         // ========================================
         // CLOCK

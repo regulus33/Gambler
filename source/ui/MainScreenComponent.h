@@ -548,18 +548,10 @@ private:
         // Add note range controls component (right of sequencer)
         addAndMakeVisible(noteRangeControls);
 
-        // Initialize note range controls with current scale range
-        noteRangeControls.setRange(
-            processorRef.getState().getScaleRangeMin(),
-            processorRef.getState().getScaleRangeMax());
-
-        // Wire up note range callback to update backend Scale
-        noteRangeControls.onRangeChanged = [this](int minNote, int maxNote) {
-            // Update state directly (thread-safe via APVTS)
-            processorRef.getState().setScaleRangeMin(minNote);
-            processorRef.getState().setScaleRangeMax(maxNote);
-            DBG("Note range changed: " << minNote << " - " << maxNote);
-        };
+        // Initialize note range controls with current scale window parameters
+        noteRangeControls.setWindow(
+            processorRef.getState().getScaleWindowOffset(),
+            processorRef.getState().getScaleWindowSize());
     }
 
     /**

@@ -29,6 +29,28 @@ public:
     // Getters
     int getRangeMin() const { return rangeMin; }
     int getRangeMax() const { return rangeMax; }
+
+    // Window-based helpers (static utility functions)
+    // These compute min/max from window offset and size
+    static int computeMinFromWindow(int offset, int size) {
+        (void)size;  // Unused - min is just the offset
+        return juce::jlimit(MIN_MIDI_NOTE, MAX_MIDI_NOTE, offset);
+    }
+
+    static int computeMaxFromWindow(int offset, int size) {
+        int maxNote = offset + size - 1;  // -1 because range is inclusive
+        return juce::jlimit(MIN_MIDI_NOTE, MAX_MIDI_NOTE, maxNote);
+    }
+
+    static int computeOffsetFromRange(int minNote, int maxNote) {
+        (void)maxNote;  // Unused - offset is just the min
+        return juce::jlimit(MIN_MIDI_NOTE, MAX_MIDI_NOTE, minNote);
+    }
+
+    static int computeSizeFromRange(int minNote, int maxNote) {
+        int size = maxNote - minNote + 1;  // +1 because range is inclusive
+        return juce::jlimit(1, MAX_MIDI_NOTE + 1, size);
+    }
     
     const std::array<int, NUM_CHROMATIC_NOTES>& getScaleNotes() const {
         return scaleNotes;

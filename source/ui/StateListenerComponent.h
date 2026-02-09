@@ -100,11 +100,11 @@ protected:
     }
 
     /**
-     * Listen to scale range parameters (min/max)
+     * Listen to scale window parameters (offset/size)
      */
     void listenToScaleRange() {
-        listenToParameter(Params::Keys::ID::SCALE_RANGE_MIN);
-        listenToParameter(Params::Keys::ID::SCALE_RANGE_MAX);
+        listenToParameter(Params::Keys::ID::SCALE_WINDOW_OFFSET);
+        listenToParameter(Params::Keys::ID::SCALE_WINDOW_SIZE);
     }
 
     /**

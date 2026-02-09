@@ -319,23 +319,51 @@ public:
     }
 
     // ========================================
-    // SCALE RANGE (Global - applies to all steps)
+    // SCALE WINDOW (Global - applies to all steps)
     // ========================================
 
-    int getScaleRangeMin() const {
-        return getIntParam(Params::Keys::ID::SCALE_RANGE_MIN);
+    // Window-based parameters (stored in APVTS)
+    int getScaleWindowOffset() const {
+        return getIntParam(Params::Keys::ID::SCALE_WINDOW_OFFSET);
     }
 
-    void setScaleRangeMin(int min) {
-        setIntParam(Params::Keys::ID::SCALE_RANGE_MIN, juce::jlimit(0, 127, min));
+    void setScaleWindowOffset(int offset) {
+        setIntParam(Params::Keys::ID::SCALE_WINDOW_OFFSET, juce::jlimit(0, 127, offset));
+    }
+
+    int getScaleWindowSize() const {
+        return getIntParam(Params::Keys::ID::SCALE_WINDOW_SIZE);
+    }
+
+    void setScaleWindowSize(int size) {
+        setIntParam(Params::Keys::ID::SCALE_WINDOW_SIZE, juce::jlimit(1, 128, size));
+    }
+
+    // Computed range values (for backward compatibility and convenience)
+    // These compute min/max from the window offset and size
+    int getScaleRangeMin() const {
+        return Scale::computeMinFromWindow(getScaleWindowOffset(), getScaleWindowSize());
     }
 
     int getScaleRangeMax() const {
-        return getIntParam(Params::Keys::ID::SCALE_RANGE_MAX);
+        return Scale::computeMaxFromWindow(getScaleWindowOffset(), getScaleWindowSize());
+    }
+
+    // Set range by computing window offset and size
+    void setScaleRangeMin(int min) {
+        int currentMax = getScaleRangeMax();
+        int newOffset = Scale::computeOffsetFromRange(min, currentMax);
+        int newSize = Scale::computeSizeFromRange(min, currentMax);
+        setScaleWindowOffset(newOffset);
+        setScaleWindowSize(newSize);
     }
 
     void setScaleRangeMax(int max) {
-        setIntParam(Params::Keys::ID::SCALE_RANGE_MAX, juce::jlimit(0, 127, max));
+        int currentMin = getScaleRangeMin();
+        int newOffset = Scale::computeOffsetFromRange(currentMin, max);
+        int newSize = Scale::computeSizeFromRange(currentMin, max);
+        setScaleWindowOffset(newOffset);
+        setScaleWindowSize(newSize);
     }
 
     // ========================================
