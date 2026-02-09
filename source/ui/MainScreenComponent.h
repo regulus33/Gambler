@@ -239,6 +239,17 @@ public:
             }
         };
 
+        // Setup callback for sequence grid drag - change sequence length
+        sequenceOverview.getSequenceGrid().onLengthDragged = [this](int newLength) {
+            auto& state = processorRef.getState();
+            state.setLength(newLength);
+            DBG("Sequence grid dragged: new length = " + juce::String(newLength));
+
+            // Update the sequence grid to reflect the new length
+            int currentStep = state.getCurrentIndex();
+            sequenceOverview.getSequenceGrid().updateFromState(state, currentStep);
+        };
+
         // Add subsequence controls component
         addAndMakeVisible(subsequenceControls);
 

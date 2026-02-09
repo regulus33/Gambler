@@ -16,6 +16,7 @@ namespace SequenceGridConstants {
     constexpr juce::uint32 defaultGreyHex = 0xff808080;      // Grey for default squares
     constexpr juce::uint32 defaultDarkGreyHex = 0xff808080;  // Dark grey for rest steps
     constexpr juce::uint32 outOfBoundsGreyHex = 0xff3B3B3B;
+    constexpr juce::uint32 dragPreviewOrangeHex = 0xFFFF8C00; // Orange color for drag preview
     // Window row opacity (for non-visible rows)
     constexpr float nonVisibleRowOpacity = 0.3f;  // Non-visible rows at 30% opacity
     // Calculated dimensions
@@ -64,6 +65,7 @@ public:
         for (int row = 0; row < gridRows; ++row) {
             for (int col = 0; col < gridCols; ++col) {
                 const auto& state = squareStates[row][col];
+                int stepIndex = row * gridCols + col;
 
                 int x = col * (squareSize + squareSpacing);
                 int y = row * (squareSize + squareSpacing);
@@ -86,6 +88,17 @@ public:
                     if (currentWindowRow >= 0 && row != currentWindowRow) {
                         displayColor = displayColor.withAlpha(nonVisibleRowOpacity);
                     }
+
+                    // During drag: show preview of new length
+                    if (isDraggingLength) {
+                        if (stepIndex < dragTargetLength) {
+                            // Squares within the new length - show in orange
+                            displayColor = juce::Colour(dragPreviewOrangeHex);
+                        } else {
+                            // Squares beyond the new length - show in grey
+                            displayColor = juce::Colour(outOfBoundsGreyHex);
+                        }
+                    }
                 }
 
                 // Fill square with color
@@ -96,6 +109,12 @@ public:
                 if (state.hasBorder) {
                     g.setColour (UIConstants::stepIndicatorWhite);
                     g.drawRoundedRectangle (squareBounds.reduced (0.5f), squareCornerRadius, borderWidth);
+                }
+
+                // During drag: highlight the target square (last step in new length)
+                if (isDraggingLength && stepIndex == dragTargetLength - 1) {
+                    g.setColour (UIConstants::stepIndicatorWhite.withAlpha(0.5f));
+                    g.drawRoundedRectangle (squareBounds.reduced (1.0f), squareCornerRadius, 1.5f);
                 }
             }
         }
@@ -285,6 +304,11 @@ public:
 
         auto pos = event.getPosition();
 
+        // Store initial mouse position and reset drag state
+        mouseDownPosition = pos;
+        isDraggingLength = false;
+        mouseDownStepIndex = -1;
+
         // Calculate which square was clicked
         for (int row = 0; row < gridRows; ++row) {
             for (int col = 0; col < gridCols; ++col) {
@@ -295,16 +319,51 @@ public:
 
                 if (squareBounds.contains(pos)) {
                     // Calculate step index (0-63)
-                    int stepIndex = row * gridCols + col;
-
-                    // Trigger callback if set
-                    if (onSquareClicked) {
-                        onSquareClicked(stepIndex);
-                    }
+                    mouseDownStepIndex = row * gridCols + col;
                     return;
                 }
             }
         }
+    }
+
+    /**
+     * Mouse drag handler - changes sequence length by dragging to different squares
+     */
+    void mouseDrag(const juce::MouseEvent& event) override {
+        using namespace SequenceGridConstants;
+
+        auto pos = event.getPosition();
+
+        // Find which square we're currently hovering over
+        int hoveredStepIndex = getSquareIndexAtPosition(pos);
+
+        // If we're over a valid square and it's different from where we started, enter drag mode
+        if (hoveredStepIndex >= 0 && hoveredStepIndex != mouseDownStepIndex) {
+            isDraggingLength = true;
+            dragTargetLength = hoveredStepIndex + 1; // Length is index + 1
+            repaint(); // Show visual feedback
+        }
+    }
+
+    /**
+     * Mouse up handler - finalizes length change or triggers click
+     */
+    void mouseUp(const juce::MouseEvent& event) override {
+        if (isDraggingLength) {
+            // We were dragging - finalize the length change
+            if (onLengthDragged && dragTargetLength > 0) {
+                onLengthDragged(dragTargetLength);
+            }
+            isDraggingLength = false;
+            repaint();
+        } else if (mouseDownStepIndex >= 0) {
+            // No drag occurred - treat as a click
+            if (onSquareClicked) {
+                onSquareClicked(mouseDownStepIndex);
+            }
+        }
+
+        mouseDownStepIndex = -1;
     }
 
     /**
@@ -343,11 +402,42 @@ public:
     // Callback for when a square is double-clicked (to force jump to that step)
     std::function<void(int)> onSquareDoubleClicked;
 
+    // Callback for when sequence length is changed by dragging
+    std::function<void(int)> onLengthDragged;
+
 private:
     std::array<std::array<SquareState, SequenceGridConstants::gridCols>,
                SequenceGridConstants::gridRows> squareStates;
 
     int currentWindowRow;  // Current visible window row (0-7), or -1 if disabled
+
+    // Drag state for length adjustment
+    juce::Point<int> mouseDownPosition;
+    int mouseDownStepIndex = -1;
+    bool isDraggingLength = false;
+    int dragTargetLength = 0;
+
+    /**
+     * Helper method to get the step index at a given position
+     * Returns -1 if position is not over any square
+     */
+    int getSquareIndexAtPosition(const juce::Point<int>& pos) const {
+        using namespace SequenceGridConstants;
+
+        for (int row = 0; row < gridRows; ++row) {
+            for (int col = 0; col < gridCols; ++col) {
+                int x = col * (squareSize + squareSpacing);
+                int y = row * (squareSize + squareSpacing);
+
+                auto squareBounds = juce::Rectangle<int>(x, y, squareSize, squareSize);
+
+                if (squareBounds.contains(pos)) {
+                    return row * gridCols + col;
+                }
+            }
+        }
+        return -1;
+    }
 
     /**
      * Get the color for a chromatic note (0-11)
