@@ -31,7 +31,7 @@ namespace StepButtonConstants {
  * The absolute step index is calculated as: windowStart + localIndex
  *
  * Visual States:
- * - Current (white fill) - This step is currently playing (playback position)
+ * - Current (white fill + black circle with note name) - This step is currently playing
  * - Selected (white border) - This step is selected for editing
  * - Normal (note color fill) - Regular step with note color
  * - Rest (grey fill) - Step contains a rest (-1)
@@ -152,7 +152,7 @@ public:
 
             // Draw active circle indicator if this is the playing step
             if (isCurrent) {
-                drawActiveCircle(g, bounds, absoluteStepIndex);
+                drawActiveCircle(g, bounds, midiNote);
             }
         } else {
             // Step is beyond sequence length - draw as empty/inactive
@@ -220,10 +220,10 @@ private:
         g.drawText(noteName, bounds, juce::Justification::centred, false);
     }
 
-    void drawActiveCircle(juce::Graphics& g, const juce::Rectangle<float>& bounds, int stepIndex) {
+    void drawActiveCircle(juce::Graphics& g, const juce::Rectangle<float>& bounds, int midiNote) {
         using namespace StepButtonConstants;
 
-        // Draw black circle with white text showing step number
+        // Draw black circle with white text showing note name (e.g., "A7", "Bb2")
         float circleDiameter = activeCircleRadius * 2.0f;
         float circleX = bounds.getCentreX() - activeCircleRadius;
         float circleY = bounds.getCentreY() - activeCircleRadius;
@@ -234,7 +234,7 @@ private:
         g.setColour(juce::Colours::black);
         g.fillEllipse(circleBounds);
 
-        // Draw white text (step number 1-64)
+        // Draw white text (note name like "A7" or "Bb2")
         g.setColour(juce::Colours::white);
 
         // Load Inter font
@@ -243,7 +243,9 @@ private:
             BinaryData::InterVariableFont_ttfSize);
         g.setFont(juce::FontOptions(interFont).withHeight(fontSize));
 
-        g.drawText(juce::String(stepIndex + 1), circleBounds, juce::Justification::centred, false);
+        // Convert MIDI note to note name (e.g., "C4", "Gb3")
+        juce::String noteName = MusicConstants::midiNoteToNoteName(midiNote);
+        g.drawText(noteName, circleBounds, juce::Justification::centred, false);
     }
 
     void paintMidiLearnOverlay(juce::Graphics& g) {

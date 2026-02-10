@@ -27,8 +27,8 @@ namespace SequencerStepsConstants {
  * This is a "window" into the full sequence, showing 8 consecutive steps.
  * Each step displays:
  * - Background color from the note's scale color
- * - Note number (MIDI note 0-127)
- * - Current step indicator: white fill + black circle (40px diameter) with white text
+ * - Note name + octave (e.g., "A7", "Bb2")
+ * - Current step indicator: white fill + black circle (40px diameter) with note name
  * - Selected step indicator: white border
  *
  * The window can be moved through the sequence to view different sections.
