@@ -210,11 +210,13 @@ private:
         // Text color: always black (works on both white current step and colored note backgrounds)
         g.setColour(isCurrent ? textColorOnCurrent : textColorOnNote);
 
-        // Load Inter font
+        // Load Inter font and make it bold
         auto interFont = juce::Typeface::createSystemTypefaceFor(
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
-        g.setFont(juce::FontOptions(interFont).withHeight(fontSize));
+        juce::Font font(juce::FontOptions(interFont).withHeight(fontSize));
+        font.setBold(true);
+        g.setFont(font);
 
         // Center the text
         g.drawText(noteName, bounds, juce::Justification::centred, false);
@@ -237,11 +239,13 @@ private:
         // Draw white text (note name like "A7" or "Bb2")
         g.setColour(juce::Colours::white);
 
-        // Load Inter font
+        // Load Inter font and make it bold
         auto interFont = juce::Typeface::createSystemTypefaceFor(
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
-        g.setFont(juce::FontOptions(interFont).withHeight(fontSize));
+        juce::Font font(juce::FontOptions(interFont).withHeight(fontSize));
+        font.setBold(true);
+        g.setFont(font);
 
         // Convert MIDI note to note name (e.g., "C4", "Gb3")
         juce::String noteName = MusicConstants::midiNoteToNoteName(midiNote);
