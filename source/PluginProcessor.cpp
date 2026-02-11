@@ -201,8 +201,10 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         jassertfalse;
         // If any commands had completion callbacks, notify the UI to execute them
         // This simply calls functions if any functions are pending...
-        if (commandQueue.hasCompletionCallbacks() && onCompletionCallbacksPending) {
-            onCompletionCallbacksPending(); // this just calls trigger async update
+        // Make a local copy to avoid race condition with UI thread clearing the callback
+        auto callback = onCompletionCallbacksPending;
+        if (commandQueue.hasCompletionCallbacks() && callback) {
+            callback(); // this just calls trigger async update
         }
     }
     // STANDALONE MODE ==== previewing midi notes when touching UI ========================================================
@@ -483,8 +485,10 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         }
 
         // Notify UI that a tick occurred (thread-safe via AsyncUpdater)
-        if (onSequenceTick) {
-            onSequenceTick();
+        // Make a local copy to avoid race condition with UI thread clearing the callback
+        auto callback = onSequenceTick;
+        if (callback) {
+            callback();
         }
     }
 }
@@ -812,8 +816,10 @@ void PluginProcessor::triggerStepMidi (int stepIndex) {
     }
 
     // Notify UI that state changed
-    if (onSequenceTick) {
-        onSequenceTick();
+    // Make a local copy to avoid race condition with UI thread clearing the callback
+    auto callback = onSequenceTick;
+    if (callback) {
+        callback();
     }
 }
 
@@ -1070,9 +1076,11 @@ void PluginProcessor::processMidiInput (const juce::MidiBuffer& midiMessages) {
                 if (learned) {
                     DBG ("Learned: CH" << channel << "-CC" << ccNumber);
                     // Trigger UI update callback
-                    if (onMidiLearned) {
+                    // Make a local copy to avoid race condition with UI thread clearing the callback
+                    auto callback = onMidiLearned;
+                    if (callback) {
                         DBG ("  Calling onMidiLearned callback");
-                        onMidiLearned();
+                        callback();
                     } else {
                         DBG ("  WARNING: onMidiLearned callback is null!");
                     }
@@ -1111,9 +1119,11 @@ void PluginProcessor::processMidiInput (const juce::MidiBuffer& midiMessages) {
                 if (learned) {
                     DBG ("Learned: CH" << channel << "-N" << noteNumber);
                     // Trigger UI update callback
-                    if (onMidiLearned) {
+                    // Make a local copy to avoid race condition with UI thread clearing the callback
+                    auto callback = onMidiLearned;
+                    if (callback) {
                         DBG ("  Calling onMidiLearned callback");
-                        onMidiLearned();
+                        callback();
                     } else {
                         DBG ("  WARNING: onMidiLearned callback is null!");
                     }
@@ -1165,8 +1175,9 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             int newNote = octaveIndex * 12 + pitchClass;
             state.updateCurrentNoteForStep (selectedStep, newNote);
             DBG ("  → Octave changed to " << octaveIndex << " (MIDI note " << newNote << ")");
-            if (onSequenceTick)
-                onSequenceTick();
+            auto callback = onSequenceTick;
+            if (callback)
+                callback();
             break;
         }
 
@@ -1180,8 +1191,9 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             int newNote = octave * 12 + pitchClass;
             state.updateCurrentNoteForStep (selectedStep, newNote);
             DBG ("  → Note changed to pitch class " << pitchClass << " (MIDI note " << newNote << ")");
-            if (onSequenceTick)
-                onSequenceTick();
+            auto callback = onSequenceTick;
+            if (callback)
+                callback();
             break;
         }
 
@@ -1190,8 +1202,9 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             int percentage = static_cast<int> (normalizedValue * 100.0f);
             state.setProbabilityPercentage (percentage);
             DBG ("  → Probability changed to " << percentage << "%");
-            if (onSequenceTick)
-                onSequenceTick();
+            auto callback = onSequenceTick;
+            if (callback)
+                callback();
             break;
         }
 
@@ -1302,8 +1315,9 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
                     state.setSelectedStepForEditing (absoluteStep);
                     DBG ("  → Step " << absoluteStep << " selected for editing (window " << localStepIndex << ")");
                 }
-                if (onSequenceTick)
-                    onSequenceTick();
+                auto callback = onSequenceTick;
+                if (callback)
+                    callback();
             }
             break;
         }
@@ -1317,8 +1331,9 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
                     state.setStepNotesLength (selectedStep, currentLength - 1);
                     DBG ("  → Substep length decreased to " << (currentLength - 1));
                 }
-                if (onSequenceTick)
-                    onSequenceTick();
+                auto callback = onSequenceTick;
+                if (callback)
+                    callback();
             }
             break;
         }
@@ -1331,8 +1346,9 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
                     state.setStepNotesLength (selectedStep, currentLength + 1);
                     DBG ("  → Substep length increased to " << (currentLength + 1));
                 }
-                if (onSequenceTick)
-                    onSequenceTick();
+                auto callback = onSequenceTick;
+                if (callback)
+                    callback();
             }
             break;
         }

@@ -130,22 +130,23 @@ public:
     void setProbabilityPercentage(int percentage) {
         percentage = juce::jlimit(0, 100, percentage);
         int numToPlay = (ParamConstants::MAX_STEPS * percentage) / 100;
-        
+
         // Reset all to false
         for (int i = 0; i < ParamConstants::MAX_STEPS; i++) {
             setPlayProbability(i, false);
         }
-        
+
         // Randomly set numToPlay indices to true
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        
+        // Use thread_local to avoid data races between audio and UI threads
+        thread_local std::random_device rd;
+        thread_local std::mt19937 gen(rd());
+
         std::vector<int> indices;
         for (int i = 0; i < ParamConstants::MAX_STEPS; i++) {
             indices.push_back(i);
         }
         std::shuffle(indices.begin(), indices.end(), gen);
-        
+
         for (int i = 0; i < numToPlay && i < static_cast<int>(indices.size()); i++) {
             setPlayProbability(indices[i], true);
         }
@@ -540,8 +541,9 @@ public:
         setCurrentIndex(currentIndex);
 
         // Always generate a random probability index for UI visualization
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
+        // Use thread_local to avoid data races between audio and UI threads
+        thread_local std::random_device rd;
+        thread_local std::mt19937 gen(rd());
         std::uniform_int_distribution<> dis(0, ParamConstants::MAX_STEPS - 1);
         int probabilityIndex = dis(gen);
         setLastProbabilityIndex(probabilityIndex);
@@ -551,17 +553,16 @@ public:
             // Tick the substep first to advance the substep index
             int substepIdx = tickStepSubstepOnly(currentIndex);
 
-            // Check play probability - if false, record rest and return -1
+            // Check play probability - if false, return rest without modifying state
             if (!getPlayProbability(probabilityIndex)) {
-                // Record this step as a rest (note number = -1)
-                setStepNote(currentIndex, substepIdx, -1);
+                // Return -1 (rest) without storing it
+                // Roll mode is live/temporary - we don't modify APVTS from audio thread
                 return -1;
             }
 
-            // Probability check passed - randomize the current step's note (stores unquantized)
-            randomizeStepNote(currentIndex);
-            // Return the quantized version for playback
-            return getQuantizedStepNote(currentIndex, substepIdx);
+            // Probability check passed - generate and return a random note
+            // WITHOUT storing it (to avoid APVTS modifications from audio thread)
+            return generateRandomNote(currentIndex);
         }
 
         // Not in random mode - just tick the current step normally
@@ -599,13 +600,34 @@ public:
     }
 
     /**
+     * Generate a random note within scale and range WITHOUT storing it
+     * This is used by roll mode to avoid APVTS modifications from audio thread
+     * Returns the quantized note ready for playback
+     */
+    int generateRandomNote(int stepIndex) const {
+        // Use thread_local to avoid data races between audio and UI threads
+        thread_local std::random_device rd;
+        thread_local std::mt19937 gen(rd());
+
+        int rangeMin = getScaleRangeMin();
+        int rangeMax = getScaleRangeMax();
+        std::uniform_int_distribution<> dis(rangeMin, rangeMax);
+
+        int randomNote = dis(gen);
+        // Quantize to the step's scale and return
+        return quantizeNoteToStepScale(stepIndex, randomNote);
+    }
+
+    /**
      * Randomize a step's current note within scale and range
      * NOTE: Stores UNQUANTIZED random value. Quantization happens on-the-fly during playback/display.
      * This allows changing scales without losing the underlying random data.
+     * WARNING: Should only be called from message thread (modifies APVTS)
      */
     void randomizeStepNote(int stepIndex) {
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
+        // Use thread_local to avoid data races between audio and UI threads
+        thread_local std::random_device rd;
+        thread_local std::mt19937 gen(rd());
 
         int rangeMin = getScaleRangeMin();
         int rangeMax = getScaleRangeMax();
