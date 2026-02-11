@@ -3,6 +3,10 @@
 #include "juce_gui_basics/juce_gui_basics.h"
 #include <catch2/catch_session.hpp>
 
+#if CAPTURE_JASSERTS
+#include "helpers/JassertCapture.h"
+#endif
+
 int main (int argc, char* argv[])
 {
     // This lets us use JUCE's MessageManager without leaking.
@@ -11,7 +15,15 @@ int main (int argc, char* argv[])
     // It's nicer DX when placed here vs. manually in Catch2 SECTIONs
     juce::ScopedJuceInitialiser_GUI gui;
 
+#if CAPTURE_JASSERTS
+    JassertCapture jassertCapture;
+#endif
+
     const int result = Catch::Session().run (argc, argv);
+
+#if CAPTURE_JASSERTS
+    jassertCapture.writeReport (REPO_ROOT_PATH "/tests");
+#endif
 
     return result;
 }

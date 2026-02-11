@@ -51,6 +51,8 @@ set_target_properties(Tests PROPERTIES
 target_compile_definitions(Tests PUBLIC
     JUCE_MODAL_LOOPS_PERMITTED=1 # let us run Message Manager in tests
     RUN_PAMPLEJUCE_TESTS=1 # also run tests in other module .cpp files guarded by RUN_PAMPLEJUCE_TESTS
+    JUCE_LOG_ASSERTIONS=1 # route jassert failures through Logger so we can capture them
+    CAPTURE_JASSERTS=1 # enable JassertCapture to collect assertions and generate jassert_report.md
 )
 
 # Let our tests target know we are running in CI

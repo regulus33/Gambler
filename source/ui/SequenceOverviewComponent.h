@@ -37,8 +37,7 @@ public:
               juce::Typeface::createSystemTypefaceFor (
                   BinaryData::Inter_24ptBold_ttf,
                   BinaryData::Inter_24ptBold_ttfSize))
-              .withHeight (SequenceOverviewConstants::titleFontSize)
-              .withStyle ("Bold"))
+              .withHeight (SequenceOverviewConstants::titleFontSize))
     {
         addAndMakeVisible (sequenceGrid);
 

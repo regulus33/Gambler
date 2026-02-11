@@ -107,8 +107,9 @@ public:
         optionNames = newNames;
         optionColours = newColours;
 
-        // Update slider range
-        slider.setRange(0.0, (double)(optionNames.size() - 1), 1.0);
+        // Update slider range (ensure end > start for NormalisableRange invariant)
+        double rangeEnd = juce::jmax(1.0, (double)(optionNames.size() - 1));
+        slider.setRange(0.0, rangeEnd, 1.0);
 
         // Clamp current value to new range
         double currentValue = slider.getValue();
