@@ -111,9 +111,9 @@ SCENARIO ("User clicks piano keys to modify scale", "[e2e][piano-roll]") {
                 REQUIRE (dbKey->isToggled == false);
                 REQUIRE (pianoRoll.getSelectedNoteIndices().size() == 11);
 
-                // Check backend state (APVTS)
-                auto scale = state.getScale();
-                REQUIRE (scale.getScaleNotes()[1] == 0);  // C# disabled
+                // Check backend state (APVTS) - scale is now per-step
+                auto scaleNotes = state.getStepScaleNotes(0);
+                REQUIRE (scaleNotes[1] == 0);  // C# disabled
             }
         }
 
@@ -146,9 +146,8 @@ SCENARIO ("User clicks piano keys to modify scale", "[e2e][piano-roll]") {
                 REQUIRE_FALSE (selectedNames.contains("Ab"));
                 REQUIRE_FALSE (selectedNames.contains("Bb"));
 
-                // Backend state should match
-                auto scale = state.getScale();
-                auto scaleNotes = scale.getScaleNotes();
+                // Backend state should match - scale is now per-step
+                auto scaleNotes = state.getStepScaleNotes(0);
                 REQUIRE (scaleNotes[0] == 1);   // C
                 REQUIRE (scaleNotes[1] == 0);   // Db
                 REQUIRE (scaleNotes[2] == 1);   // D
@@ -164,7 +163,7 @@ SCENARIO ("User clicks piano keys to modify scale", "[e2e][piano-roll]") {
             }
         }
 
-        WHEN ("User tries to disable the last remaining note") {
+        WHEN ("User disables all notes including the last one") {
             // Disable all notes except C
             for (int i = 1; i < 12; i++) {
                 pianoRoll.TEST_simulateKeyClick(i);
@@ -175,18 +174,14 @@ SCENARIO ("User clicks piano keys to modify scale", "[e2e][piano-roll]") {
             REQUIRE (pianoRoll.getSelectedNoteIndices().size() == 1);
             REQUIRE (pianoRoll.getKeyData(0)->isToggled == true);
 
-            // Try to disable C (should be prevented)
+            // Disable C too - the piano roll allows this
             bool wasToggled = pianoRoll.TEST_simulateKeyClick(0);
             fixture.processMessages();
 
-            THEN ("Action is prevented and C remains enabled") {
-                REQUIRE (wasToggled == false);
-                REQUIRE (pianoRoll.getKeyData(0)->isToggled == true);
-                REQUIRE (pianoRoll.getSelectedNoteIndices().size() == 1);
-
-                // Backend state should still have C enabled
-                auto scale = state.getScale();
-                REQUIRE (scale.getScaleNotes()[0] == 1);
+            THEN ("C is toggled off") {
+                REQUIRE (wasToggled == true);
+                REQUIRE (pianoRoll.getKeyData(0)->isToggled == false);
+                REQUIRE (pianoRoll.getSelectedNoteIndices().size() == 0);
             }
         }
     }
@@ -252,7 +247,7 @@ SCENARIO ("User changes note via note controls", "[e2e][notes]") {
 
             // Set the note slider value - this triggers onValueChange -> onNoteChanged callback
             // which flows through MainScreenComponent to update the state
-            noteControls.getNoteSlider().getSlider().setValue (4.0, juce::sendNotification);
+            noteControls.getNoteSlider().getSlider().getSlider().setValue (4.0, juce::sendNotification);
             fixture.processMessages();
 
             THEN ("The note should be E at the same octave") {
@@ -267,7 +262,7 @@ SCENARIO ("User changes note via note controls", "[e2e][notes]") {
             int initialPitchClass = initialNote % 12;
 
             // Set the octave slider value - this triggers onValueChange -> onOctaveChanged callback
-            noteControls.getOctaveSlider().getSlider().setValue (6.0, juce::sendNotification);
+            noteControls.getOctaveSlider().getSlider().getSlider().setValue (6.0, juce::sendNotification);
             fixture.processMessages();
 
             THEN ("The note should be at octave 6 with the same pitch class") {

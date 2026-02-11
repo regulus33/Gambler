@@ -793,6 +793,433 @@ TEST_CASE("DawSync") {
 }
 
 // ============================================================================
+// Scale - Additional Coverage
+// ============================================================================
+
+TEST_CASE("Scale additional coverage") {
+    SECTION("isNoteInRange()") {
+        SECTION("Given range 60-72, note 65 is in range") {
+            Scale scale;
+            scale.setRange(60, 72);
+            REQUIRE(scale.isNoteInRange(65) == true);
+        }
+
+        SECTION("Given range 60-72, note 59 is not in range") {
+            Scale scale;
+            scale.setRange(60, 72);
+            REQUIRE(scale.isNoteInRange(59) == false);
+        }
+
+        SECTION("Given range 60-72, note 73 is not in range") {
+            Scale scale;
+            scale.setRange(60, 72);
+            REQUIRE(scale.isNoteInRange(73) == false);
+        }
+
+        SECTION("Given range 60-72, boundary values are in range") {
+            Scale scale;
+            scale.setRange(60, 72);
+            REQUIRE(scale.isNoteInRange(60) == true);
+            REQUIRE(scale.isNoteInRange(72) == true);
+        }
+    }
+
+    SECTION("isNoteInScale() boundary cases") {
+        SECTION("Given chromatic scale, note -1 is not in scale") {
+            Scale scale;
+            REQUIRE(scale.isNoteInScale(-1) == false);
+        }
+
+        SECTION("Given chromatic scale, note 128 is not in scale") {
+            Scale scale;
+            REQUIRE(scale.isNoteInScale(128) == false);
+        }
+
+        SECTION("Given chromatic scale, note 0 is in scale") {
+            Scale scale;
+            REQUIRE(scale.isNoteInScale(0) == true);
+        }
+
+        SECTION("Given chromatic scale, note 127 is in scale") {
+            Scale scale;
+            REQUIRE(scale.isNoteInScale(127) == true);
+        }
+    }
+
+    SECTION("setScaleNote()") {
+        SECTION("Given chromatic scale, disabling one note") {
+            Scale scale;
+            scale.setScaleNote(3, 0);  // Disable Eb
+            REQUIRE(scale.getScaleNotes()[3] == 0);
+            REQUIRE(scale.getScaleNotes()[2] == 1);  // D still enabled
+        }
+
+        SECTION("Given empty scale, enabling one note") {
+            Scale scale;
+            scale.setScaleFromNames({});  // All disabled
+            scale.setScaleNote(0, 1);  // Enable C
+            REQUIRE(scale.getScaleNotes()[0] == 1);
+        }
+
+        SECTION("Given out-of-range index, nothing changes") {
+            Scale scale;
+            scale.setScaleNote(-1, 0);
+            scale.setScaleNote(12, 0);
+            // Should not crash; all notes still enabled
+            for (int i = 0; i < 12; i++) {
+                REQUIRE(scale.getScaleNotes()[i] == 1);
+            }
+        }
+    }
+
+    SECTION("setRangeMin() and setRangeMax() individually") {
+        SECTION("Given default scale, setRangeMin to 24") {
+            Scale scale;
+            scale.setRangeMin(24);
+            REQUIRE(scale.getRangeMin() == 24);
+            REQUIRE(scale.getRangeMax() == 127);
+        }
+
+        SECTION("Given default scale, setRangeMax to 96") {
+            Scale scale;
+            scale.setRangeMax(96);
+            REQUIRE(scale.getRangeMin() == 0);
+            REQUIRE(scale.getRangeMax() == 96);
+        }
+
+        SECTION("setRangeMin above current max is rejected") {
+            Scale scale;
+            scale.setRange(60, 72);
+            scale.setRangeMin(80);
+            REQUIRE(scale.getRangeMin() == 60);  // Unchanged
+        }
+
+        SECTION("setRangeMax below current min is rejected") {
+            Scale scale;
+            scale.setRange(60, 72);
+            scale.setRangeMax(50);
+            REQUIRE(scale.getRangeMax() == 72);  // Unchanged
+        }
+
+        SECTION("setRangeMin to negative is rejected") {
+            Scale scale;
+            scale.setRangeMin(-1);
+            REQUIRE(scale.getRangeMin() == 0);
+        }
+
+        SECTION("setRangeMax above 127 is rejected") {
+            Scale scale;
+            scale.setRangeMax(200);
+            REQUIRE(scale.getRangeMax() == 127);
+        }
+    }
+
+    SECTION("quantize() with no enabled notes returns -1") {
+        Scale scale;
+        scale.setScaleFromNames({});  // All disabled
+        int result = scale.quantize(60);
+        REQUIRE(result == -1);
+    }
+
+    SECTION("quantize() at MIDI boundaries") {
+        Scale scale;
+        scale.setScaleFromNames({"C"});  // Only C enabled
+
+        SECTION("Quantize note 0 (C) stays at 0") {
+            REQUIRE(scale.quantize(0) == 0);
+        }
+
+        SECTION("Quantize note 1 (Db) goes to C0 = 0") {
+            REQUIRE(scale.quantize(1) == 0);
+        }
+
+        SECTION("Quantize note 127 (G9) goes to nearest C") {
+            int result = scale.quantize(127);
+            REQUIRE(result % 12 == 0);  // Must be a C
+            REQUIRE(result <= 127);
+        }
+    }
+
+    SECTION("Static window utility functions") {
+        SECTION("computeMinFromWindow returns offset clamped to valid range") {
+            REQUIRE(Scale::computeMinFromWindow(60, 24) == 60);
+            REQUIRE(Scale::computeMinFromWindow(-5, 24) == 0);
+            REQUIRE(Scale::computeMinFromWindow(200, 24) == 127);
+        }
+
+        SECTION("computeMaxFromWindow returns offset+size-1 clamped to valid range") {
+            REQUIRE(Scale::computeMaxFromWindow(60, 24) == 83);  // 60 + 24 - 1
+            REQUIRE(Scale::computeMaxFromWindow(120, 20) == 127);  // Clamped
+            REQUIRE(Scale::computeMaxFromWindow(0, 1) == 0);  // 0 + 1 - 1
+        }
+
+        SECTION("computeOffsetFromRange returns min clamped to valid range") {
+            REQUIRE(Scale::computeOffsetFromRange(60, 72) == 60);
+            REQUIRE(Scale::computeOffsetFromRange(-5, 72) == 0);
+        }
+
+        SECTION("computeSizeFromRange returns max-min+1 clamped") {
+            REQUIRE(Scale::computeSizeFromRange(60, 72) == 13);  // 72 - 60 + 1
+            REQUIRE(Scale::computeSizeFromRange(0, 127) == 128);
+            REQUIRE(Scale::computeSizeFromRange(60, 60) == 1);  // Single note range
+        }
+    }
+}
+
+// ============================================================================
+// InternalClock - Additional Coverage
+// ============================================================================
+
+TEST_CASE("InternalClock additional coverage") {
+    SECTION("setSampleRate() with invalid values") {
+        InternalClock clock;
+
+        SECTION("Zero sample rate is rejected") {
+            clock.setSampleRate(0.0);
+            REQUIRE(clock.getSampleRate() == 44100.0);  // Default unchanged
+        }
+
+        SECTION("Negative sample rate is rejected") {
+            clock.setSampleRate(-48000.0);
+            REQUIRE(clock.getSampleRate() == 44100.0);  // Default unchanged
+        }
+
+        SECTION("Positive sample rate is accepted") {
+            clock.setSampleRate(96000.0);
+            REQUIRE(clock.getSampleRate() == 96000.0);
+        }
+    }
+
+    SECTION("Multiple pulse triggers accumulate remainder correctly") {
+        InternalClock clock;
+        clock.setSampleRate(48000.0);
+        clock.setBpm(120.0);
+        clock.setSubdivision(Subdivision::SIXTEENTH);
+        clock.start();
+
+        // Process a huge buffer that covers multiple pulses
+        // At 120 BPM, 16th notes: 6000 samples per pulse
+        // 18000 samples = 3 pulses
+        int pulseCount = 0;
+        // Process in one big block (larger than one pulse)
+        bool triggered = clock.processSamples(18000);
+        if (triggered) pulseCount++;
+        // The clock only returns true once per call, so additional pulses are lost
+        // unless processed in smaller blocks
+        REQUIRE(pulseCount == 1);  // Only one trigger per call
+    }
+
+    SECTION("calculateSamplesPerPulse() for various subdivisions") {
+        InternalClock clock;
+        clock.setSampleRate(48000.0);
+        clock.setBpm(120.0);
+
+        SECTION("Quarter notes: 48000 / (120 * 1 / 60) = 24000") {
+            clock.setSubdivision(Subdivision::QUARTER);
+            REQUIRE(clock.calculateSamplesPerPulse() == Catch::Approx(24000.0));
+        }
+
+        SECTION("Eighth notes: 48000 / (120 * 2 / 60) = 12000") {
+            clock.setSubdivision(Subdivision::EIGHTH);
+            REQUIRE(clock.calculateSamplesPerPulse() == Catch::Approx(12000.0));
+        }
+
+        SECTION("32nd notes: 48000 / (120 * 8 / 60) = 3000") {
+            clock.setSubdivision(Subdivision::THIRTY_SECOND);
+            REQUIRE(clock.calculateSamplesPerPulse() == Catch::Approx(3000.0));
+        }
+    }
+}
+
+// ============================================================================
+// Clock - Additional Coverage
+// ============================================================================
+
+TEST_CASE("Clock additional coverage") {
+    SECTION("calculateSamplesPerStep() in INTERNAL mode") {
+        Clock clock;
+        clock.setMode(ClockMode::INTERNAL);
+        clock.setSampleRate(48000.0);
+        clock.setBpm(120.0);
+        clock.setSubdivision(Subdivision::SIXTEENTH);
+
+        double samplesPerStep = clock.calculateSamplesPerStep(0.0, 48000.0);
+        REQUIRE(samplesPerStep == Catch::Approx(6000.0));
+    }
+
+    SECTION("calculateSamplesPerStep() in DAW_SYNC mode") {
+        Clock clock;
+        clock.setMode(ClockMode::DAW_SYNC);
+        clock.setSubdivision(Subdivision::SIXTEENTH);
+
+        double samplesPerStep = clock.calculateSamplesPerStep(120.0, 48000.0);
+        REQUIRE(samplesPerStep == Catch::Approx(6000.0));
+    }
+
+    SECTION("calculateSamplesPerStep() with invalid DAW params") {
+        Clock clock;
+        clock.setMode(ClockMode::DAW_SYNC);
+
+        REQUIRE(clock.calculateSamplesPerStep(0.0, 48000.0) == 0.0);
+        REQUIRE(clock.calculateSamplesPerStep(120.0, 0.0) == 0.0);
+        REQUIRE(clock.calculateSamplesPerStep(-1.0, 48000.0) == 0.0);
+    }
+
+    SECTION("DAW sync loop detection (pulse count goes backwards)") {
+        Clock clock;
+        clock.setMode(ClockMode::DAW_SYNC);
+
+        // Normal advancement
+        clock.updateDawSync(1);
+        REQUIRE(clock.shouldTick() == true);
+
+        clock.updateDawSync(2);
+        REQUIRE(clock.shouldTick() == true);
+
+        // Simulate DAW loop: pulse count goes backwards
+        clock.updateDawSync(0);
+        // After reset, advancing should trigger again
+        clock.updateDawSync(1);
+        REQUIRE(clock.shouldTick() == true);
+    }
+
+    SECTION("MIDI clock pulse accumulation") {
+        Clock clock;
+        clock.setMode(ClockMode::INTERNAL);
+        clock.setSampleRate(48000.0);
+        clock.setBpm(120.0);
+        clock.setSubdivision(Subdivision::SIXTEENTH);
+        clock.start();
+
+        // Initially no pulses accumulated
+        REQUIRE(clock.getMidiClockPulsesToSend() == 0);
+
+        // Accumulate a pulse
+        clock.accumulateMidiClockPulse();
+        int pulses = clock.getMidiClockPulsesToSend();
+        REQUIRE(pulses == 6);  // 16th note subdivision: 24/4 = 6 MIDI clocks
+
+        // After reading, counter is reset
+        REQUIRE(clock.getMidiClockPulsesToSend() == 0);
+    }
+
+    SECTION("MIDI clock pulses not sent in DAW_SYNC mode") {
+        Clock clock;
+        clock.setMode(ClockMode::DAW_SYNC);
+        clock.accumulateMidiClockPulse();
+
+        REQUIRE(clock.getMidiClockPulsesToSend() == 0);
+    }
+
+    SECTION("start() in DAW_SYNC mode does nothing") {
+        Clock clock;
+        clock.setMode(ClockMode::DAW_SYNC);
+        clock.start();
+        REQUIRE(clock.isRunning() == false);
+    }
+
+    SECTION("stop() in DAW_SYNC mode does nothing") {
+        Clock clock;
+        clock.setMode(ClockMode::DAW_SYNC);
+        clock.stop();
+        REQUIRE(clock.isRunning() == false);
+    }
+}
+
+// ============================================================================
+// DawSync - Additional Coverage
+// ============================================================================
+
+TEST_CASE("DawSync additional coverage") {
+    SECTION("calculatePulseCount() for all subdivisions") {
+        DawSync dawSync;
+
+        SECTION("Quarter note subdivision at 4.0 PPQ = 4 pulses") {
+            dawSync.setSubdivision(Subdivision::QUARTER);
+            REQUIRE(dawSync.calculatePulseCount(4.0) == 4);
+        }
+
+        SECTION("32nd note subdivision at 1.0 PPQ = 8 pulses") {
+            dawSync.setSubdivision(Subdivision::THIRTY_SECOND);
+            REQUIRE(dawSync.calculatePulseCount(1.0) == 8);
+        }
+
+        SECTION("Zero PPQ position = 0 pulses") {
+            dawSync.setSubdivision(Subdivision::SIXTEENTH);
+            REQUIRE(dawSync.calculatePulseCount(0.0) == 0);
+        }
+    }
+
+    SECTION("update() with no position info") {
+        DawSync dawSync;
+
+        juce::Optional<juce::AudioPlayHead::PositionInfo> noPosition;
+        int pulseCount = dawSync.update(noPosition);
+
+        REQUIRE(pulseCount == 0);
+        REQUIRE(dawSync.getIsPlaying() == false);
+    }
+
+    SECTION("update() with playing DAW") {
+        DawSync dawSync;
+        dawSync.setSubdivision(Subdivision::SIXTEENTH);
+
+        juce::AudioPlayHead::PositionInfo pos;
+        pos.setIsPlaying(true);
+        pos.setPpqPosition(1.0);  // 1 quarter note in
+
+        int pulseCount = dawSync.update(juce::makeOptional(pos));
+
+        REQUIRE(dawSync.getIsPlaying() == true);
+        REQUIRE(pulseCount == 4);  // 1.0 * 4 = 4 pulses for 16th notes
+    }
+
+    SECTION("update() with DAW stop resets state") {
+        DawSync dawSync;
+        dawSync.setSubdivision(Subdivision::SIXTEENTH);
+
+        // Start playing
+        juce::AudioPlayHead::PositionInfo playing;
+        playing.setIsPlaying(true);
+        playing.setPpqPosition(2.0);
+        dawSync.update(juce::makeOptional(playing));
+        REQUIRE(dawSync.getIsPlaying() == true);
+
+        // Stop
+        juce::AudioPlayHead::PositionInfo stopped;
+        stopped.setIsPlaying(false);
+        dawSync.update(juce::makeOptional(stopped));
+
+        REQUIRE(dawSync.getIsPlaying() == false);
+        REQUIRE(dawSync.getCurrentPulseCount() == 0);
+        REQUIRE(dawSync.getLastPpqPosition() == 0.0);
+    }
+
+    SECTION("update() with advancing playhead") {
+        DawSync dawSync;
+        dawSync.setSubdivision(Subdivision::SIXTEENTH);
+
+        juce::AudioPlayHead::PositionInfo pos;
+        pos.setIsPlaying(true);
+
+        // Frame 1: at PPQ 0.0
+        pos.setPpqPosition(0.0);
+        int pulse1 = dawSync.update(juce::makeOptional(pos));
+        REQUIRE(pulse1 == 0);
+
+        // Frame 2: at PPQ 0.5 (half a quarter note)
+        pos.setPpqPosition(0.5);
+        int pulse2 = dawSync.update(juce::makeOptional(pos));
+        REQUIRE(pulse2 == 2);  // 0.5 * 4 = 2
+
+        // Frame 3: at PPQ 1.0
+        pos.setPpqPosition(1.0);
+        int pulse3 = dawSync.update(juce::makeOptional(pos));
+        REQUIRE(pulse3 == 4);  // 1.0 * 4 = 4
+    }
+}
+
+// ============================================================================
 // ClockMode Helper Function Tests
 // ============================================================================
 

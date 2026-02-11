@@ -92,12 +92,12 @@ SCENARIO("MidiValueConverter scaled conversion", "[midimapping]") {
             float scaled127 = MidiValueConverter::midiToScaled(127, -1.0f, 1.0f);
             float scaled64 = MidiValueConverter::midiToScaled(64, -1.0f, 1.0f);
 
-            // COMMENTED OUT - Test failing, needs investigation
-            // THEN("Negative range works correctly") {
-            //     REQUIRE(scaled0 == Catch::Approx(-1.0f));
-            //     REQUIRE(scaled127 == Catch::Approx(1.0f));
-            //     REQUIRE(scaled64 == Catch::Approx(0.0f).epsilon(0.02f));
-            // }
+            THEN("Negative range works correctly") {
+                REQUIRE(scaled0 == Catch::Approx(-1.0f));
+                REQUIRE(scaled127 == Catch::Approx(1.0f));
+                // 64/127 = 0.5039..., mapped to [-1, 1] = -1 + 0.5039 * 2 = 0.0079
+                REQUIRE(scaled64 == Catch::Approx(0.0f).margin(0.02f));
+            }
         }
     }
 }
@@ -230,32 +230,76 @@ SCENARIO("MidiMapping structure", "[midimapping]") {
 SCENARIO("MidiControlId name lookup", "[midimapping]") {
     GIVEN("Various MidiControlIds") {
         WHEN("Getting names for piano roll notes") {
-            std::string nameC = getMidiControlName(MidiControlId::SCALE_NOTE_C);
-            std::string nameDb = getMidiControlName(MidiControlId::SCALE_NOTE_Db);
-
-            THEN("Names are descriptive") {
-                REQUIRE(nameC == "Scale Note C");
-                REQUIRE(nameDb == "Scale Note Db");
+            THEN("All 12 notes have names") {
+                REQUIRE(getMidiControlName(MidiControlId::SCALE_NOTE_C) == "Scale Note C");
+                REQUIRE(getMidiControlName(MidiControlId::SCALE_NOTE_Db) == "Scale Note Db");
+                REQUIRE(getMidiControlName(MidiControlId::SCALE_NOTE_D) == "Scale Note D");
+                REQUIRE(getMidiControlName(MidiControlId::SCALE_NOTE_Eb) == "Scale Note Eb");
+                REQUIRE(getMidiControlName(MidiControlId::SCALE_NOTE_E) == "Scale Note E");
+                REQUIRE(getMidiControlName(MidiControlId::SCALE_NOTE_F) == "Scale Note F");
+                REQUIRE(getMidiControlName(MidiControlId::SCALE_NOTE_Gb) == "Scale Note Gb");
+                REQUIRE(getMidiControlName(MidiControlId::SCALE_NOTE_G) == "Scale Note G");
+                REQUIRE(getMidiControlName(MidiControlId::SCALE_NOTE_Ab) == "Scale Note Ab");
+                REQUIRE(getMidiControlName(MidiControlId::SCALE_NOTE_A) == "Scale Note A");
+                REQUIRE(getMidiControlName(MidiControlId::SCALE_NOTE_Bb) == "Scale Note Bb");
+                REQUIRE(getMidiControlName(MidiControlId::SCALE_NOTE_B) == "Scale Note B");
             }
         }
 
-        WHEN("Getting names for controls") {
-            std::string octave = getMidiControlName(MidiControlId::OCTAVE_SLIDER);
-            std::string prob = getMidiControlName(MidiControlId::PROBABILITY_SLIDER);
+        WHEN("Getting names for sliders") {
+            THEN("All slider names are descriptive") {
+                REQUIRE(getMidiControlName(MidiControlId::OCTAVE_SLIDER) == "Octave Slider");
+                REQUIRE(getMidiControlName(MidiControlId::NOTE_SLIDER) == "Note Slider");
+                REQUIRE(getMidiControlName(MidiControlId::PROBABILITY_SLIDER) == "Probability Slider");
+            }
+        }
 
-            THEN("Names are descriptive") {
-                REQUIRE(octave == "Octave Slider");
-                REQUIRE(prob == "Probability Slider");
+        WHEN("Getting names for sequencer steps") {
+            THEN("Steps are numbered") {
+                REQUIRE(getMidiControlName(MidiControlId::STEP_0) == "Step 0");
+                REQUIRE(getMidiControlName(MidiControlId::STEP_7) == "Step 7");
             }
         }
 
         WHEN("Getting names for buttons") {
-            std::string roll = getMidiControlName(MidiControlId::BUTTON_ROLL);
-            std::string nudgeLeft = getMidiControlName(MidiControlId::BUTTON_NUDGE_LEFT);
+            THEN("All button names are descriptive") {
+                REQUIRE(getMidiControlName(MidiControlId::BUTTON_ROLL) == "Roll Button");
+                REQUIRE(getMidiControlName(MidiControlId::BUTTON_PAGE_LEFT) == "Page Left / Duplicate");
+                REQUIRE(getMidiControlName(MidiControlId::BUTTON_PAGE_RIGHT) == "Page Right / Clear Window");
+                REQUIRE(getMidiControlName(MidiControlId::BUTTON_LENGTH_PLUS) == "Length + / Clear Step");
+                REQUIRE(getMidiControlName(MidiControlId::BUTTON_LENGTH_MINUS) == "Length - / Randomize All");
+                REQUIRE(getMidiControlName(MidiControlId::BUTTON_NUDGE_LEFT) == "Nudge Left / Randomize Step");
+                REQUIRE(getMidiControlName(MidiControlId::BUTTON_NUDGE_RIGHT) == "Nudge Right / Shuffle");
+                REQUIRE(getMidiControlName(MidiControlId::BUTTON_SHIFT) == "Shift Button");
+            }
+        }
 
+        WHEN("Getting names for subsequence controls") {
             THEN("Names are descriptive") {
-                REQUIRE(roll == "Roll Button");
-                REQUIRE(nudgeLeft == "Nudge Left");
+                REQUIRE(getMidiControlName(MidiControlId::SUBSEQ_BAR_0) == "Subseq Bar 0");
+                REQUIRE(getMidiControlName(MidiControlId::SUBSEQ_BAR_7) == "Subseq Bar 7");
+                REQUIRE(getMidiControlName(MidiControlId::SUBSEQ_MINUS) == "Subseq Minus Button");
+                REQUIRE(getMidiControlName(MidiControlId::SUBSEQ_PLUS) == "Subseq Plus Button");
+            }
+        }
+
+        WHEN("Getting names for note range controls") {
+            THEN("Names are descriptive") {
+                REQUIRE(getMidiControlName(MidiControlId::NOTE_RANGE_MIN) == "Note Range Min");
+                REQUIRE(getMidiControlName(MidiControlId::NOTE_RANGE_MAX) == "Note Range Max");
+            }
+        }
+
+        WHEN("Getting names for navigation") {
+            THEN("Names are descriptive") {
+                REQUIRE(getMidiControlName(MidiControlId::VIEW_TOGGLE) == "View Toggle");
+                REQUIRE(getMidiControlName(MidiControlId::SETTINGS_TOGGLE) == "Settings Toggle");
+            }
+        }
+
+        WHEN("Getting name for unknown control ID") {
+            THEN("Returns 'Unknown Control'") {
+                REQUIRE(getMidiControlName(MidiControlId::COUNT) == "Unknown Control");
             }
         }
     }
