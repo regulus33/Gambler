@@ -131,6 +131,9 @@ private:
             DBG("Executed " << numCallbacks << " completion callbacks");
         }
 
+        // Apply any pending note writes from the audio thread (roll mode)
+        processorRef.getState().applyPendingNoteWrites();
+
         // Update the main screen from sequence state
         mainScreen.updateFromSequence();
 

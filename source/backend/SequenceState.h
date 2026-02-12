@@ -5,6 +5,7 @@
 #include "ModulationType.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <array>
+#include <atomic>
 #include <vector>
 #include <random>
 
@@ -553,16 +554,19 @@ public:
             // Tick the substep first to advance the substep index
             int substepIdx = tickStepSubstepOnly(currentIndex);
 
-            // Check play probability - if false, return rest without modifying state
+            // Check play probability - if false, queue a rest and return -1
             if (!getPlayProbability(probabilityIndex)) {
-                // Return -1 (rest) without storing it
-                // Roll mode is live/temporary - we don't modify APVTS from audio thread
+                // Queue the rest note write for the message thread to apply
+                queueNoteWrite(currentIndex, substepIdx, -1);
                 return -1;
             }
 
-            // Probability check passed - generate and return a random note
-            // WITHOUT storing it (to avoid APVTS modifications from audio thread)
-            return generateRandomNote(currentIndex);
+            // Probability check passed - generate a random note
+            // Queue the unquantized note for deferred storage on message thread
+            // Return the quantized version for immediate playback
+            int unquantizedNote = generateRandomNoteUnquantized();
+            queueNoteWrite(currentIndex, substepIdx, unquantizedNote);
+            return quantizeNoteToStepScale(currentIndex, unquantizedNote);
         }
 
         // Not in random mode - just tick the current step normally
@@ -600,11 +604,11 @@ public:
     }
 
     /**
-     * Generate a random note within scale and range WITHOUT storing it
-     * This is used by roll mode to avoid APVTS modifications from audio thread
-     * Returns the quantized note ready for playback
+     * Generate a random unquantized note within the scale range.
+     * Used by roll mode - the unquantized value is queued for deferred storage,
+     * while quantization happens on-the-fly for playback.
      */
-    int generateRandomNote(int stepIndex) const {
+    int generateRandomNoteUnquantized() const {
         // Use thread_local to avoid data races between audio and UI threads
         thread_local std::random_device rd;
         thread_local std::mt19937 gen(rd());
@@ -613,9 +617,7 @@ public:
         int rangeMax = getScaleRangeMax();
         std::uniform_int_distribution<> dis(rangeMin, rangeMax);
 
-        int randomNote = dis(gen);
-        // Quantize to the step's scale and return
-        return quantizeNoteToStepScale(stepIndex, randomNote);
+        return dis(gen);
     }
 
     /**
@@ -738,11 +740,54 @@ public:
     }
 
     // ========================================
+    // PENDING NOTE WRITES (audio thread -> message thread)
+    // ========================================
+
+    /**
+     * Apply any pending note writes queued by the audio thread.
+     * Must be called from the message thread (e.g., in handleAsyncUpdate).
+     */
+    void applyPendingNoteWrites() {
+        int readIdx = pendingNoteReadIndex.load(std::memory_order_acquire);
+        int writeIdx = pendingNoteWriteIndex.load(std::memory_order_acquire);
+
+        while (readIdx != writeIdx) {
+            auto& entry = pendingNoteBuffer[readIdx % PENDING_NOTE_BUFFER_SIZE];
+            setStepNote(entry.stepIndex, entry.substepIndex, entry.noteValue);
+            readIdx++;
+            pendingNoteReadIndex.store(readIdx, std::memory_order_release);
+        }
+    }
+
+    // ========================================
     // PARAMETER ACCESS HELPERS
     // ========================================
 
 private:
     APVTS& apvts;
+
+    // Lock-free SPSC ring buffer for deferring note writes from audio to message thread
+    struct PendingNoteWrite {
+        int stepIndex;
+        int substepIndex;
+        int noteValue;
+    };
+    static constexpr int PENDING_NOTE_BUFFER_SIZE = 64;
+    std::array<PendingNoteWrite, PENDING_NOTE_BUFFER_SIZE> pendingNoteBuffer {};
+    std::atomic<int> pendingNoteWriteIndex { 0 };
+    std::atomic<int> pendingNoteReadIndex { 0 };
+
+    void queueNoteWrite(int stepIndex, int substepIndex, int noteValue) {
+        int writeIdx = pendingNoteWriteIndex.load(std::memory_order_relaxed);
+        int readIdx = pendingNoteReadIndex.load(std::memory_order_acquire);
+        // Drop if buffer full (shouldn't happen at normal tick rates)
+        if (writeIdx - readIdx >= PENDING_NOTE_BUFFER_SIZE) return;
+        auto& entry = pendingNoteBuffer[writeIdx % PENDING_NOTE_BUFFER_SIZE];
+        entry.stepIndex = stepIndex;
+        entry.substepIndex = substepIndex;
+        entry.noteValue = noteValue;
+        pendingNoteWriteIndex.store(writeIdx + 1, std::memory_order_release);
+    }
 
     int getIntParam(const juce::String& paramId) const {
         if (auto* param = apvts.getRawParameterValue(paramId)) {
