@@ -176,6 +176,12 @@ public:
      */
     juce::StringArray getAvailableMidiOutputDeviceNames() const;
 
+    /**
+     * Get the configured MIDI output channel (1-16)
+     * Reads from APVTS parameter for thread-safe access.
+     */
+    int getMidiOutputChannel() const;
+
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 

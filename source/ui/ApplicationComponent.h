@@ -212,7 +212,9 @@ private:
 
             // Wire up settings callbacks to processor's clock
             // Sync initial state from processor
-            settingsScreen->setInternalClockEnabled(processorRef.getClock().getMode() == ClockMode::INTERNAL);
+            auto currentClockMode = processorRef.getClock().getMode();
+            settingsScreen->setInternalClockEnabled(currentClockMode == ClockMode::INTERNAL);
+            settingsScreen->setExternalMidiClockEnabled(currentClockMode == ClockMode::EXTERNAL_MIDI_CLOCK);
             settingsScreen->setTempo(processorRef.getClock().getBpm());
 
             settingsScreen->onInternalClockChanged = [this](bool enabled) {
@@ -281,6 +283,33 @@ private:
                 } else {
                     processorRef.closeAllMidiClockOutputs();
                     DBG("MIDI clock output disabled - closed all devices");
+                }
+            };
+
+            // External MIDI Clock toggle callback
+            settingsScreen->onExternalMidiClockChanged = [this](bool enabled) {
+                processorRef.queueCommand(ProcessorCommand([this, enabled]() {
+                    if (enabled) {
+                        processorRef.getClock().setMode(ClockMode::EXTERNAL_MIDI_CLOCK);
+                        DBG("External MIDI clock enabled");
+                    } else {
+                        // Revert to internal clock when unchecking external
+                        processorRef.getClock().setMode(ClockMode::INTERNAL);
+                        processorRef.getClock().start();
+                        DBG("External MIDI clock disabled, reverted to internal clock");
+                    }
+                }));
+            };
+
+            // Sync MIDI output channel from APVTS
+            if (auto* param = dynamic_cast<juce::AudioParameterInt*>(
+                    processorRef.getAPVTS().getParameter(Params::Keys::ID::MIDI_OUTPUT_CHANNEL))) {
+                settingsScreen->setMidiOutputChannel(param->get());
+            }
+            settingsScreen->onMidiOutputChannelChanged = [this](int channel) {
+                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::MIDI_OUTPUT_CHANNEL)) {
+                    param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(channel)));
+                    DBG("MIDI output channel changed to: " + juce::String(channel));
                 }
             };
 

@@ -44,12 +44,15 @@ public:
      */
     void setMode(ClockMode newMode) {
         mode = newMode;
-        
+
         // Reset state when switching modes
         if (mode == ClockMode::INTERNAL) {
             internalClock.reset(); // reset samples
-        } else {
+        } else if (mode == ClockMode::DAW_SYNC) {
             lastDawPulseCount = 0; // reset the pulse daw count.
+        } else if (mode == ClockMode::EXTERNAL_MIDI_CLOCK) {
+            externalMidiClockPulseCount = 0;
+            externalClockRunning = false;
         }
     }
     
@@ -123,8 +126,9 @@ public:
      * @return Number of samples per step, or 0.0 if calculation is not possible
      */
     double calculateSamplesPerStep(double dawBpm, double sampleRate) const {
-        if (mode == ClockMode::INTERNAL) {
+        if (mode == ClockMode::INTERNAL || mode == ClockMode::EXTERNAL_MIDI_CLOCK) {
             // Use internal clock's calculation
+            // For external MIDI clock, use internal BPM as approximation for note length
             return internalClock.calculateSamplesPerPulse();
         } else {
             // DAW_SYNC mode: calculate based on DAW tempo
@@ -145,6 +149,7 @@ public:
             internalClock.start();
         }
         // In DAW_SYNC mode, the DAW controls start/stop
+        // In EXTERNAL_MIDI_CLOCK mode, start/stop is controlled by MIDI Start/Stop messages
     }
     
     /**
@@ -153,6 +158,9 @@ public:
     void stop() {
         if (mode == ClockMode::INTERNAL) {
             internalClock.stop();
+        }
+        if (mode == ClockMode::EXTERNAL_MIDI_CLOCK) {
+            externalClockRunning = false;
         }
         // In DAW_SYNC mode, the DAW controls start/stop
     }
@@ -166,6 +174,9 @@ public:
         if (mode == ClockMode::INTERNAL) {
             return internalClock.getIsRunning();
         }
+        if (mode == ClockMode::EXTERNAL_MIDI_CLOCK) {
+            return externalClockRunning;
+        }
         // In DAW_SYNC mode, running state comes from DAW
         return false;  // Will be overridden by updateDawSync
     }
@@ -176,6 +187,7 @@ public:
     void reset() {
         internalClock.reset();
         lastDawPulseCount = 0;
+        externalMidiClockPulseCount = 0;
         shouldTriggerPulse = false;
     }
     
@@ -238,6 +250,61 @@ public:
         return result;
     }
 
+    // ========================================
+    // External MIDI Clock support
+    // ========================================
+
+    /**
+     * Process an incoming external MIDI clock pulse (0xF8)
+     * Called from processBlock when in EXTERNAL_MIDI_CLOCK mode.
+     * Counts 24 PPQN pulses and triggers sequencer ticks at subdivision boundaries.
+     */
+    void processExternalMidiClockPulse() {
+        if (mode != ClockMode::EXTERNAL_MIDI_CLOCK) return;
+
+        externalMidiClockPulseCount++;
+        int pulsesPerTick = getPulsesPerMidiClock(subdivision);
+
+        if (externalMidiClockPulseCount >= pulsesPerTick) {
+            shouldTriggerPulse = true;
+            externalMidiClockPulseCount -= pulsesPerTick;  // Carry over remainder
+        }
+    }
+
+    /**
+     * Handle MIDI Start message (0xFA) for external clock
+     */
+    void handleExternalMidiStart() {
+        if (mode != ClockMode::EXTERNAL_MIDI_CLOCK) return;
+        externalClockRunning = true;
+        externalMidiClockPulseCount = 0;
+    }
+
+    /**
+     * Handle MIDI Stop message (0xFC) for external clock
+     */
+    void handleExternalMidiStop() {
+        if (mode != ClockMode::EXTERNAL_MIDI_CLOCK) return;
+        externalClockRunning = false;
+        externalMidiClockPulseCount = 0;
+    }
+
+    /**
+     * Handle MIDI Continue message (0xFB) for external clock
+     */
+    void handleExternalMidiContinue() {
+        if (mode != ClockMode::EXTERNAL_MIDI_CLOCK) return;
+        externalClockRunning = true;
+        // Don't reset pulse count on continue - resume from where we left off
+    }
+
+    /**
+     * Check if external MIDI clock is running
+     */
+    bool isExternalClockRunning() const {
+        return externalClockRunning;
+    }
+
     /**
      * Get the number of MIDI clock pulses to send this cycle
      * MIDI clock runs at 24 PPQN (pulses per quarter note)
@@ -289,7 +356,10 @@ public:
         auto xml = std::make_unique<juce::XmlElement>("Clock");
 
         // Save clock mode
-        xml->setAttribute("mode", mode == ClockMode::INTERNAL ? "internal" : "daw_sync");
+        juce::String modeStr = "daw_sync";
+        if (mode == ClockMode::INTERNAL) modeStr = "internal";
+        else if (mode == ClockMode::EXTERNAL_MIDI_CLOCK) modeStr = "external_midi_clock";
+        xml->setAttribute("mode", modeStr);
 
         // Save BPM (for internal mode)
         xml->setAttribute("bpm", getBpm());
@@ -316,7 +386,9 @@ public:
 
         // Restore clock mode
         juce::String modeStr = xml.getStringAttribute("mode", "daw_sync");
-        ClockMode restoredMode = (modeStr == "internal") ? ClockMode::INTERNAL : ClockMode::DAW_SYNC;
+        ClockMode restoredMode = ClockMode::DAW_SYNC;
+        if (modeStr == "internal") restoredMode = ClockMode::INTERNAL;
+        else if (modeStr == "external_midi_clock") restoredMode = ClockMode::EXTERNAL_MIDI_CLOCK;
         setMode(restoredMode);
 
         // Restore BPM
@@ -342,6 +414,10 @@ private:
     int lastDawPulseCount;         // Last pulse count from DAW (for edge detection)
     bool shouldTriggerPulse;       // Flag indicating a pulse should be triggered
     int midiClockPulsesAccumulated = 0;  // Accumulated MIDI clock pulses to send
+
+    // External MIDI clock state
+    int externalMidiClockPulseCount = 0;  // Accumulated external MIDI clock pulses (24 PPQN)
+    bool externalClockRunning = false;     // Whether external clock is running (received Start)
 
     /**
      * Get the number of MIDI clock pulses per sequencer tick

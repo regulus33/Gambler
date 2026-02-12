@@ -102,9 +102,14 @@ namespace Params
             // ========================================
             // CLOCK
             // ========================================
-            inline const String CLOCK_MODE = "clock_mode";  // 0=INTERNAL, 1=DAW_SYNC
+            inline const String CLOCK_MODE = "clock_mode";  // 0=INTERNAL, 1=DAW_SYNC, 2=EXTERNAL_MIDI_CLOCK
             inline const String CLOCK_BPM = "clock_bpm";
             inline const String CLOCK_SUBDIVISION = "clock_subdivision";  // 0=QUARTER, 1=EIGHTH, 2=SIXTEENTH, 3=THIRTY_SECOND
+
+            // ========================================
+            // MIDI OUTPUT
+            // ========================================
+            inline const String MIDI_OUTPUT_CHANNEL = "midi_output_channel";  // 1-16
 
             // ========================================
             // USER PREFERENCES
@@ -224,6 +229,9 @@ namespace Params
             inline const String CLOCK_MODE = "Clock Mode";
             inline const String CLOCK_BPM = "BPM";
             inline const String CLOCK_SUBDIVISION = "Subdivision";
+
+            // MIDI Output
+            inline const String MIDI_OUTPUT_CHANNEL = "MIDI Output Channel";
 
             // User preferences
             inline const String PREF_PREVIEW_NOTES = "Preview Notes";
@@ -393,9 +401,14 @@ namespace Params
         // ========================================
         // CLOCK
         // ========================================
-        params.push_back(createIntParam(Keys::ID::CLOCK_MODE, Keys::LABEL::CLOCK_MODE, 0, 1, 0));  // 0=INTERNAL
+        params.push_back(createIntParam(Keys::ID::CLOCK_MODE, Keys::LABEL::CLOCK_MODE, 0, 2, 0));  // 0=INTERNAL, 1=DAW_SYNC, 2=EXTERNAL_MIDI_CLOCK
         params.push_back(createFloatParam(Keys::ID::CLOCK_BPM, Keys::LABEL::CLOCK_BPM, 20.0f, 999.0f, 120.0f));
         params.push_back(createIntParam(Keys::ID::CLOCK_SUBDIVISION, Keys::LABEL::CLOCK_SUBDIVISION, 0, 3, 2));  // 2=SIXTEENTH
+
+        // ========================================
+        // MIDI OUTPUT
+        // ========================================
+        params.push_back(createIntParam(Keys::ID::MIDI_OUTPUT_CHANNEL, Keys::LABEL::MIDI_OUTPUT_CHANNEL, 1, 16, 1));
 
         // ========================================
         // USER PREFERENCES

@@ -54,10 +54,14 @@ public:
         internalClockToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
         internalClockToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
         internalClockToggle.onClick = [this] {
-            // Enable/disable tempo slider based on internal clock state
-            tempoSlider.setEnabled(internalClockToggle.getToggleState());
+            bool intEnabled = internalClockToggle.getToggleState();
+            tempoSlider.setEnabled(intEnabled);
+            if (intEnabled) {
+                // Mutually exclusive: disable external MIDI clock
+                externalMidiClockToggle.setToggleState(false, juce::dontSendNotification);
+            }
             if (onInternalClockChanged)
-                onInternalClockChanged(internalClockToggle.getToggleState());
+                onInternalClockChanged(intEnabled);
         };
 
         // Setup tempo slider
@@ -92,6 +96,28 @@ public:
         midiClockOutputToggle.onClick = [this] {
             if (onMidiClockOutputChanged)
                 onMidiClockOutputChanged(midiClockOutputToggle.getToggleState());
+        };
+
+        // Setup External MIDI Clock checkbox
+        externalMidiClockToggle.setButtonText("External MIDI Clock");
+        externalMidiClockToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        externalMidiClockToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
+        externalMidiClockToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+        externalMidiClockToggle.setToggleState(false, juce::dontSendNotification);
+        externalMidiClockToggle.onClick = [this] {
+            bool extEnabled = externalMidiClockToggle.getToggleState();
+            if (extEnabled) {
+                // Mutually exclusive: disable internal clock and tempo
+                internalClockToggle.setToggleState(false, juce::dontSendNotification);
+                internalClockToggle.setEnabled(false);
+                tempoSlider.setEnabled(false);
+            } else {
+                // Re-enable internal clock toggle
+                internalClockToggle.setEnabled(true);
+                tempoSlider.setEnabled(internalClockToggle.getToggleState());
+            }
+            if (onExternalMidiClockChanged)
+                onExternalMidiClockChanged(extEnabled);
         };
 
         // Setup note length slider
@@ -153,6 +179,7 @@ public:
         clockTimingGroup->addControl(internalClockToggle);
         clockTimingGroup->addLabeledControl(tempoLabel, tempoSlider);
         clockTimingGroup->addControl(midiClockOutputToggle);
+        clockTimingGroup->addControl(externalMidiClockToggle);
         addAndMakeVisible(*clockTimingGroup);
 
         playbackGroup = std::make_unique<SettingsGroup>("Playback");
@@ -161,12 +188,26 @@ public:
         playbackGroup->addControl(followStepToggle);
         addAndMakeVisible(*playbackGroup);
 
-        // TODO: Replace placeholder text with actual MIDI settings/controls
+        // Setup MIDI output channel dropdown
+        midiOutputChannelLabel.setText("Output Channel", juce::dontSendNotification);
+        midiOutputChannelLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+        midiOutputChannelLabel.setJustificationType(juce::Justification::centredLeft);
+
+        midiOutputChannelComboBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF2A2A2A));
+        midiOutputChannelComboBox.setColour(juce::ComboBox::textColourId, juce::Colours::white);
+        midiOutputChannelComboBox.setColour(juce::ComboBox::outlineColourId, juce::Colours::grey);
+        midiOutputChannelComboBox.setColour(juce::ComboBox::arrowColourId, juce::Colours::white);
+        for (int i = 1; i <= 16; ++i) {
+            midiOutputChannelComboBox.addItem(juce::String(i), i);
+        }
+        midiOutputChannelComboBox.setSelectedId(1, juce::dontSendNotification);
+        midiOutputChannelComboBox.onChange = [this] {
+            if (onMidiOutputChannelChanged)
+                onMidiOutputChannelChanged(midiOutputChannelComboBox.getSelectedId());
+        };
+
         midiGroup = std::make_unique<SettingsGroup>("MIDI");
-        midiPlaceholderLabel.setText("MIDI settings coming soon...", juce::dontSendNotification);
-        midiPlaceholderLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.5f));
-        midiPlaceholderLabel.setJustificationType(juce::Justification::centred);
-        midiGroup->addControl(midiPlaceholderLabel);
+        midiGroup->addLabeledControl(midiOutputChannelLabel, midiOutputChannelComboBox);
         addAndMakeVisible(*midiGroup);
 
         // TODO: Replace placeholder text with actual Group 4 settings/controls
@@ -267,6 +308,8 @@ public:
     std::function<void(bool)> onPreviewNotesChanged;
     std::function<void(bool)> onFollowStepChanged;
     std::function<void(bool)> onMidiClockOutputChanged;
+    std::function<void(bool)> onExternalMidiClockChanged;
+    std::function<void(int)> onMidiOutputChannelChanged;
 
     // Accessors for current values
     bool isInternalClockEnabled() const { return internalClockToggle.getToggleState(); }
@@ -297,6 +340,29 @@ public:
         return midiClockOutputToggle.getToggleState();
     }
 
+    void setExternalMidiClockEnabled(bool enabled) {
+        externalMidiClockToggle.setToggleState(enabled, juce::dontSendNotification);
+        if (enabled) {
+            internalClockToggle.setEnabled(false);
+            tempoSlider.setEnabled(false);
+        } else {
+            internalClockToggle.setEnabled(true);
+            tempoSlider.setEnabled(internalClockToggle.getToggleState());
+        }
+    }
+
+    bool isExternalMidiClockEnabled() const {
+        return externalMidiClockToggle.getToggleState();
+    }
+
+    void setMidiOutputChannel(int channel) {
+        midiOutputChannelComboBox.setSelectedId(channel, juce::dontSendNotification);
+    }
+
+    int getMidiOutputChannel() const {
+        return midiOutputChannelComboBox.getSelectedId();
+    }
+
 private:
     juce::Typeface::Ptr interTypeface;
 
@@ -315,6 +381,7 @@ private:
     juce::Label tempoLabel;
     juce::Slider tempoSlider;
     juce::ToggleButton midiClockOutputToggle;
+    juce::ToggleButton externalMidiClockToggle;
 
     // Playback controls
     juce::Label noteLengthLabel;
@@ -322,8 +389,11 @@ private:
     juce::ToggleButton previewNotesToggle;
     juce::ToggleButton followStepToggle;
 
+    // MIDI controls
+    juce::Label midiOutputChannelLabel;
+    juce::ComboBox midiOutputChannelComboBox;
+
     // Placeholder labels (TODO: replace with actual controls)
-    juce::Label midiPlaceholderLabel;
     juce::Label group4PlaceholderLabel;
     juce::Label group5PlaceholderLabel;
     juce::Label group6PlaceholderLabel;

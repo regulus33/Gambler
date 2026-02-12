@@ -224,15 +224,13 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         const auto& msg = previewMidiBuffer[start1 + i];
         // If it is note on, then send to the midi buffer
         if (msg.isNoteOn) {
-            // play the note on full velocity always on 1
-            // TODO: this will need to be synced to whatever midi channel is configured to send out midi on.
-            auto noteOn = juce::MidiMessage::noteOn (1, msg.noteNumber, msg.velocity);
+            auto noteOn = juce::MidiMessage::noteOn (getMidiOutputChannel(), msg.noteNumber, msg.velocity);
             // send to midi buffer
             midiMessages.addEvent (noteOn, 0);
             DBG ("Preview MIDI Note ON added to buffer: " << msg.noteNumber);
         } else {
             // note off
-            auto noteOff = juce::MidiMessage::noteOff (1, msg.noteNumber, msg.velocity);
+            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), msg.noteNumber, msg.velocity);
             midiMessages.addEvent (noteOff, 0);
             DBG ("Preview MIDI Note OFF added to buffer: " << msg.noteNumber);
         }
@@ -242,11 +240,11 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     for (int i = 0; i < block_size2; ++i) {
         const auto& msg = previewMidiBuffer[start2 + i];
         if (msg.isNoteOn) {
-            auto noteOn = juce::MidiMessage::noteOn (1, msg.noteNumber, msg.velocity);
+            auto noteOn = juce::MidiMessage::noteOn (getMidiOutputChannel(), msg.noteNumber, msg.velocity);
             midiMessages.addEvent (noteOn, 0);
             DBG ("Preview MIDI Note ON added to buffer: " << msg.noteNumber);
         } else {
-            auto noteOff = juce::MidiMessage::noteOff (1, msg.noteNumber, msg.velocity);
+            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), msg.noteNumber, msg.velocity);
             midiMessages.addEvent (noteOff, 0);
             DBG ("Preview MIDI Note OFF added to buffer: " << msg.noteNumber);
         }
@@ -271,9 +269,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
             // Clamp to buffer bounds for safety
             sampleOffset = juce::jlimit(0, buffer.getNumSamples() - 1, sampleOffset);
 
-            // make the note off message
-            // TODO: again we need to make channel configurable, this will need to be changed.
-            auto noteOff = juce::MidiMessage::noteOff (1, scheduledNoteOffNote, scheduledNoteOffVelocity);
+            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), scheduledNoteOffNote, scheduledNoteOffVelocity);
             // add the event at the precise sample offset
             midiMessages.addEvent (noteOff, sampleOffset);
 
@@ -368,7 +364,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         // off after we stop the sequence...
         // Send note off for previous note immediately (if any)
         if (lastPlayedNote >= 0) {
-            auto noteOff = juce::MidiMessage::noteOff (1, lastPlayedNote, (juce::uint8) 0);
+            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), lastPlayedNote, (juce::uint8) 0);
             midiMessages.addEvent (noteOff, 0);
 
             // Send directly to MIDI output device (for standalone mode)
@@ -420,7 +416,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
                     // Otherwise it is just a CC, send that
                 } else if (mod.getType() == ModulationType::CC) {
                     // Send CC message
-                    auto ccMsg = juce::MidiMessage::controllerEvent (1, mod.getCCNumber(), mod.getValue());
+                    auto ccMsg = juce::MidiMessage::controllerEvent (getMidiOutputChannel(), mod.getCCNumber(), mod.getValue());
                     // send the event
                     midiMessages.addEvent (ccMsg, 0);
 
@@ -433,7 +429,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
             }
 
             // Valid note - send note on with velocity
-            auto noteOn = juce::MidiMessage::noteOn (1, note, velocity);
+            auto noteOn = juce::MidiMessage::noteOn (getMidiOutputChannel(), note, velocity);
             // add this note to the messages
             midiMessages.addEvent (noteOn, 0);
 
@@ -766,7 +762,7 @@ void PluginProcessor::triggerStepMidi (int stepIndex) {
     if (lastPlayedNote >= 0) {
         if (midiOutput) {
             // Standalone mode: send directly to MIDI device
-            auto noteOff = juce::MidiMessage::noteOff (1, lastPlayedNote, (juce::uint8) 0);
+            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), lastPlayedNote, (juce::uint8) 0);
             midiOutput->sendMessageNow (noteOff);
             DBG ("Preview MIDI Note OFF (standalone): " << lastPlayedNote);
         } else {
@@ -788,7 +784,7 @@ void PluginProcessor::triggerStepMidi (int stepIndex) {
         if (midiOutput) {
             for (const auto& mod : selectedMods) {
                 if (mod.getType() == ModulationType::CC) {
-                    auto ccMsg = juce::MidiMessage::controllerEvent (1, mod.getCCNumber(), mod.getValue());
+                    auto ccMsg = juce::MidiMessage::controllerEvent (getMidiOutputChannel(), mod.getCCNumber(), mod.getValue());
                     midiOutput->sendMessageNow (ccMsg);
                     DBG ("Preview MIDI CC (standalone): " << mod.getCCNumber() << " = " << mod.getValue());
                 }
@@ -797,7 +793,7 @@ void PluginProcessor::triggerStepMidi (int stepIndex) {
 
         if (midiOutput) {
             // Standalone mode: send directly to MIDI device
-            auto noteOn = juce::MidiMessage::noteOn (1, note, velocity);
+            auto noteOn = juce::MidiMessage::noteOn (getMidiOutputChannel(), note, velocity);
             midiOutput->sendMessageNow (noteOn);
             DBG ("Preview MIDI Note ON (standalone): " << note << " (velocity " << (int) velocity << ", step " << stepIndex << ")");
         } else {
@@ -871,7 +867,7 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
     if (lastPlayedNote >= 0) {
         if (midiOutput) {
             // Standalone mode: send directly to MIDI device
-            auto noteOff = juce::MidiMessage::noteOff (1, lastPlayedNote, (juce::uint8) 0);
+            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), lastPlayedNote, (juce::uint8) 0);
             midiOutput->sendMessageNow (noteOff);
             DBG ("  Preview MIDI Note OFF sent (standalone): " << lastPlayedNote);
         } else {
@@ -896,7 +892,7 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
             // For each
             for (const auto& mod : selectedMods) {
                 if (mod.getType() == ModulationType::CC) {
-                    auto ccMsg = juce::MidiMessage::controllerEvent (1, mod.getCCNumber(), mod.getValue());
+                    auto ccMsg = juce::MidiMessage::controllerEvent (getMidiOutputChannel(), mod.getCCNumber(), mod.getValue());
                     midiOutput->sendMessageNow (ccMsg);
                     DBG ("  Preview MIDI CC (standalone): " << mod.getCCNumber() << " = " << mod.getValue());
                 }
@@ -905,7 +901,7 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
 
         if (midiOutput) {
             // Standalone mode: send directly to MIDI device
-            auto noteOn = juce::MidiMessage::noteOn (1, note, velocity);
+            auto noteOn = juce::MidiMessage::noteOn (getMidiOutputChannel(), note, velocity);
             midiOutput->sendMessageNow (noteOn);
             DBG ("  Preview MIDI Note ON sent (standalone): " << note << " (velocity " << (int) velocity << ")");
         } else {
@@ -977,7 +973,7 @@ void PluginProcessor::stopSequencer() {
 
     // Send note off for any playing note
     if (lastPlayedNote >= 0) {
-        auto noteOff = juce::MidiMessage::noteOff (1, lastPlayedNote, (juce::uint8) 0);
+        auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), lastPlayedNote, (juce::uint8) 0);
 
         // Send to MIDI output if available (standalone mode)
         if (midiOutput) {
@@ -1058,6 +1054,31 @@ void PluginProcessor::processMidiInput (const juce::MidiBuffer& midiMessages) {
     // Iterate through all incoming MIDI messages
     for (const auto& metadata : midiMessages) {
         auto msg = metadata.getMessage();
+
+        // Process external MIDI clock messages (system real-time)
+        if (clock.getMode() == ClockMode::EXTERNAL_MIDI_CLOCK) {
+            if (msg.isMidiClock()) {  // 0xF8 timing clock
+                clock.processExternalMidiClockPulse();
+                continue;
+            }
+            if (msg.isMidiStart()) {  // 0xFA
+                clock.handleExternalMidiStart();
+                sequencerState.store(SequencerState::Playing);
+                DBG("External MIDI Start received - sequencer playing");
+                continue;
+            }
+            if (msg.isMidiContinue()) {  // 0xFB
+                clock.handleExternalMidiContinue();
+                sequencerState.store(SequencerState::Playing);
+                DBG("External MIDI Continue received - sequencer resumed");
+                continue;
+            }
+            if (msg.isMidiStop()) {  // 0xFC
+                clock.handleExternalMidiStop();
+                DBG("External MIDI Stop received");
+                continue;
+            }
+        }
 
         // Process CC messages
         if (msg.isController()) {
@@ -1623,6 +1644,14 @@ juce::StringArray PluginProcessor::getAvailableMidiOutputDeviceNames() const {
     }
 
     return names;
+}
+
+int PluginProcessor::getMidiOutputChannel() const {
+    if (auto* param = dynamic_cast<juce::AudioParameterInt*>(
+            apvts.getParameter(Params::Keys::ID::MIDI_OUTPUT_CHANNEL))) {
+        return param->get();
+    }
+    return 1;  // Default fallback
 }
 
 //==============================================================================

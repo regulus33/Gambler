@@ -473,7 +473,7 @@ public:
     }
 
     void setClockMode(int mode) {
-        setIntParam(Params::Keys::ID::CLOCK_MODE, juce::jlimit(0, 1, mode));
+        setIntParam(Params::Keys::ID::CLOCK_MODE, juce::jlimit(0, 2, mode));
     }
 
     float getClockBpm() const {

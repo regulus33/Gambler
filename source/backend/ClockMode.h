@@ -8,7 +8,8 @@
  */
 enum class ClockMode {
     DAW_SYNC,
-    INTERNAL
+    INTERNAL,
+    EXTERNAL_MIDI_CLOCK
 };
 
 /**
