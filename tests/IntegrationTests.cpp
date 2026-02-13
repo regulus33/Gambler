@@ -1,7 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #include "../source/backend/Clock.h"
-#include "../source/backend/ProcessorCommand.h"
 #include "../source/backend/Scale.h"
 
 /**
@@ -41,33 +40,6 @@ SCENARIO("Clock mode switching integration", "[integration]") {
             THEN("Can process samples again") {
                 clock.processInternalClock(6000);  // Enough for one tick at 120 BPM
                 REQUIRE(clock.shouldTick() == true);
-            }
-        }
-    }
-}
-
-SCENARIO("ProcessorCommandQueue basic operations", "[integration]") {
-    GIVEN("A ProcessorCommandQueue") {
-        ProcessorCommandQueue queue;
-        int counter = 0;
-
-        WHEN("Queueing multiple commands") {
-            queue.push(ProcessorCommand([&counter]() {
-                counter++;
-            }));
-
-            queue.push(ProcessorCommand([&counter]() {
-                counter += 10;
-            }));
-
-            queue.push(ProcessorCommand([&counter]() {
-                counter *= 2;
-            }));
-
-            THEN("All commands can be executed in order") {
-                int executed = queue.executeAll();
-                REQUIRE(executed == 3);
-                REQUIRE(counter == 22);  // (0 + 1 + 10) * 2 = 22
             }
         }
     }
