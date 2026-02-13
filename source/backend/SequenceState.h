@@ -751,15 +751,15 @@ public:
         int readIdx = pendingNoteReadIndex.load(std::memory_order_acquire);
         int writeIdx = pendingNoteWriteIndex.load(std::memory_order_acquire);
 
-        int count = writeIdx - readIdx;
-        if (count > 0) {
-            DBG("applyPendingNoteWrites: processing " << count << " queued writes");
-        }
-
         while (readIdx != writeIdx) {
             auto& entry = pendingNoteBuffer[readIdx % PENDING_NOTE_BUFFER_SIZE];
-            DBG("  Writing note " << entry.noteValue << " to step " << entry.stepIndex << " substep " << entry.substepIndex);
-            setStepNote(entry.stepIndex, entry.substepIndex, entry.noteValue);
+            // Write directly to the parameter atomic, bypassing setValueNotifyingHost.
+            // This avoids triggering the full APVTS listener cascade which can crash.
+            // The UI reads via getRawParameterValue()->load() so it still sees the update.
+            auto paramId = Params::Keys::ID::stepNote(entry.stepIndex, entry.substepIndex);
+            if (auto* raw = apvts.getRawParameterValue(paramId)) {
+                raw->store(static_cast<float>(entry.noteValue), std::memory_order_release);
+            }
             readIdx++;
             pendingNoteReadIndex.store(readIdx, std::memory_order_release);
         }
