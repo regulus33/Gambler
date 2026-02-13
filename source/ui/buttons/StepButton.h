@@ -150,8 +150,8 @@ public:
                 drawNoteText(g, bounds, midiNote, isCurrent);
             }
 
-            // Draw active circle indicator if this is the playing step
-            if (isCurrent) {
+            // Draw active circle indicator if this is the playing step (skip for rests)
+            if (isCurrent && !isRest) {
                 drawActiveCircle(g, bounds, midiNote);
             }
         } else {
