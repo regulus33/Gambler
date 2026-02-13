@@ -192,21 +192,6 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     // Clear incoming MIDI (we're generating, not processing MIDI through)
     midiMessages.clear();
 
-    // NOTE: these are not called as far as I know, legacy code.
-    // Execute any queued commands from UI thread (thread-safe state modifications)
-    int numCommands = commandQueue.executeAll();
-    if (numCommands > 0) {
-        DBG ("Executed " << numCommands << " queued commands");
-        // Not supposed to be called anymore. We should be using listeners
-        jassertfalse;
-        // If any commands had completion callbacks, notify the UI to execute them
-        // This simply calls functions if any functions are pending...
-        // Make a local copy to avoid race condition with UI thread clearing the callback
-        auto callback = onCompletionCallbacksPending;
-        if (commandQueue.hasCompletionCallbacks() && callback) {
-            callback(); // this just calls trigger async update
-        }
-    }
     // STANDALONE MODE ==== previewing midi notes when touching UI ========================================================
     // Process any queued preview MIDI messages (from UI thread)
     // create 2 pairs of start and size
@@ -707,6 +692,42 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
         DBG ("SHUFFLE triggered");
     }
 
+    // ========== CLOCK PARAMETERS ==========
+
+    if (parameterID == Params::Keys::ID::CLOCK_MODE) {
+        int intValue = static_cast<int>(newValue);
+        // APVTS values: 0=INTERNAL, 1=DAW_SYNC, 2=EXTERNAL_MIDI_CLOCK
+        switch (intValue) {
+            case 0:
+                clock.setMode(ClockMode::INTERNAL);
+                clock.start();
+                DBG("Clock mode set to INTERNAL (started)");
+                break;
+            case 1:
+                clock.setMode(ClockMode::DAW_SYNC);
+                clock.stop();
+                DBG("Clock mode set to DAW_SYNC");
+                break;
+            case 2:
+                clock.setMode(ClockMode::EXTERNAL_MIDI_CLOCK);
+                clock.stop();
+                DBG("Clock mode set to EXTERNAL_MIDI_CLOCK");
+                break;
+            default:
+                break;
+        }
+    }
+
+    if (parameterID == Params::Keys::ID::CLOCK_BPM) {
+        clock.setBpm(static_cast<double>(newValue));
+        DBG("Clock BPM set to " + juce::String(newValue));
+    }
+
+    if (parameterID == Params::Keys::ID::CLOCK_SUBDIVISION) {
+        clock.setSubdivision(static_cast<Subdivision>(static_cast<int>(newValue)));
+        DBG("Clock subdivision set to " + juce::String(static_cast<int>(newValue)));
+    }
+
     // ========== SCALE CLEAR BUTTON ==========
     if (parameterID == Params::Keys::ID::CLEAR_SCALE && isOn) {
         auto& state = getState();
@@ -1025,25 +1046,15 @@ void PluginProcessor::loadStateFromXml (const juce::XmlElement& xml) {
         DBG ("  - APVTS loaded (sequence data included)");
     }
 
-    // Queue command to load domain state on audio thread
-    // We need to copy the XML data since the original may be destroyed
-    auto xmlCopy = std::make_shared<juce::XmlElement> (xml);
+    // Clock settings (mode, BPM, subdivision) are handled automatically:
+    // apvts.replaceState() above updates the APVTS params, which fires parameterChanged,
+    // which applies the new values to the Clock object.
 
-    queueCommand (ProcessorCommand (
-        [this, xmlCopy]() {
-            // Load Clock settings
-            if (auto* clockXml = xmlCopy->getChildByName ("Clock")) {
-                clock.fromXml (*clockXml);
-                juce::String modeStr = (clock.getMode() == ClockMode::INTERNAL) ? "INTERNAL" : "DAW_SYNC";
-                DBG ("  - Clock loaded (mode: " + modeStr + ", BPM: " + juce::String (clock.getBpm()) + ")");
-            }
-
-            // Load MIDI Learn Mappings
-            if (auto* midiLearnXml = xmlCopy->getChildByName ("MidiLearnMappings")) {
-                midiLearnRegistry.fromXml (*midiLearnXml);
-                DBG ("  - MIDI Learn Mappings loaded");
-            }
-        }));
+    // Load MIDI Learn Mappings directly (we're already on the message thread)
+    if (auto* midiLearnXml = xml.getChildByName ("MidiLearnMappings")) {
+        midiLearnRegistry.fromXml (*midiLearnXml);
+        DBG ("  - MIDI Learn Mappings loaded");
+    }
 }
 
 //==============================================================================

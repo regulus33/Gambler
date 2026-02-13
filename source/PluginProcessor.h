@@ -4,7 +4,6 @@
 #include "backend/DawSync.h"
 #include "backend/MidiLearnRegistry.h"
 #include "backend/PresetManager.h"
-#include "backend/ProcessorCommand.h"
 #include "backend/SequenceState.h"
 #include "data/Params.h"
 #include <juce_audio_devices/juce_audio_devices.h>
@@ -61,11 +60,6 @@ public:
     // Callback for UI updates when sequence ticks (called from audio thread)
     // The callback should be thread-safe (e.g., trigger an AsyncUpdater)
     std::function<void()> onSequenceTick;
-
-    // Callback for notifying when command completion callbacks are pending
-    // Called from audio thread - should trigger an AsyncUpdater to execute
-    // completion callbacks on the message thread
-    std::function<void()> onCompletionCallbacksPending;
 
     // Callback for UI updates when MIDI learn mapping is created (called from audio thread)
     // The callback should be thread-safe (e.g., trigger an AsyncUpdater)
@@ -143,24 +137,6 @@ public:
     void loadStateFromXml(const juce::XmlElement& xml);
 
     /**
-     * Queue a command to be executed on the audio thread
-     * This is the thread-safe way to modify domain state from the UI thread.
-     * Returns false if the queue is full (command was dropped).
-     */
-    bool queueCommand(ProcessorCommand command) {
-        return commandQueue.push(std::move(command));
-    }
-
-    /**
-     * Execute any pending completion callbacks (called from message thread)
-     * This should be called from handleAsyncUpdate() after onCompletionCallbacksPending triggers.
-     * Returns the number of callbacks executed.
-     */
-    int executeCompletionCallbacks() {
-        return commandQueue.executeCompletionCallbacks();
-    }
-
-    /**
      * Open all available MIDI devices for clock output (standalone mode only)
      * This should be called when the user wants to send MIDI clock to all devices.
      */
@@ -236,9 +212,6 @@ private:
     };
     juce::AbstractFifo previewMidiFifo { 32 };  // Ring buffer for up to 32 messages
     std::array<PreviewMidiMessage, 32> previewMidiBuffer;
-
-    // Command queue for thread-safe UI → Audio communication
-    ProcessorCommandQueue commandQueue;
 
     // MIDI learn registry for user-configurable mappings
     MidiLearnRegistry midiLearnRegistry;

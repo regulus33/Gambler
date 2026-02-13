@@ -503,17 +503,11 @@ private:
 
         // Setup callback for step clicks - set current index and trigger MIDI
         sequencerSteps.onStepClicked = [this](int stepIndex) {
-            // Trigger MIDI for this step (also sets current index via queued command)
+            // Trigger MIDI for this step (also sets selected step and fires onSequenceTick)
             processorRef.triggerStepMidi(stepIndex);
 
-            // Queue a separate command with completion callback for UI update
-            // This ensures updateSubsequenceBar runs after the current index is set
-            processorRef.queueCommand(ProcessorCommand(
-                []() {}, // No-op command (index already set by triggerStepMidi)
-                [this]() {
-                    updateSubsequenceBar();
-                }
-            ));
+            // Update subsequence bar directly (triggerStepMidi already set the selected step)
+            updateSubsequenceBar();
             DBG("Step clicked: " + juce::String(stepIndex));
         };
 

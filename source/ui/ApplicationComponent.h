@@ -85,12 +85,6 @@ public:
             triggerAsyncUpdate();
         };
 
-        // Wire up the completion callbacks notification to trigger async UI updates
-        // This ensures UI updates happen after queued commands have executed
-        processorRef.onCompletionCallbacksPending = [this]() {
-            triggerAsyncUpdate();
-        };
-
         // Wire up MIDI learn callback to trigger UI updates when mapping is created
         processorRef.onMidiLearned = [this]() {
             triggerAsyncUpdate();
@@ -100,7 +94,6 @@ public:
     ~ApplicationComponent() override {
         // Clear the callbacks before destruction to avoid dangling reference
         processorRef.onSequenceTick = nullptr;
-        processorRef.onCompletionCallbacksPending = nullptr;
         processorRef.onMidiLearned = nullptr;
         cancelPendingUpdate();
     }
@@ -124,13 +117,6 @@ public:
 
 private:
     void handleAsyncUpdate() override {
-        // Execute any pending completion callbacks from queued commands
-        // These callbacks contain UI update logic that should run after domain state changes
-        int numCallbacks = processorRef.executeCompletionCallbacks();
-        if (numCallbacks > 0) {
-            DBG("Executed " << numCallbacks << " completion callbacks");
-        }
-
         // Apply any pending note writes from the audio thread (roll mode)
         processorRef.getState().applyPendingNoteWrites();
 
@@ -221,23 +207,20 @@ private:
             settingsScreen->setTempo(processorRef.getClock().getBpm());
 
             settingsScreen->onInternalClockChanged = [this](bool enabled) {
-                processorRef.queueCommand(ProcessorCommand([this, enabled]() {
-                    if (enabled) {
-                        processorRef.getClock().setMode(ClockMode::INTERNAL);
-                        processorRef.getClock().start();
-                    } else {
-                        processorRef.getClock().setMode(ClockMode::DAW_SYNC);
-                        processorRef.getClock().stop();
-                    }
+                // Set CLOCK_MODE via APVTS - parameterChanged handles applying to Clock
+                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::CLOCK_MODE)) {
+                    // 0=INTERNAL, 1=DAW_SYNC
+                    param->setValueNotifyingHost(param->convertTo0to1(enabled ? 0.0f : 1.0f));
                     DBG("Internal clock " + juce::String(enabled ? "enabled" : "disabled"));
-                }));
+                }
             };
 
             settingsScreen->onTempoChanged = [this](double bpm) {
-                processorRef.queueCommand(ProcessorCommand([this, bpm]() {
-                    processorRef.getClock().setBpm(bpm);
+                // Set CLOCK_BPM via APVTS - parameterChanged handles applying to Clock
+                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::CLOCK_BPM)) {
+                    param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(bpm)));
                     DBG("Tempo changed to: " + juce::String(bpm) + " BPM");
-                }));
+                }
             };
 
             // Sync note length setting from APVTS-backed state
@@ -291,17 +274,12 @@ private:
 
             // External MIDI Clock toggle callback
             settingsScreen->onExternalMidiClockChanged = [this](bool enabled) {
-                processorRef.queueCommand(ProcessorCommand([this, enabled]() {
-                    if (enabled) {
-                        processorRef.getClock().setMode(ClockMode::EXTERNAL_MIDI_CLOCK);
-                        DBG("External MIDI clock enabled");
-                    } else {
-                        // Revert to internal clock when unchecking external
-                        processorRef.getClock().setMode(ClockMode::INTERNAL);
-                        processorRef.getClock().start();
-                        DBG("External MIDI clock disabled, reverted to internal clock");
-                    }
-                }));
+                // Set CLOCK_MODE via APVTS - parameterChanged handles applying to Clock
+                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::CLOCK_MODE)) {
+                    // 2=EXTERNAL_MIDI_CLOCK, 0=INTERNAL
+                    param->setValueNotifyingHost(param->convertTo0to1(enabled ? 2.0f : 0.0f));
+                    DBG("External MIDI clock " + juce::String(enabled ? "enabled" : "disabled"));
+                }
             };
 
             // Sync MIDI output channel from APVTS
