@@ -1,47 +1,13 @@
 # TODO
 
------
+fix cc modulation panel
 
+Make standlone allow slave mode 
 
-# Step selection
-Currently when you select a step, the step is white
-but the active step (sequence index) is just a step
-with a white border, neither of these states are clear.
+test master clock standalone
 
-# Step selection Bug?
-Seems to be an occasional bug where note selection
-is not being properly set, something with quant?
+dropdown with multi channel support
 
-# CC modulation
-The cc modulation panel, we need buttons:
-1. enable all
-2. select one
-3. randomize selected
+Add a settings button to make the current preset the template default
 
-# navigation 
-clicking a step in overview should make that step the active step
-
-double clicking a step should make that step the current index
-
-remove the follow playback
-
-make current step white!
-
-active step should be red or white border
-
-make the steps and the piano keys color.lighten() on current step
-
-{} have an option where when pressing one or more keys (or toggling)
-other keys that would be in key light up, always factoring the whole selected group.
-
-saveable keyboard settings, stack them all up as rectangles atop the piano
-
-If you click another row in seqeuncer overview that isn't active row in follow step mode you get pushed back to active...
-
-# Standalone 
-
-We haven't tested standalone much in master clock mode and we also haven't 
-implemented slave mode for standalone.
-
------ 
-
+make 

@@ -1,0 +1,202 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "CMake: Configure",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["-B", "build", "-G", "Ninja"],
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "CMake: Configure (Release)",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["-B", "build", "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release"],
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Build: Standalone (Debug)",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--build", "build", "--target", "Gambler2_Standalone", "--config", "Debug", "-j", "8"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "group": "build"
+            }
+        },
+        {
+            "label": "Build: Standalone (Release)",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--build", "build", "--target", "Gambler2_Standalone", "--config", "Release", "-j", "8"],
+            "group": "build",
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "group": "build"
+            }
+        },
+        {
+            "label": "Build: VST3 (Debug)",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--build", "build", "--target", "Gambler2_VST3", "--config", "Debug", "-j", "8"],
+            "group": "build",
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "group": "build"
+            }
+        },
+        {
+            "label": "Build: VST3 (Release)",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--build", "build", "--target", "Gambler2_VST3", "--config", "Release", "-j", "8"],
+            "group": "build",
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "group": "build"
+            }
+        },
+        {
+            "label": "Build: AU (Debug)",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--build", "build", "--target", "Gambler2_AU", "--config", "Debug", "-j", "8"],
+            "group": "build",
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "group": "build"
+            }
+        },
+        {
+            "label": "Build: AU (Release)",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--build", "build", "--target", "Gambler2_AU", "--config", "Release", "-j", "8"],
+            "group": "build",
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "group": "build"
+            }
+        },
+        {
+            "label": "Build: All (Debug)",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--build", "build", "--config", "Debug", "-j", "8"],
+            "group": "build",
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "group": "build"
+            }
+        },
+        {
+            "label": "Build: All (Release)",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--build", "build", "--config", "Release", "-j", "8"],
+            "group": "build",
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "group": "build"
+            }
+        },
+        {
+            "label": "Clean: Build Directory",
+            "type": "shell",
+            "command": "rm",
+            "args": ["-rf", "build"],
+            "problemMatcher": []
+        },
+        {
+            "label": "Clean: Rebuild All (Debug)",
+            "type": "shell",
+            "command": "rm -rf build && cmake -B build -G Ninja && cmake --build build --config Debug -j 8",
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "Build & Run: Standalone (Debug)",
+            "type": "shell",
+            "command": "cmake --build build --target Gambler2_Standalone --config Debug -j 8 && open build/Gambler2_artefacts/Debug/Standalone/Gambler2.app",
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Build & Run: Standalone (Release)",
+            "type": "shell",
+            "command": "cmake --build build --target Gambler2_Standalone --config Release -j 8 && open build/Gambler2_artefacts/Release/Standalone/Gambler2.app",
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Build & Run: VST3 → Bitwig (Debug)",
+            "type": "shell",
+            "command": "cmake --build build --target Gambler2_VST3 --config Debug -j 8 && open -a 'Bitwig Studio'",
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Build & Run: VST3 → Bitwig (Release)",
+            "type": "shell",
+            "command": "cmake --build build --target Gambler2_VST3 --config Release -j 8 && open -a 'Bitwig Studio'",
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Build & Run: AU → Logic (Debug)",
+            "type": "shell",
+            "command": "cmake --build build --target Gambler2_AU --config Debug -j 8 && open -a 'Logic Pro'",
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Build & Run: AU → Logic (Release)",
+            "type": "shell",
+            "command": "cmake --build build --target Gambler2_AU --config Release -j 8 && open -a 'Logic Pro'",
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        }
+    ]
+}
+
