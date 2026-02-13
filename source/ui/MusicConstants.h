@@ -91,6 +91,7 @@ inline juce::Colour getNoteColor(int chromaticNote) {
  * Convert MIDI note number to note name (e.g., 60 -> "C4", 67 -> "G4")
  */
 inline juce::String midiNoteToNoteName(int midiNote) {
+    if (midiNote < 0 || midiNote > 127) return "-";
     int chromaticNote = midiNote % NUM_CHROMATIC_NOTES;
     int octave = (midiNote / 12) - 1; // MIDI note 60 = C4
     return CHROMATIC_NOTE_NAMES[chromaticNote] + juce::String(octave);
