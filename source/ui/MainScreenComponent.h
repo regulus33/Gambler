@@ -441,6 +441,9 @@ public:
     // Accessors for navbar
     NavBarComponent& getNavBar() { return navBar; }
 
+    // Accessor for note range controls (for MIDI learn repaint)
+    NoteRangeControlsComponent& getNoteRangeControls() { return noteRangeControls; }
+
     // Accessors for testing
     SequenceOverviewComponent& getSequenceOverview() { return sequenceOverview; }
 
@@ -541,6 +544,12 @@ private:
     void setupNoteRangeCallbacks() {
         // Add note range controls component (right of sequencer)
         addAndMakeVisible(noteRangeControls);
+
+        // Wire up MIDI learn registry for note range knobs
+        noteRangeControls.setRegistry(&processorRef.getMidiLearnRegistry());
+        noteRangeControls.setMidiLearnSelectedCallback([this]() {
+            if (onAsyncUpdateNeeded) onAsyncUpdateNeeded();
+        });
 
         // Initialize note range controls with current scale window parameters
         noteRangeControls.setWindow(

@@ -1,7 +1,9 @@
 #pragma once
 
 #include "BinaryData.h"
+#include "MidiLearnOverlayPainter.h"
 #include "StateListenerComponent.h"
+#include "../backend/MidiMapping.h"
 #include "../backend/Scale.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -198,6 +200,27 @@ public:
         // Setup range gauge
         addAndMakeVisible (rangeGauge);
 
+        // Setup MIDI learn overlays (hidden by default, shown during learn mode)
+        addAndMakeVisible(offsetOverlay_);
+        offsetOverlay_.setVisible(false);
+        offsetOverlay_.setInterceptsMouseClicks(true, false);
+        offsetOverlay_.onMouseDown = [this]() {
+            if (registry_ && registry_->isLearning()) {
+                registry_->setLearningControl(MidiControlId::NOTE_RANGE_MIN);
+                if (onMidiLearnSelected) onMidiLearnSelected();
+            }
+        };
+
+        addAndMakeVisible(widthOverlay_);
+        widthOverlay_.setVisible(false);
+        widthOverlay_.setInterceptsMouseClicks(true, false);
+        widthOverlay_.onMouseDown = [this]() {
+            if (registry_ && registry_->isLearning()) {
+                registry_->setLearningControl(MidiControlId::NOTE_RANGE_MAX);
+                if (onMidiLearnSelected) onMidiLearnSelected();
+            }
+        };
+
         // Subscribe to scale range parameters
         listenToScaleRange();
     }
@@ -222,6 +245,25 @@ public:
         rangeGauge.setActiveNote(noteNumber);
     }
 
+    /**
+     * Set the MIDI learn registry for the note range knobs
+     */
+    void setRegistry(MidiLearnRegistry* registry) {
+        registry_ = registry;
+    }
+
+    /**
+     * Set the callback for when a control is selected for MIDI learning
+     */
+    void setMidiLearnSelectedCallback(std::function<void()> callback) {
+        onMidiLearnSelected = std::move(callback);
+    }
+
+    /**
+     * Callback when this control is selected for MIDI learning
+     */
+    std::function<void()> onMidiLearnSelected;
+
     ~NoteRangeControlsComponent() override {
         windowWidthSlider.setLookAndFeel (nullptr);
         windowOffsetSlider.setLookAndFeel (nullptr);
@@ -232,11 +274,24 @@ public:
 
         auto bounds = getLocalBounds().toFloat();
 
+        // Show/hide MIDI learn overlays based on learn mode
+        bool isLearning = registry_ && registry_->isLearning();
+        offsetOverlay_.setVisible(isLearning);
+        widthOverlay_.setVisible(isLearning);
+
         // Draw white border inside the bounds
         g.setColour (juce::Colours::white);
         float inset = borderWidth * 0.5f;
         juce::Rectangle<float> borderBounds = bounds.reduced (inset);
         g.drawRoundedRectangle (borderBounds, borderRadius, borderWidth);
+
+        // Paint MIDI learn overlays on top of each slider
+        if (isLearning) {
+            MidiLearnOverlayPainter::paint(g, windowOffsetSlider.getBounds(),
+                                           registry_, MidiControlId::NOTE_RANGE_MIN, 0.0f);
+            MidiLearnOverlayPainter::paint(g, windowWidthSlider.getBounds(),
+                                           registry_, MidiControlId::NOTE_RANGE_MAX, 0.0f);
+        }
 
         // Draw rotated "Note Range" label in the left half, above the sliders
         // Calculate the available space: from top to just above windowOffsetSlider (top slider)
@@ -281,6 +336,10 @@ public:
         int offsetSliderX = sliderPadding + contentPaddingLeft;
         int offsetSliderY = widthSliderY - sliderVerticalSpacing - sliderDiameter;
         windowOffsetSlider.setBounds (offsetSliderX, offsetSliderY, sliderDiameter, sliderDiameter);
+
+        // Position MIDI learn overlays on top of their respective sliders
+        offsetOverlay_.setBounds (offsetSliderX, offsetSliderY, sliderDiameter, sliderDiameter);
+        widthOverlay_.setBounds (widthSliderX, widthSliderY, sliderDiameter, sliderDiameter);
 
         // Position range gauge in the right half with margins
         int halfWidth = getWidth() / 2;
@@ -356,11 +415,30 @@ private:
     }
 
 
+    // Transparent overlay component that sits on top of a slider in MIDI learn mode
+    class MidiLearnOverlay : public juce::Component {
+    public:
+        std::function<void()> onMouseDown;
+
+        void mouseDown(const juce::MouseEvent&) override {
+            if (onMouseDown) onMouseDown();
+        }
+
+        void paint(juce::Graphics&) override {
+            // Transparent - the parent paints the overlay visuals
+        }
+    };
+
     juce::Typeface::Ptr interBoldFont;
     NoteRangeSliderLookAndFeel sliderLookAndFeel;
     juce::Slider windowWidthSlider;   // Bottom slider: window width (1-128)
     juce::Slider windowOffsetSlider;  // Top slider: window offset (0-127)
     NoteRangeGauge rangeGauge;
+
+    // MIDI learn state
+    MidiLearnRegistry* registry_ = nullptr;
+    MidiLearnOverlay offsetOverlay_;
+    MidiLearnOverlay widthOverlay_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NoteRangeControlsComponent)
 };

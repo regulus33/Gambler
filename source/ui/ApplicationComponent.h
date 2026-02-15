@@ -138,6 +138,7 @@ private:
         mainScreen.getSequencerControls().repaint();
         mainScreen.getSequencerSteps().repaint();
         mainScreen.getPianoRoll().repaint();
+        mainScreen.getNoteRangeControls().repaint();
     }
 
     void updatePlayPauseButtonState() {
