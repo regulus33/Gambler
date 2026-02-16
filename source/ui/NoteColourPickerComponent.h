@@ -11,7 +11,7 @@ namespace NoteColourPickerConstants {
     constexpr int whiteKeyHeight = 60;
     constexpr int blackKeyWidth = 22;
     constexpr int blackKeyHeight = 36;
-    constexpr int keySpacing = 2;
+    constexpr int keySpacing = 1;  // Gap between white keys (adjust to taste)
     constexpr float cornerRadius = 3.0f;
     constexpr float borderWidth = 1.5f;
 }
