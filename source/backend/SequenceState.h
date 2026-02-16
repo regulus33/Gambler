@@ -524,6 +524,32 @@ public:
 
 
     // ========================================
+    // NOTE COLOURS
+    // ========================================
+
+    /**
+     * Get the colour for a chromatic note (0-11)
+     * Reads from APVTS parameter, allowing per-preset customization
+     */
+    juce::Colour getNoteColour(int chromaticNote) const {
+        int index = chromaticNote % 12;
+        if (index < 0) index += 12;
+        int argb = getIntParam(Params::Keys::ID::noteColour(index));
+        return juce::Colour(static_cast<juce::uint32>(argb));
+    }
+
+    /**
+     * Set the colour for a chromatic note (0-11)
+     * Writes to APVTS parameter so it's saved with presets
+     */
+    void setNoteColour(int chromaticNote, juce::Colour colour) {
+        int index = chromaticNote % 12;
+        if (index < 0) index += 12;
+        setIntParam(Params::Keys::ID::noteColour(index),
+                    static_cast<int>(colour.getARGB()));
+    }
+
+    // ========================================
     // SEQUENCER OPERATIONS
     // ========================================
 

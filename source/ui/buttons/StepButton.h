@@ -54,6 +54,10 @@ public:
         // Subscribe to sequence metadata
         listenToSequenceMetadata();
 
+        // Subscribe to note colour changes
+        for (int i = 0; i < 12; ++i)
+            listenToParameter(Params::Keys::ID::noteColour(i));
+
         // Enable mouse clicks
         setInterceptsMouseClicks(true, false);
     }
@@ -129,7 +133,7 @@ public:
                 fillColor = StepButtonConstants::restStepColor;
             } else {
                 int chromaticNote = midiNote % 12;
-                fillColor = MusicConstants::getNoteColor(chromaticNote);
+                fillColor = getState().getNoteColour(chromaticNote);
             }
 
             // Fill background

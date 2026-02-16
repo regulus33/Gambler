@@ -10,6 +10,7 @@
 #define GAMBLER_GAMBLERPARAMS_H
 
 #include "juce_audio_processors/juce_audio_processors.h"
+#include <climits>
 
 using namespace std;
 using namespace juce;
@@ -176,6 +177,13 @@ namespace Params
 
             // Clear Scale trigger
             inline const String CLEAR_SCALE = "clear_scale";
+
+            // ========================================
+            // NOTE COLOURS (12 customizable note colors)
+            // ========================================
+            inline String noteColour(int noteIndex) {
+                return "note_colour_" + String(noteIndex);
+            }
         }
 
         namespace LABEL
@@ -246,6 +254,12 @@ namespace Params
 
             // Clear Scale trigger
             inline const String CLEAR_SCALE = "Clear Scale";
+
+            // Note colours
+            inline String noteColour(int noteIndex) {
+                static const char* noteNames[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
+                return "Note Colour " + String(noteNames[noteIndex]);
+            }
 
             // Legacy UI labels - Primary row
             inline const String ROLL = "Roll";
@@ -458,6 +472,33 @@ namespace Params
         for (int i = 0; i < 7; ++i) {
             params.push_back(createIntParam(Keys::ID::ccNumber(i), Keys::LABEL::ccNumber(i), 0, 127, i + 1));
             params.push_back(createIntParam(Keys::ID::ccValue(i), Keys::LABEL::ccValue(i), 0, 127, 64));
+        }
+
+        // ========================================
+        // NOTE COLOURS (12 customizable note colors, stored as ARGB int)
+        // ========================================
+        {
+            const int defaultNoteColours[12] = {
+                static_cast<int>(0xFFFF6B6B), // C   - Red
+                static_cast<int>(0xFFFF9F6B), // Db  - Orange
+                static_cast<int>(0xFFFFD66B), // D   - Yellow
+                static_cast<int>(0xFFFFE66B), // Eb  - Light yellow
+                static_cast<int>(0xFFE6FF6B), // E   - Yellow-green
+                static_cast<int>(0xFF6BFFB4), // F   - Light green
+                static_cast<int>(0xFF6BFFD6), // Gb  - Cyan-green
+                static_cast<int>(0xFF6BD6FF), // G   - Cyan
+                static_cast<int>(0xFF6BB4FF), // Ab  - Light blue
+                static_cast<int>(0xFF9F6BFF), // A   - Purple
+                static_cast<int>(0xFFD66BFF), // Bb  - Magenta
+                static_cast<int>(0xFFFF6BD6)  // B   - Pink
+            };
+            for (int i = 0; i < 12; ++i) {
+                params.push_back(make_unique<AudioParameterInt>(
+                    Keys::ID::noteColour(i),
+                    Keys::LABEL::noteColour(i),
+                    INT_MIN, INT_MAX,
+                    defaultNoteColours[i]));
+            }
         }
 
         // Write Scale mode

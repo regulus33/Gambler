@@ -366,7 +366,7 @@ public:
                     noteColor = juce::Colour(SequenceGridConstants::defaultGreyHex);
                 } else {
                     int chromaticNote = midiNote % 12;
-                    noteColor = MusicConstants::NOTE_COLOURS[chromaticNote];
+                    noteColor = state.getNoteColour(chromaticNote);
                 }
 
                 bool isCurrentSubstep = (i == currentSubstepIndex);

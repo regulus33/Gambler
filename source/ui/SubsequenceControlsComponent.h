@@ -305,6 +305,10 @@ public:
         listenToParameter(Params::Keys::ID::SEQ_SELECTED_STEP);
         listenToStepNotes(0, ParamConstants::MAX_STEPS - 1);
         listenToStepNotesLength(0, ParamConstants::MAX_STEPS - 1);
+
+        // Subscribe to note colour changes
+        for (int i = 0; i < 12; ++i)
+            listenToParameter(Params::Keys::ID::noteColour(i));
     }
 
     void paint (juce::Graphics& g) override {
@@ -382,7 +386,7 @@ protected:
                 } else {
                     // Normal note - use chromatic color
                     int pitchClass = noteNumber % 12;
-                    juce::Colour noteColor = MusicConstants::NOTE_COLOURS[static_cast<size_t>(pitchClass)];
+                    juce::Colour noteColor = getState().getNoteColour(pitchClass);
                     subsequenceBar.setBarColor(i, noteColor);
                 }
             } else {

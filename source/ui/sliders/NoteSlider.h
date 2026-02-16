@@ -115,6 +115,26 @@ public:
     }
 
     /**
+     * Update the full set of 12 note colours (called when note colour params change)
+     * This updates the slider's internal colour array for the chromatic scale
+     */
+    void updateNoteColours(const juce::Array<juce::Colour>& allColours) {
+        if (allColours.size() == 12) {
+            allNoteColours_ = allColours;
+            // Rebuild current options using stored scale indices
+            juce::Array<juce::Colour> filteredColours;
+            for (int idx : scaleNoteIndices_) {
+                filteredColours.add(allNoteColours_[idx]);
+            }
+            juce::Array<juce::String> filteredNames;
+            for (int idx : scaleNoteIndices_) {
+                filteredNames.add(MusicConstants::CHROMATIC_NOTE_NAMES[static_cast<size_t>(idx)]);
+            }
+            slider_.updateOptions(filteredNames, filteredColours);
+        }
+    }
+
+    /**
      * Update the note slider to only show notes from the selected scale
      * @param noteNames Array of note names to display (e.g., {"C", "D", "E"})
      * @param noteColours Array of colours for each note (must match noteNames size)
@@ -214,6 +234,9 @@ private:
     // Mapping from note slider index to chromatic pitch class (0-11)
     // This allows the slider to show only scale notes while maintaining correct pitch mapping
     juce::Array<int> scaleNoteIndices_;
+
+    // Full set of 12 note colours (updated dynamically from APVTS)
+    juce::Array<juce::Colour> allNoteColours_;
 
     MidiControlId midiControlId_ = MidiControlId::COUNT;
     MidiLearnRegistry* registry_ = nullptr;

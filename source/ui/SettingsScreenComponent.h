@@ -2,6 +2,7 @@
 
 #include "BinaryData.h"
 #include "NavBarComponent.h"
+#include "NoteColourPickerComponent.h"
 #include "SettingsGroup.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_audio_devices/juce_audio_devices.h>
@@ -210,13 +211,11 @@ public:
         midiGroup->addLabeledControl(midiOutputChannelLabel, midiOutputChannelComboBox);
         addAndMakeVisible(*midiGroup);
 
-        // TODO: Replace placeholder text with actual Group 4 settings/controls
-        group4 = std::make_unique<SettingsGroup>("Group 4");
-        group4PlaceholderLabel.setText("Group 4 settings coming soon...", juce::dontSendNotification);
-        group4PlaceholderLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.5f));
-        group4PlaceholderLabel.setJustificationType(juce::Justification::centred);
-        group4->addControl(group4PlaceholderLabel);
-        addAndMakeVisible(*group4);
+        // Note Colours group - mini piano keyboard colour picker
+        noteColourPicker = std::make_unique<NoteColourPickerComponent>(processor);
+        noteColoursGroup = std::make_unique<SettingsGroup>("Note Colours");
+        noteColoursGroup->addCustomControl(*noteColourPicker, 62);
+        addAndMakeVisible(*noteColoursGroup);
 
         // TODO: Replace placeholder text with actual Group 5 settings/controls
         group5 = std::make_unique<SettingsGroup>("Group 5");
@@ -260,7 +259,7 @@ public:
         int clockTimingHeight = clockTimingGroup->getMinimumHeight();
         int playbackHeight = playbackGroup->getMinimumHeight();
         int midiHeight = midiGroup->getMinimumHeight();
-        int group4Height = group4->getMinimumHeight();
+        int group4Height = noteColoursGroup->getMinimumHeight();
         int group5Height = group5->getMinimumHeight();
         int group6Height = group6->getMinimumHeight();
 
@@ -290,7 +289,7 @@ public:
         grid.items.add(juce::GridItem(*midiGroup).withArea(1, 3));
 
         // Row 2
-        grid.items.add(juce::GridItem(*group4).withArea(2, 1));
+        grid.items.add(juce::GridItem(*noteColoursGroup).withArea(2, 1));
         grid.items.add(juce::GridItem(*group5).withArea(2, 2));
         grid.items.add(juce::GridItem(*group6).withArea(2, 3));
 
@@ -372,7 +371,7 @@ private:
     std::unique_ptr<SettingsGroup> clockTimingGroup;
     std::unique_ptr<SettingsGroup> playbackGroup;
     std::unique_ptr<SettingsGroup> midiGroup;
-    std::unique_ptr<SettingsGroup> group4;
+    std::unique_ptr<SettingsGroup> noteColoursGroup;
     std::unique_ptr<SettingsGroup> group5;
     std::unique_ptr<SettingsGroup> group6;
 
@@ -393,8 +392,10 @@ private:
     juce::Label midiOutputChannelLabel;
     juce::ComboBox midiOutputChannelComboBox;
 
+    // Note colour picker
+    std::unique_ptr<NoteColourPickerComponent> noteColourPicker;
+
     // Placeholder labels (TODO: replace with actual controls)
-    juce::Label group4PlaceholderLabel;
     juce::Label group5PlaceholderLabel;
     juce::Label group6PlaceholderLabel;
 };

@@ -104,6 +104,10 @@ public:
         listenToScaleRange();  // Scale range min/max
         listenToParameter(Params::Keys::ID::SEQ_SELECTED_STEP);  // Selected step changes
 
+        // Subscribe to note colour changes
+        for (int i = 0; i < 12; ++i)
+            listenToParameter(Params::Keys::ID::noteColour(i));
+
         setSize (componentWidth, componentHeight);
     }
 
@@ -362,10 +366,11 @@ protected:
 
         Scale scale = state.getStepScale(selectedStep);
 
-        // Update key toggle states
+        // Update key toggle states and colors
         auto scaleNotes = scale.getScaleNotes();
         for (int i = 0; i < 12; i++) {
             keys[i]->isToggled = (scaleNotes[i] != 0);
+            keys[i]->color = state.getNoteColour(i);
         }
 
         repaint();

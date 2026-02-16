@@ -239,6 +239,7 @@ public:
      */
     void updateFromState (SequenceState& state, int playbackStep = -1) {
         using namespace SequenceGridConstants;
+        stateRef = &state;
 
         int sequenceLength = state.getLength();
         int selectedStep = state.getSelectedStepForEditing();
@@ -441,25 +442,24 @@ private:
 
     /**
      * Get the color for a chromatic note (0-11)
-     * Same color mapping as SequencerStepsComponent
+     * Reads from SequenceState if available, otherwise uses hardcoded defaults
      */
     juce::Colour getNoteColor (int chromaticNote) const {
+        if (stateRef != nullptr) {
+            return stateRef->getNoteColour(chromaticNote);
+        }
+        // Fallback to hardcoded defaults (shouldn't normally be reached)
         const juce::Colour noteColors[12] = {
-            juce::Colour (0xFFFF6B6B), // C - Red
-            juce::Colour (0xFFFF9F6B), // Db - Orange
-            juce::Colour (0xFFFFD66B), // D - Yellow
-            juce::Colour (0xFFFFE66B), // Eb - Light yellow
-            juce::Colour (0xFFE6FF6B), // E - Yellow-green
-            juce::Colour (0xFF6BFFB4), // F - Light green
-            juce::Colour (0xFF6BFFD6), // Gb - Cyan-green
-            juce::Colour (0xFF6BD6FF), // G - Cyan
-            juce::Colour (0xFF6BB4FF), // Ab - Light blue
-            juce::Colour (0xFF9F6BFF), // A - Purple
-            juce::Colour (0xFFD66BFF), // Bb - Magenta
-            juce::Colour (0xFFFF6BD6)  // B - Pink
+            juce::Colour (0xFFFF6B6B), juce::Colour (0xFFFF9F6B),
+            juce::Colour (0xFFFFD66B), juce::Colour (0xFFFFE66B),
+            juce::Colour (0xFFE6FF6B), juce::Colour (0xFF6BFFB4),
+            juce::Colour (0xFF6BFFD6), juce::Colour (0xFF6BD6FF),
+            juce::Colour (0xFF6BB4FF), juce::Colour (0xFF9F6BFF),
+            juce::Colour (0xFFD66BFF), juce::Colour (0xFFFF6BD6)
         };
-
         return noteColors[chromaticNote % 12];
     }
+
+    SequenceState* stateRef = nullptr;
 };
 
