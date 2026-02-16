@@ -2,7 +2,7 @@
 
 #include "sliders/OctaveSlider.h"
 #include "sliders/NoteSlider.h"
-#include "MusicConstants.h"
+#include "BinaryData.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace NoteControlsConstants {
@@ -19,7 +19,11 @@ namespace NoteControlsConstants {
  */
 class NoteControlsComponent : public juce::Component {
 public:
-    NoteControlsComponent() {
+    NoteControlsComponent()
+        : interBoldFont_(juce::Typeface::createSystemTypefaceFor(
+              BinaryData::Inter_24ptBold_ttf,
+              BinaryData::Inter_24ptBold_ttfSize))
+    {
         addAndMakeVisible(octaveSlider_);
         addAndMakeVisible(noteSlider_);
 
@@ -113,6 +117,13 @@ public:
         noteSlider_.onMidiLearnSelected = callback;
     }
 
+    void setRestOverlay(bool isRest) {
+        if (showRestOverlay_ != isRest) {
+            showRestOverlay_ = isRest;
+            repaint();
+        }
+    }
+
     void paint (juce::Graphics& g) override {
         using namespace NoteControlsConstants;
         g.fillAll (juce::Colours::transparentBlack);
@@ -120,6 +131,15 @@ public:
         auto r = getLocalBounds().toFloat();
         g.setColour (juce::Colours::white);
         g.drawRoundedRectangle (r.reduced (0.5f), cornerRadius, borderStrokeWidth);
+
+        if (showRestOverlay_) {
+            g.setColour(juce::Colour(0xCC1a1a1a));
+            g.fillRoundedRectangle(r, cornerRadius);
+
+            g.setColour(juce::Colours::white);
+            g.setFont(juce::Font(juce::FontOptions(interBoldFont_).withHeight(20.0f)));
+            g.drawText("REST", getLocalBounds(), juce::Justification::centred);
+        }
     }
 
     void resized() override {
@@ -141,5 +161,7 @@ public:
 private:
     OctaveSlider octaveSlider_;
     NoteSlider noteSlider_;
+    juce::Typeface::Ptr interBoldFont_;
+    bool showRestOverlay_ = false;
 };
 

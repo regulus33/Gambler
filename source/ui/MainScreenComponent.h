@@ -417,6 +417,7 @@ public:
 
         // Update the note/octave controls to reflect the selected step's note
         mainControls.getNoteControls().setFromMidiNote(selectedNote);
+        mainControls.getNoteControls().setRestOverlay(selectedNote < 0);
 
         // Update the sequence overview grid to show all 64 steps
         // - White fill indicates current step (playback position)
@@ -471,6 +472,7 @@ private:
                 int chromaticNote = midiNote % 12;
                 pianoRoll.setActiveNote(chromaticNote);
                 mainControls.getNoteControls().setFromMidiNote(midiNote);
+                mainControls.getNoteControls().setRestOverlay(midiNote < 0);
             }
         };
         subsequenceControls.onMinusClicked = [this]() {
