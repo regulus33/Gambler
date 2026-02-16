@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BinaryData.h"
+#include "GlobalScaleQuantizerComponent.h"
 #include "NavBarComponent.h"
 #include "NoteColourPickerComponent.h"
 #include "SettingsGroup.h"
@@ -217,13 +218,11 @@ public:
         noteColoursGroup->addCustomControl(*noteColourPicker, 62);
         addAndMakeVisible(*noteColoursGroup);
 
-        // TODO: Replace placeholder text with actual Group 5 settings/controls
-        group5 = std::make_unique<SettingsGroup>("Group 5");
-        group5PlaceholderLabel.setText("Group 5 settings coming soon...", juce::dontSendNotification);
-        group5PlaceholderLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.5f));
-        group5PlaceholderLabel.setJustificationType(juce::Justification::centred);
-        group5->addControl(group5PlaceholderLabel);
-        addAndMakeVisible(*group5);
+        // Scale Quantizer group - global scale setting for all steps
+        globalScaleQuantizer_ = std::make_unique<GlobalScaleQuantizerComponent>(processor);
+        scaleQuantizerGroup = std::make_unique<SettingsGroup>("Scale Quantizer");
+        scaleQuantizerGroup->addCustomControl(*globalScaleQuantizer_, 100);
+        addAndMakeVisible(*scaleQuantizerGroup);
 
         // TODO: Replace placeholder text with actual Group 6 settings/controls
         group6 = std::make_unique<SettingsGroup>("Group 6");
@@ -260,7 +259,7 @@ public:
         int playbackHeight = playbackGroup->getMinimumHeight();
         int midiHeight = midiGroup->getMinimumHeight();
         int group4Height = noteColoursGroup->getMinimumHeight();
-        int group5Height = group5->getMinimumHeight();
+        int group5Height = scaleQuantizerGroup->getMinimumHeight();
         int group6Height = group6->getMinimumHeight();
 
         // 3x2 Grid layout using Grid
@@ -290,7 +289,7 @@ public:
 
         // Row 2
         grid.items.add(juce::GridItem(*noteColoursGroup).withArea(2, 1));
-        grid.items.add(juce::GridItem(*group5).withArea(2, 2));
+        grid.items.add(juce::GridItem(*scaleQuantizerGroup).withArea(2, 2));
         grid.items.add(juce::GridItem(*group6).withArea(2, 3));
 
         // Perform layout
@@ -372,7 +371,7 @@ private:
     std::unique_ptr<SettingsGroup> playbackGroup;
     std::unique_ptr<SettingsGroup> midiGroup;
     std::unique_ptr<SettingsGroup> noteColoursGroup;
-    std::unique_ptr<SettingsGroup> group5;
+    std::unique_ptr<SettingsGroup> scaleQuantizerGroup;
     std::unique_ptr<SettingsGroup> group6;
 
     // Clock & Timing controls
@@ -395,8 +394,10 @@ private:
     // Note colour picker
     std::unique_ptr<NoteColourPickerComponent> noteColourPicker;
 
+    // Global scale quantizer
+    std::unique_ptr<GlobalScaleQuantizerComponent> globalScaleQuantizer_;
+
     // Placeholder labels (TODO: replace with actual controls)
-    juce::Label group5PlaceholderLabel;
     juce::Label group6PlaceholderLabel;
 };
 
