@@ -120,6 +120,8 @@ public:
     void setRestOverlay(bool isRest) {
         if (showRestOverlay_ != isRest) {
             showRestOverlay_ = isRest;
+            octaveSlider_.setVisible(!isRest);
+            noteSlider_.setVisible(!isRest);
             repaint();
         }
     }
@@ -133,9 +135,6 @@ public:
         g.drawRoundedRectangle (r.reduced (0.5f), cornerRadius, borderStrokeWidth);
 
         if (showRestOverlay_) {
-            g.setColour(juce::Colour(0xCC1a1a1a));
-            g.fillRoundedRectangle(r, cornerRadius);
-
             g.setColour(juce::Colours::white);
             g.setFont(juce::Font(juce::FontOptions(interBoldFont_).withHeight(20.0f)));
             g.drawText("REST", getLocalBounds(), juce::Justification::centred);
