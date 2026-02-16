@@ -159,18 +159,20 @@ public:
         using namespace GlobalScaleQuantizerConstants;
 
         auto area = getLocalBounds();
-        auto topRow = area.removeFromTop(dropdownHeight);
+
+        // Dropdowns at the bottom
+        auto bottomRow = area.removeFromBottom(dropdownHeight);
 
         int scaleLabelWidth = 40;
         int keyLabelWidth = 30;
-        int remainingWidth = topRow.getWidth() - scaleLabelWidth - keyLabelWidth - dropdownSpacing;
+        int remainingWidth = bottomRow.getWidth() - scaleLabelWidth - keyLabelWidth - dropdownSpacing;
         int dropdownWidth = remainingWidth / 2;
 
-        scaleLabel_.setBounds(topRow.removeFromLeft(scaleLabelWidth));
-        scaleTypeDropdown_.setBounds(topRow.removeFromLeft(dropdownWidth));
-        topRow.removeFromLeft(dropdownSpacing);
-        keyLabel_.setBounds(topRow.removeFromLeft(keyLabelWidth));
-        keyDropdown_.setBounds(topRow);
+        scaleLabel_.setBounds(bottomRow.removeFromLeft(scaleLabelWidth));
+        scaleTypeDropdown_.setBounds(bottomRow.removeFromLeft(dropdownWidth));
+        bottomRow.removeFromLeft(dropdownSpacing);
+        keyLabel_.setBounds(bottomRow.removeFromLeft(keyLabelWidth));
+        keyDropdown_.setBounds(bottomRow);
     }
 
 private:
@@ -260,7 +262,7 @@ private:
     juce::Rectangle<float> getKeyboardArea() const {
         using namespace GlobalScaleQuantizerConstants;
         auto area = getLocalBounds();
-        area.removeFromTop(dropdownHeight + keyboardTopMargin);
+        area.removeFromBottom(dropdownHeight + keyboardTopMargin);
         return area.toFloat();
     }
 
