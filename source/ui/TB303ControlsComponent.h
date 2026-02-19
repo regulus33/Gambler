@@ -11,14 +11,15 @@
  * TB303ControlsComponent
  *
  * Replaces the PianoRoll + MainControls area when the view is in "303 Synth mode".
- * Displays per-step 303 parameters (7 knobs) and global 303 parameters (5 knobs).
- *
- * Layout (622 × 241 px, two rows):
- *   Row 0 (~50px): "303" title label + 5 global knobs (Tune, Vol, Drive, DistMix, Reverb)
- *   Row 1 (~191px): 7 per-step knobs (Cutoff, Res, EnvMod, Decay, Accent, Wave, Slew)
+ * Two tabs:
+ *   STEP tab: 7 per-step knobs (Cutoff, Res, EnvMod, Decay, Accent, Wave, Slew)
+ *   GLOBAL tab: 5 global knobs (Tune, Vol, Drive, DistMix, Reverb)
  *
  * Per-step params are stored in stepModValue[0..6] via SequenceState.
  * Global params write directly to APVTS float parameters.
+ *
+ * Roll behaviour: when the Roll button is held, each step tick randomises that
+ * step's per-step 303 params (handled in PluginProcessor::processBlock).
  */
 class TB303ControlsComponent : public StateListenerComponent {
 public:
@@ -30,24 +31,29 @@ public:
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
 
-        // Title label
-        titleLabel.setText("303 SYNTH", juce::dontSendNotification);
-        titleLabel.setFont(juce::FontOptions(interFont).withHeight(13.f).withStyle("Bold"));
-        titleLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.9f));
-        titleLabel.setJustificationType(juce::Justification::centredLeft);
-        addAndMakeVisible(titleLabel);
+        // ---- Tab buttons ----
+        tabStepBtn.setButtonText("STEP");
+        tabGlobalBtn.setButtonText("GLOBAL");
 
-        // ---- Per-step knobs (row 1) ----
+        for (auto* btn : { &tabStepBtn, &tabGlobalBtn }) {
+            btn->setClickingTogglesState(false);
+            btn->setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.55f));
+            addAndMakeVisible(*btn);
+        }
+
+        tabStepBtn  .onClick = [this]() { showTab(0); };
+        tabGlobalBtn.onClick = [this]() { showTab(1); };
+
+        // ---- Per-step knobs (7 slots: cutoff, res, envmod, decay, accent, wave, slew) ----
         static const char* perStepLabels[] = { "CUTOFF", "RESON", "ENVMOD", "DECAY", "ACCENT", "WAVE", "SLEW" };
-        // Slot colours matching MidiDataPerStepSelectionComponent
         static const juce::uint32 slotColours[] = {
-            0xFFFF6B6B,  // C-Red
-            0xFFFF9F6B,  // Db-Orange
-            0xFFFFD66B,  // D-Yellow
-            0xFFFFE66B,  // Eb-Light yellow
-            0xFFE6FF6B,  // E-Yellow-green
-            0xFF6BFFB4,  // F-Light green
-            0xFF6BFFD6   // Gb-Cyan-green
+            0xFFFF6B6B,  // red
+            0xFFFF9F6B,  // orange
+            0xFFFFD66B,  // yellow
+            0xFFFFE66B,  // light yellow
+            0xFFE6FF6B,  // yellow-green
+            0xFF6BFFB4,  // light green
+            0xFF6BFFD6   // cyan-green
         };
 
         for (int i = 0; i < 7; ++i) {
@@ -81,14 +87,14 @@ public:
             };
         }
 
-        // ---- Global knobs (row 0) ----
-        static const char* globalLabels[]    = { "TUNE", "VOL", "DRIVE", "DISTMIX", "REVERB" };
-        static const char* globalParamIds[]  = {
+        // ---- Global knobs (5: tune, vol, drive, distmix, reverb) ----
+        static const char* globalLabels[]   = { "TUNE", "VOL", "DRIVE", "DISTMIX", "REVERB" };
+        static const char* globalParamIds[] = {
             "synth_tuning", "synth_volume", "synth_dist_drive", "synth_dist_mix", "synth_reverb_wet"
         };
-        static const double globalMins[]  = { -12.0, 0.0, 0.0, 0.0, 0.0 };
-        static const double globalMaxs[]  = {  12.0, 1.0, 1.0, 1.0, 1.0 };
-        static const double globalDefs[]  = {   0.0, 0.75, 0.0, 0.0, 0.0 };
+        static const double globalMins[] = { -12.0, 0.0, 0.0, 0.0, 0.0 };
+        static const double globalMaxs[] = {  12.0, 1.0, 1.0, 1.0, 1.0 };
+        static const double globalDefs[] = {   0.0, 0.75, 0.0, 0.0, 0.0 };
 
         for (int i = 0; i < 5; ++i) {
             auto& knob = globalKnobs[i];
@@ -102,91 +108,92 @@ public:
             knob.setColour(juce::Slider::textBoxTextColourId, juce::Colours::white.withAlpha(0.8f));
             knob.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colours::transparentBlack);
             knob.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
-            addAndMakeVisible(knob);
+            // Start hidden — shown when switching to GLOBAL tab
+            addChildComponent(knob);
 
             auto& lbl = globalLabels_[i];
             lbl.setText(globalLabels[i], juce::dontSendNotification);
             lbl.setFont(juce::FontOptions(interFont).withHeight(9.f));
             lbl.setColour(juce::Label::textColourId, juce::Colour(0xFF6BD6FF).withAlpha(0.85f));
             lbl.setJustificationType(juce::Justification::centred);
-            addAndMakeVisible(lbl);
+            addChildComponent(lbl);
 
-            // Attach global knob to APVTS param
             globalAttachments[i] = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
                 getProcessor().getAPVTS(), globalParamIds[i], knob);
         }
 
-        // ---- Randomize button ----
-        randomizeBtn.setButtonText("RND");
-        randomizeBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF484848));
-        randomizeBtn.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.8f));
-        randomizeBtn.onClick = [this]() { randomizePerStepParams(); };
-        addAndMakeVisible(randomizeBtn);
-
-        // Subscribe to step mod values (all steps) + selected step changes
+        // Subscribe to step mod values (all steps) + selected step changes + global params
         listenToModulations(0, 63);
         listenToParameter(Params::Keys::ID::SEQ_SELECTED_STEP);
-        // Global params
         listenToParameter(Params::Keys::ID::SYNTH_TUNING);
         listenToParameter(Params::Keys::ID::SYNTH_VOLUME);
         listenToParameter(Params::Keys::ID::SYNTH_DIST_DRIVE);
         listenToParameter(Params::Keys::ID::SYNTH_DIST_MIX);
         listenToParameter(Params::Keys::ID::SYNTH_REVERB_WET);
+
+        // Initialise tab colours (start on STEP tab)
+        updateTabColours();
     }
 
     void paint(juce::Graphics& g) override {
         g.fillAll(juce::Colour(0xFF1E1E1E));
 
-        // Subtle separator between global row and per-step row
-        int separatorY = globalRowHeight;
+        // Tab strip background
+        g.setColour(juce::Colour(0xFF252525));
+        g.fillRect(0, 0, getWidth(), tabStripH);
+
+        // Active tab underline
+        g.setColour(juce::Colour(0xFF6BD6FF));
+        auto& activeBtn = (activeTab == 0) ? tabStepBtn : tabGlobalBtn;
+        auto ab = activeBtn.getBounds();
+        g.fillRect(ab.getX(), ab.getBottom() - 2, ab.getWidth(), 2);
+
+        // Separator between strip and content
         g.setColour(juce::Colours::white.withAlpha(0.07f));
-        g.drawHorizontalLine(separatorY, 0.f, (float)getWidth());
+        g.drawHorizontalLine(tabStripH, 0.f, (float)getWidth());
     }
 
     void resized() override {
         auto bounds = getLocalBounds();
-        const int w = bounds.getWidth();
+        if (bounds.isEmpty()) return;
 
-        // ---- Row 0: global controls ----
-        auto globalRow = bounds.removeFromTop(globalRowHeight);
-        globalRow.reduce(8, 4);
+        // Tab strip
+        auto tabStrip = bounds.removeFromTop(tabStripH);
+        int tabY = tabStrip.getY() + (tabStrip.getHeight() - tabBtnH) / 2;
+        tabStepBtn  .setBounds(8,                  tabY, tabBtnW, tabBtnH);
+        tabGlobalBtn.setBounds(8 + tabBtnW + 4,    tabY, tabBtnW, tabBtnH);
 
-        // Title label on the left
-        titleLabel.setBounds(globalRow.removeFromLeft(60));
+        // Content area
+        auto content = bounds.reduced(4, 4);
 
-        // 5 global knobs + labels — distribute remaining space
-        const int numGlobal = 5;
-        const int knobAreaW = globalRow.getWidth() / numGlobal;
-        const int knobSize  = juce::jmin(knobAreaW - 4, globalRowHeight - 20);
-        const int labelH    = 12;
-
-        for (int i = 0; i < numGlobal; ++i) {
-            auto cell = globalRow.removeFromLeft(knobAreaW);
-            int knobX = cell.getX() + (cell.getWidth() - knobSize) / 2;
-            int knobY = cell.getY();
-            globalKnobs[i].setBounds(knobX, knobY, knobSize, knobSize);
-            globalLabels_[i].setBounds(knobX, knobY + knobSize - 2, knobSize, labelH);
-        }
-
-        // Randomize button (top-right, small)
-        randomizeBtn.setBounds(w - 48, 4, 44, 22);
-
-        // ---- Row 1: per-step knobs ----
-        auto stepRow = bounds; // remainder
-        stepRow.reduce(4, 4);
-
-        const int numStep = 7;
-        const int cellW   = stepRow.getWidth() / numStep;
-        const int knobH   = stepRow.getHeight() - 14;  // leave room for label
-        const int kSize   = juce::jmin(cellW - 6, knobH);
-        const int lH      = 12;
-
-        for (int i = 0; i < numStep; ++i) {
-            auto cell = stepRow.removeFromLeft(cellW);
-            int kx = cell.getX() + (cell.getWidth() - kSize) / 2;
-            int ky = cell.getY() + (cell.getHeight() - kSize - lH) / 2;
-            perStepKnobs[i].setBounds(kx, ky, kSize, kSize);
-            perStepLabels_[i].setBounds(kx - 4, ky + kSize, kSize + 8, lH);
+        if (activeTab == 0) {
+            // Seven per-step knobs spread across full width
+            const int n       = 7;
+            const int cellW   = content.getWidth() / n;
+            const int labelH  = 12;
+            const int kSize   = juce::jmin(cellW - 6, content.getHeight() - labelH - 4);
+            auto row = content;
+            for (int i = 0; i < n; ++i) {
+                auto cell = row.removeFromLeft(cellW);
+                int kx = cell.getX() + (cell.getWidth() - kSize) / 2;
+                int ky = cell.getY() + (cell.getHeight() - kSize - labelH) / 2;
+                perStepKnobs[i] .setBounds(kx,     ky,          kSize,       kSize);
+                perStepLabels_[i].setBounds(kx - 4, ky + kSize,  kSize + 8,   labelH);
+            }
+        } else {
+            // Five global knobs spread across full width
+            const int n       = 5;
+            const int cellW   = content.getWidth() / n;
+            const int labelH  = 12;
+            const int kSize   = juce::jmin(cellW - 6, content.getHeight() - labelH - 4);
+            auto row = content;
+            for (int i = 0; i < n; ++i) {
+                auto cell = row.removeFromLeft(cellW);
+                int kx = cell.getX() + (cell.getWidth() - kSize) / 2;
+                int ky = cell.getY() + (cell.getHeight() - kSize - labelH) / 2;
+                globalKnobs[i]  .setBounds(kx,     ky,          kSize,       kSize);
+                globalLabels_[i].setBounds(kx - 4, ky + kSize,  kSize + 8,   labelH);
+            }
         }
     }
 
@@ -196,6 +203,28 @@ protected:
     }
 
 private:
+    // Switch the visible tab
+    void showTab(int tabIndex) {
+        activeTab = tabIndex;
+        const bool showStep = (tabIndex == 0);
+
+        for (auto& k : perStepKnobs)  k.setVisible(showStep);
+        for (auto& l : perStepLabels_) l.setVisible(showStep);
+        for (auto& k : globalKnobs)   k.setVisible(!showStep);
+        for (auto& l : globalLabels_) l.setVisible(!showStep);
+
+        updateTabColours();
+        resized();
+        repaint();
+    }
+
+    void updateTabColours() {
+        tabStepBtn.setColour(juce::TextButton::buttonColourId,
+            activeTab == 0 ? juce::Colour(0xFF383838) : juce::Colour(0xFF252525));
+        tabGlobalBtn.setColour(juce::TextButton::buttonColourId,
+            activeTab == 1 ? juce::Colour(0xFF383838) : juce::Colour(0xFF252525));
+    }
+
     void updateFromSequence() {
         auto& state = getState();
         int selectedStep = state.getSelectedStepForEditing();
@@ -209,40 +238,22 @@ private:
         perStepKnobs[4].setValue(state.getStep303Accent    (selectedStep), juce::dontSendNotification);
         perStepKnobs[5].setValue(state.getStep303Waveform  (selectedStep), juce::dontSendNotification);
         perStepKnobs[6].setValue(state.getStep303Slew      (selectedStep), juce::dontSendNotification);
-        // Global knobs are handled by APVTS attachment automatically
+        // Global knobs are kept in sync by APVTS attachment automatically
     }
 
-    void randomizePerStepParams() {
-        // Musical sweet-spot ranges per param
-        static const int mins[] = { 25,  0, 15, 15,  0,   0,  0 };
-        static const int maxs[] = { 90, 80,100, 85, 55, 127, 35 };
+    // Layout constants
+    static constexpr int tabStripH = 28;
+    static constexpr int tabBtnW   = 60;
+    static constexpr int tabBtnH   = 20;
 
-        thread_local std::mt19937 rng(std::random_device{}());
-
-        auto& state = getState();
-        int selectedStep = state.getSelectedStepForEditing();
-        if (selectedStep < 0) return;
-
-        for (int i = 0; i < 7; ++i) {
-            // Waveform (slot 5): snap to 0 or 127
-            int val;
-            if (i == 5) {
-                val = (std::uniform_int_distribution<int>(0, 1)(rng) == 0) ? 0 : 127;
-            } else {
-                val = std::uniform_int_distribution<int>(mins[i], maxs[i])(rng);
-            }
-            state.setStepModValue(selectedStep, i, val);
-        }
-    }
-
-    // Layout constant
-    static constexpr int globalRowHeight = 52;
+    int activeTab = 0;
 
     juce::Typeface::Ptr interFont;
 
-    juce::Label titleLabel;
+    juce::TextButton tabStepBtn;
+    juce::TextButton tabGlobalBtn;
 
-    // Per-step knobs (7 slots = cutoff, res, envmod, decay, accent, wave, slew)
+    // Per-step knobs (7 slots: cutoff, res, envmod, decay, accent, wave, slew)
     std::array<juce::Slider, 7> perStepKnobs;
     std::array<juce::Label,  7> perStepLabels_;
 
@@ -250,8 +261,6 @@ private:
     std::array<juce::Slider, 5> globalKnobs;
     std::array<juce::Label,  5> globalLabels_;
     std::array<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>, 5> globalAttachments;
-
-    juce::TextButton randomizeBtn;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TB303ControlsComponent)
 };

@@ -398,6 +398,31 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
 
         DBG ("Clock tick! Step: " << currentStepIndex << ", Note: " << note);
 
+        // Roll mode: randomise this step's 303 per-step params + global reverb
+        if (state.getIsRandom()) {
+            static std::random_device rd303;
+            static std::mt19937 rng303 (rd303());
+            static const int mins303[] = { 25,  0, 15, 15,  0,   0,  0 };
+            static const int maxs303[] = { 90, 80,100, 85, 55, 127, 35 };
+
+            for (int i = 0; i < 7; ++i) {
+                int val;
+                if (i == 5) { // waveform: snap to 0 or 127
+                    val = (std::uniform_int_distribution<int>(0, 1)(rng303) == 0) ? 0 : 127;
+                } else {
+                    val = std::uniform_int_distribution<int>(mins303[i], maxs303[i])(rng303);
+                }
+                state.setStepModValue (currentStepIndex, i, val);
+            }
+
+            // Also randomise global reverb wet (0.0 – 0.5 sweet spot)
+            float revWet = std::uniform_real_distribution<float>(0.0f, 0.5f)(rng303);
+            if (auto* rawRev = apvts.getRawParameterValue (Params::Keys::ID::SYNTH_REVERB_WET))
+                rawRev->store (revWet);
+
+            DBG ("Roll: randomised 303 params for step " << currentStepIndex);
+        }
+
         // Update TB-303 engine with new step's per-step 303 parameters
         tb303Engine.setStepParams (
             state.getStep303Cutoff    (currentStepIndex),
