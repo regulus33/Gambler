@@ -90,8 +90,8 @@ juce_add_plugin("${PROJECT_NAME}"
     PLUGIN_CODE P002
     FORMATS "${FORMATS}"
 
-    # MIDI Effect configuration - required for use as MIDI effect in DAWs like Bitwig
-    IS_MIDI_EFFECT TRUE
+    # Synth configuration - audio output with MIDI input/output
+    IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT TRUE
 
@@ -124,7 +124,7 @@ add_library(SharedCode INTERFACE
 
 clap_juce_extensions_plugin(TARGET "${PROJECT_NAME}"
     CLAP_ID "${BUNDLE_ID}"
-    CLAP_FEATURES audio-effect)
+    CLAP_FEATURES instrument synthesizer)
 
 # Enable fast math, C++20 and a few other target defaults
 include(SharedCodeDefaults)

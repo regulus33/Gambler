@@ -302,6 +302,26 @@ public:
         setBoolParam(Params::Keys::ID::stepModSelected(stepIndex, modIndex), selected);
     }
 
+    // ========================================
+    // PER-STEP 303 PARAMS (alias into stepModValue slots 0-6)
+    // ========================================
+
+    int getStep303Cutoff   (int step) const { return getStepModValue(step, 0); }
+    int getStep303Resonance(int step) const { return getStepModValue(step, 1); }
+    int getStep303EnvMod   (int step) const { return getStepModValue(step, 2); }
+    int getStep303Decay    (int step) const { return getStepModValue(step, 3); }
+    int getStep303Accent   (int step) const { return getStepModValue(step, 4); }
+    int getStep303Waveform (int step) const { return getStepModValue(step, 5); }
+    int getStep303Slew     (int step) const { return getStepModValue(step, 6); }
+
+    void setStep303Cutoff   (int step, int v) { setStepModValue(step, 0, v); }
+    void setStep303Resonance(int step, int v) { setStepModValue(step, 1, v); }
+    void setStep303EnvMod   (int step, int v) { setStepModValue(step, 2, v); }
+    void setStep303Decay    (int step, int v) { setStepModValue(step, 3, v); }
+    void setStep303Accent   (int step, int v) { setStepModValue(step, 4, v); }
+    void setStep303Waveform (int step, int v) { setStepModValue(step, 5, v); }
+    void setStep303Slew     (int step, int v) { setStepModValue(step, 6, v); }
+
     /**
      * Get all selected modulations for a step
      */
