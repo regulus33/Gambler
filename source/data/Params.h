@@ -179,15 +179,6 @@ namespace Params
             inline const String CLEAR_SCALE = "clear_scale";
 
             // ========================================
-            // GLOBAL 303 SYNTH PARAMS
-            // ========================================
-            inline const String SYNTH_TUNING     = "synth_tuning";      // float -12..+12 semitones
-            inline const String SYNTH_VOLUME      = "synth_volume";      // float 0..1
-            inline const String SYNTH_DIST_DRIVE  = "synth_dist_drive";  // float 0..1
-            inline const String SYNTH_DIST_MIX    = "synth_dist_mix";    // float 0..1
-            inline const String SYNTH_REVERB_WET  = "synth_reverb_wet";  // float 0..1
-
-            // ========================================
             // NOTE COLOURS (12 customizable note colors)
             // ========================================
             inline String noteColour(int noteIndex) {
@@ -263,13 +254,6 @@ namespace Params
 
             // Clear Scale trigger
             inline const String CLEAR_SCALE = "Clear Scale";
-
-            // Global 303 synth params
-            inline const String SYNTH_TUNING     = "Tuning";
-            inline const String SYNTH_VOLUME      = "Volume";
-            inline const String SYNTH_DIST_DRIVE  = "Drive";
-            inline const String SYNTH_DIST_MIX    = "Dist Mix";
-            inline const String SYNTH_REVERB_WET  = "Reverb Wet";
 
             // Note colours
             inline String noteColour(int noteIndex) {
@@ -516,15 +500,6 @@ namespace Params
                     defaultNoteColours[i]));
             }
         }
-
-        // ========================================
-        // GLOBAL 303 SYNTH PARAMS
-        // ========================================
-        params.push_back(createFloatParam(Keys::ID::SYNTH_TUNING,    Keys::LABEL::SYNTH_TUNING,    -12.f, 12.f, 0.f));
-        params.push_back(createFloatParam(Keys::ID::SYNTH_VOLUME,     Keys::LABEL::SYNTH_VOLUME,     0.f, 1.f, 0.75f));
-        params.push_back(createFloatParam(Keys::ID::SYNTH_DIST_DRIVE, Keys::LABEL::SYNTH_DIST_DRIVE, 0.f, 1.f, 0.f));
-        params.push_back(createFloatParam(Keys::ID::SYNTH_DIST_MIX,   Keys::LABEL::SYNTH_DIST_MIX,   0.f, 1.f, 0.f));
-        params.push_back(createFloatParam(Keys::ID::SYNTH_REVERB_WET, Keys::LABEL::SYNTH_REVERB_WET, 0.f, 1.f, 0.f));
 
         // Write Scale mode
         params.push_back(createBoolParam(Keys::ID::WRITE_SCALE, Keys::LABEL::WRITE_SCALE, false));

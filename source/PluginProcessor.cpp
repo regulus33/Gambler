@@ -146,9 +146,6 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock) {
     // Set sample rate for internal clock timing
     clock.setSampleRate (sampleRate);
-
-    // Prepare TB-303 synth engine
-    tb303Engine.prepare (sampleRate, samplesPerBlock);
 }
 
 void PluginProcessor::releaseResources() {
@@ -239,20 +236,6 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     // tell the queue you are done reading it.
     if (block_size1 + block_size2 > 0) {
         previewMidiFifo.finishedRead (block_size1 + block_size2);
-    }
-
-    // Apply global TB-303 params from APVTS (once per block)
-    {
-        auto* tuning  = apvts.getRawParameterValue (Params::Keys::ID::SYNTH_TUNING);
-        auto* vol     = apvts.getRawParameterValue (Params::Keys::ID::SYNTH_VOLUME);
-        auto* drive   = apvts.getRawParameterValue (Params::Keys::ID::SYNTH_DIST_DRIVE);
-        auto* distMix = apvts.getRawParameterValue (Params::Keys::ID::SYNTH_DIST_MIX);
-        auto* revWet  = apvts.getRawParameterValue (Params::Keys::ID::SYNTH_REVERB_WET);
-        if (tuning)  tb303Engine.setTuning    (tuning ->load());
-        if (vol)     tb303Engine.setVolume    (vol    ->load());
-        if (drive)   tb303Engine.setDistDrive (drive  ->load());
-        if (distMix) tb303Engine.setDistMix   (distMix->load());
-        if (revWet)  tb303Engine.setReverbWet (revWet ->load());
     }
 
     // Check if scheduled note-off should be sent, this is necessary to allow length adjustments.
@@ -398,41 +381,6 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
 
         DBG ("Clock tick! Step: " << currentStepIndex << ", Note: " << note);
 
-        // Roll mode: randomise this step's 303 per-step params + global reverb
-        if (state.getIsRandom()) {
-            static std::random_device rd303;
-            static std::mt19937 rng303 (rd303());
-            static const int mins303[] = { 25,  0, 15, 15,  0,   0,  0 };
-            static const int maxs303[] = { 90, 80,100, 85, 55, 127, 35 };
-
-            for (int i = 0; i < 7; ++i) {
-                int val;
-                if (i == 5) { // waveform: snap to 0 or 127
-                    val = (std::uniform_int_distribution<int>(0, 1)(rng303) == 0) ? 0 : 127;
-                } else {
-                    val = std::uniform_int_distribution<int>(mins303[i], maxs303[i])(rng303);
-                }
-                state.setStepModValue (currentStepIndex, i, val);
-            }
-
-            // Also randomise global reverb wet (0.0 – 0.5 sweet spot)
-            float revWet = std::uniform_real_distribution<float>(0.0f, 0.5f)(rng303);
-            if (auto* rawRev = apvts.getRawParameterValue (Params::Keys::ID::SYNTH_REVERB_WET))
-                rawRev->store (revWet);
-
-            DBG ("Roll: randomised 303 params for step " << currentStepIndex);
-        }
-
-        // Update TB-303 engine with new step's per-step 303 parameters
-        tb303Engine.setStepParams (
-            state.getStep303Cutoff    (currentStepIndex),
-            state.getStep303Resonance (currentStepIndex),
-            state.getStep303EnvMod    (currentStepIndex),
-            state.getStep303Decay     (currentStepIndex),
-            state.getStep303Accent    (currentStepIndex),
-            state.getStep303Waveform  (currentStepIndex),
-            state.getStep303Slew      (currentStepIndex));
-
         // Make sure it is not a rest
         if (note >= 0) {
             // Get step modulations for this step (using APVTS-backed state)
@@ -523,8 +471,6 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         }
     }
 
-    // Process TB-303 audio synthesis (reads midiMessages, writes to audio buffer)
-    tb303Engine.processBlock (buffer, midiMessages);
 }
 
 //==============================================================================

@@ -6,7 +6,6 @@
 #include "backend/PresetManager.h"
 #include "backend/SequenceState.h"
 #include "data/Params.h"
-#include "synth/TB303Engine.h"
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -124,9 +123,6 @@ public:
     MidiLearnRegistry& getMidiLearnRegistry() noexcept { return midiLearnRegistry; }
     const MidiLearnRegistry& getMidiLearnRegistry() const noexcept { return midiLearnRegistry; }
 
-    // TB-303 synth engine
-    TB303Engine& getTB303Engine() noexcept { return tb303Engine; }
-
     /**
      * Get the current plugin state as XML (for preset saving)
      * This creates a complete snapshot of all state that should be saved.
@@ -219,9 +215,6 @@ private:
 
     // MIDI learn registry for user-configurable mappings
     MidiLearnRegistry midiLearnRegistry;
-
-    // TB-303 synthesizer engine
-    TB303Engine tb303Engine;
 
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();

@@ -5,7 +5,6 @@
 #include "NavBarComponent.h"
 #include "PianoRollComponent.h"
 #include "MidiDataPerStepSelectionComponent.h"
-#include "TB303ControlsComponent.h"
 #include "SequencerStepsComponent.h"
 #include "SequencerControlsComponent.h"
 #include "MainControlsComponent.h"
@@ -78,7 +77,6 @@ public:
           navBar(processor),
           pianoRoll(processor),
           midiDataPerStep(processor),
-          tb303Controls(processor),
           sequencerSteps(processor),
           sequencerControls(processor),
           mainControls(processor),
@@ -89,22 +87,8 @@ public:
         // Add navbar
         addAndMakeVisible(navBar);
 
-        // Setup callback for view toggle button in navbar:
-        // toggled=false → Piano Roll mode (pianoRoll + mainControls visible)
-        // toggled=true  → 303 Synth mode (tb303Controls visible, pianoRoll + mainControls hidden)
-        navBar.onViewToggleClicked = [this](bool toggled) {
-            bool show303 = toggled;
-            pianoRoll   .setVisible(!show303);
-            mainControls.setVisible(!show303);
-            tb303Controls.setVisible(show303);
-            DBG("View mode changed: " + juce::String(show303 ? "303 Synth" : "Piano Roll"));
-        };
-
-        // Add piano roll component (visible by default in Piano Roll mode)
+        // Add piano roll component
         addAndMakeVisible(pianoRoll);
-
-        // Add 303 controls (hidden by default — shown when view toggle is ON)
-        addChildComponent(tb303Controls);
 
         // Initialize piano roll with the selected step's scale
         auto& state = processorRef.getState();
@@ -293,14 +277,6 @@ public:
 
         // Position MIDI data per step component at same location as piano roll
         midiDataPerStep.setBounds(pianoRollX, pianoRollY, pianoRollWidth, pianoRollHeight);
-
-        // Position TB303 controls: covers pianoRoll area + mainControls area combined
-        {
-            int tb303W = pianoRollWidth + mainControlsGapFromPianoRoll + mainControlsWidth;  // 638
-            int tb303Y = pianoRollY - mainControlsOverflowTop;
-            int tb303H = pianoRollHeight + mainControlsOverflowTop;  // 241
-            tb303Controls.setBounds(pianoRollX, tb303Y, tb303W, tb303H);
-        }
 
         // Position main controls to the right of the piano roll / MIDI data panel
         int mainControlsX = pianoRollX + pianoRollWidth + mainControlsGapFromPianoRoll;
@@ -660,7 +636,6 @@ private:
     NavBarComponent navBar;
     PianoRollComponent pianoRoll;
     MidiDataPerStepSelectionComponent midiDataPerStep;
-    TB303ControlsComponent tb303Controls;
     SequencerStepsComponent sequencerSteps;
     SequencerControlsComponent sequencerControls;
     MainControlsComponent mainControls;

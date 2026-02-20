@@ -90,8 +90,9 @@ juce_add_plugin("${PROJECT_NAME}"
     PLUGIN_CODE P002
     FORMATS "${FORMATS}"
 
-    # Synth configuration - audio output with MIDI input/output
-    IS_SYNTH TRUE
+    # Pure MIDI effect configuration
+    IS_SYNTH FALSE
+    IS_MIDI_EFFECT TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT TRUE
 
@@ -124,7 +125,7 @@ add_library(SharedCode INTERFACE
 
 clap_juce_extensions_plugin(TARGET "${PROJECT_NAME}"
     CLAP_ID "${BUNDLE_ID}"
-    CLAP_FEATURES instrument synthesizer)
+    CLAP_FEATURES note-effect midi-effect)
 
 # Enable fast math, C++20 and a few other target defaults
 include(SharedCodeDefaults)
@@ -180,7 +181,6 @@ target_link_libraries(SharedCode
     melatonin_inspector
     juce_audio_utils
     juce_audio_processors
-    juce_dsp
     juce_gui_basics
     juce_gui_extra
     juce::juce_recommended_config_flags
