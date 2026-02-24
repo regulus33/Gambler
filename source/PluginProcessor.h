@@ -6,6 +6,9 @@
 #include "backend/PresetManager.h"
 #include "backend/SequenceState.h"
 #include "data/Params.h"
+#if GAMBLER_HAS_SYNTH
+#include "synth/SynthEngine.h"
+#endif
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -215,6 +218,10 @@ private:
 
     // MIDI learn registry for user-configurable mappings
     MidiLearnRegistry midiLearnRegistry;
+
+#if GAMBLER_HAS_SYNTH
+    std::unique_ptr<SynthEngine> synthEngine;
+#endif
 
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();

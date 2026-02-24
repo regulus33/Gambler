@@ -178,6 +178,26 @@ namespace Params
             // Clear Scale trigger
             inline const String CLEAR_SCALE = "clear_scale";
 
+#if GAMBLER_HAS_SYNTH
+            // ========================================
+            // BUILT-IN SYNTH ENGINE
+            // ========================================
+            inline const String SYNTH_OSC_BLEND = "synth_osc_blend";
+            inline const String SYNTH_FILTER_CUTOFF = "synth_filter_cutoff";
+            inline const String SYNTH_FILTER_RESO = "synth_filter_reso";
+            inline const String SYNTH_FILTER_DRIVE = "synth_filter_drive";
+            inline const String SYNTH_AMP_ATTACK = "synth_amp_attack";
+            inline const String SYNTH_AMP_DECAY = "synth_amp_decay";
+            inline const String SYNTH_AMP_SUSTAIN = "synth_amp_sustain";
+            inline const String SYNTH_AMP_RELEASE = "synth_amp_release";
+            inline const String SYNTH_FLT_ATTACK = "synth_flt_attack";
+            inline const String SYNTH_FLT_DECAY = "synth_flt_decay";
+            inline const String SYNTH_FLT_SUSTAIN = "synth_flt_sustain";
+            inline const String SYNTH_FLT_RELEASE = "synth_flt_release";
+            inline const String SYNTH_FLT_ENV_DEPTH = "synth_flt_env_depth";
+            inline const String SYNTH_MASTER_GAIN = "synth_master_gain";
+#endif
+
             // ========================================
             // NOTE COLOURS (12 customizable note colors)
             // ========================================
@@ -254,6 +274,24 @@ namespace Params
 
             // Clear Scale trigger
             inline const String CLEAR_SCALE = "Clear Scale";
+
+#if GAMBLER_HAS_SYNTH
+            // Built-in synth engine labels
+            inline const String SYNTH_OSC_BLEND = "Osc Blend";
+            inline const String SYNTH_FILTER_CUTOFF = "Filter Cutoff";
+            inline const String SYNTH_FILTER_RESO = "Filter Resonance";
+            inline const String SYNTH_FILTER_DRIVE = "Filter Drive";
+            inline const String SYNTH_AMP_ATTACK = "Amp Attack";
+            inline const String SYNTH_AMP_DECAY = "Amp Decay";
+            inline const String SYNTH_AMP_SUSTAIN = "Amp Sustain";
+            inline const String SYNTH_AMP_RELEASE = "Amp Release";
+            inline const String SYNTH_FLT_ATTACK = "Filter Attack";
+            inline const String SYNTH_FLT_DECAY = "Filter Decay";
+            inline const String SYNTH_FLT_SUSTAIN = "Filter Sustain";
+            inline const String SYNTH_FLT_RELEASE = "Filter Release";
+            inline const String SYNTH_FLT_ENV_DEPTH = "Filter Env Depth";
+            inline const String SYNTH_MASTER_GAIN = "Master Gain";
+#endif
 
             // Note colours
             inline String noteColour(int noteIndex) {
@@ -509,6 +547,71 @@ namespace Params
 
         // Clear Scale trigger
         params.push_back(createBoolParam(Keys::ID::CLEAR_SCALE, Keys::LABEL::CLEAR_SCALE, false));
+
+#if GAMBLER_HAS_SYNTH
+        // ========================================
+        // BUILT-IN SYNTH ENGINE PARAMETERS
+        // ========================================
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_OSC_BLEND, Keys::LABEL::SYNTH_OSC_BLEND,
+            NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_FILTER_CUTOFF, Keys::LABEL::SYNTH_FILTER_CUTOFF,
+            NormalisableRange<float>(20.0f, 20000.0f, 0.0f, 0.25f), 8000.0f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_FILTER_RESO, Keys::LABEL::SYNTH_FILTER_RESO,
+            NormalisableRange<float>(0.0f, 1.0f), 0.15f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_FILTER_DRIVE, Keys::LABEL::SYNTH_FILTER_DRIVE,
+            NormalisableRange<float>(1.0f, 10.0f), 1.0f));
+
+        // Amp envelope
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_AMP_ATTACK, Keys::LABEL::SYNTH_AMP_ATTACK,
+            NormalisableRange<float>(0.001f, 5.0f, 0.0f, 0.3f), 0.01f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_AMP_DECAY, Keys::LABEL::SYNTH_AMP_DECAY,
+            NormalisableRange<float>(0.001f, 5.0f, 0.0f, 0.3f), 0.3f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_AMP_SUSTAIN, Keys::LABEL::SYNTH_AMP_SUSTAIN,
+            NormalisableRange<float>(0.0f, 1.0f), 0.8f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_AMP_RELEASE, Keys::LABEL::SYNTH_AMP_RELEASE,
+            NormalisableRange<float>(0.001f, 10.0f, 0.0f, 0.3f), 0.3f));
+
+        // Filter envelope
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_FLT_ATTACK, Keys::LABEL::SYNTH_FLT_ATTACK,
+            NormalisableRange<float>(0.001f, 5.0f, 0.0f, 0.3f), 0.01f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_FLT_DECAY, Keys::LABEL::SYNTH_FLT_DECAY,
+            NormalisableRange<float>(0.001f, 5.0f, 0.0f, 0.3f), 0.5f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_FLT_SUSTAIN, Keys::LABEL::SYNTH_FLT_SUSTAIN,
+            NormalisableRange<float>(0.0f, 1.0f), 0.3f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_FLT_RELEASE, Keys::LABEL::SYNTH_FLT_RELEASE,
+            NormalisableRange<float>(0.001f, 10.0f, 0.0f, 0.3f), 0.5f));
+
+        // Filter envelope depth (-1 to +1, bipolar)
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_FLT_ENV_DEPTH, Keys::LABEL::SYNTH_FLT_ENV_DEPTH,
+            NormalisableRange<float>(-1.0f, 1.0f), 0.5f));
+
+        // Master gain
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_MASTER_GAIN, Keys::LABEL::SYNTH_MASTER_GAIN,
+            NormalisableRange<float>(0.0f, 1.0f), 0.7f));
+#endif
 
         return { params.begin(), params.end() };
     }

@@ -127,6 +127,36 @@ clap_juce_extensions_plugin(TARGET "${PROJECT_NAME}"
     CLAP_ID "${BUNDLE_ID}"
     CLAP_FEATURES note-effect midi-effect)
 
+# ========================================
+# SYNTH TARGET — Gambler2Synth (sequencer + built-in synth)
+# ========================================
+set(SYNTH_TARGET "Gambler2Synth")
+
+juce_add_plugin("${SYNTH_TARGET}"
+    ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icon.png"
+    COMPANY_NAME "${COMPANY_NAME}"
+    BUNDLE_ID "${BUNDLE_ID}.synth"
+    COPY_PLUGIN_AFTER_BUILD TRUE
+    PLUGIN_MANUFACTURER_CODE Pamp
+    PLUGIN_CODE P003
+    FORMATS "${FORMATS}"
+
+    # Synth configuration
+    IS_SYNTH TRUE
+    IS_MIDI_EFFECT FALSE
+    NEEDS_MIDI_INPUT TRUE
+    NEEDS_MIDI_OUTPUT TRUE
+
+    PRODUCT_NAME "Gambler2 Synth"
+
+    IPHONE_SCREEN_ORIENTATIONS UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+    IPAD_SCREEN_ORIENTATIONS UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+    PLIST_TO_MERGE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/Info-iOS.plist")
+
+clap_juce_extensions_plugin(TARGET "${SYNTH_TARGET}"
+    CLAP_ID "${BUNDLE_ID}.synth"
+    CLAP_FEATURES instrument synthesizer)
+
 # Enable fast math, C++20 and a few other target defaults
 include(SharedCodeDefaults)
 
@@ -189,6 +219,10 @@ target_link_libraries(SharedCode
 
 # Link the JUCE plugin targets our SharedCode target
 target_link_libraries("${PROJECT_NAME}" PRIVATE SharedCode)
+
+# Link synth target to SharedCode + juce_dsp (synth-only dependency)
+target_link_libraries("${SYNTH_TARGET}" PRIVATE SharedCode juce_dsp)
+target_compile_definitions("${SYNTH_TARGET}" PRIVATE GAMBLER_HAS_SYNTH=1)
 
 # IPP support, comment out to disable
 include(PamplejuceIPP)
