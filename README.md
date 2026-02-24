@@ -399,14 +399,6 @@ Modal dialog for entering a name when saving a new preset.
 
 Floating window container for settings content. Provides window chrome and positioning.
 
-#### `MidiDataPerStepSelectionComponent`
-
-UI for viewing/editing MIDI CC and velocity data per step. Alternative view to the piano roll.
-
-#### `VerticalBarSlider`
-
-Vertical bar-style slider used for modulation/velocity editing in MidiDataPerStepSelectionComponent.
-
 #### `UIConstants` (namespace)
 
 Shared UI constants (colors, dimensions, spacing) used across components.

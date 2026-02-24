@@ -4,7 +4,6 @@
 #include "BinaryData.h"
 #include "NavBarComponent.h"
 #include "PianoRollComponent.h"
-#include "MidiDataPerStepSelectionComponent.h"
 #include "SequencerStepsComponent.h"
 #include "SequencerControlsComponent.h"
 #include "MainControlsComponent.h"
@@ -76,7 +75,6 @@ public:
         : processorRef(processor),
           navBar(processor),
           pianoRoll(processor),
-          midiDataPerStep(processor),
           sequencerSteps(processor),
           sequencerControls(processor),
           mainControls(processor),
@@ -124,9 +122,6 @@ public:
             if (onAsyncUpdateNeeded)
                 onAsyncUpdateNeeded();
         };
-
-        // Add MIDI data per step component (hidden by default)
-        addChildComponent(midiDataPerStep);
 
         // Add main controls component (note/octave + probability/grid)
         addAndMakeVisible(mainControls);
@@ -205,9 +200,6 @@ public:
             int currentStep = state.getCurrentIndex();
             sequenceOverview.getSequenceGrid().updateFromState(state, currentStep);
 
-            // Update the MIDI data per step component to show the selected step's data
-            midiDataPerStep.updateFromSequence();
-
             // Update the piano roll to show the selected step's scale
             Scale stepScale = processorRef.getState().getStepScale(stepIndex);
             pianoRoll.setScale(stepScale);
@@ -275,9 +267,6 @@ public:
         // Position piano roll
         pianoRoll.setBounds(pianoRollX, pianoRollY, pianoRollWidth, pianoRollHeight);
 
-        // Position MIDI data per step component at same location as piano roll
-        midiDataPerStep.setBounds(pianoRollX, pianoRollY, pianoRollWidth, pianoRollHeight);
-
         // Position main controls to the right of the piano roll / MIDI data panel
         int mainControlsX = pianoRollX + pianoRollWidth + mainControlsGapFromPianoRoll;
         int mainControlsY = pianoRollY - mainControlsOverflowTop;
@@ -326,8 +315,6 @@ public:
             // Update the piano roll active note
             pianoRoll.setActiveNote(chromaticNote);
 
-            // Update MIDI data per step component with current step's modulations
-            midiDataPerStep.updateFromSequence();
         } else {
             // Clear both if stepIndex is -1
             pianoRoll.setActiveNote(-1);
@@ -635,7 +622,6 @@ private:
 
     NavBarComponent navBar;
     PianoRollComponent pianoRoll;
-    MidiDataPerStepSelectionComponent midiDataPerStep;
     SequencerStepsComponent sequencerSteps;
     SequencerControlsComponent sequencerControls;
     MainControlsComponent mainControls;
