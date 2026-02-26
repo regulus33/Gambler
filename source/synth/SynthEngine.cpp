@@ -11,6 +11,8 @@ void SynthEngine::prepare (double sampleRate, int blockSize)
 {
     for (auto& voice : voices)
         voice.prepare (sampleRate, blockSize);
+
+    reverb.prepare (sampleRate, blockSize);
 }
 
 void SynthEngine::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -61,6 +63,10 @@ void SynthEngine::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuff
     {
         buffer.applyGain (masterGain);
     }
+
+    // FDN Reverb (post voices, post gain)
+    updateReverbParams();
+    reverb.processBlock (outL, outR, numSamples);
 }
 
 void SynthEngine::updateVoiceParams()
@@ -97,6 +103,28 @@ void SynthEngine::updateVoiceParams()
         if (voice.isActive())
             voice.updateParams (blend, cutoff, reso, drive, ampParams, fltParams, envDepth);
     }
+}
+
+void SynthEngine::updateReverbParams()
+{
+    auto getFloat = [this] (const juce::String& id) -> float {
+        if (auto* p = apvts.getRawParameterValue (id))
+            return p->load();
+        return 0.0f;
+    };
+
+    FDNReverb::Params rp;
+    rp.decay = getFloat ("synth_rev_decay");
+    rp.size = getFloat ("synth_rev_size");
+    rp.preDelayMs = getFloat ("synth_rev_predelay");
+    rp.lowCutHz = getFloat ("synth_rev_low_cut");
+    rp.highCutHz = getFloat ("synth_rev_high_cut");
+    rp.lowDampHz = getFloat ("synth_rev_low_damp");
+    rp.highDampHz = getFloat ("synth_rev_high_damp");
+    rp.stereoMs = getFloat ("synth_rev_stereo");
+    rp.dryWet = getFloat ("synth_rev_mix");
+
+    reverb.setParams (rp);
 }
 
 void SynthEngine::handleNoteOn (int midiNote, float velocity)

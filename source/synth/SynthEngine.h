@@ -3,6 +3,7 @@
 #if GAMBLER_HAS_SYNTH
 
 #include "SynthVoice.h"
+#include "FDNReverb.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <array>
 
@@ -23,6 +24,7 @@ private:
 
     juce::AudioProcessorValueTreeState& apvts;
     std::array<SynthVoice, NUM_VOICES> voices;
+    FDNReverb reverb;
     juce::uint32 noteOnCounter = 0;
     float masterGain = 0.7f;
 
@@ -30,6 +32,7 @@ private:
     void handleNoteOff (int midiNote);
     void renderVoices (float* outL, float* outR, int numSamples);
     void updateVoiceParams();
+    void updateReverbParams();
 
     SynthVoice* findFreeVoice();
 };

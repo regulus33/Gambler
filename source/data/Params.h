@@ -196,6 +196,17 @@ namespace Params
             inline const String SYNTH_FLT_RELEASE = "synth_flt_release";
             inline const String SYNTH_FLT_ENV_DEPTH = "synth_flt_env_depth";
             inline const String SYNTH_MASTER_GAIN = "synth_master_gain";
+
+            // FDN Reverb
+            inline const String SYNTH_REV_DECAY = "synth_rev_decay";
+            inline const String SYNTH_REV_SIZE = "synth_rev_size";
+            inline const String SYNTH_REV_PREDELAY = "synth_rev_predelay";
+            inline const String SYNTH_REV_LOW_CUT = "synth_rev_low_cut";
+            inline const String SYNTH_REV_HIGH_CUT = "synth_rev_high_cut";
+            inline const String SYNTH_REV_LOW_DAMP = "synth_rev_low_damp";
+            inline const String SYNTH_REV_HIGH_DAMP = "synth_rev_high_damp";
+            inline const String SYNTH_REV_STEREO = "synth_rev_stereo";
+            inline const String SYNTH_REV_MIX = "synth_rev_mix";
 #endif
 
             // ========================================
@@ -291,6 +302,17 @@ namespace Params
             inline const String SYNTH_FLT_RELEASE = "Filter Release";
             inline const String SYNTH_FLT_ENV_DEPTH = "Filter Env Depth";
             inline const String SYNTH_MASTER_GAIN = "Master Gain";
+
+            // FDN Reverb labels
+            inline const String SYNTH_REV_DECAY = "Reverb Decay";
+            inline const String SYNTH_REV_SIZE = "Reverb Size";
+            inline const String SYNTH_REV_PREDELAY = "Reverb Pre-Delay";
+            inline const String SYNTH_REV_LOW_CUT = "Reverb Low Cut";
+            inline const String SYNTH_REV_HIGH_CUT = "Reverb High Cut";
+            inline const String SYNTH_REV_LOW_DAMP = "Reverb Low Damp";
+            inline const String SYNTH_REV_HIGH_DAMP = "Reverb High Damp";
+            inline const String SYNTH_REV_STEREO = "Reverb Stereo";
+            inline const String SYNTH_REV_MIX = "Reverb Mix";
 #endif
 
             // Note colours
@@ -611,6 +633,43 @@ namespace Params
         params.push_back(make_unique<AudioParameterFloat>(
             Keys::ID::SYNTH_MASTER_GAIN, Keys::LABEL::SYNTH_MASTER_GAIN,
             NormalisableRange<float>(0.0f, 1.0f), 0.7f));
+
+        // FDN Reverb
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_REV_DECAY, Keys::LABEL::SYNTH_REV_DECAY,
+            NormalisableRange<float>(0.2f, 30.0f, 0.0f, 0.3f), 2.0f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_REV_SIZE, Keys::LABEL::SYNTH_REV_SIZE,
+            NormalisableRange<float>(0.3f, 3.0f), 1.0f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_REV_PREDELAY, Keys::LABEL::SYNTH_REV_PREDELAY,
+            NormalisableRange<float>(0.0f, 500.0f, 0.0f, 0.4f), 10.0f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_REV_LOW_CUT, Keys::LABEL::SYNTH_REV_LOW_CUT,
+            NormalisableRange<float>(20.0f, 500.0f, 0.0f, 0.4f), 100.0f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_REV_HIGH_CUT, Keys::LABEL::SYNTH_REV_HIGH_CUT,
+            NormalisableRange<float>(1000.0f, 20000.0f, 0.0f, 0.3f), 12000.0f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_REV_LOW_DAMP, Keys::LABEL::SYNTH_REV_LOW_DAMP,
+            NormalisableRange<float>(20.0f, 1000.0f, 0.0f, 0.4f), 200.0f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_REV_HIGH_DAMP, Keys::LABEL::SYNTH_REV_HIGH_DAMP,
+            NormalisableRange<float>(1000.0f, 16000.0f, 0.0f, 0.3f), 6000.0f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_REV_STEREO, Keys::LABEL::SYNTH_REV_STEREO,
+            NormalisableRange<float>(0.0f, 200.0f), 0.0f));
+
+        params.push_back(make_unique<AudioParameterFloat>(
+            Keys::ID::SYNTH_REV_MIX, Keys::LABEL::SYNTH_REV_MIX,
+            NormalisableRange<float>(0.0f, 1.0f), 0.3f));
 #endif
 
         return { params.begin(), params.end() };
