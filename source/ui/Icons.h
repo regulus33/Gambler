@@ -798,21 +798,6 @@ public:
     }
 
     /**
-     * Creates a placeholder icon 1 for view toggle (temporary - using keyboard icon)
-     * TODO: Replace with proper piano roll icon
-     */
-    static juce::Path createViewToggleIcon1() {
-        return createBarChartIcon();
-    }
-
-    /**
-     * Creates icon 2 for view toggle (bar chart for MIDI data view)
-     */
-    static juce::Path createViewToggleIcon2() {
-        return createKeyboardIcon();
-    }
-
-    /**
      * Creates a chevron down icon for dropdowns
      * Original SVG viewBox: 0 0 12 8
      * Simple downward pointing chevron/arrow

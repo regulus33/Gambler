@@ -18,7 +18,7 @@ namespace NavBarConstants {
     constexpr int presetSelectorGapFromLogo = 20;  // Gap between logo and preset selector
     constexpr int versionLabelWidth = 60;
     constexpr int versionLabelHeight = 20;
-    constexpr int versionLabelMarginRight = 10;  // Gap between version and view toggle button
+    constexpr int versionLabelMarginRight = 10;  // Gap between version and MIDI learn button
     constexpr int buttonSize = ToggleIconButtonConstants::totalSize;  // 36px
     constexpr int buttonGap = 10;  // Gap between buttons
     constexpr int settingsButtonOffsetRight = 46;  // Offset from right edge
@@ -35,8 +35,7 @@ namespace NavBarConstants {
  * A navigation bar component that displays:
  * - Logo (left side, centered vertically)
  * - Preset selector (right of logo)
- * - Version label (right side, left of view toggle button)
- * - View toggle button (right side, left of settings button)
+ * - Version label (right side, left of settings button)
  * - Settings button (right side)
  *
  * This component is displayed at the top of all screens.
@@ -44,8 +43,7 @@ namespace NavBarConstants {
 class NavBarComponent : public juce::Component {
 public:
     explicit NavBarComponent(PluginProcessor& processor)
-        : viewToggleButton(Icons::createViewToggleIcon1, Icons::createViewToggleIcon2, false, true),
-          settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false, 0.75f, Icons::closeIconScale),
+        : settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false, 0.75f, Icons::closeIconScale),
           midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, true),
           playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
@@ -74,14 +72,6 @@ public:
         midiLearnButton.onClick = [this](bool toggled) {
             if (onMidiLearnClicked) {
                 onMidiLearnClicked(toggled);
-            }
-        };
-
-        // Add view toggle button
-        addAndMakeVisible(viewToggleButton);
-        viewToggleButton.onClick = [this](bool toggled) {
-            if (onViewToggleClicked) {
-                onViewToggleClicked(toggled);
             }
         };
 
@@ -164,13 +154,8 @@ public:
         int settingsButtonY = (height - buttonSize) / 2;  // Vertically center
         settingsButton.setBounds(settingsButtonX, settingsButtonY, buttonSize, buttonSize);
 
-        // Position view toggle button left of settings button
-        int viewToggleButtonX = settingsButtonX - buttonSize - buttonGap;
-        int viewToggleButtonY = (height - buttonSize) / 2;  // Vertically center
-        viewToggleButton.setBounds(viewToggleButtonX, viewToggleButtonY, buttonSize, buttonSize);
-
-        // Position MIDI learn button left of view toggle button
-        int midiLearnButtonX = viewToggleButtonX - buttonSize - buttonGap;
+        // Position MIDI learn button left of settings button
+        int midiLearnButtonX = settingsButtonX - buttonSize - buttonGap;
         int midiLearnButtonY = (height - buttonSize) / 2;  // Vertically center
         midiLearnButton.setBounds(midiLearnButtonX, midiLearnButtonY, buttonSize, buttonSize);
 
@@ -207,10 +192,6 @@ public:
 
     // Callback when settings button is clicked
     std::function<void()> onSettingsClicked;
-
-    // Callback when view toggle button is clicked
-    // Parameter: true = toggled on (icon 2), false = toggled off (icon 1)
-    std::function<void(bool)> onViewToggleClicked;
 
     // Callback when MIDI learn button is clicked
     // Parameter: true = MIDI learn mode ON, false = MIDI learn mode OFF
@@ -263,7 +244,6 @@ private:
     PresetSelectorComponent presetSelector;
     juce::Label versionLabel;
     ToggleIconButton midiLearnButton;
-    ToggleIconButton viewToggleButton;
     ToggleIconButton settingsButton;
     ToggleIconButton playPauseButton;
     ToggleIconButton stopButton;

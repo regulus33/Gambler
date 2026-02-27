@@ -120,9 +120,8 @@ namespace Params
             inline const String PREF_NOTE_LENGTH = "pref_note_length";
 
             // ========================================
-            // UI STATE (kept for backward compatibility)
+            // SEQUENCER CONTROL BUTTONS (MIDI-mappable)
             // ========================================
-            // Primary row buttons (momentary/trigger)
             inline const String ROLL = "roll";
             inline const String INDEX_LEFT = "index_left";
             inline const String INDEX_RIGHT = "index_right";
@@ -140,34 +139,9 @@ namespace Params
             inline const String RANDOMIZE_ALL = "randomize_all";
             inline const String SHUFFLE = "shuffle";
 
-            // Top right buttons
-            inline const String EXPORT = "export";
-            inline const String SAVE = "save";
-            inline const String LOAD = "load";
-
-            // Sub notes buttons
-            inline const String SUB_NOTES_PLUS = "sub_notes_plus";
-            inline const String SUB_NOTES_MINUS = "sub_notes_minus";
-
-            // Main controls (these now map to the selected step's data)
-            inline const String OCTAVE = "octave";
-            inline const String NOTE = "note";
-            inline const String PROBABILITY = "probability";
-
-            // MIDI mode
-            inline const String MIDI_MODE = "midi_mode";
-
-            // Note range (legacy - now use SCALE_RANGE_MIN/MAX)
+            // Note range
             inline const String NOTE_RANGE_MIN = "note_range_min";
             inline const String NOTE_RANGE_MAX = "note_range_max";
-
-            // Step buttons (8 buttons for UI window)
-            inline String stepButtonSelected(int index) { return "step_button_" + String(index) + "_selected"; }
-            inline String stepButtonHighlighted(int index) { return "step_button_" + String(index) + "_highlighted"; }
-
-            // CC controls (7 slots - legacy, now use stepModValue)
-            inline String ccNumber(int slot) { return "cc_number_" + String(slot); }
-            inline String ccValue(int slot) { return "cc_value_" + String(slot); }
 
             // Write Scale mode
             inline const String WRITE_SCALE = "write_scale";
@@ -321,7 +295,7 @@ namespace Params
                 return "Note Colour " + String(noteNames[noteIndex]);
             }
 
-            // Legacy UI labels - Primary row
+            // Sequencer control button labels
             inline const String ROLL = "Roll";
             inline const String INDEX_LEFT = "Index Left";
             inline const String INDEX_RIGHT = "Index Right";
@@ -339,21 +313,8 @@ namespace Params
             inline const String RANDOMIZE_ALL = "Randomize All";
             inline const String SHUFFLE = "Shuffle";
 
-            inline const String EXPORT = "Export";
-            inline const String SAVE = "Save";
-            inline const String LOAD = "Load";
-            inline const String SUB_NOTES_PLUS = "Sub Notes +";
-            inline const String SUB_NOTES_MINUS = "Sub Notes -";
-            inline const String OCTAVE = "Octave";
-            inline const String NOTE = "Note";
-            inline const String PROBABILITY = "Probability";
-            inline const String MIDI_MODE = "MIDI Mode";
             inline const String NOTE_RANGE_MIN = "Note Range Min";
             inline const String NOTE_RANGE_MAX = "Note Range Max";
-            inline String stepButtonSelected(int index) { return "Step " + String(index) + " Selected"; }
-            inline String stepButtonHighlighted(int index) { return "Step " + String(index) + " Highlighted"; }
-            inline String ccNumber(int slot) { return "CC " + String(slot) + " Number"; }
-            inline String ccValue(int slot) { return "CC " + String(slot) + " Value"; }
         }
     };
 
@@ -492,9 +453,8 @@ namespace Params
         params.push_back(createFloatParam(Keys::ID::PREF_NOTE_LENGTH, Keys::LABEL::PREF_NOTE_LENGTH, 0.1f, 2.0f, 0.9f));
 
         // ========================================
-        // LEGACY UI STATE (for backward compatibility)
+        // SEQUENCER CONTROL BUTTONS (MIDI-mappable)
         // ========================================
-        // Primary row buttons
         params.push_back(createBoolParam(Keys::ID::ROLL, Keys::LABEL::ROLL));
         params.push_back(createBoolParam(Keys::ID::INDEX_LEFT, Keys::LABEL::INDEX_LEFT));
         params.push_back(createBoolParam(Keys::ID::INDEX_RIGHT, Keys::LABEL::INDEX_RIGHT));
@@ -512,27 +472,8 @@ namespace Params
         params.push_back(createBoolParam(Keys::ID::RANDOMIZE_ALL, Keys::LABEL::RANDOMIZE_ALL));
         params.push_back(createBoolParam(Keys::ID::SHUFFLE, Keys::LABEL::SHUFFLE));
 
-        params.push_back(createBoolParam(Keys::ID::EXPORT, Keys::LABEL::EXPORT));
-        params.push_back(createBoolParam(Keys::ID::SAVE, Keys::LABEL::SAVE));
-        params.push_back(createBoolParam(Keys::ID::LOAD, Keys::LABEL::LOAD));
-        params.push_back(createBoolParam(Keys::ID::SUB_NOTES_PLUS, Keys::LABEL::SUB_NOTES_PLUS));
-        params.push_back(createBoolParam(Keys::ID::SUB_NOTES_MINUS, Keys::LABEL::SUB_NOTES_MINUS));
-        params.push_back(createIntParam(Keys::ID::OCTAVE, Keys::LABEL::OCTAVE, -4, 4, 0));
-        params.push_back(createIntParam(Keys::ID::NOTE, Keys::LABEL::NOTE, 0, 127, 60));
-        params.push_back(createIntParam(Keys::ID::PROBABILITY, Keys::LABEL::PROBABILITY, 0, 100, 100));
-        params.push_back(createIntParam(Keys::ID::MIDI_MODE, Keys::LABEL::MIDI_MODE, 0, 1, 0));
         params.push_back(createIntParam(Keys::ID::NOTE_RANGE_MIN, Keys::LABEL::NOTE_RANGE_MIN, 0, 127, 0));
         params.push_back(createIntParam(Keys::ID::NOTE_RANGE_MAX, Keys::LABEL::NOTE_RANGE_MAX, 0, 127, 127));
-
-        for (int i = 0; i < 8; ++i) {
-            params.push_back(createBoolParam(Keys::ID::stepButtonSelected(i), Keys::LABEL::stepButtonSelected(i)));
-            params.push_back(createBoolParam(Keys::ID::stepButtonHighlighted(i), Keys::LABEL::stepButtonHighlighted(i)));
-        }
-
-        for (int i = 0; i < 7; ++i) {
-            params.push_back(createIntParam(Keys::ID::ccNumber(i), Keys::LABEL::ccNumber(i), 0, 127, i + 1));
-            params.push_back(createIntParam(Keys::ID::ccValue(i), Keys::LABEL::ccValue(i), 0, 127, 64));
-        }
 
         // ========================================
         // NOTE COLOURS (12 customizable note colors, stored as ARGB int)
