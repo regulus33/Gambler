@@ -49,7 +49,8 @@ public:
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
           writeScaleButton(processor),
           scaleLatchButton(processor),
-          scaleClearButton(processor)
+          scaleClearButton(processor),
+          exportButton(Icons::createExportIcon, Icons::createExportIcon, true, false)
     {
         // Add logo component
         addAndMakeVisible(logo);
@@ -110,6 +111,14 @@ public:
         // Add scale clear button
         addAndMakeVisible(scaleClearButton);
         // Note: No callback needed - triggers clear action via APVTS parameter
+
+        // Add export button
+        addAndMakeVisible(exportButton);
+        exportButton.onClick = [this](bool) {
+            if (onExportClicked) {
+                onExportClicked();
+            }
+        };
 
         // Set MIDI learn button colors and stroke width
         // White when OFF (state 1), grey when ON/active (state 2)
@@ -188,6 +197,11 @@ public:
         int scaleClearButtonX = scaleLatchButtonX - buttonSize - buttonGap;
         int scaleClearButtonY = (height - buttonSize) / 2;  // Vertically center
         scaleClearButton.setBounds(scaleClearButtonX, scaleClearButtonY, buttonSize, buttonSize);
+
+        // Position export button left of scale clear button
+        int exportButtonX = scaleClearButtonX - buttonSize - buttonGap;
+        int exportButtonY = (height - buttonSize) / 2;
+        exportButton.setBounds(exportButtonX, exportButtonY, buttonSize, buttonSize);
     }
 
     // Callback when settings button is clicked
@@ -202,6 +216,9 @@ public:
 
     // Callback when stop button is clicked
     std::function<void()> onStopClicked;
+
+    // Callback when export button is clicked
+    std::function<void()> onExportClicked;
 
     // Note: WriteScale button doesn't need a callback - MainScreenComponent checks state directly
 
@@ -250,5 +267,6 @@ private:
     WriteScaleButton writeScaleButton;
     ScaleLatchButton scaleLatchButton;
     ScaleClearButton scaleClearButton;
+    ToggleIconButton exportButton;
 };
 

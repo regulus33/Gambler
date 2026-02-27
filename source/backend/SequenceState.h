@@ -493,6 +493,10 @@ public:
         setIntParam(Params::Keys::ID::CLOCK_SUBDIVISION, juce::jlimit(0, 3, subdivision));
     }
 
+    int getMidiOutputChannel() const {
+        return getIntParam(Params::Keys::ID::MIDI_OUTPUT_CHANNEL);
+    }
+
     // ========================================
     // USER PREFERENCES
     // ========================================

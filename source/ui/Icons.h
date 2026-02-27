@@ -1548,4 +1548,29 @@ public:
         return path;
     }
 
+    /**
+     * Creates an export/download icon (arrow pointing down into a tray)
+     * ViewBox: 0 0 24 24
+     */
+    static juce::Path createExportIcon() {
+        juce::Path path;
+
+        // Down arrow shaft
+        path.startNewSubPath(12.0f, 3.0f);
+        path.lineTo(12.0f, 15.0f);
+
+        // Arrow head
+        path.startNewSubPath(7.0f, 11.0f);
+        path.lineTo(12.0f, 16.0f);
+        path.lineTo(17.0f, 11.0f);
+
+        // Tray (U shape)
+        path.startNewSubPath(4.0f, 14.0f);
+        path.lineTo(4.0f, 20.0f);
+        path.lineTo(20.0f, 20.0f);
+        path.lineTo(20.0f, 14.0f);
+
+        return path;
+    }
+
 };

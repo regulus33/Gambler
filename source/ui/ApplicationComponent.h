@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../PluginProcessor.h"
+#include "../backend/MidiExporter.h"
 #include "MainScreenComponent.h"
 #include "SettingsScreenComponent.h"
 #include "../backend/ClockMode.h"
@@ -67,6 +68,11 @@ public:
             processorRef.stopSequencer();
             // Update button state immediately
             updatePlayPauseButtonState();
+        };
+
+        // Setup export button callback
+        mainScreen.getNavBar().onExportClicked = [this]() {
+            exportMidiFile();
         };
 
         // Note: WriteScale button doesn't need a callback - the logic is handled
@@ -195,6 +201,11 @@ private:
                 processorRef.stopSequencer();
                 // Update button state immediately
                 updatePlayPauseButtonState();
+            };
+
+            // Setup export button callback for settings screen
+            settingsScreen->getNavBar().onExportClicked = [this]() {
+                exportMidiFile();
             };
 
             // Note: WriteScale button doesn't need a callback - the logic is handled
@@ -432,8 +443,28 @@ private:
         }
     }
 
+    void exportMidiFile() {
+        auto midiFile = MidiExporter::createMidiFile(processorRef.getState());
+
+        fileChooser = std::make_unique<juce::FileChooser>(
+            "Save MIDI File",
+            juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                .getChildFile("Gambler-Export.mid"),
+            "*.mid");
+
+        fileChooser->launchAsync(
+            juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles,
+            [midiFile](const juce::FileChooser& chooser) {
+                auto result = chooser.getResult();
+                if (result != juce::File()) {
+                    MidiExporter::writeToFile(midiFile, result);
+                }
+            });
+    }
+
     PluginProcessor& processorRef;
     MainScreenComponent mainScreen;
     std::unique_ptr<SettingsScreenComponent> settingsScreen;
+    std::unique_ptr<juce::FileChooser> fileChooser;
 };
 

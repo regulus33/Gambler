@@ -4,6 +4,7 @@
 #include "SequenceGrid.h"
 #include "StateListenerComponent.h"
 #include "UIConstants.h"
+#include "../backend/MidiExporter.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
@@ -79,6 +80,20 @@ public:
     SequenceGrid& getSequenceGrid() { return sequenceGrid; }
     const SequenceGrid& getSequenceGrid() const { return sequenceGrid; }
 
+    void mouseDown(const juce::MouseEvent&) override {
+        dragStarted = false;
+    }
+
+    void mouseDrag(const juce::MouseEvent& event) override {
+        if (!dragStarted && event.getDistanceFromDragStart() > 10) {
+            dragStarted = true;
+            auto midiFile = MidiExporter::createMidiFile(getState());
+            auto tempFile = MidiExporter::writeToTempFile(midiFile);
+            juce::DragAndDropContainer::performExternalDragDropOfFiles(
+                {tempFile.getFullPathName()}, false, this);
+        }
+    }
+
 protected:
     /**
      * Called on message thread when any subscribed parameter changes.
@@ -95,5 +110,6 @@ protected:
 private:
     juce::Font titleFont;
     SequenceGrid sequenceGrid;
+    bool dragStarted = false;
 };
 
