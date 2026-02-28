@@ -12,6 +12,80 @@
 
 class PluginProcessor;
 
+/**
+ * ExportButton
+ *
+ * A button that supports both click-to-save and drag-to-export.
+ * - Click (mouseUp without drag): fires onClicked callback (opens file chooser)
+ * - Drag (mouseDrag past threshold): fires onDragStarted to get a temp file,
+ *   then initiates external file drag-and-drop into a DAW.
+ *
+ * Renders the export icon using the same style as ToggleIconButton.
+ */
+class ExportButton : public juce::Component {
+public:
+    ExportButton() {}
+
+    void paint(juce::Graphics& g) override {
+        using namespace ToggleIconButtonConstants;
+
+        juce::Path path = Icons::createExportIcon();
+        auto pathBounds = path.getBounds();
+
+        float scale = static_cast<float>(contentSize) /
+            juce::jmax(pathBounds.getWidth(), pathBounds.getHeight());
+
+        juce::AffineTransform transform = juce::AffineTransform::scale(scale)
+            .translated(
+                padding + (contentSize - pathBounds.getWidth() * scale) / 2.0f - (pathBounds.getX() * scale),
+                padding + (contentSize - pathBounds.getHeight() * scale) / 2.0f - (pathBounds.getY() * scale)
+            );
+
+        g.setColour(juce::Colours::white);
+        g.strokePath(path, juce::PathStrokeType(1.5f), transform);
+    }
+
+    void mouseDown(const juce::MouseEvent&) override {
+        didDrag = false;
+    }
+
+    void mouseDrag(const juce::MouseEvent& event) override {
+        if (!didDrag && event.getDistanceFromDragStart() > 8) {
+            didDrag = true;
+            if (onDragStarted) {
+                auto tempFile = onDragStarted();
+                if (tempFile != juce::File()) {
+                    juce::DragAndDropContainer::performExternalDragDropOfFiles(
+                        {tempFile.getFullPathName()}, false, this);
+                }
+            }
+        }
+    }
+
+    void mouseUp(const juce::MouseEvent&) override {
+        if (!didDrag && onClicked) {
+            onClicked();
+        }
+    }
+
+    void mouseEnter(const juce::MouseEvent&) override {
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    }
+
+    void mouseExit(const juce::MouseEvent&) override {
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+    }
+
+    // Fired on click (no drag) — open file chooser
+    std::function<void()> onClicked;
+
+    // Fired on drag — should return a temp MIDI file path
+    std::function<juce::File()> onDragStarted;
+
+private:
+    bool didDrag = false;
+};
+
 namespace NavBarConstants {
     constexpr int height = 45;  // Height of the navbar
     constexpr int logoGapFromTop = 10;  // Gap between top and logo
@@ -49,8 +123,7 @@ public:
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
           writeScaleButton(processor),
           scaleLatchButton(processor),
-          scaleClearButton(processor),
-          exportButton(Icons::createExportIcon, Icons::createExportIcon, true, false)
+          scaleClearButton(processor)
     {
         // Add logo component
         addAndMakeVisible(logo);
@@ -112,12 +185,18 @@ public:
         addAndMakeVisible(scaleClearButton);
         // Note: No callback needed - triggers clear action via APVTS parameter
 
-        // Add export button
+        // Add export button (supports click-to-save and drag-to-DAW)
         addAndMakeVisible(exportButton);
-        exportButton.onClick = [this](bool) {
+        exportButton.onClicked = [this]() {
             if (onExportClicked) {
                 onExportClicked();
             }
+        };
+        exportButton.onDragStarted = [this]() -> juce::File {
+            if (onExportDragStarted) {
+                return onExportDragStarted();
+            }
+            return {};
         };
 
         // Set MIDI learn button colors and stroke width
@@ -217,8 +296,11 @@ public:
     // Callback when stop button is clicked
     std::function<void()> onStopClicked;
 
-    // Callback when export button is clicked
+    // Callback when export button is clicked (opens file chooser)
     std::function<void()> onExportClicked;
+
+    // Callback when export button is dragged (returns temp MIDI file for D&D)
+    std::function<juce::File()> onExportDragStarted;
 
     // Note: WriteScale button doesn't need a callback - MainScreenComponent checks state directly
 
@@ -267,6 +349,6 @@ private:
     WriteScaleButton writeScaleButton;
     ScaleLatchButton scaleLatchButton;
     ScaleClearButton scaleClearButton;
-    ToggleIconButton exportButton;
+    ExportButton exportButton;
 };
 

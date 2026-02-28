@@ -70,9 +70,13 @@ public:
             updatePlayPauseButtonState();
         };
 
-        // Setup export button callback
+        // Setup export button callbacks (click = file chooser, drag = D&D to DAW)
         mainScreen.getNavBar().onExportClicked = [this]() {
             exportMidiFile();
+        };
+        mainScreen.getNavBar().onExportDragStarted = [this]() -> juce::File {
+            auto midiFile = MidiExporter::createMidiFile(processorRef.getState());
+            return MidiExporter::writeToTempFile(midiFile);
         };
 
         // Note: WriteScale button doesn't need a callback - the logic is handled
@@ -203,9 +207,13 @@ private:
                 updatePlayPauseButtonState();
             };
 
-            // Setup export button callback for settings screen
+            // Setup export button callbacks for settings screen
             settingsScreen->getNavBar().onExportClicked = [this]() {
                 exportMidiFile();
+            };
+            settingsScreen->getNavBar().onExportDragStarted = [this]() -> juce::File {
+                auto midiFile = MidiExporter::createMidiFile(processorRef.getState());
+                return MidiExporter::writeToTempFile(midiFile);
             };
 
             // Note: WriteScale button doesn't need a callback - the logic is handled
