@@ -7,10 +7,13 @@
 #include "WriteScaleButton.h"
 #include "ScaleLatchButton.h"
 #include "ScaleClearButton.h"
+#include "sliders/SubdivisionSlider.h"
+#include "../data/Params.h"
+#include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
-class PluginProcessor;
+#include "../PluginProcessor.h"
 
 /**
  * ExportButton
@@ -117,7 +120,8 @@ namespace NavBarConstants {
 class NavBarComponent : public juce::Component {
 public:
     explicit NavBarComponent(PluginProcessor& processor)
-        : settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false, 0.75f, Icons::closeIconScale),
+        : processorRef(processor),
+          settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false, 0.75f, Icons::closeIconScale),
           midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, true),
           playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
@@ -198,6 +202,12 @@ public:
             }
             return {};
         };
+
+        // Add subdivision slider with APVTS attachment
+        addAndMakeVisible(subdivisionSlider);
+        subdivisionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+            processorRef.getAPVTS(), Params::Keys::ID::CLOCK_SUBDIVISION,
+            subdivisionSlider.getSlider());
 
         // Set MIDI learn button colors and stroke width
         // White when OFF (state 1), grey when ON/active (state 2)
@@ -281,6 +291,12 @@ public:
         int exportButtonX = scaleClearButtonX - buttonSize - buttonGap;
         int exportButtonY = (height - buttonSize) / 2;
         exportButton.setBounds(exportButtonX, exportButtonY, buttonSize, buttonSize);
+
+        // Position subdivision slider left of export button
+        int subdivSliderSize = SubdivisionSliderConstants::totalSize;
+        int subdivSliderX = exportButtonX - subdivSliderSize - buttonGap;
+        int subdivSliderY = (height - subdivSliderSize) / 2;
+        subdivisionSlider.setBounds(subdivSliderX, subdivSliderY, subdivSliderSize, subdivSliderSize);
     }
 
     // Callback when settings button is clicked
@@ -339,6 +355,7 @@ public:
     WriteScaleButton& getWriteScaleButton() { return writeScaleButton; }
 
 private:
+    PluginProcessor& processorRef;
     LogoComponent logo;
     PresetSelectorComponent presetSelector;
     juce::Label versionLabel;
@@ -350,5 +367,7 @@ private:
     ScaleLatchButton scaleLatchButton;
     ScaleClearButton scaleClearButton;
     ExportButton exportButton;
+    SubdivisionSlider subdivisionSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> subdivisionAttachment;
 };
 

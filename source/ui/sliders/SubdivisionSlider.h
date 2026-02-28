@@ -1,0 +1,111 @@
+#pragma once
+
+#include "BinaryData.h"
+#include <juce_gui_basics/juce_gui_basics.h>
+
+/**
+ * SubdivisionSlider
+ *
+ * A compact rotary slider for clock subdivision (1/4, 1/8, 1/16, 1/32).
+ * Sized to fit the 45px navbar — 36×36px total with a 24px knob.
+ * Same visual style as NotchedSlider (white stroke ring, white pointer, colored dots)
+ * but without the vertical label or gauge box.
+ */
+
+namespace SubdivisionSliderConstants {
+    constexpr int knobDiameter = 24;
+    constexpr float knobRadius = knobDiameter / 2.0f;
+    constexpr float knobStrokeWidth = 2.0f;
+    constexpr float pointerWidth = 2.5f;
+    constexpr float dotRingRadius = 17.0f;
+    constexpr float dotDiameter = 3.0f;
+    constexpr float dotSelectedScale = 2.0f;
+    constexpr int totalSize = 36;
+}
+
+class SubdivisionSlider : public juce::Component {
+public:
+    SubdivisionSlider() {
+        slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+        slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        slider.setLookAndFeel(&lf);
+        slider.setRange(0.0, 3.0, 1.0);
+        slider.setValue(2.0); // default: 16th notes
+        addAndMakeVisible(slider);
+
+        setSize(SubdivisionSliderConstants::totalSize,
+                SubdivisionSliderConstants::totalSize);
+    }
+
+    ~SubdivisionSlider() override {
+        slider.setLookAndFeel(nullptr);
+    }
+
+    juce::Slider& getSlider() { return slider; }
+
+    void resized() override {
+        slider.setBounds(getLocalBounds());
+    }
+
+private:
+    static constexpr int numNotches = 4;
+
+    static inline const juce::Colour dotColours[numNotches] = {
+        juce::Colour(0xffa78bfa), // purple  – 1/4
+        juce::Colour(0xff60a5fa), // blue    – 1/8
+        juce::Colour(0xff4ade80), // green   – 1/16
+        juce::Colour(0xfffbbf24), // amber   – 1/32
+    };
+
+    class LookAndFeel : public juce::LookAndFeel_V4 {
+    public:
+        void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
+                              float sliderPos, float startAngle, float endAngle,
+                              juce::Slider& s) override
+        {
+            using namespace SubdivisionSliderConstants;
+
+            auto bounds = juce::Rectangle<int>(x, y, width, height).toFloat();
+            auto centre = bounds.getCentre();
+
+            // Hollow knob ring
+            g.setColour(juce::Colours::white);
+            g.drawEllipse(centre.getX() - knobRadius,
+                          centre.getY() - knobRadius,
+                          knobDiameter, knobDiameter,
+                          knobStrokeWidth);
+
+            int currentIndex = juce::jlimit(0, numNotches - 1,
+                                            (int) std::round(s.getValue()));
+
+            // Dots
+            for (int i = 0; i < numNotches; ++i) {
+                float angle = juce::jmap((float) i / (float) (numNotches - 1),
+                                         startAngle, endAngle);
+                auto pt = centre.getPointOnCircumference(dotRingRadius, angle);
+                float d = (i == currentIndex) ? dotDiameter * dotSelectedScale : dotDiameter;
+
+                g.setColour(dotColours[i]);
+                g.fillEllipse(pt.getX() - d * 0.5f,
+                              pt.getY() - d * 0.5f,
+                              d, d);
+            }
+
+            // White pointer
+            float pointerAngle = startAngle + sliderPos * (endAngle - startAngle);
+            auto outer = centre.getPointOnCircumference(knobRadius - 1.5f, pointerAngle);
+            auto inner = centre.getPointOnCircumference(knobRadius * 0.55f, pointerAngle);
+
+            juce::Path pointer;
+            pointer.startNewSubPath(outer);
+            pointer.lineTo(inner);
+
+            g.setColour(juce::Colours::white);
+            g.strokePath(pointer, juce::PathStrokeType(pointerWidth,
+                juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+    };
+
+    juce::Slider slider;
+    LookAndFeel lf;
+};
