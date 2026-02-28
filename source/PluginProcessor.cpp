@@ -741,7 +741,9 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
     }
 
     if (parameterID == Params::Keys::ID::CLOCK_SUBDIVISION) {
-        clock.setSubdivision(static_cast<Subdivision>(static_cast<int>(newValue)));
+        auto newSubdivision = static_cast<Subdivision>(static_cast<int>(newValue));
+        clock.setSubdivision(newSubdivision);
+        dawSync.setSubdivision(newSubdivision);
         DBG("Clock subdivision set to " + juce::String(static_cast<int>(newValue)));
     }
 
