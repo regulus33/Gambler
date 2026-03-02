@@ -432,12 +432,18 @@ public:
     }
 
     /**
-     * Quantize a note to a specific step's scale
-     * Returns -1 (rest) if no scale notes are enabled
+     * Quantize a note to a specific step's scale and clamp to note range.
+     * Range clamping and scale quantization are applied on-the-fly without
+     * modifying stored data — changing the range or scale affects playback
+     * immediately.
+     * Returns -1 (rest) if no scale notes are enabled.
      */
     int quantizeNoteToStepScale(int stepIndex, int noteNumber) const {
-        if (noteNumber < 0) noteNumber = 0;
-        if (noteNumber > 127) noteNumber = 127;
+        int rangeMin = getScaleRangeMin();
+        int rangeMax = getScaleRangeMax();
+
+        // Clamp to note range first
+        noteNumber = juce::jlimit(rangeMin, rangeMax, noteNumber);
 
         // Check if any notes are enabled in this step's scale
         bool anyEnabled = false;
@@ -450,19 +456,23 @@ public:
         // If no notes are enabled, return -1 (rest) to indicate "no note should play"
         if (!anyEnabled) return -1;
 
-        // If already in scale, return it
+        // If already in scale and in range, return it
         if (isNoteInStepScale(stepIndex, noteNumber)) return noteNumber;
 
-        // Find nearest note in scale (prefer lower when equidistant)
-        for (int distance = 1; distance <= 12; distance++) {
+        // Find nearest note in scale within the range (prefer lower when equidistant)
+        for (int distance = 1; distance <= 127; distance++) {
             int downNote = noteNumber - distance;
-            if (downNote >= 0 && isNoteInStepScale(stepIndex, downNote)) return downNote;
+            if (downNote >= rangeMin && isNoteInStepScale(stepIndex, downNote)) return downNote;
 
             int upNote = noteNumber + distance;
-            if (upNote <= 127 && isNoteInStepScale(stepIndex, upNote)) return upNote;
+            if (upNote <= rangeMax && isNoteInStepScale(stepIndex, upNote)) return upNote;
+
+            // Stop searching if both directions are out of range
+            if (downNote < rangeMin && upNote > rangeMax) break;
         }
 
-        return noteNumber;
+        // No scale note found in range — return as rest
+        return -1;
     }
 
     // ========================================
