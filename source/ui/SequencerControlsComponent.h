@@ -75,16 +75,6 @@ namespace SequencerControlsConstants {
  */
 class SequencerControlsComponent : public StateListenerComponent {
 public:
-    // Button position indices
-    static constexpr int kPosition0 = 0;  // Roll (always)
-    static constexpr int kPosition1 = 1;  // Page Left / Duplicate
-    static constexpr int kPosition2 = 2;  // Page Right / Clear Window
-    static constexpr int kPosition3 = 3;  // Length+ / Clear Step
-    static constexpr int kPosition4 = 4;  // Length- / Randomize All
-    static constexpr int kPosition5 = 5;  // Nudge Left / Randomize Step
-    static constexpr int kPosition6 = 6;  // Nudge Right / Shuffle
-    static constexpr int kPosition7 = 7;  // Shift (always)
-
     explicit SequencerControlsComponent(PluginProcessor& processor)
         : StateListenerComponent(processor)
         // Always-visible buttons
@@ -141,29 +131,28 @@ public:
     void resized() override {
         using namespace SequencerControlsConstants;
         int size = static_cast<int>(buttonSize);
-        int spacing = static_cast<int>(buttonSize + gap);
+        int stride = static_cast<int>(buttonSize + gap);
 
-        // Position 0: Roll (always visible)
-        rollButton.setBounds(kPosition0 * spacing, 0, size, size);
+        // Helper to position a button at a grid slot
+        auto place = [&](juce::Component& comp, int slot) {
+            comp.setBounds(slot * stride, 0, size, size);
+        };
 
-        // Position 7: Shift (always visible)
-        shiftButton.setBounds(kPosition7 * spacing, 0, size, size);
+        // Always-visible buttons
+        place(rollButton, 0);
+        place(shiftButton, 7);
 
-        // Positions 1-6: Normal mode buttons
-        pageLeftButton.setBounds(kPosition1 * spacing, 0, size, size);
-        pageRightButton.setBounds(kPosition2 * spacing, 0, size, size);
-        lengthPlusButton.setBounds(kPosition3 * spacing, 0, size, size);
-        lengthMinusButton.setBounds(kPosition4 * spacing, 0, size, size);
-        nudgeLeftButton.setBounds(kPosition5 * spacing, 0, size, size);
-        nudgeRightButton.setBounds(kPosition6 * spacing, 0, size, size);
+        // Normal mode buttons (positions 1-6)
+        juce::Component* normalButtons[] = { &pageLeftButton, &pageRightButton, &lengthPlusButton,
+                                              &lengthMinusButton, &nudgeLeftButton, &nudgeRightButton };
+        // Shift mode buttons (same positions, different buttons)
+        juce::Component* shiftButtons[] = { &duplicateButton, &clearWindowButton, &clearStepButton,
+                                             &randomizeAllButton, &randomizeStepButton, &shuffleButton };
 
-        // Positions 1-6: Shift mode buttons (same positions, different buttons)
-        duplicateButton.setBounds(kPosition1 * spacing, 0, size, size);
-        clearWindowButton.setBounds(kPosition2 * spacing, 0, size, size);
-        clearStepButton.setBounds(kPosition3 * spacing, 0, size, size);
-        randomizeAllButton.setBounds(kPosition4 * spacing, 0, size, size);
-        randomizeStepButton.setBounds(kPosition5 * spacing, 0, size, size);
-        shuffleButton.setBounds(kPosition6 * spacing, 0, size, size);
+        for (int i = 0; i < 6; ++i) {
+            place(*normalButtons[i], i + 1);
+            place(*shiftButtons[i], i + 1);
+        }
     }
 
     bool isShiftActive() const {

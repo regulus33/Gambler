@@ -28,6 +28,8 @@ namespace NotchedSliderConstants {
     constexpr float dotRingRadius = 27.0f;
     constexpr float dotDiameter = 3.0f;
     constexpr float dotSelectedScale = 2.0f;
+    // Interaction area: knob + enough space for dot ring + padding
+    constexpr int sliderInteractionPadding = static_cast<int>(dotRingRadius * 2) - knobDiameter + 5;  // 21
     // Label
     constexpr int labelWidth = 28;
     constexpr int labelGap = 24;
@@ -169,7 +171,7 @@ public:
         auto area = getLocalBounds();
 
         // Centre the slider in the area
-        const int sliderSize = knobDiameter + 21; // knob diameter + dot ring space
+        const int sliderSize = knobDiameter + sliderInteractionPadding;
         auto sliderBounds = juce::Rectangle<int> (0, 0, sliderSize, sliderSize).withCentre (area.getCentre());
         sliderBounds.translate (0, -sliderYOffset);
         slider.setBounds (sliderBounds);
@@ -180,7 +182,7 @@ public:
         labelBounds = juce::Rectangle<int> (labelX, labelY, labelWidth, labelWidth);
 
         // Position gauge below the slider
-        const int sliderVisualBottom = sliderBounds.getCentreY() + (knobDiameter / 2 + 2) - 2;
+        const int sliderVisualBottom = sliderBounds.getCentreY() + knobDiameter / 2;
         auto gaugeRect = juce::Rectangle<int> (0, 0, gaugeWidth, gaugeHeight);
         auto centreY = sliderVisualBottom + gaugeGap + gaugeHeight / 2;
         gaugeBounds = gaugeRect.withCentre ({ sliderBounds.getCentreX(), centreY });

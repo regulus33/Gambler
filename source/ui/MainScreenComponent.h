@@ -16,38 +16,33 @@
 namespace MainScreenLayout {
     // Background
     constexpr juce::uint32 bgColourHex = 0xFF1E1E1E;
-    // Spacing
-    constexpr int navBarGapFromContent = 25;  // Gap between navbar and content below
-    // Piano roll / MIDI data panel
-    constexpr int pianoRollX = 22;
-    constexpr int pianoRollY = NavBarConstants::height + navBarGapFromContent;
+
+    // Margins
+    constexpr int marginLeft = 22;
+    constexpr int marginRight = 22;
+
+    // Title row (between navbar and content)
+    constexpr int titleRowHeight = 25;
+    constexpr float titleFontSize = 16.0f;
+
+    // Top content row
     constexpr int pianoRollWidth = 422;
     constexpr int pianoRollHeight = 206;
-    // Main controls
-    constexpr int mainControlsOverflowTop = 35;
-    constexpr int mainControlsOverflowBottom = 0;
-    constexpr int mainControlsGapFromPianoRoll = 18;
     constexpr int mainControlsWidth = 198;
-    // Sequence overview
-    constexpr int sequenceOverviewGapFromMainControls = 18;
     constexpr int sequenceOverviewWidth = 198;
-    constexpr int sequenceOverviewHeight = 260;
-    // Subsequence controls
-    constexpr int subsequenceControlsGap = 40;
     constexpr int subsequenceControlsWidth = SubsequenceControlsConstants::containerWidth;
-    constexpr int subsequenceControlsHeight = 260;
-    // Sequencer
-    constexpr int sequencerX = 22;
-    constexpr int gapAboveSequencerSteps = 20;  // Vertical gap between piano roll area and sequencer steps
-    constexpr int sequencerStepsY = pianoRollY + pianoRollHeight + gapAboveSequencerSteps;
+    constexpr int topRowGap = 18;            // horizontal gap between panels
+    constexpr int subsequenceExtraGap = 22;  // extra gap before subsequence
+
+    // Top content row height (tallest panel determines the row height)
+    constexpr int topContentHeight = 225;  // sequence grid (196) + padding
+
+    // Sequencer rows
+    constexpr int gapAboveSequencer = 20;
     constexpr int sequencerWidth = 862;
-    constexpr int sequencerStepsHeight = 92;
-    constexpr int gapBetweenSequencerStepsAndControls = 14;  // Vertical gap between sequencer steps and controls
-    constexpr int sequencerControlsY = sequencerStepsY + sequencerStepsHeight + gapBetweenSequencerStepsAndControls;
-    constexpr int sequencerControlsHeight = 92;
-    // Note range controls (right of sequencer)
-    constexpr int noteRangeControlsGap = 18;
-    constexpr int noteRangeControlsRightMargin = 22;
+    constexpr int stepHeight = 92;
+    constexpr int gapBetweenStepRows = 14;
+    constexpr int noteRangeGap = 18;
 }
 
 /**
@@ -73,6 +68,11 @@ class MainScreenComponent : public juce::Component,
 public:
     explicit MainScreenComponent(PluginProcessor& processor)
         : processorRef(processor),
+          titleFont(juce::FontOptions(
+              juce::Typeface::createSystemTypefaceFor(
+                  BinaryData::Inter_24ptBold_ttf,
+                  BinaryData::Inter_24ptBold_ttfSize))
+              .withHeight(MainScreenLayout::titleFontSize)),
           navBar(processor),
           pianoRoll(processor),
           sequencerSteps(processor),
@@ -253,7 +253,19 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
-        g.fillAll(juce::Colour(MainScreenLayout::bgColourHex));
+        using namespace MainScreenLayout;
+        g.fillAll(juce::Colour(bgColourHex));
+
+        // Draw section titles in the title row (above their respective panels)
+        g.setFont(titleFont);
+        g.setColour(juce::Colours::white);
+
+        auto titleRect = [&](const juce::Component& comp) {
+            return juce::Rectangle<int>(comp.getX(), comp.getY() - titleRowHeight, comp.getWidth(), titleRowHeight);
+        };
+        g.drawText("Main Controls", titleRect(mainControls), juce::Justification::centred, false);
+        g.drawText("Sequence", titleRect(sequenceOverview), juce::Justification::centred, false);
+        g.drawText("Subseq", titleRect(subsequenceControls), juce::Justification::centred, false);
     }
 
     void resized() override {
@@ -261,40 +273,41 @@ public:
 
         auto area = getLocalBounds();
 
-        // Position navbar at the top
+        // Row 1: Navbar
         navBar.setBounds(area.removeFromTop(NavBarConstants::height));
 
-        // Position piano roll
-        pianoRoll.setBounds(pianoRollX, pianoRollY, pianoRollWidth, pianoRollHeight);
+        // Row 2: Title row (just reserves space — titles drawn in paint)
+        area.removeFromTop(titleRowHeight);
 
-        // Position main controls to the right of the piano roll / MIDI data panel
-        int mainControlsX = pianoRollX + pianoRollWidth + mainControlsGapFromPianoRoll;
-        int mainControlsY = pianoRollY - mainControlsOverflowTop;
-        int mainControlsHeight = pianoRollHeight + mainControlsOverflowTop + mainControlsOverflowBottom;
-        mainControls.setBounds(mainControlsX, mainControlsY, mainControlsWidth, mainControlsHeight);
+        // Row 3: Top content (piano roll + panels)
+        auto topRow = area.removeFromTop(topContentHeight);
+        topRow.removeFromLeft(marginLeft);
+        topRow.removeFromRight(marginRight);
 
-        // Position sequence overview to the right of main controls
-        int sequenceOverviewX = mainControlsX + mainControlsWidth + sequenceOverviewGapFromMainControls;
-        int sequenceOverviewY = mainControlsY;
-        sequenceOverview.setBounds(sequenceOverviewX, sequenceOverviewY, sequenceOverviewWidth, sequenceOverviewHeight);
+        pianoRoll.setBounds(topRow.removeFromLeft(pianoRollWidth).withHeight(pianoRollHeight));
+        topRow.removeFromLeft(topRowGap);
+        mainControls.setBounds(topRow.removeFromLeft(mainControlsWidth));
+        topRow.removeFromLeft(topRowGap);
+        sequenceOverview.setBounds(topRow.removeFromLeft(sequenceOverviewWidth));
+        topRow.removeFromLeft(subsequenceExtraGap);
+        subsequenceControls.setBounds(topRow.removeFromLeft(subsequenceControlsWidth));
 
-        // Position subsequence controls to the right of sequence overview
-        int subsequenceControlsX = sequenceOverviewX + sequenceOverviewWidth + subsequenceControlsGap;
-        int subsequenceControlsY = mainControlsY;
-        subsequenceControls.setBounds(subsequenceControlsX, subsequenceControlsY, subsequenceControlsWidth, subsequenceControlsHeight);
+        // Row 4 & 5: Sequencer steps + controls with note range on the right
+        area.removeFromTop(gapAboveSequencer);
 
-        // Position sequencer steps
-        sequencerSteps.setBounds(sequencerX, sequencerStepsY, sequencerWidth, sequencerStepsHeight);
+        auto bottomArea = area;
+        bottomArea.removeFromLeft(marginLeft);
+        bottomArea.removeFromRight(marginRight);
 
-        // Position sequencer controls
-        sequencerControls.setBounds(sequencerX, sequencerControlsY, sequencerWidth, sequencerControlsHeight);
+        auto sequencerArea = bottomArea.removeFromLeft(sequencerWidth);
+        bottomArea.removeFromLeft(noteRangeGap);
+        auto noteRangeArea = bottomArea;
 
-        // Position note range controls (right of sequencer)
-        int noteRangeControlsX = sequencerX + sequencerWidth + noteRangeControlsGap;
-        int noteRangeControlsY = sequencerStepsY;
-        int noteRangeControlsWidth = getWidth() - noteRangeControlsX - noteRangeControlsRightMargin;
-        int noteRangeControlsHeight = (sequencerControlsY - sequencerStepsY) + sequencerControlsHeight;
-        noteRangeControls.setBounds(noteRangeControlsX, noteRangeControlsY, noteRangeControlsWidth, noteRangeControlsHeight);
+        sequencerSteps.setBounds(sequencerArea.removeFromTop(stepHeight));
+        sequencerArea.removeFromTop(gapBetweenStepRows);
+        sequencerControls.setBounds(sequencerArea.removeFromTop(stepHeight));
+
+        noteRangeControls.setBounds(noteRangeArea.withHeight(stepHeight * 2 + gapBetweenStepRows));
     }
 
     // Accessors for testing
@@ -619,6 +632,7 @@ private:
     }
 
     PluginProcessor& processorRef;
+    juce::Font titleFont;
 
     NavBarComponent navBar;
     PianoRollComponent pianoRoll;

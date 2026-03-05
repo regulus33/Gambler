@@ -1,17 +1,10 @@
 #pragma once
 
-#include "BinaryData.h"
 #include "SequenceGrid.h"
 #include "StateListenerComponent.h"
-#include "UIConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
-#include <functional>
 
 namespace SequenceOverviewConstants {
-    // Title
-    constexpr float titleFontSize = 16.0f;
-    constexpr int titleHeight = 24;
-    constexpr int gapBelowTitle = 13;
     // Container layout
     constexpr int containerWidth = 198;
     // Grid positioning (centered within container)
@@ -22,7 +15,6 @@ namespace SequenceOverviewConstants {
  * SequenceOverviewComponent
  *
  * Top-level container for the Sequence Overview UI.
- * - Title "Sequence" at the top
  * - SequenceGrid (8x8 grid of colored squares)
  *
  * Observer Pattern:
@@ -32,12 +24,7 @@ namespace SequenceOverviewConstants {
 class SequenceOverviewComponent : public StateListenerComponent {
 public:
     explicit SequenceOverviewComponent(PluginProcessor& processor)
-        : StateListenerComponent(processor),
-          titleFont (juce::FontOptions (
-              juce::Typeface::createSystemTypefaceFor (
-                  BinaryData::Inter_24ptBold_ttf,
-                  BinaryData::Inter_24ptBold_ttfSize))
-              .withHeight (SequenceOverviewConstants::titleFontSize))
+        : StateListenerComponent(processor)
     {
         addAndMakeVisible (sequenceGrid);
 
@@ -49,28 +36,13 @@ public:
         listenToSequenceMetadata();
     }
 
-    void paint (juce::Graphics& g) override {
-        using namespace SequenceOverviewConstants;
-        g.fillAll (juce::Colours::transparentBlack);
-
-        g.setFont (titleFont);
-        g.setColour (juce::Colours::white);
-
-        auto area = getLocalBounds();
-        auto titleArea = area.removeFromTop (titleHeight);
-        titleArea.translate (0, UIConstants::titleYOffset);
-        g.drawText ("Sequence", titleArea, juce::Justification::centred, false);
-    }
-
     void resized() override {
         using namespace SequenceOverviewConstants;
-
-        int gridY = titleHeight + gapBelowTitle;
 
         // Center the grid horizontally
         sequenceGrid.setBounds (
             gridHorizontalPadding,
-            gridY,
+            0,
             SequenceGridConstants::gridWidth,
             SequenceGridConstants::gridHeight);
     }
@@ -93,6 +65,5 @@ protected:
     }
 
 private:
-    juce::Font titleFont;
     SequenceGrid sequenceGrid;
 };

@@ -38,24 +38,10 @@ public:
 
     void paint(juce::Graphics& g) override {
         using namespace ScaleClearButtonConstants;
-
-        // Get the eraser icon
-        juce::Path path = Icons::createEraserIcon();
-        juce::Colour color = isPressed ? juce::Colours::grey : juce::Colours::white;
-
-        // Scale and center the icon
-        auto pathBounds = path.getBounds();
-        float scale = static_cast<float>(contentSize) / juce::jmax(pathBounds.getWidth(), pathBounds.getHeight());
-
-        juce::AffineTransform transform = juce::AffineTransform::scale(scale)
-            .translated(
-                padding + (contentSize - pathBounds.getWidth() * scale) / 2.0f - (pathBounds.getX() * scale),
-                padding + (contentSize - pathBounds.getHeight() * scale) / 2.0f - (pathBounds.getY() * scale)
-            );
-
-        // Draw the icon
-        g.setColour(color);
-        g.fillPath(path, transform);
+        auto path = Icons::createEraserIcon();
+        auto iconArea = juce::Rectangle<float>(padding, padding, contentSize, contentSize);
+        auto color = isPressed ? juce::Colours::grey : juce::Colours::white;
+        Icons::drawIcon(g, path, iconArea, color);
     }
 
     void mouseDown(const juce::MouseEvent&) override {

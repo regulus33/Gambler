@@ -38,24 +38,9 @@ public:
 
     void paint(juce::Graphics& g) override {
         using namespace ScaleLatchButtonConstants;
-
-        // Get the appropriate icon based on latch state
-        juce::Path path = isParamOn() ? Icons::createLockClosedIcon() : Icons::createLockOpenIcon();
-        juce::Colour color = juce::Colours::white;
-
-        // Scale and center the icon
-        auto pathBounds = path.getBounds();
-        float scale = static_cast<float>(contentSize) / juce::jmax(pathBounds.getWidth(), pathBounds.getHeight());
-
-        juce::AffineTransform transform = juce::AffineTransform::scale(scale)
-            .translated(
-                padding + (contentSize - pathBounds.getWidth() * scale) / 2.0f - (pathBounds.getX() * scale),
-                padding + (contentSize - pathBounds.getHeight() * scale) / 2.0f - (pathBounds.getY() * scale)
-            );
-
-        // Draw the icon
-        g.setColour(color);
-        g.strokePath(path, juce::PathStrokeType(1.5f), transform);
+        auto path = isParamOn() ? Icons::createLockClosedIcon() : Icons::createLockOpenIcon();
+        auto iconArea = juce::Rectangle<float>(padding, padding, contentSize, contentSize);
+        Icons::strokeIcon(g, path, iconArea, juce::Colours::white, 1.5f, true, 1.0f);
     }
 
     void mouseDown(const juce::MouseEvent&) override {

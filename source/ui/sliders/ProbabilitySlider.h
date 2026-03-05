@@ -26,9 +26,10 @@
 namespace AnalogueSliderConstants {
     constexpr int knobDiameter = 38;
     constexpr float knobRadius = knobDiameter / 2.0f;
-    constexpr float knobStrokeWidth = 3.0f; // change width of stroke around
+    constexpr float knobStrokeWidth = 3.0f;
     constexpr float thumbWidth = 3.0f;
     constexpr int sliderYOffset = 6;
+    constexpr int sliderInteractionPadding = 21;  // extra space around knob for interaction
     constexpr int labelWidth = 28;
     constexpr int labelGap = 18;
     constexpr int labelYOffset = 7;
@@ -190,7 +191,7 @@ public:
         auto area = getLocalBounds();
 
         // Centre the slider in the area
-        const int sliderSize = knobDiameter + 21; // knob diameter + some space for interaction
+        const int sliderSize = knobDiameter + sliderInteractionPadding;
         auto sliderBounds = juce::Rectangle<int> (0, 0, sliderSize, sliderSize).withCentre (area.getCentre());
         sliderBounds.translate (0, -sliderYOffset);
         slider.setBounds (sliderBounds);
@@ -201,7 +202,7 @@ public:
         labelBounds = juce::Rectangle<int> (labelX, labelY, labelWidth, labelWidth);
 
         // Position gauge below the slider
-        const int sliderVisualBottom = sliderBounds.getCentreY() + (knobDiameter / 2 + 2) - 2;
+        const int sliderVisualBottom = sliderBounds.getCentreY() + knobDiameter / 2;
         auto gaugeRect = juce::Rectangle<int> (0, 0, gaugeWidth, gaugeHeight);
         auto centreY = sliderVisualBottom + gaugeGap + gaugeHeight / 2;
         gaugeBounds = gaugeRect.withCentre ({ sliderBounds.getCentreX(), centreY });

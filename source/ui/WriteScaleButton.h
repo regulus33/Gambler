@@ -44,33 +44,13 @@ public:
 
     void paint(juce::Graphics& g) override {
         using namespace WriteScaleButtonConstants;
+        auto path = Icons::createRecordIcon();
+        auto iconArea = juce::Rectangle<float>(padding, padding, iconSize, iconSize);
 
-        // Create the record icon (circle)
-        juce::Path path = Icons::createRecordIcon();
-        auto pathBounds = path.getBounds();
-
-        // Calculate scale factor to fit path into icon area
-        float scale = static_cast<float>(iconSize) / juce::jmax(pathBounds.getWidth(), pathBounds.getHeight());
-
-        // Apply transform: scale and translate to center in button with padding
-        juce::AffineTransform transform = juce::AffineTransform::scale(scale)
-            .translated(
-                padding + (iconSize - pathBounds.getWidth() * scale) / 2.0f - (pathBounds.getX() * scale),
-                padding + (iconSize - pathBounds.getHeight() * scale) / 2.0f - (pathBounds.getY() * scale)
-            );
-
-        // Read toggle state from APVTS parameter
-        bool isOn = isParamOn();
-
-        if (isOn) {
-            // Toggled ON: filled red circle
-            g.setColour(juce::Colour(0xFFFF0000));  // Red
-            g.fillPath(path, transform);
-        } else {
-            // Toggled OFF: white stroke circle with clear fill
-            g.setColour(juce::Colours::white);
-            g.strokePath(path, juce::PathStrokeType(1.5f), transform);
-        }
+        if (isParamOn())
+            Icons::drawIcon(g, path, iconArea, juce::Colour(0xFFFF0000));
+        else
+            Icons::strokeIcon(g, path, iconArea, juce::Colours::white, 1.5f, true, 1.0f);
     }
 
     void mouseDown(const juce::MouseEvent& /*event*/) override {

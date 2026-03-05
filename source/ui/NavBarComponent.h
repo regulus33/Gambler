@@ -31,21 +31,9 @@ public:
 
     void paint(juce::Graphics& g) override {
         using namespace ToggleIconButtonConstants;
-
-        juce::Path path = Icons::createExportIcon();
-        auto pathBounds = path.getBounds();
-
-        float scale = static_cast<float>(contentSize) /
-            juce::jmax(pathBounds.getWidth(), pathBounds.getHeight());
-
-        juce::AffineTransform transform = juce::AffineTransform::scale(scale)
-            .translated(
-                padding + (contentSize - pathBounds.getWidth() * scale) / 2.0f - (pathBounds.getX() * scale),
-                padding + (contentSize - pathBounds.getHeight() * scale) / 2.0f - (pathBounds.getY() * scale)
-            );
-
-        g.setColour(juce::Colours::white);
-        g.strokePath(path, juce::PathStrokeType(1.5f), transform);
+        auto path = Icons::createExportIcon();
+        auto iconArea = juce::Rectangle<float>(padding, padding, contentSize, contentSize);
+        Icons::strokeIcon(g, path, iconArea, juce::Colours::white, 1.5f, true, 1.0f);
     }
 
     void mouseDown(const juce::MouseEvent&) override {
@@ -90,20 +78,19 @@ private:
 };
 
 namespace NavBarConstants {
-    constexpr int height = 45;  // Height of the navbar
-    constexpr int logoGapFromTop = 10;  // Gap between top and logo
-    constexpr int presetSelectorGapFromLogo = 20;  // Gap between logo and preset selector
+    constexpr int height = 45;
+    constexpr int marginLeft = 22;
+    constexpr int marginRight = 10;
+    constexpr int buttonSize = ToggleIconButtonConstants::totalSize;  // 36px
+    constexpr int buttonGap = 10;
+    constexpr int presetSelectorGap = 20;
     constexpr int versionLabelWidth = 60;
     constexpr int versionLabelHeight = 20;
-    constexpr int versionLabelMarginRight = 10;  // Gap between version and MIDI learn button
-    constexpr int buttonSize = ToggleIconButtonConstants::totalSize;  // 36px
-    constexpr int buttonGap = 10;  // Gap between buttons
-    constexpr int settingsButtonOffsetRight = 46;  // Offset from right edge
 
     // Transport button colors
     const juce::Colour inactiveColor = juce::Colours::white;
-    const juce::Colour activePlayColor = juce::Colour(0xff4ade80);  // Green-400 for playing state
-    const juce::Colour activeStopColor = juce::Colour(0xfff87171);  // Red-400 for stopped state
+    const juce::Colour activePlayColor = juce::Colour(0xff4ade80);
+    const juce::Colour activeStopColor = juce::Colour(0xfff87171);
 }
 
 /**
@@ -224,79 +211,45 @@ public:
         stopButton.setColor2(NavBarConstants::inactiveColor);
     }
 
-    void paint(juce::Graphics& g) override {
-        // Navbar has transparent background - parent will paint the background
-    }
-
     void resized() override {
         using namespace NavBarConstants;
 
-        auto area = getLocalBounds();
+        auto area = getLocalBounds().reduced(marginLeft, 0).withTrimmedRight(marginRight - marginLeft);
 
-        // Position logo on the left, centered vertically
-        int logoWidth = logo.getCalculatedWidth();
-        int logoHeight = logo.getCalculatedHeight();
-        int logoX = 22;  // Match left margin from main layout
-        int logoY = (height - logoHeight) / 2;
-        logo.setBounds(logoX, logoY, logoWidth, logoHeight);
+        // Helper to add a fixed-size item centered vertically
+        auto addItem = [&](juce::FlexBox& fb, juce::Component& comp, float w, float h, float gap = 0.0f) {
+            fb.items.add(juce::FlexItem(comp).withWidth(w).withHeight(h).withMargin({0, 0, 0, gap}));
+        };
 
-        // Position preset selector to the right of logo
-        int presetSelectorWidth = presetSelector.getCalculatedWidth();
-        int presetSelectorHeight = presetSelector.getCalculatedHeight();
-        int presetSelectorX = logoX + logoWidth + presetSelectorGapFromLogo;
-        int presetSelectorY = (height - presetSelectorHeight) / 2;
-        presetSelector.setBounds(presetSelectorX, presetSelectorY, presetSelectorWidth, presetSelectorHeight);
+        juce::FlexBox fb;
+        fb.flexDirection = juce::FlexBox::Direction::row;
+        fb.alignItems = juce::FlexBox::AlignItems::center;
 
-        // Position settings button in top right corner
-        int settingsButtonX = getWidth() - buttonSize - settingsButtonOffsetRight;
-        int settingsButtonY = (height - buttonSize) / 2;  // Vertically center
-        settingsButton.setBounds(settingsButtonX, settingsButtonY, buttonSize, buttonSize);
+        // Left group: logo + preset selector
+        addItem(fb, logo, static_cast<float>(logo.getCalculatedWidth()), static_cast<float>(logo.getCalculatedHeight()));
+        addItem(fb, presetSelector, static_cast<float>(presetSelector.getCalculatedWidth()),
+                static_cast<float>(presetSelector.getCalculatedHeight()), presetSelectorGap);
 
-        // Position MIDI learn button left of settings button
-        int midiLearnButtonX = settingsButtonX - buttonSize - buttonGap;
-        int midiLearnButtonY = (height - buttonSize) / 2;  // Vertically center
-        midiLearnButton.setBounds(midiLearnButtonX, midiLearnButtonY, buttonSize, buttonSize);
+        // Flexible spacer pushes remaining items to the right
+        fb.items.add(juce::FlexItem().withFlex(1.0f));
 
-        // Position version label left of MIDI learn button
-        int versionLabelX = midiLearnButtonX - versionLabelWidth - versionLabelMarginRight;
-        int versionLabelY = (height - versionLabelHeight) / 2;  // Vertically center
-        versionLabel.setBounds(versionLabelX, versionLabelY, versionLabelWidth, versionLabelHeight);
+        // Right group: tool buttons, transport, version, settings
+        float bs = static_cast<float>(buttonSize);
+        float bg = static_cast<float>(buttonGap);
+        float ss = static_cast<float>(SubdivisionSliderConstants::totalSize);
 
-        // Position stop button left of version label
-        int stopButtonX = versionLabelX - buttonSize - buttonGap;
-        int stopButtonY = (height - buttonSize) / 2;  // Vertically center
-        stopButton.setBounds(stopButtonX, stopButtonY, buttonSize, buttonSize);
+        addItem(fb, subdivisionSlider, ss, ss);
+        addItem(fb, exportButton, bs, bs, bg);
+        addItem(fb, scaleClearButton, bs, bs, bg);
+        addItem(fb, scaleLatchButton, bs, bs, bg);
+        addItem(fb, writeScaleButton, bs, bs, bg);
+        addItem(fb, playPauseButton, bs, bs, bg);
+        addItem(fb, stopButton, bs, bs, bg);
+        addItem(fb, versionLabel, static_cast<float>(versionLabelWidth), static_cast<float>(versionLabelHeight), bg);
+        addItem(fb, midiLearnButton, bs, bs, bg);
+        addItem(fb, settingsButton, bs, bs, bg);
 
-        // Position play/pause button left of stop button
-        int playPauseButtonX = stopButtonX - buttonSize - buttonGap;
-        int playPauseButtonY = (height - buttonSize) / 2;  // Vertically center
-        playPauseButton.setBounds(playPauseButtonX, playPauseButtonY, buttonSize, buttonSize);
-
-        // Position write scale button left of play/pause button
-        int writeScaleButtonX = playPauseButtonX - buttonSize - buttonGap;
-        int writeScaleButtonY = (height - buttonSize) / 2;  // Vertically center
-        writeScaleButton.setBounds(writeScaleButtonX, writeScaleButtonY, buttonSize, buttonSize);
-
-        // Position scale latch button left of write scale button
-        int scaleLatchButtonX = writeScaleButtonX - buttonSize - buttonGap;
-        int scaleLatchButtonY = (height - buttonSize) / 2;  // Vertically center
-        scaleLatchButton.setBounds(scaleLatchButtonX, scaleLatchButtonY, buttonSize, buttonSize);
-
-        // Position scale clear button left of scale latch button
-        int scaleClearButtonX = scaleLatchButtonX - buttonSize - buttonGap;
-        int scaleClearButtonY = (height - buttonSize) / 2;  // Vertically center
-        scaleClearButton.setBounds(scaleClearButtonX, scaleClearButtonY, buttonSize, buttonSize);
-
-        // Position export button left of scale clear button
-        int exportButtonX = scaleClearButtonX - buttonSize - buttonGap;
-        int exportButtonY = (height - buttonSize) / 2;
-        exportButton.setBounds(exportButtonX, exportButtonY, buttonSize, buttonSize);
-
-        // Position subdivision slider left of export button
-        int subdivSliderSize = SubdivisionSliderConstants::totalSize;
-        int subdivSliderX = exportButtonX - subdivSliderSize - buttonGap;
-        int subdivSliderY = (height - subdivSliderSize) / 2;
-        subdivisionSlider.setBounds(subdivSliderX, subdivSliderY, subdivSliderSize, subdivSliderSize);
+        fb.performLayout(area.toFloat());
     }
 
     // Callback when settings button is clicked

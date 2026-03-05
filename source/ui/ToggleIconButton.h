@@ -52,35 +52,15 @@ public:
     void paint (juce::Graphics& g) override {
         using namespace ToggleIconButtonConstants;
 
-        // Get the appropriate icon path, color, and scale based on toggle state
-        juce::Path path = isToggled ? iconPath2() : iconPath1();
-        juce::Colour color = isToggled ? color2 : color1;
+        auto path = isToggled ? iconPath2() : iconPath1();
+        auto color = isToggled ? color2 : color1;
         float iconScale = isToggled ? iconScale2 : iconScale1;
+        auto iconArea = juce::Rectangle<float>(padding, padding, contentSize, contentSize);
 
-        // The original path is designed for various bounding boxes
-        // We need to scale it to fit within the contentSize (20px)
-        auto pathBounds = path.getBounds();
-
-        // Calculate scale factor to fit path into content area
-        float scale = static_cast<float>(contentSize) / juce::jmax(pathBounds.getWidth(), pathBounds.getHeight());
-
-        // Apply additional icon scale
-        scale *= iconScale;
-
-        // Apply transform: scale and translate to center in content area with padding
-        juce::AffineTransform transform = juce::AffineTransform::scale(scale)
-            .translated(
-                padding + (contentSize - pathBounds.getWidth() * scale) / 2.0f - (pathBounds.getX() * scale),
-                padding + (contentSize - pathBounds.getHeight() * scale) / 2.0f - (pathBounds.getY() * scale)
-            );
-
-        // Draw the icon with the appropriate color
-        g.setColour(color);
-        if (drawWithStroke) {
-            g.strokePath(path, juce::PathStrokeType(1.5f), transform);
-        } else {
-            g.fillPath(path, transform);
-        }
+        if (drawWithStroke)
+            Icons::strokeIcon(g, path, iconArea, color, 1.5f, true, iconScale);
+        else
+            Icons::drawIcon(g, path, iconArea, color, true, iconScale);
     }
 
     void mouseDown (const juce::MouseEvent& /*event*/) override {

@@ -1,10 +1,7 @@
 #pragma once
 
 #include "BinaryData.h"
-#include "MusicConstants.h"
-#include "SequenceGrid.h"  // For SquareState and constants
 #include "StateListenerComponent.h"
-#include "UIConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 #include <array>
@@ -14,10 +11,6 @@ namespace SubsequenceControlsConstants {
     // Current unscaled height: title(24) + gap(13) + bars(157) + gap(16) + buttons(15) = 225px
     // To fit in 196px with title fixed: (196 - 24) / (13 + 157 + 16 + 15) = 172 / 201 ≈ 0.856
     constexpr float heightScaleFactor = 1.1f;
-
-    // Title (not scaled)
-    constexpr float titleFontSize = 16.0f;
-    constexpr int titleHeight = 24;
 
     // Base dimensions (before scaling)
     constexpr int baseGapBelowTitle = 13;
@@ -57,8 +50,8 @@ namespace SubsequenceControlsConstants {
     constexpr int horizontalPadding = 10;  // Padding on each side
     constexpr int containerWidth = static_cast<int>(barWidth) + 2 * horizontalPadding;
 
-    // Total height calculation (should equal SequenceGrid height of 196px)
-    constexpr int totalHeight = titleHeight + gapBelowTitle + barStackHeight + gapAboveButtons + buttonHeight;
+    // Total height calculation
+    constexpr int totalHeight = gapBelowTitle + barStackHeight + gapAboveButtons + buttonHeight;
 }
 
 /**
@@ -274,9 +267,6 @@ class SubsequenceControlsComponent : public StateListenerComponent {
 public:
     explicit SubsequenceControlsComponent(PluginProcessor& processor)
         : StateListenerComponent(processor),
-          interBoldFont (juce::Typeface::createSystemTypefaceFor (
-              BinaryData::Inter_24ptBold_ttf,
-              BinaryData::Inter_24ptBold_ttfSize)),
           minusButton ("-"),
           plusButton ("+")
     {
@@ -311,29 +301,10 @@ public:
             listenToParameter(Params::Keys::ID::noteColour(i));
     }
 
-    void paint (juce::Graphics& g) override {
-        using namespace SubsequenceControlsConstants;
-        g.fillAll (juce::Colours::transparentBlack);
-
-        juce::Font titleFont;
-        if (interBoldFont != nullptr)
-            titleFont = juce::Font (interBoldFont);
-
-        titleFont.setHeight (titleFontSize);
-
-        g.setFont (titleFont);
-        g.setColour (juce::Colours::white);
-
-        auto area = getLocalBounds();
-        auto titleArea = area.removeFromTop (titleHeight);
-        titleArea.translate (0, UIConstants::titleYOffset);
-        g.drawText ("Subseq", titleArea, juce::Justification::centred, false);
-    }
-
     void resized() override {
         using namespace SubsequenceControlsConstants;
 
-        int barY = titleHeight + gapBelowTitle;
+        int barY = gapBelowTitle;
 
         // Center the bar horizontally
         int barX = (getWidth() - static_cast<int>(barWidth)) / 2;
@@ -400,7 +371,6 @@ protected:
     }
 
 private:
-    juce::Typeface::Ptr interBoldFont;
     SubsequenceBar subsequenceBar;
     SubsequenceButton minusButton;
     SubsequenceButton plusButton;
