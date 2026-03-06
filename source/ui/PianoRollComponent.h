@@ -8,18 +8,15 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace PianoRollConstants {
-    // Scale factor to match 4 sequencer steps (4×92px) + 3 gaps (3×18px) = 422px
-    constexpr float scaleFactor = 1.031f;
-    // Component size (scaled)
+    // Component size
     constexpr int componentWidth = 422;
     constexpr int componentHeight = 206;
-    // Font
-    constexpr float fontSize = 12.4f;  // Scaled 3.1% from 12.0f
-    // Active note circle
-    constexpr float activeCircleRadius = 13.4f;  // ~27px diameter (scaled from 13.0f)
+    // Base (unscaled) font and active circle — scaled dynamically to match component size
+    constexpr float baseFontSize = 12.0f;
+    constexpr float baseActiveCircleRadius = 13.0f;
     // Key border
     constexpr float keyBorderWidth = 1.0f;
-    // Black key positioning
+    // Black key positioning (in unscaled path coordinates)
     constexpr float blackKeyWidth = 40.0f;
     constexpr float blackKeyShift = 30.0f;
     // Unselected key colors
@@ -46,7 +43,7 @@ struct KeyData {
  *
  * Displays 12 keys representing the chromatic scale using custom SVG paths
  * Users can toggle notes on/off to define the scale
- * Total size: 422 x 206 pixels (scaled 3.1% to match 4 sequencer steps + 3 gaps)
+ * Total size: 422 x 206 pixels (paths auto-scaled from SVG coordinates to fit)
  *
  * Observer Pattern:
  * - Listens to all scale parameters (12 notes + range min/max)
@@ -447,24 +444,27 @@ private:
         // Check if this is the active note
         bool isActive = (keyIndex == activeNoteIndex);
 
+        float scaledFontSize = baseFontSize * derivedScale_;
+        float scaledCircleRadius = baseActiveCircleRadius * derivedScale_;
+
         if (isActive) {
             // Draw black circle behind the text
             auto circleCentre = textArea.getCentre();
             g.setColour (juce::Colours::black);
-            g.fillEllipse (circleCentre.x - activeCircleRadius, circleCentre.y - activeCircleRadius,
-                          activeCircleRadius * 2.0f, activeCircleRadius * 2.0f);
+            g.fillEllipse (circleCentre.x - scaledCircleRadius, circleCentre.y - scaledCircleRadius,
+                          scaledCircleRadius * 2.0f, scaledCircleRadius * 2.0f);
 
             // Draw note name in white, bold Inter font
             g.setColour (juce::Colours::white);
             juce::Font font (interFont);
-            font.setHeight (fontSize);
+            font.setHeight (scaledFontSize);
             font.setBold (true);
             g.setFont (font);
         } else {
             // Draw note name in black, regular Inter font
             g.setColour (juce::Colours::black);
             juce::Font font (interFont);
-            font.setHeight (fontSize);
+            font.setHeight (scaledFontSize);
             g.setFont (font);
         }
 
@@ -544,11 +544,17 @@ private:
         // B key (index 11) - width 57.1
         keys[11]->path = createWhiteKeyLeftNotch (xPos);
 
-        // Apply scale transform to all paths to match sequencer step width
-        auto scaleTransform = juce::AffineTransform::scale (scaleFactor);
-        for (int i = 0; i < 12; i++) {
-            keys[i]->path.applyTransform (scaleTransform);
-        }
+        // Calculate the natural (unscaled) width of all keys combined
+        float naturalWidth = 0.0f;
+        for (int i = 0; i < 12; i++)
+            naturalWidth = juce::jmax(naturalWidth, keys[i]->path.getBounds().getRight());
+
+        // Derive scale factor to fit paths into the component width
+        derivedScale_ = static_cast<float>(componentWidth) / naturalWidth;
+
+        auto scaleTransform = juce::AffineTransform::scale(derivedScale_);
+        for (int i = 0; i < 12; i++)
+            keys[i]->path.applyTransform(scaleTransform);
     }
 
     /**
@@ -658,6 +664,7 @@ private:
 
     juce::OwnedArray<KeyData> keys;
     juce::Typeface::Ptr interFont;
+    float derivedScale_ = 1.0f;  // Computed in setupKeyPaths from path dimensions vs component size
     int activeNoteIndex = -1; // -1 means no active note, 0-11 for chromatic scale
 
     // MIDI learn support
