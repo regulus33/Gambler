@@ -28,13 +28,6 @@ public:
 
         juce::MidiMessageSequence track;
 
-        // Tempo meta-event at tick 0
-        float bpm = state.getClockBpm();
-        int microsecondsPerBeat = static_cast<int>(60000000.0 / bpm);
-        auto tempoEvent = juce::MidiMessage::tempoMetaEvent(microsecondsPerBeat);
-        tempoEvent.setTimeStamp(0.0);
-        track.addEvent(tempoEvent);
-
         // Ticks per step based on subdivision
         int ticksPerStep = ticksForSubdivision(state.getClockSubdivision());
 
