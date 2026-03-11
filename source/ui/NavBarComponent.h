@@ -307,6 +307,9 @@ public:
     // Access to write scale button for checking state
     WriteScaleButton& getWriteScaleButton() { return writeScaleButton; }
 
+    // Access to subdivision slider for MIDI learn wiring
+    SubdivisionSlider& getSubdivisionSlider() { return subdivisionSlider; }
+
 private:
     PluginProcessor& processorRef;
     LogoComponent logo;

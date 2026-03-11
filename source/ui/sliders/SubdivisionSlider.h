@@ -1,6 +1,9 @@
 #pragma once
 
 #include "BinaryData.h"
+#include "../../backend/MidiLearnRegistry.h"
+#include "../../backend/MidiMapping.h"
+#include "../MidiLearnOverlayPainter.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /**
@@ -33,6 +36,17 @@ public:
         slider.setValue(2.0); // default: 16th notes
         addAndMakeVisible(slider);
 
+        // Add invisible overlay for MIDI learn mode
+        addAndMakeVisible(midiLearnOverlay_);
+        midiLearnOverlay_.setVisible(false);
+        midiLearnOverlay_.setInterceptsMouseClicks(true, false);
+        midiLearnOverlay_.onMouseDown = [this]() {
+            if (registry_ && registry_->isLearning()) {
+                registry_->setLearningControl(MidiControlId::SUBDIVISION_SLIDER);
+                if (onMidiLearnSelected) onMidiLearnSelected();
+            }
+        };
+
         setSize(SubdivisionSliderConstants::totalSize,
                 SubdivisionSliderConstants::totalSize);
     }
@@ -43,11 +57,36 @@ public:
 
     juce::Slider& getSlider() { return slider; }
 
+    void setRegistry(MidiLearnRegistry* registry) { registry_ = registry; }
+
+    std::function<void()> onMidiLearnSelected;
+
+    void paint(juce::Graphics& g) override {
+        // Paint MIDI learn overlay on top
+        bool isLearning = registry_ && registry_->isLearning();
+        midiLearnOverlay_.setVisible(isLearning);
+        if (isLearning) {
+            MidiLearnOverlayPainter::paint(g, getLocalBounds(),
+                                           registry_, MidiControlId::SUBDIVISION_SLIDER, 0.0f);
+        }
+    }
+
     void resized() override {
         slider.setBounds(getLocalBounds());
+        midiLearnOverlay_.setBounds(getLocalBounds());
     }
 
 private:
+    // Transparent overlay for MIDI learn click interception
+    class MidiLearnOverlay : public juce::Component {
+    public:
+        std::function<void()> onMouseDown;
+        void mouseDown(const juce::MouseEvent&) override {
+            if (onMouseDown) onMouseDown();
+        }
+        void paint(juce::Graphics&) override {}
+    };
+
     static constexpr int numNotches = 4;
 
     static inline const juce::Colour dotColours[numNotches] = {
@@ -108,4 +147,6 @@ private:
 
     juce::Slider slider;
     LookAndFeel lf;
+    MidiLearnOverlay midiLearnOverlay_;
+    MidiLearnRegistry* registry_ = nullptr;
 };

@@ -1427,21 +1427,32 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
         }
 
         // ========== NOTE RANGE CONTROLS ==========
+        // These set the APVTS window params directly so param listeners fire
         case MidiControlId::NOTE_RANGE_MIN: {
-            int minNote = MidiValueConverter::midiToDiscreteIndex (midiValue, 127);
-            state.setScaleRangeMin (minNote);
-            DBG ("  → Note range min set to " << minNote);
+            int offset = MidiValueConverter::midiToDiscreteIndex (midiValue, 127);
+            state.setScaleWindowOffset (offset);
+            DBG ("  → Note range offset set to " << offset);
             if (onSequenceTick)
                 onSequenceTick();
             break;
         }
 
         case MidiControlId::NOTE_RANGE_MAX: {
-            int maxNote = MidiValueConverter::midiToDiscreteIndex (midiValue, 127);
-            state.setScaleRangeMax (maxNote);
-            DBG ("  → Note range max set to " << maxNote);
+            int size = MidiValueConverter::midiToDiscreteIndex (midiValue, 127) + 1; // 1-128
+            state.setScaleWindowSize (size);
+            DBG ("  → Note range size set to " << size);
             if (onSequenceTick)
                 onSequenceTick();
+            break;
+        }
+
+        // ========== SUBDIVISION SLIDER ==========
+        case MidiControlId::SUBDIVISION_SLIDER: {
+            int subdivisionIndex = MidiValueConverter::midiToDiscreteIndex (midiValue, 3);
+            if (auto* param = apvts.getParameter (Params::Keys::ID::CLOCK_SUBDIVISION)) {
+                param->setValueNotifyingHost (param->convertTo0to1 (static_cast<float> (subdivisionIndex)));
+                DBG ("  → Subdivision set to " << subdivisionIndex);
+            }
             break;
         }
 

@@ -80,8 +80,11 @@ enum class MidiControlId {
     SUBSEQ_PLUS,   // Increase substep length
 
     // ========== NOTE RANGE CONTROLS (2 sliders) ==========
-    NOTE_RANGE_MIN,  // 0-127 (MIDI note number)
-    NOTE_RANGE_MAX,  // 0-127 (MIDI note number)
+    NOTE_RANGE_MIN,  // 0-127 (window offset)
+    NOTE_RANGE_MAX,  // 1-128 (window size)
+
+    // ========== CLOCK CONTROLS ==========
+    SUBDIVISION_SLIDER,  // 0-3 (quarter, eighth, sixteenth, thirty-second)
 
     // ========== MIDI DATA PER STEP (14 controls: 7 values + 7 toggles) ==========
     CC_LANE_0_VALUE, CC_LANE_1_VALUE, CC_LANE_2_VALUE, CC_LANE_3_VALUE,
@@ -231,8 +234,11 @@ inline std::string getMidiControlName(MidiControlId id) {
         case MidiControlId::SUBSEQ_PLUS:   return "Subseq Plus Button";
 
         // Note Range
-        case MidiControlId::NOTE_RANGE_MIN: return "Note Range Min";
-        case MidiControlId::NOTE_RANGE_MAX: return "Note Range Max";
+        case MidiControlId::NOTE_RANGE_MIN: return "Note Range Offset";
+        case MidiControlId::NOTE_RANGE_MAX: return "Note Range Size";
+
+        // Clock Controls
+        case MidiControlId::SUBDIVISION_SLIDER: return "Subdivision";
 
         // Navigation
         case MidiControlId::VIEW_TOGGLE:     return "View Toggle";

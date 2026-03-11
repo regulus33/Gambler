@@ -519,6 +519,12 @@ private:
         // Wire up MIDI learn registry for piano roll keys
         pianoRoll.setRegistry(&processorRef.getMidiLearnRegistry());
 
+        // Wire up MIDI learn registry for subdivision slider in navbar
+        navBar.getSubdivisionSlider().setRegistry(&processorRef.getMidiLearnRegistry());
+        navBar.getSubdivisionSlider().onMidiLearnSelected = [this]() {
+            if (onAsyncUpdateNeeded) onAsyncUpdateNeeded();
+        };
+
         // Wire up callback for when a control is selected for MIDI learning
         // This triggers a repaint of all MIDI learn components to update borders
         mainControls.setMidiLearnSelectedCallback([this]() {

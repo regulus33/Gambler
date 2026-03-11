@@ -285,8 +285,14 @@ SCENARIO("MidiControlId name lookup", "[midimapping]") {
 
         WHEN("Getting names for note range controls") {
             THEN("Names are descriptive") {
-                REQUIRE(getMidiControlName(MidiControlId::NOTE_RANGE_MIN) == "Note Range Min");
-                REQUIRE(getMidiControlName(MidiControlId::NOTE_RANGE_MAX) == "Note Range Max");
+                REQUIRE(getMidiControlName(MidiControlId::NOTE_RANGE_MIN) == "Note Range Offset");
+                REQUIRE(getMidiControlName(MidiControlId::NOTE_RANGE_MAX) == "Note Range Size");
+            }
+        }
+
+        WHEN("Getting names for clock controls") {
+            THEN("Names are descriptive") {
+                REQUIRE(getMidiControlName(MidiControlId::SUBDIVISION_SLIDER) == "Subdivision");
             }
         }
 

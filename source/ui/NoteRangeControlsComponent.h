@@ -5,6 +5,8 @@
 #include "StateListenerComponent.h"
 #include "../backend/MidiMapping.h"
 #include "../backend/Scale.h"
+#include "../data/Params.h"
+#include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace NoteRangeControlsConstants {
@@ -175,27 +177,22 @@ public:
         // Range: 1 to 128 (minimum window width is 1 note)
         windowWidthSlider.setSliderStyle (juce::Slider::RotaryVerticalDrag);
         windowWidthSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-        windowWidthSlider.setRange (1.0, 128.0, 1.0);
-        windowWidthSlider.setValue (128.0);  // Default: full range
         windowWidthSlider.setLookAndFeel (&sliderLookAndFeel);
-        windowWidthSlider.onValueChange = [this] {
-            clampAndUpdateValues();
-            updateBackendAndGauge();
-        };
         addAndMakeVisible (windowWidthSlider);
 
         // Setup window offset slider (top slider)
         // Range: 0 to 127 (starting position of the window)
         windowOffsetSlider.setSliderStyle (juce::Slider::RotaryVerticalDrag);
         windowOffsetSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-        windowOffsetSlider.setRange (0.0, 127.0, 1.0);
-        windowOffsetSlider.setValue (0.0);  // Default: start at note 0
         windowOffsetSlider.setLookAndFeel (&sliderLookAndFeel);
-        windowOffsetSlider.onValueChange = [this] {
-            clampAndUpdateValues();
-            updateBackendAndGauge();
-        };
         addAndMakeVisible (windowOffsetSlider);
+
+        // Create APVTS attachments - these bidirectionally sync sliders with params
+        // The param range defines the slider range automatically
+        windowOffsetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+            getProcessor().getAPVTS(), Params::Keys::ID::SCALE_WINDOW_OFFSET, windowOffsetSlider);
+        windowWidthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+            getProcessor().getAPVTS(), Params::Keys::ID::SCALE_WINDOW_SIZE, windowWidthSlider);
 
         // Setup range gauge
         addAndMakeVisible (rangeGauge);
@@ -229,10 +226,7 @@ public:
      * Set the current window values (for initialization from backend)
      */
     void setWindow(int offset, int size) {
-        windowOffsetSlider.setValue(static_cast<double>(offset), juce::dontSendNotification);
-        windowWidthSlider.setValue(static_cast<double>(size), juce::dontSendNotification);
-
-        // Update gauge with computed min/max
+        // Sliders are synced via APVTS attachments, just update the gauge
         int minNote = Scale::computeMinFromWindow(offset, size);
         int maxNote = Scale::computeMaxFromWindow(offset, size);
         rangeGauge.setRange(minNote, maxNote);
@@ -360,11 +354,7 @@ protected:
         int offset = state.getScaleWindowOffset();
         int size = state.getScaleWindowSize();
 
-        // Update sliders directly from window parameters
-        windowOffsetSlider.setValue(static_cast<double>(offset), juce::dontSendNotification);
-        windowWidthSlider.setValue(static_cast<double>(size), juce::dontSendNotification);
-
-        // Update gauge with computed min/max
+        // Sliders are synced via APVTS attachments - just update the gauge
         int minNote = Scale::computeMinFromWindow(offset, size);
         int maxNote = Scale::computeMaxFromWindow(offset, size);
         rangeGauge.setRange(minNote, maxNote);
@@ -374,47 +364,6 @@ protected:
     }
 
 private:
-    /**
-     * Clamp slider values to ensure offset + width - 1 <= 127
-     * Called whenever either slider changes
-     * Keeps slider ranges static but clamps the actual values
-     */
-    void clampAndUpdateValues() {
-        constexpr int MAX_MIDI_NOTE = 127;
-
-        int currentOffset = static_cast<int>(windowOffsetSlider.getValue());
-        int currentWidth = static_cast<int>(windowWidthSlider.getValue());
-
-        // Calculate maximum allowed offset for current width
-        // If width is 20, max offset is 127 - 20 + 1 = 108
-        // This ensures offset + width - 1 <= 127
-        int maxAllowedOffset = MAX_MIDI_NOTE - currentWidth + 1;
-
-        // Clamp offset if it exceeds the limit
-        if (currentOffset > maxAllowedOffset) {
-            windowOffsetSlider.setValue(static_cast<double>(maxAllowedOffset), juce::dontSendNotification);
-        }
-    }
-
-    void updateBackendAndGauge() {
-        // Get current window values from sliders
-        int offset = static_cast<int>(windowOffsetSlider.getValue());
-        int size = static_cast<int>(windowWidthSlider.getValue());
-
-        // Compute min/max for gauge display
-        int minNote = Scale::computeMinFromWindow(offset, size);
-        int maxNote = Scale::computeMaxFromWindow(offset, size);
-
-        // Update gauge
-        rangeGauge.setRange(minNote, maxNote);
-
-        // Update backend parameters directly
-        auto& state = getState();
-        state.setScaleWindowOffset(offset);
-        state.setScaleWindowSize(size);
-    }
-
-
     // Transparent overlay component that sits on top of a slider in MIDI learn mode
     class MidiLearnOverlay : public juce::Component {
     public:
@@ -434,6 +383,10 @@ private:
     juce::Slider windowWidthSlider;   // Bottom slider: window width (1-128)
     juce::Slider windowOffsetSlider;  // Top slider: window offset (0-127)
     NoteRangeGauge rangeGauge;
+
+    // APVTS attachments - bidirectionally sync sliders with params
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> windowOffsetAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> windowWidthAttachment;
 
     // MIDI learn state
     MidiLearnRegistry* registry_ = nullptr;
