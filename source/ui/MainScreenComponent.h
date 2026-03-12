@@ -88,27 +88,19 @@ public:
         // Add piano roll component
         addAndMakeVisible(pianoRoll);
 
-        // Initialize piano roll with the selected step's scale
+        // Initialize piano roll with the global scale
         auto& state = processorRef.getState();
-        int selectedStep = state.getSelectedStepForEditing();
-        if (selectedStep >= 0) {
-            pianoRoll.setScale(state.getStepScale(selectedStep));
-        }
+        pianoRoll.setScale(state.getGlobalScale());
 
-        // Setup callback for scale changes - update selected step's scale when user toggles notes
+        // Setup callback for scale changes - update global scale when user toggles notes
         pianoRoll.onNoteChanged = [this]() {
             // Get the scale from the piano roll
             Scale newScale = pianoRoll.getScale();
 
-            // Update scale via APVTS-backed state (thread-safe, no command queue needed)
+            // Update global scale via APVTS-backed state (thread-safe, no command queue needed)
             auto& state = processorRef.getState();
-
-            // Update the selected step's scale
-            int selectedStep = state.getSelectedStepForEditing();
-            if (selectedStep >= 0) {
-                state.setStepScaleNotes(selectedStep, newScale.getScaleNotes());
-                DBG("Piano roll scale changed - updated step: " << selectedStep << " scale");
-            }
+            state.setGlobalScaleNotes(newScale.getScaleNotes());
+            DBG("Piano roll scale changed - updated global scale");
 
             // Update the note controls to only show selected scale notes
             auto selectedIndices = pianoRoll.getSelectedNoteIndices();
@@ -199,10 +191,6 @@ public:
             // Update the sequence grid to show the new selection (preserve current step indicator)
             int currentStep = state.getCurrentIndex();
             sequenceOverview.getSequenceGrid().updateFromState(state, currentStep);
-
-            // Update the piano roll to show the selected step's scale
-            Scale stepScale = processorRef.getState().getStepScale(stepIndex);
-            pianoRoll.setScale(stepScale);
 
             // Update the active step and note
             setActiveStepAndNote(stepIndex);
@@ -377,8 +365,6 @@ public:
         int currentStep = state.getCurrentIndex();
         int selectedStep = state.getSelectedStepForEditing();
 
-        // Note: WriteScale is now handled in audio thread before quantization (see PluginProcessor::processBlock)
-
         // Update the active step indicator to follow the sequence playback
         setActiveStepAndNote(currentStep);
 
@@ -423,11 +409,6 @@ public:
         auto& probabilityGauge = mainControls.getProbabilityControls().getProbabilityGauge();
         probabilityGauge.highlightCircle(lastProbabilityIndex);
 
-        // Update the piano roll to show the selected step's scale
-        if (selectedStep >= 0) {
-            Scale stepScale = state.getStepScale(selectedStep);
-            pianoRoll.setScale(stepScale);
-        }
     }
 
     // Accessors for navbar

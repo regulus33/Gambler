@@ -417,96 +417,81 @@ TEST_CASE("SequenceState tick") {
 }
 
 // ============================================================================
-// Per-Step Scale Tests
+// Global Scale Tests
 // ============================================================================
 
-TEST_CASE("SequenceState per-step scale") {
+TEST_CASE("SequenceState global scale") {
     SequenceStateFixture fixture;
     auto& state = fixture.getState();
 
-    SECTION("Default: all scale notes enabled for each step") {
+    SECTION("Default: all scale notes enabled") {
         for (int note = 0; note < 12; note++) {
-            REQUIRE(state.getStepScaleNote(0, note) == true);
+            REQUIRE(state.getGlobalScaleNote(note) == true);
         }
     }
 
-    SECTION("setStepScaleNote() disables a note") {
-        state.setStepScaleNote(0, 1, false);  // Disable Db for step 0
-        REQUIRE(state.getStepScaleNote(0, 1) == false);
-        REQUIRE(state.getStepScaleNote(0, 0) == true);  // C still enabled
+    SECTION("setGlobalScaleNote() disables a note") {
+        state.setGlobalScaleNote(1, false);  // Disable Db
+        REQUIRE(state.getGlobalScaleNote(1) == false);
+        REQUIRE(state.getGlobalScaleNote(0) == true);  // C still enabled
     }
 
-    SECTION("Different steps can have different scales") {
-        state.setStepScaleNote(0, 1, false);  // Disable Db for step 0
-        state.setStepScaleNote(1, 3, false);  // Disable Eb for step 1
-
-        REQUIRE(state.getStepScaleNote(0, 1) == false);
-        REQUIRE(state.getStepScaleNote(0, 3) == true);  // Eb still on for step 0
-        REQUIRE(state.getStepScaleNote(1, 1) == true);   // Db still on for step 1
-        REQUIRE(state.getStepScaleNote(1, 3) == false);
-    }
-
-    SECTION("getStepScaleNotes() returns all 12 note states") {
-        auto notes = state.getStepScaleNotes(0);
+    SECTION("getGlobalScaleNotes() returns all 12 note states") {
+        auto notes = state.getGlobalScaleNotes();
         for (int i = 0; i < 12; i++) {
             REQUIRE(notes[i] == 1);
         }
     }
 
-    SECTION("setStepScaleNotes() sets all 12 notes at once") {
+    SECTION("setGlobalScaleNotes() sets all 12 notes at once") {
         std::array<int, 12> cMajor = {1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1};
-        state.setStepScaleNotes(0, cMajor);
+        state.setGlobalScaleNotes(cMajor);
 
-        auto notes = state.getStepScaleNotes(0);
+        auto notes = state.getGlobalScaleNotes();
         for (int i = 0; i < 12; i++) {
             REQUIRE(notes[i] == cMajor[i]);
         }
     }
 
-    SECTION("isNoteInStepScale() checks note against step scale") {
+    SECTION("isNoteInGlobalScale() checks note against global scale") {
         std::array<int, 12> cMajor = {1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1};
-        state.setStepScaleNotes(0, cMajor);
+        state.setGlobalScaleNotes(cMajor);
 
-        REQUIRE(state.isNoteInStepScale(0, 60) == true);   // C4 in C major
-        REQUIRE(state.isNoteInStepScale(0, 61) == false);  // C#4 not in C major
-        REQUIRE(state.isNoteInStepScale(0, 62) == true);   // D4 in C major
+        REQUIRE(state.isNoteInGlobalScale(60) == true);   // C4 in C major
+        REQUIRE(state.isNoteInGlobalScale(61) == false);  // C#4 not in C major
+        REQUIRE(state.isNoteInGlobalScale(62) == true);   // D4 in C major
     }
 
-    SECTION("quantizeNoteToStepScale() quantizes to nearest scale note") {
+    SECTION("quantizeNoteToGlobalScale() quantizes to nearest scale note") {
         std::array<int, 12> cMajor = {1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1};
-        state.setStepScaleNotes(0, cMajor);
+        state.setGlobalScaleNotes(cMajor);
 
-        REQUIRE(state.quantizeNoteToStepScale(0, 60) == 60);  // C stays C
-        REQUIRE(state.quantizeNoteToStepScale(0, 61) == 60);  // C# -> C (nearest down)
-        REQUIRE(state.quantizeNoteToStepScale(0, 66) == 65);  // Gb -> F (equidistant, prefers down)
+        REQUIRE(state.quantizeNoteToGlobalScale(60) == 60);  // C stays C
+        REQUIRE(state.quantizeNoteToGlobalScale(61) == 60);  // C# -> C (nearest down)
+        REQUIRE(state.quantizeNoteToGlobalScale(66) == 65);  // Gb -> F (equidistant, prefers down)
     }
 
-    SECTION("quantizeNoteToStepScale() with no enabled notes returns -1") {
+    SECTION("quantizeNoteToGlobalScale() with no enabled notes returns -1") {
         std::array<int, 12> noNotes = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        state.setStepScaleNotes(0, noNotes);
+        state.setGlobalScaleNotes(noNotes);
 
-        REQUIRE(state.quantizeNoteToStepScale(0, 60) == -1);
+        REQUIRE(state.quantizeNoteToGlobalScale(60) == -1);
     }
 
-    SECTION("getStepScale() returns a Scale object") {
+    SECTION("getGlobalScale() returns a Scale object") {
         std::array<int, 12> cMajor = {1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1};
-        state.setStepScaleNotes(0, cMajor);
+        state.setGlobalScaleNotes(cMajor);
 
-        Scale scale = state.getStepScale(0);
+        Scale scale = state.getGlobalScale();
         auto notes = scale.getScaleNotes();
         for (int i = 0; i < 12; i++) {
             REQUIRE(notes[i] == cMajor[i]);
         }
     }
 
-    SECTION("Boundary: getStepScaleNote() with invalid step returns true") {
-        REQUIRE(state.getStepScaleNote(-1, 0) == true);
-        REQUIRE(state.getStepScaleNote(64, 0) == true);
-    }
-
-    SECTION("Boundary: getStepScaleNote() with invalid note returns true") {
-        REQUIRE(state.getStepScaleNote(0, -1) == true);
-        REQUIRE(state.getStepScaleNote(0, 12) == true);
+    SECTION("Boundary: getGlobalScaleNote() with invalid note returns true") {
+        REQUIRE(state.getGlobalScaleNote(-1) == true);
+        REQUIRE(state.getGlobalScaleNote(12) == true);
     }
 }
 

@@ -96,10 +96,9 @@ public:
         // Set up paths with proper positioning
         setupKeyPaths();
 
-        // Subscribe to all scale parameters
-        listenToStepScaleNotes(0, ParamConstants::MAX_STEPS - 1);  // All steps' scale notes
+        // Subscribe to global scale parameters
+        listenToGlobalScaleNotes();  // Global scale notes
         listenToScaleRange();  // Scale range min/max
-        listenToParameter(Params::Keys::ID::SEQ_SELECTED_STEP);  // Selected step changes
 
         // Subscribe to note colour changes
         for (int i = 0; i < 12; ++i)
@@ -356,12 +355,10 @@ protected:
      * Updates the piano roll to reflect the current scale state.
      */
     void onStateChanged() override {
-        // Read scale from the selected step's APVTS state
+        // Read global scale from APVTS state
         auto& state = getState();
-        int selectedStep = state.getSelectedStepForEditing();
-        if (selectedStep < 0) return;
 
-        Scale scale = state.getStepScale(selectedStep);
+        Scale scale = state.getGlobalScale();
 
         // Update key toggle states and colors
         auto scaleNotes = scale.getScaleNotes();

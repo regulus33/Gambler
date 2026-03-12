@@ -373,23 +373,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         // Tick the sequence to get the next note (using APVTS-backed state)
         auto& state = getState(); // get the avpts wrapper
 
-        // IMPORTANT: Check WriteScale BEFORE ticking (before quantization happens)
-        // If WriteScale is enabled, copy the selected step's scale to the next step
-        // This ensures the note is quantized with the correct scale
-        if (auto* writeScaleParam = apvts.getParameter(Params::Keys::ID::WRITE_SCALE)) {
-            if (writeScaleParam->getValue() > 0.5f) {
-                int selectedStep = state.getSelectedStepForEditing();
-                int nextStepIndex = (state.getCurrentIndex() + 1) % state.getLength();
-
-                if (selectedStep >= 0 && nextStepIndex >= 0) {
-                    auto selectedScale = state.getStepScaleNotes(selectedStep);
-                    state.setStepScaleNotes(nextStepIndex, selectedScale);
-                    DBG("WriteScale: Copied scale from step " << selectedStep << " to step " << nextStepIndex);
-                }
-            }
-        }
-
-        int note = state.tick(); // get next note (now quantized with the correct scale)
+        int note = state.tick(); // get next note (quantized with the global scale)
         int currentStepIndex = state.getCurrentIndex(); // get current step index
 
         DBG ("Clock tick! Step: " << currentStepIndex << ", Note: " << note);
@@ -750,14 +734,13 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
     // ========== SCALE CLEAR BUTTON ==========
     if (parameterID == Params::Keys::ID::CLEAR_SCALE && isOn) {
         auto& state = getState();
-        int selectedStep = state.getSelectedStepForEditing();
 
-        // Clear the scale by disabling all notes (empty scale)
+        // Clear the global scale by disabling all notes (empty scale)
         for (int note = 0; note < ParamConstants::NUM_SCALE_NOTES; note++) {
-            state.setStepScaleNote(selectedStep, note, false);
+            state.setGlobalScaleNote(note, false);
         }
 
-        DBG("CLEAR_SCALE triggered - cleared scale for step " << selectedStep);
+        DBG("CLEAR_SCALE triggered - cleared global scale");
     }
 }
 
@@ -1490,18 +1473,14 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
         case MidiControlId::SCALE_NOTE_Bb:
         case MidiControlId::SCALE_NOTE_B: {
             int noteIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::SCALE_NOTE_C);
-            int selectedStep = state.getSelectedStepForEditing();
+            bool currentState = state.getGlobalScaleNote(noteIndex);
 
-            if (selectedStep >= 0) {
-                bool currentState = state.getStepScaleNote(selectedStep, noteIndex);
-
-                // Toggle mode: Note ON toggles, Note OFF does nothing
-                if (isNoteOnOrCCPositive) {
-                    state.setStepScaleNote(selectedStep, noteIndex, !currentState);
-                    DBG ("  → Step " << selectedStep << " scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
-                    if (onSequenceTick)
-                        onSequenceTick();
-                }
+            // Toggle mode: Note ON toggles, Note OFF does nothing
+            if (isNoteOnOrCCPositive) {
+                state.setGlobalScaleNote(noteIndex, !currentState);
+                DBG ("  → Global scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
+                if (onSequenceTick)
+                    onSequenceTick();
             }
             break;
         }

@@ -205,12 +205,12 @@ public:
 
     /**
      * Get the quantized version of a step's note
-     * This applies the step's scale quantization on-the-fly without modifying stored data
+     * This applies the global scale quantization on-the-fly without modifying stored data
      */
     int getQuantizedStepNote(int stepIndex, int substepIndex) const {
         int note = getStepNote(stepIndex, substepIndex);
         if (note < 0) return note;  // Don't quantize rests
-        return quantizeNoteToStepScale(stepIndex, note);
+        return quantizeNoteToGlobalScale(note);
     }
 
     /**
@@ -369,86 +369,84 @@ public:
     }
 
     // ========================================
-    // PER-STEP SCALE
+    // GLOBAL SCALE
     // ========================================
 
     /**
-     * Get a specific note's enabled state for a step's scale
+     * Get a specific note's enabled state in the global scale
      */
-    bool getStepScaleNote(int stepIndex, int noteIndex) const {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return true;
+    bool getGlobalScaleNote(int noteIndex) const {
         if (noteIndex < 0 || noteIndex >= ParamConstants::NUM_SCALE_NOTES) return true;
-        return getBoolParam(Params::Keys::ID::stepScaleNote(stepIndex, noteIndex));
+        return getBoolParam(Params::Keys::ID::globalScaleNote(noteIndex));
     }
 
     /**
-     * Set a specific note's enabled state for a step's scale
+     * Set a specific note's enabled state in the global scale
      */
-    void setStepScaleNote(int stepIndex, int noteIndex, bool enabled) {
-        if (stepIndex >= 0 && stepIndex < ParamConstants::MAX_STEPS &&
-            noteIndex >= 0 && noteIndex < ParamConstants::NUM_SCALE_NOTES) {
-            setBoolParam(Params::Keys::ID::stepScaleNote(stepIndex, noteIndex), enabled);
+    void setGlobalScaleNote(int noteIndex, bool enabled) {
+        if (noteIndex >= 0 && noteIndex < ParamConstants::NUM_SCALE_NOTES) {
+            setBoolParam(Params::Keys::ID::globalScaleNote(noteIndex), enabled);
         }
     }
 
     /**
-     * Get all scale notes for a specific step
+     * Get all global scale notes
      */
-    std::array<int, 12> getStepScaleNotes(int stepIndex) const {
+    std::array<int, 12> getGlobalScaleNotes() const {
         std::array<int, 12> notes;
         for (int i = 0; i < 12; i++) {
-            notes[i] = getStepScaleNote(stepIndex, i) ? 1 : 0;
+            notes[i] = getGlobalScaleNote(i) ? 1 : 0;
         }
         return notes;
     }
 
     /**
-     * Set all scale notes for a specific step
+     * Set all global scale notes
      */
-    void setStepScaleNotes(int stepIndex, const std::array<int, 12>& notes) {
+    void setGlobalScaleNotes(const std::array<int, 12>& notes) {
         for (int i = 0; i < 12; i++) {
-            setStepScaleNote(stepIndex, i, notes[i] != 0);
+            setGlobalScaleNote(i, notes[i] != 0);
         }
     }
 
     /**
-     * Get a Scale object for a specific step
+     * Get a Scale object for the global scale
      */
-    Scale getStepScale(int stepIndex) const {
+    Scale getGlobalScale() const {
         Scale scale;
-        scale.setScaleNotes(getStepScaleNotes(stepIndex));
-        scale.setRangeMin(getScaleRangeMin());  // Range is still global
+        scale.setScaleNotes(getGlobalScaleNotes());
+        scale.setRangeMin(getScaleRangeMin());
         scale.setRangeMax(getScaleRangeMax());
         return scale;
     }
 
     /**
-     * Check if a note is in a specific step's scale
+     * Check if a note is in the global scale
      */
-    bool isNoteInStepScale(int stepIndex, int noteNumber) const {
+    bool isNoteInGlobalScale(int noteNumber) const {
         if (noteNumber < 0 || noteNumber > 127) return false;
         int pitchClass = noteNumber % 12;
-        return getStepScaleNote(stepIndex, pitchClass);
+        return getGlobalScaleNote(pitchClass);
     }
 
     /**
-     * Quantize a note to a specific step's scale and clamp to note range.
+     * Quantize a note to the global scale and clamp to note range.
      * Range clamping and scale quantization are applied on-the-fly without
      * modifying stored data — changing the range or scale affects playback
      * immediately.
      * Returns -1 (rest) if no scale notes are enabled.
      */
-    int quantizeNoteToStepScale(int stepIndex, int noteNumber) const {
+    int quantizeNoteToGlobalScale(int noteNumber) const {
         int rangeMin = getScaleRangeMin();
         int rangeMax = getScaleRangeMax();
 
         // Clamp to note range first
         noteNumber = juce::jlimit(rangeMin, rangeMax, noteNumber);
 
-        // Check if any notes are enabled in this step's scale
+        // Check if any notes are enabled in the global scale
         bool anyEnabled = false;
         for (int i = 0; i < 12; i++) {
-            if (getStepScaleNote(stepIndex, i)) {
+            if (getGlobalScaleNote(i)) {
                 anyEnabled = true;
                 break;
             }
@@ -457,15 +455,15 @@ public:
         if (!anyEnabled) return -1;
 
         // If already in scale and in range, return it
-        if (isNoteInStepScale(stepIndex, noteNumber)) return noteNumber;
+        if (isNoteInGlobalScale(noteNumber)) return noteNumber;
 
         // Find nearest note in scale within the range (prefer lower when equidistant)
         for (int distance = 1; distance <= 127; distance++) {
             int downNote = noteNumber - distance;
-            if (downNote >= rangeMin && isNoteInStepScale(stepIndex, downNote)) return downNote;
+            if (downNote >= rangeMin && isNoteInGlobalScale(downNote)) return downNote;
 
             int upNote = noteNumber + distance;
-            if (upNote <= rangeMax && isNoteInStepScale(stepIndex, upNote)) return upNote;
+            if (upNote <= rangeMax && isNoteInGlobalScale(upNote)) return upNote;
 
             // Stop searching if both directions are out of range
             if (downNote < rangeMin && upNote > rangeMax) break;
@@ -606,7 +604,7 @@ public:
             // Return the quantized version for immediate playback
             int unquantizedNote = generateRandomNoteUnquantized();
             queueNoteWrite(currentIndex, substepIdx, unquantizedNote);
-            return quantizeNoteToStepScale(currentIndex, unquantizedNote);
+            return quantizeNoteToGlobalScale(unquantizedNote);
         }
 
         // Not in random mode - just tick the current step normally

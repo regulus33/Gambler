@@ -87,11 +87,11 @@ namespace Params
             }
 
             // ========================================
-            // PER-STEP SCALE DATA (64 steps × 12 notes)
+            // GLOBAL SCALE DATA (12 notes)
             // ========================================
-            // Per-step scale notes (each step has its own scale configuration)
-            inline String stepScaleNote(int stepIndex, int noteIndex) {
-                return "step_" + String(stepIndex) + "_scale_note_" + String(noteIndex);
+            // Global scale notes (single scale applies to all steps)
+            inline String globalScaleNote(int noteIndex) {
+                return "global_scale_note_" + String(noteIndex);
             }
 
             // ========================================
@@ -142,9 +142,6 @@ namespace Params
             // Note range
             inline const String NOTE_RANGE_MIN = "note_range_min";
             inline const String NOTE_RANGE_MAX = "note_range_max";
-
-            // Write Scale mode
-            inline const String WRITE_SCALE = "write_scale";
 
             // Scale Latch mode (false = momentary, true = latched)
             inline const String SCALE_LATCH = "scale_latch";
@@ -230,10 +227,10 @@ namespace Params
                 return "Step " + String(stepIndex) + " Mod " + String(modIndex) + " Active";
             }
 
-            // Per-step scale
-            inline String stepScaleNote(int stepIndex, int noteIndex) {
+            // Global scale
+            inline String globalScaleNote(int noteIndex) {
                 static const char* noteNames[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
-                return "Step " + String(stepIndex) + " Scale " + noteNames[noteIndex];
+                return "Global Scale " + String(noteNames[noteIndex]);
             }
             inline const String SCALE_WINDOW_OFFSET = "Scale Window Offset";
             inline const String SCALE_WINDOW_SIZE = "Scale Window Size";
@@ -250,9 +247,6 @@ namespace Params
             inline const String PREF_PREVIEW_NOTES = "Preview Notes";
             inline const String PREF_FOLLOW_STEP = "Follow Step";
             inline const String PREF_NOTE_LENGTH = "Note Length";
-
-            // Write Scale mode
-            inline const String WRITE_SCALE = "Write Scale";
 
             // Scale Latch mode
             inline const String SCALE_LATCH = "Scale Latch";
@@ -416,15 +410,13 @@ namespace Params
         }
 
         // ========================================
-        // PER-STEP SCALE DATA (64 steps × 12 notes)
+        // GLOBAL SCALE DATA (12 notes)
         // ========================================
-        for (int step = 0; step < ParamConstants::MAX_STEPS; ++step) {
-            for (int note = 0; note < ParamConstants::NUM_SCALE_NOTES; ++note) {
-                params.push_back(createBoolParam(
-                    Keys::ID::stepScaleNote(step, note),
-                    Keys::LABEL::stepScaleNote(step, note),
-                    true));  // All notes enabled by default (chromatic)
-            }
+        for (int note = 0; note < ParamConstants::NUM_SCALE_NOTES; ++note) {
+            params.push_back(createBoolParam(
+                Keys::ID::globalScaleNote(note),
+                Keys::LABEL::globalScaleNote(note),
+                true));  // All notes enabled by default (chromatic)
         }
 
         // ========================================
@@ -501,9 +493,6 @@ namespace Params
                     defaultNoteColours[i]));
             }
         }
-
-        // Write Scale mode
-        params.push_back(createBoolParam(Keys::ID::WRITE_SCALE, Keys::LABEL::WRITE_SCALE, false));
 
         // Scale Latch mode (false = momentary, true = latched)
         params.push_back(createBoolParam(Keys::ID::SCALE_LATCH, Keys::LABEL::SCALE_LATCH, false));

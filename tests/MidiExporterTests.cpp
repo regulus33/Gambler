@@ -316,16 +316,16 @@ TEST_CASE("MidiExporter applies scale quantization") {
         state.setLength(1);
         state.setStepNote(0, 0, 61);  // Db4
 
-        // Set scale to C major (only C D E F G A B enabled)
+        // Set global scale to C major (only C D E F G A B enabled)
         for (int i = 0; i < 12; ++i)
-            state.setStepScaleNote(0, i, false);
-        state.setStepScaleNote(0, 0, true);   // C
-        state.setStepScaleNote(0, 2, true);   // D
-        state.setStepScaleNote(0, 4, true);   // E
-        state.setStepScaleNote(0, 5, true);   // F
-        state.setStepScaleNote(0, 7, true);   // G
-        state.setStepScaleNote(0, 9, true);   // A
-        state.setStepScaleNote(0, 11, true);  // B
+            state.setGlobalScaleNote(i, false);
+        state.setGlobalScaleNote(0, true);   // C
+        state.setGlobalScaleNote(2, true);   // D
+        state.setGlobalScaleNote(4, true);   // E
+        state.setGlobalScaleNote(5, true);   // F
+        state.setGlobalScaleNote(7, true);   // G
+        state.setGlobalScaleNote(9, true);   // A
+        state.setGlobalScaleNote(11, true);  // B
 
         auto midi = f.exportMidi();
         auto notes = f.getNoteOns(midi);

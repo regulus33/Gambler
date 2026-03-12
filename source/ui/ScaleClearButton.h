@@ -15,7 +15,7 @@ namespace ScaleClearButtonConstants {
 /**
  * ScaleClearButton
  *
- * A button that clears the selected step's scale (sets all notes to enabled/chromatic).
+ * A button that clears the global scale (sets all notes to disabled).
  * This is a momentary button - it triggers the clear action when clicked.
  *
  * Syncs with CLEAR_SCALE APVTS parameter (trigger).

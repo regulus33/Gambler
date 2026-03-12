@@ -4,7 +4,6 @@
 #include "LogoComponent.h"
 #include "PresetSelectorComponent.h"
 #include "ToggleIconButton.h"
-#include "WriteScaleButton.h"
 #include "ScaleLatchButton.h"
 #include "ScaleClearButton.h"
 #include "sliders/SubdivisionSlider.h"
@@ -112,7 +111,6 @@ public:
           midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, true),
           playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
-          writeScaleButton(processor),
           scaleLatchButton(processor),
           scaleClearButton(processor)
     {
@@ -163,10 +161,6 @@ public:
                 onStopClicked();
             }
         };
-
-        // Add write scale button
-        addAndMakeVisible(writeScaleButton);
-        // Note: No callback needed - logic is handled in audio thread
 
         // Add scale latch button
         addAndMakeVisible(scaleLatchButton);
@@ -242,7 +236,6 @@ public:
         addItem(fb, exportButton, bs, bs, bg);
         addItem(fb, scaleClearButton, bs, bs, bg);
         addItem(fb, scaleLatchButton, bs, bs, bg);
-        addItem(fb, writeScaleButton, bs, bs, bg);
         addItem(fb, playPauseButton, bs, bs, bg);
         addItem(fb, stopButton, bs, bs, bg);
         addItem(fb, versionLabel, static_cast<float>(versionLabelWidth), static_cast<float>(versionLabelHeight), bg);
@@ -270,8 +263,6 @@ public:
 
     // Callback when export button is dragged (returns temp MIDI file for D&D)
     std::function<juce::File()> onExportDragStarted;
-
-    // Note: WriteScale button doesn't need a callback - MainScreenComponent checks state directly
 
     // Public method to set settings button toggle state (for ApplicationComponent)
     void setSettingsToggled(bool toggled) {
@@ -304,9 +295,6 @@ public:
     // Access to preset selector for wiring up callbacks
     PresetSelectorComponent& getPresetSelector() { return presetSelector; }
 
-    // Access to write scale button for checking state
-    WriteScaleButton& getWriteScaleButton() { return writeScaleButton; }
-
     // Access to subdivision slider for MIDI learn wiring
     SubdivisionSlider& getSubdivisionSlider() { return subdivisionSlider; }
 
@@ -319,7 +307,6 @@ private:
     ToggleIconButton settingsButton;
     ToggleIconButton playPauseButton;
     ToggleIconButton stopButton;
-    WriteScaleButton writeScaleButton;
     ScaleLatchButton scaleLatchButton;
     ScaleClearButton scaleClearButton;
     ExportButton exportButton;

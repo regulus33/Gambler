@@ -108,13 +108,11 @@ protected:
     }
 
     /**
-     * Listen to all scale note parameters for a range of steps
+     * Listen to all global scale note parameters
      */
-    void listenToStepScaleNotes(int startStep, int endStep) {
-        for (int step = startStep; step <= endStep && step < ParamConstants::MAX_STEPS; step++) {
-            for (int note = 0; note < ParamConstants::NUM_SCALE_NOTES; note++) {
-                listenToParameter(Params::Keys::ID::stepScaleNote(step, note));
-            }
+    void listenToGlobalScaleNotes() {
+        for (int note = 0; note < ParamConstants::NUM_SCALE_NOTES; note++) {
+            listenToParameter(Params::Keys::ID::globalScaleNote(note));
         }
     }
 

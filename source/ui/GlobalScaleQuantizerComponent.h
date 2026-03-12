@@ -35,10 +35,10 @@ public:
     {
         using namespace GlobalScaleQuantizerConstants;
 
-        // Listen to step 0's 12 scale note params for preset sync
+        // Listen to global scale note params
         for (int i = 0; i < 12; ++i) {
-            listenToParameter(Params::Keys::ID::stepScaleNote(0, i));
-            keyStates_[i] = getState().getStepScaleNote(0, i);
+            listenToParameter(Params::Keys::ID::globalScaleNote(i));
+            keyStates_[i] = getState().getGlobalScaleNote(i);
         }
 
         // Scale type dropdown
@@ -149,9 +149,9 @@ public:
     }
 
     void onStateChanged() override {
-        // Read step 0's scale to sync keyboard display
+        // Read global scale to sync keyboard display
         for (int i = 0; i < 12; ++i)
-            keyStates_[i] = getState().getStepScaleNote(0, i);
+            keyStates_[i] = getState().getGlobalScaleNote(i);
         repaint();
     }
 
@@ -224,13 +224,13 @@ private:
         int keyIndex = keyDropdown_.getSelectedId() - 1; // 0-based
 
         keyStates_ = computeScaleNotes(scaleIndex, keyIndex);
-        applyScaleToAllSteps();
+        applyScale();
         repaint();
     }
 
     void toggleKey(int noteIndex) {
         keyStates_[static_cast<size_t>(noteIndex)] = !keyStates_[static_cast<size_t>(noteIndex)];
-        applyScaleToAllSteps();
+        applyScale();
 
         // Set dropdown to Custom
         suppressDropdownUpdate_ = true;
@@ -240,13 +240,12 @@ private:
         repaint();
     }
 
-    void applyScaleToAllSteps() {
+    void applyScale() {
         std::array<int, 12> notes {};
         for (int i = 0; i < 12; ++i)
             notes[static_cast<size_t>(i)] = keyStates_[static_cast<size_t>(i)] ? 1 : 0;
 
-        for (int step = 0; step < ParamConstants::MAX_STEPS; ++step)
-            getState().setStepScaleNotes(step, notes);
+        getState().setGlobalScaleNotes(notes);
     }
 
     static bool isBlackKey(int noteIndex) {

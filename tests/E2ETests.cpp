@@ -111,8 +111,8 @@ SCENARIO ("User clicks piano keys to modify scale", "[e2e][piano-roll]") {
                 REQUIRE (dbKey->isToggled == false);
                 REQUIRE (pianoRoll.getSelectedNoteIndices().size() == 11);
 
-                // Check backend state (APVTS) - scale is now per-step
-                auto scaleNotes = state.getStepScaleNotes(0);
+                // Check backend state (APVTS) - global scale
+                auto scaleNotes = state.getGlobalScaleNotes();
                 REQUIRE (scaleNotes[1] == 0);  // C# disabled
             }
         }
@@ -146,8 +146,8 @@ SCENARIO ("User clicks piano keys to modify scale", "[e2e][piano-roll]") {
                 REQUIRE_FALSE (selectedNames.contains("Ab"));
                 REQUIRE_FALSE (selectedNames.contains("Bb"));
 
-                // Backend state should match - scale is now per-step
-                auto scaleNotes = state.getStepScaleNotes(0);
+                // Backend state should match - global scale
+                auto scaleNotes = state.getGlobalScaleNotes();
                 REQUIRE (scaleNotes[0] == 1);   // C
                 REQUIRE (scaleNotes[1] == 0);   // Db
                 REQUIRE (scaleNotes[2] == 1);   // D
