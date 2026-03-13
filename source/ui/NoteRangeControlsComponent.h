@@ -29,7 +29,8 @@ namespace NoteRangeControlsConstants {
     constexpr int rangeBarXOffset = -4;      // Shift gauge left (negative) or right (positive) (rightmost pasdding)
     constexpr int midiNoteCount = 128;
     // Range bar colours
-    constexpr juce::uint32 rangeActiveColourHex = 0xFF4CAF50;   // Green for notes in range
+    constexpr juce::uint32 rangeInScaleColourHex = 0xFF2196F3;  // Blue for notes in range AND in scale (playable)
+    constexpr juce::uint32 rangeNotInScaleColourHex = 0xFF4CAF50; // Green for notes in range but NOT in scale
     constexpr juce::uint32 rangeInactiveColourHex = 0xFF373737; // Grey for notes out of range
     // Label
     constexpr float labelFontSize = 22.0f;
@@ -93,12 +94,18 @@ public:
  * NoteRangeGauge
  *
  * Visual representation of the MIDI note range.
- * Displays 128 rectangles (one per MIDI note), colored based on min/max range.
- * The currently playing note is highlighted in white.
+ * Displays 128 rectangles (one per MIDI note), colored based on:
+ * - Grey: out of range
+ * - Green: in range but NOT in scale
+ * - Blue: in range AND in scale (actually playable)
+ * - White: currently playing note (only while note is active)
  */
 class NoteRangeGauge : public juce::Component {
 public:
-    NoteRangeGauge() = default;
+    NoteRangeGauge() {
+        // Default: all notes in scale (chromatic)
+        scaleNotes.fill(true);
+    }
 
     void setRange (int newMin, int newMax) {
         minNote = newMin;
@@ -106,9 +113,21 @@ public:
         repaint();
     }
 
+    void setScaleNotes(const std::array<bool, 12>& notes) {
+        scaleNotes = notes;
+        repaint();
+    }
+
     void setActiveNote (int noteNumber) {
         if (activeNote != noteNumber) {
             activeNote = noteNumber;
+            repaint();
+        }
+    }
+
+    void clearActiveNote() {
+        if (activeNote != -1) {
+            activeNote = -1;
             repaint();
         }
     }
@@ -129,13 +148,23 @@ public:
 
             juce::Rectangle<float> noteRect (bounds.getX(), y, noteWidth, noteHeight);
 
-            // Color: white for active note, green for in-range, grey for out-of-range
-            if (noteIndex == activeNote)
+            // Determine color based on state
+            bool inRange = (noteIndex >= minNote && noteIndex <= maxNote);
+            bool inScale = scaleNotes[noteIndex % 12];
+
+            if (noteIndex == activeNote) {
+                // Currently playing note - white
                 g.setColour (juce::Colours::white);
-            else if (noteIndex >= minNote && noteIndex <= maxNote)
-                g.setColour (juce::Colour (rangeActiveColourHex));
-            else
+            } else if (!inRange) {
+                // Out of range - grey
                 g.setColour (juce::Colour (rangeInactiveColourHex));
+            } else if (inScale) {
+                // In range AND in scale - blue (playable)
+                g.setColour (juce::Colour (rangeInScaleColourHex));
+            } else {
+                // In range but NOT in scale - green
+                g.setColour (juce::Colour (rangeNotInScaleColourHex));
+            }
 
             g.fillRect (noteRect);
         }
@@ -145,6 +174,7 @@ private:
     int minNote = 0;
     int maxNote = 127;
     int activeNote = -1;  // -1 means no active note
+    std::array<bool, 12> scaleNotes;  // Which pitch classes are in the scale
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NoteRangeGauge)
 };
@@ -218,8 +248,9 @@ public:
             }
         };
 
-        // Subscribe to scale range parameters
+        // Subscribe to scale range parameters and global scale notes
         listenToScaleRange();
+        listenToGlobalScaleNotes();
     }
 
     /**
@@ -237,6 +268,13 @@ public:
      */
     void setActiveNote(int noteNumber) {
         rangeGauge.setActiveNote(noteNumber);
+    }
+
+    /**
+     * Clear the active note highlight (called on note-off)
+     */
+    void clearActiveNote() {
+        rangeGauge.clearActiveNote();
     }
 
     /**
@@ -347,17 +385,24 @@ public:
 protected:
     /**
      * Called on message thread when any subscribed parameter changes.
-     * Updates the sliders and gauge to reflect the current window state.
+     * Updates the sliders and gauge to reflect the current window state and scale.
      */
     void onStateChanged() override {
         auto& state = getState();
         int offset = state.getScaleWindowOffset();
         int size = state.getScaleWindowSize();
 
-        // Sliders are synced via APVTS attachments - just update the gauge
+        // Update range
         int minNote = Scale::computeMinFromWindow(offset, size);
         int maxNote = Scale::computeMaxFromWindow(offset, size);
         rangeGauge.setRange(minNote, maxNote);
+
+        // Update scale notes for coloring
+        std::array<bool, 12> scaleNotes;
+        for (int i = 0; i < 12; ++i) {
+            scaleNotes[i] = state.getGlobalScaleNote(i);
+        }
+        rangeGauge.setScaleNotes(scaleNotes);
 
         // Force immediate repaint of the gauge to ensure visual feedback
         rangeGauge.repaint();

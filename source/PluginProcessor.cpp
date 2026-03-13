@@ -275,13 +275,18 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
                 // TODO: we will eventually allow the user to select multiple ways to send midi, from network midi to ble midi and possibly even OSC instead of midi.
                 midiOutput->sendMessageNow (noteOff);
             }
-            // Note scheduled at
             DBG ("Scheduled MIDI Note OFF: " << scheduledNoteOffNote << " at sample " << scheduledNoteOffSample
                  << " (offset " << sampleOffset << " in buffer)");
 
             // Clear scheduled note-off
             scheduledNoteOffSample = -1;
             scheduledNoteOffNote = -1;
+
+            // Notify UI that note-off occurred (thread-safe via AsyncUpdater)
+            auto noteOffCallback = onNoteOff;
+            if (noteOffCallback) {
+                noteOffCallback();
+            }
         }
     }
     // ========================================================

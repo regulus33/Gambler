@@ -95,6 +95,14 @@ public:
             triggerAsyncUpdate();
         };
 
+        // Wire up note-off callback to clear active note highlight
+        processorRef.onNoteOff = [this]() {
+            // Use MessageManager to safely update UI from audio thread
+            juce::MessageManager::callAsync([this]() {
+                mainScreen.getNoteRangeControls().clearActiveNote();
+            });
+        };
+
         // Wire up MIDI learn callback to trigger UI updates when mapping is created
         processorRef.onMidiLearned = [this]() {
             triggerAsyncUpdate();
@@ -104,6 +112,7 @@ public:
     ~ApplicationComponent() override {
         // Clear the callbacks before destruction to avoid dangling reference
         processorRef.onSequenceTick = nullptr;
+        processorRef.onNoteOff = nullptr;
         processorRef.onMidiLearned = nullptr;
         cancelPendingUpdate();
     }

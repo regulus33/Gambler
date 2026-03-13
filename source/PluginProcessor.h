@@ -64,6 +64,10 @@ public:
     // The callback should be thread-safe (e.g., trigger an AsyncUpdater)
     std::function<void()> onSequenceTick;
 
+    // Callback for UI updates when note-off is sent (called from audio thread)
+    // Used to clear the active note highlight in the UI
+    std::function<void()> onNoteOff;
+
     // Callback for UI updates when MIDI learn mapping is created (called from audio thread)
     // The callback should be thread-safe (e.g., trigger an AsyncUpdater)
     std::function<void()> onMidiLearned;
