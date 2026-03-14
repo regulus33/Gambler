@@ -13,8 +13,8 @@ PluginProcessor::PluginProcessor()
               ),
       apvts (*this, nullptr, "Parameters", createParameterLayout()) {
 
-    // Initialize APVTS-backed state accessor
-    sequenceState = std::make_unique<SequenceState> (apvts);
+    // Initialize APVTS-backed state accessor (with InternalState for non-MIDI-mappable params)
+    sequenceState = std::make_unique<SequenceState> (apvts, internalState);
 
     // Register as listener for all parameter changes
     for (auto* param : apvts.processor.getParameters()) {
@@ -494,9 +494,13 @@ void PluginProcessor::getStateInformation (juce::MemoryBlock& destData) {
     // Create root XML element to hold all state
     auto rootXml = std::make_unique<juce::XmlElement> ("GamblerState");
 
-    // Save APVTS parameters (contains all sequence data and user preferences)
+    // Save APVTS parameters (MIDI-mappable state)
     auto apvtsXml = apvts.copyState().createXml();
     rootXml->addChildElement (apvtsXml.release());
+
+    // Save InternalState (non-MIDI-mappable state: step notes, modulations, etc.)
+    auto internalStateXml = internalState.getState().createXml();
+    rootXml->addChildElement (internalStateXml.release());
 
     // Save Clock settings (mode, BPM, subdivision)
     rootXml->addChildElement (clock.toXml().release());
@@ -507,7 +511,7 @@ void PluginProcessor::getStateInformation (juce::MemoryBlock& destData) {
     // Convert to binary and save
     copyXmlToBinary (*rootXml, destData);
 
-    DBG ("State saved: APVTS (sequence data and preferences), Clock, and MIDI Learn Mappings");
+    DBG ("State saved: APVTS, InternalState, Clock, and MIDI Learn Mappings");
 }
 
 // TODO: are we actually using this?
@@ -520,10 +524,16 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
         if (rootXml->hasTagName ("GamblerState")) {
             DBG ("Loading state: GamblerState format");
 
-            // Load APVTS parameters (contains all sequence data)
+            // Load APVTS parameters (MIDI-mappable state)
             if (auto* apvtsXml = rootXml->getChildByName (apvts.state.getType())) {
                 apvts.replaceState (juce::ValueTree::fromXml (*apvtsXml));
-                DBG ("  - APVTS loaded (sequence data included)");
+                DBG ("  - APVTS loaded");
+            }
+
+            // Load InternalState (non-MIDI-mappable state: step notes, modulations, etc.)
+            if (auto* internalStateXml = rootXml->getChildByName (InternalState::IDs::ROOT_TYPE)) {
+                internalState.setState (juce::ValueTree::fromXml (*internalStateXml));
+                DBG ("  - InternalState loaded (step notes, modulations, etc.)");
             }
 
             // Load Clock settings
@@ -696,6 +706,24 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
             }
         }
         DBG ("SHUFFLE triggered");
+    }
+
+    // ========== PRESET CYCLING ==========
+    // These are trigger params - action happens on the ON transition
+    // The actual preset loading is handled by the UI via onPresetCycleUp/Down callbacks
+
+    if (parameterID == Params::Keys::ID::PRESET_CYCLE_UP && isOn) {
+        if (onPresetCycleUp) {
+            onPresetCycleUp();
+        }
+        DBG ("PRESET_CYCLE_UP triggered");
+    }
+
+    if (parameterID == Params::Keys::ID::PRESET_CYCLE_DOWN && isOn) {
+        if (onPresetCycleDown) {
+            onPresetCycleDown();
+        }
+        DBG ("PRESET_CYCLE_DOWN triggered");
     }
 
     // ========== CLOCK PARAMETERS ==========
@@ -1026,9 +1054,13 @@ std::unique_ptr<juce::XmlElement> PluginProcessor::getStateAsXml() {
     // Create root XML element to hold all state (same format as getStateInformation)
     auto rootXml = std::make_unique<juce::XmlElement> ("GamblerState");
 
-    // Save APVTS parameters (contains all sequence data and user preferences)
+    // Save APVTS parameters (MIDI-mappable state)
     auto apvtsXml = apvts.copyState().createXml();
     rootXml->addChildElement (apvtsXml.release());
+
+    // Save InternalState (non-MIDI-mappable state: step notes, modulations, etc.)
+    auto internalStateXml = internalState.getState().createXml();
+    rootXml->addChildElement (internalStateXml.release());
 
     // Save Clock settings (mode, BPM, subdivision)
     rootXml->addChildElement (clock.toXml().release());
@@ -1047,10 +1079,16 @@ void PluginProcessor::loadStateFromXml (const juce::XmlElement& xml) {
 
     DBG ("Loading preset state from XML");
 
-    // Load APVTS parameters (contains all sequence data)
+    // Load APVTS parameters (MIDI-mappable state)
     if (auto* apvtsXml = xml.getChildByName (apvts.state.getType())) {
         apvts.replaceState (juce::ValueTree::fromXml (*apvtsXml));
-        DBG ("  - APVTS loaded (sequence data included)");
+        DBG ("  - APVTS loaded");
+    }
+
+    // Load InternalState (non-MIDI-mappable state: step notes, modulations, etc.)
+    if (auto* internalStateXml = xml.getChildByName (InternalState::IDs::ROOT_TYPE)) {
+        internalState.setState (juce::ValueTree::fromXml (*internalStateXml));
+        DBG ("  - InternalState loaded (step notes, modulations, etc.)");
     }
 
     // Clock settings (mode, BPM, subdivision) are handled automatically:
@@ -1475,6 +1513,23 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             if (isNoteOnOrCCPositive) {
                 // This is purely a UI concern - would need UI callback
                 DBG ("  → Settings toggle (UI only)");
+            }
+            break;
+        }
+
+        // ========== PRESET CONTROLS ==========
+        case MidiControlId::PRESET_CYCLE_UP: {
+            if (auto* param = apvts.getParameter (Params::Keys::ID::PRESET_CYCLE_UP)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → PRESET_CYCLE_UP param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            }
+            break;
+        }
+
+        case MidiControlId::PRESET_CYCLE_DOWN: {
+            if (auto* param = apvts.getParameter (Params::Keys::ID::PRESET_CYCLE_DOWN)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → PRESET_CYCLE_DOWN param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }

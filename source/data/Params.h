@@ -149,6 +149,10 @@ namespace Params
             // Clear Scale trigger
             inline const String CLEAR_SCALE = "clear_scale";
 
+            // Preset cycling triggers (MIDI-mappable)
+            inline const String PRESET_CYCLE_UP = "preset_cycle_up";
+            inline const String PRESET_CYCLE_DOWN = "preset_cycle_down";
+
 #if GAMBLER_HAS_SYNTH
             // ========================================
             // BUILT-IN SYNTH ENGINE
@@ -254,6 +258,10 @@ namespace Params
             // Clear Scale trigger
             inline const String CLEAR_SCALE = "Clear Scale";
 
+            // Preset cycling triggers
+            inline const String PRESET_CYCLE_UP = "Preset Cycle Up";
+            inline const String PRESET_CYCLE_DOWN = "Preset Cycle Down";
+
 #if GAMBLER_HAS_SYNTH
             // Built-in synth engine labels
             inline const String SYNTH_OSC_BLEND = "Osc Blend";
@@ -334,80 +342,20 @@ namespace Params
         };
 
         // ========================================
-        // SEQUENCE METADATA
+        // SEQUENCE METADATA (MIDI-mappable params only)
         // ========================================
         params.push_back(createIntParam(Keys::ID::SEQ_LENGTH, Keys::LABEL::SEQ_LENGTH,
             1, ParamConstants::MAX_STEPS, ParamConstants::DEFAULT_LENGTH));
-        params.push_back(createIntParam(Keys::ID::SEQ_CURRENT_INDEX, Keys::LABEL::SEQ_CURRENT_INDEX,
-            -1, ParamConstants::MAX_STEPS - 1, -1));
+        // NOTE: SEQ_CURRENT_INDEX is now in InternalState (not MIDI-mappable, changes too frequently)
         params.push_back(createIntParam(Keys::ID::SEQ_SELECTED_STEP, Keys::LABEL::SEQ_SELECTED_STEP,
             0, ParamConstants::MAX_STEPS - 1, 0));
         params.push_back(createBoolParam(Keys::ID::SEQ_IS_RANDOM, Keys::LABEL::SEQ_IS_RANDOM, false));
         params.push_back(createBoolParam(Keys::ID::SEQ_IS_SHIFT, Keys::LABEL::SEQ_IS_SHIFT, false));
-        params.push_back(createIntParam(Keys::ID::SEQ_LAST_PROB_INDEX, "Last Prob Index", -1, 63, -1));
-        params.push_back(createIntParam(Keys::ID::SEQ_VIEW_WINDOW_START, Keys::LABEL::SEQ_VIEW_WINDOW_START, 0, 56, 0));
-
-        // Play probability array (64 bools, default all true = 100% probability)
-        for (int i = 0; i < ParamConstants::MAX_STEPS; ++i) {
-            params.push_back(createBoolParam(Keys::ID::playProbability(i),
-                Keys::LABEL::playProbability(i), true));
-        }
-
-        // ========================================
-        // STEP NOTE DATA (64 steps × 8 substeps)
-        // ========================================
-        for (int step = 0; step < ParamConstants::MAX_STEPS; ++step) {
-            // Note values for each substep (-1 to 127, -1 = rest)
-            for (int substep = 0; substep < ParamConstants::MAX_SUBSTEPS; ++substep) {
-                params.push_back(createIntParam(
-                    Keys::ID::stepNote(step, substep),
-                    Keys::LABEL::stepNote(step, substep),
-                    -1, 127, ParamConstants::DEFAULT_NOTE));
-            }
-
-            // StepNotes metadata
-            params.push_back(createIntParam(
-                Keys::ID::stepNotesLength(step),
-                Keys::LABEL::stepNotesLength(step),
-                1, ParamConstants::MAX_SUBSTEPS, 1));
-            params.push_back(createIntParam(
-                Keys::ID::stepNotesCurrentIndex(step),
-                Keys::LABEL::stepNotesCurrentIndex(step),
-                -1, ParamConstants::MAX_SUBSTEPS - 1, -1));
-        }
-
-        // ========================================
-        // STEP MODULATION DATA (64 steps × 7 modulations)
-        // ========================================
-        for (int step = 0; step < ParamConstants::MAX_STEPS; ++step) {
-            for (int mod = 0; mod < ParamConstants::NUM_MODULATIONS; ++mod) {
-                // Type: 0=CC, 1=Velocity
-                int defaultType = (mod == 0) ? 1 : 0;  // First slot is velocity
-                params.push_back(createIntParam(
-                    Keys::ID::stepModType(step, mod),
-                    Keys::LABEL::stepModType(step, mod),
-                    0, 1, defaultType));
-
-                // CC number (0-127)
-                params.push_back(createIntParam(
-                    Keys::ID::stepModCCNum(step, mod),
-                    Keys::LABEL::stepModCCNum(step, mod),
-                    0, 127, mod));  // Default CC numbers 0-6
-
-                // Value (0-127)
-                int defaultValue = (mod == 0) ? ParamConstants::DEFAULT_VELOCITY : 64;
-                params.push_back(createIntParam(
-                    Keys::ID::stepModValue(step, mod),
-                    Keys::LABEL::stepModValue(step, mod),
-                    0, 127, defaultValue));
-
-                // Selected (bool)
-                params.push_back(createBoolParam(
-                    Keys::ID::stepModSelected(step, mod),
-                    Keys::LABEL::stepModSelected(step, mod),
-                    false));
-            }
-        }
+        // NOTE: seq_last_prob_index, seq_view_window_start are now in InternalState
+        // NOTE: Play probability array (64 bools) is now in InternalState
+        // NOTE: Step note data (64 steps × 8 substeps) is now in InternalState
+        // NOTE: Step modulation data (64 steps × 7 modulations) is now in InternalState
+        // NOTE: Note colours (12 values) are now in InternalState
 
         // ========================================
         // GLOBAL SCALE DATA (12 notes)
@@ -467,38 +415,17 @@ namespace Params
         params.push_back(createIntParam(Keys::ID::NOTE_RANGE_MIN, Keys::LABEL::NOTE_RANGE_MIN, 0, 127, 0));
         params.push_back(createIntParam(Keys::ID::NOTE_RANGE_MAX, Keys::LABEL::NOTE_RANGE_MAX, 0, 127, 127));
 
-        // ========================================
-        // NOTE COLOURS (12 customizable note colors, stored as ARGB int)
-        // ========================================
-        {
-            const int defaultNoteColours[12] = {
-                static_cast<int>(0xFFFF6B6B), // C   - Red
-                static_cast<int>(0xFFFF9F6B), // Db  - Orange
-                static_cast<int>(0xFFFFD66B), // D   - Yellow
-                static_cast<int>(0xFFFFE66B), // Eb  - Light yellow
-                static_cast<int>(0xFFE6FF6B), // E   - Yellow-green
-                static_cast<int>(0xFF6BFFB4), // F   - Light green
-                static_cast<int>(0xFF6BFFD6), // Gb  - Cyan-green
-                static_cast<int>(0xFF6BD6FF), // G   - Cyan
-                static_cast<int>(0xFF6BB4FF), // Ab  - Light blue
-                static_cast<int>(0xFF9F6BFF), // A   - Purple
-                static_cast<int>(0xFFD66BFF), // Bb  - Magenta
-                static_cast<int>(0xFFFF6BD6)  // B   - Pink
-            };
-            for (int i = 0; i < 12; ++i) {
-                params.push_back(make_unique<AudioParameterInt>(
-                    Keys::ID::noteColour(i),
-                    Keys::LABEL::noteColour(i),
-                    INT_MIN, INT_MAX,
-                    defaultNoteColours[i]));
-            }
-        }
+        // NOTE: Note colours (12 customizable note colors) are now in InternalState
 
         // Scale Latch mode (false = momentary, true = latched)
         params.push_back(createBoolParam(Keys::ID::SCALE_LATCH, Keys::LABEL::SCALE_LATCH, false));
 
         // Clear Scale trigger
         params.push_back(createBoolParam(Keys::ID::CLEAR_SCALE, Keys::LABEL::CLEAR_SCALE, false));
+
+        // Preset cycling triggers (MIDI-mappable)
+        params.push_back(createBoolParam(Keys::ID::PRESET_CYCLE_UP, Keys::LABEL::PRESET_CYCLE_UP, false));
+        params.push_back(createBoolParam(Keys::ID::PRESET_CYCLE_DOWN, Keys::LABEL::PRESET_CYCLE_DOWN, false));
 
 #if GAMBLER_HAS_SYNTH
         // ========================================

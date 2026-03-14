@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../data/Params.h"
+#include "InternalState.h"
 #include "Scale.h"
 #include "ModulationType.h"
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -46,8 +47,9 @@ struct StepModulationData {
 class SequenceState {
 public:
     using APVTS = juce::AudioProcessorValueTreeState;
-    
-    explicit SequenceState(APVTS& apvts) : apvts(apvts) {}
+
+    SequenceState(APVTS& apvts, InternalState& internalState)
+        : apvts(apvts), internalState(internalState) {}
     
     // ========================================
     // SEQUENCE METADATA
@@ -62,72 +64,70 @@ public:
             juce::jlimit(1, ParamConstants::MAX_STEPS, length));
     }
     
+    // Current playback index (delegated to InternalState)
     int getCurrentIndex() const {
-        return getIntParam(Params::Keys::ID::SEQ_CURRENT_INDEX);
+        return internalState.getCurrentIndex();
     }
-    
+
     void setCurrentIndex(int index) {
-        setIntParam(Params::Keys::ID::SEQ_CURRENT_INDEX, 
-            juce::jlimit(-1, getLength() - 1, index));
+        internalState.setCurrentIndex(juce::jlimit(-1, getLength() - 1, index));
     }
-    
+
     int getSelectedStepForEditing() const {
         return getIntParam(Params::Keys::ID::SEQ_SELECTED_STEP);
     }
-    
+
     void setSelectedStepForEditing(int index) {
-        setIntParam(Params::Keys::ID::SEQ_SELECTED_STEP, 
+        setIntParam(Params::Keys::ID::SEQ_SELECTED_STEP,
             juce::jlimit(0, ParamConstants::MAX_STEPS - 1, index));
     }
-    
+
     bool getIsRandom() const {
         return getBoolParam(Params::Keys::ID::SEQ_IS_RANDOM);
     }
-    
+
     void setIsRandom(bool random) {
         setBoolParam(Params::Keys::ID::SEQ_IS_RANDOM, random);
     }
-    
+
     bool getIsShift() const {
         return getBoolParam(Params::Keys::ID::SEQ_IS_SHIFT);
     }
-    
+
     void setIsShift(bool shift) {
         setBoolParam(Params::Keys::ID::SEQ_IS_SHIFT, shift);
     }
-    
+
+    // Last probability index (delegated to InternalState)
     int getLastProbabilityIndex() const {
-        return getIntParam(Params::Keys::ID::SEQ_LAST_PROB_INDEX);
-    }
-    
-    void setLastProbabilityIndex(int index) {
-        setIntParam(Params::Keys::ID::SEQ_LAST_PROB_INDEX, index);
+        return internalState.getLastProbabilityIndex();
     }
 
+    void setLastProbabilityIndex(int index) {
+        internalState.setLastProbabilityIndex(index);
+    }
+
+    // View window start (delegated to InternalState)
     int getViewWindowStart() const {
-        return getIntParam(Params::Keys::ID::SEQ_VIEW_WINDOW_START);
+        return internalState.getViewWindowStart();
     }
 
     void setViewWindowStart(int startIndex) {
-        setIntParam(Params::Keys::ID::SEQ_VIEW_WINDOW_START,
-            juce::jlimit(0, 56, startIndex));
+        internalState.setViewWindowStart(startIndex);
     }
 
     // ========================================
-    // PLAY PROBABILITY
+    // PLAY PROBABILITY (delegated to InternalState)
     // ========================================
-    
+
     bool getPlayProbability(int index) const {
-        if (index < 0 || index >= ParamConstants::MAX_STEPS) return true;
-        return getBoolParam(Params::Keys::ID::playProbability(index));
+        return internalState.getPlayProbability(index);
     }
-    
+
     void setPlayProbability(int index, bool shouldPlay) {
-        if (index >= 0 && index < ParamConstants::MAX_STEPS) {
-            setBoolParam(Params::Keys::ID::playProbability(index), shouldPlay);
-        }
+        internalState.setPlayProbability(index, shouldPlay);
     }
-    
+
     void setProbabilityPercentage(int percentage) {
         percentage = juce::jlimit(0, 100, percentage);
         int numToPlay = (ParamConstants::MAX_STEPS * percentage) / 100;
@@ -154,42 +154,31 @@ public:
     }
     
     // ========================================
-    // STEP NOTES
+    // STEP NOTES (delegated to InternalState)
     // ========================================
-    
+
     int getStepNote(int stepIndex, int substepIndex) const {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return ParamConstants::DEFAULT_NOTE;
-        if (substepIndex < 0 || substepIndex >= ParamConstants::MAX_SUBSTEPS) return ParamConstants::DEFAULT_NOTE;
-        return getIntParam(Params::Keys::ID::stepNote(stepIndex, substepIndex));
+        return internalState.getStepNote(stepIndex, substepIndex);
     }
-    
+
     void setStepNote(int stepIndex, int substepIndex, int noteNumber) {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return;
-        if (substepIndex < 0 || substepIndex >= ParamConstants::MAX_SUBSTEPS) return;
-        setIntParam(Params::Keys::ID::stepNote(stepIndex, substepIndex), 
-            juce::jlimit(-1, 127, noteNumber));
+        internalState.setStepNote(stepIndex, substepIndex, noteNumber);
     }
-    
+
     int getStepNotesLength(int stepIndex) const {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return 1;
-        return getIntParam(Params::Keys::ID::stepNotesLength(stepIndex));
+        return internalState.getStepNotesLength(stepIndex);
     }
-    
+
     void setStepNotesLength(int stepIndex, int length) {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return;
-        setIntParam(Params::Keys::ID::stepNotesLength(stepIndex),
-            juce::jlimit(1, ParamConstants::MAX_SUBSTEPS, length));
+        internalState.setStepNotesLength(stepIndex, length);
     }
 
     int getStepNotesCurrentIndex(int stepIndex) const {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return -1;
-        return getIntParam(Params::Keys::ID::stepNotesCurrentIndex(stepIndex));
+        return internalState.getStepNotesCurrentIndex(stepIndex);
     }
 
     void setStepNotesCurrentIndex(int stepIndex, int index) {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return;
-        setIntParam(Params::Keys::ID::stepNotesCurrentIndex(stepIndex),
-            juce::jlimit(-1, ParamConstants::MAX_SUBSTEPS - 1, index));
+        internalState.setStepNotesCurrentIndex(stepIndex, index);
     }
 
     /**
@@ -251,55 +240,39 @@ public:
     }
 
     // ========================================
-    // STEP MODULATIONS
+    // STEP MODULATIONS (delegated to InternalState)
     // ========================================
 
     ModulationType getStepModType(int stepIndex, int modIndex) const {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return ModulationType::CC;
-        if (modIndex < 0 || modIndex >= ParamConstants::NUM_MODULATIONS) return ModulationType::CC;
-        return static_cast<ModulationType>(getIntParam(Params::Keys::ID::stepModType(stepIndex, modIndex)));
+        return static_cast<ModulationType>(internalState.getStepModType(stepIndex, modIndex));
     }
 
     void setStepModType(int stepIndex, int modIndex, ModulationType type) {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return;
-        if (modIndex < 0 || modIndex >= ParamConstants::NUM_MODULATIONS) return;
-        setIntParam(Params::Keys::ID::stepModType(stepIndex, modIndex), static_cast<int>(type));
+        internalState.setStepModType(stepIndex, modIndex, static_cast<int>(type));
     }
 
     int getStepModCCNum(int stepIndex, int modIndex) const {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return 0;
-        if (modIndex < 0 || modIndex >= ParamConstants::NUM_MODULATIONS) return 0;
-        return getIntParam(Params::Keys::ID::stepModCCNum(stepIndex, modIndex));
+        return internalState.getStepModCC(stepIndex, modIndex);
     }
 
     void setStepModCCNum(int stepIndex, int modIndex, int ccNum) {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return;
-        if (modIndex < 0 || modIndex >= ParamConstants::NUM_MODULATIONS) return;
-        setIntParam(Params::Keys::ID::stepModCCNum(stepIndex, modIndex), juce::jlimit(0, 127, ccNum));
+        internalState.setStepModCC(stepIndex, modIndex, ccNum);
     }
 
     int getStepModValue(int stepIndex, int modIndex) const {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return 64;
-        if (modIndex < 0 || modIndex >= ParamConstants::NUM_MODULATIONS) return 64;
-        return getIntParam(Params::Keys::ID::stepModValue(stepIndex, modIndex));
+        return internalState.getStepModValue(stepIndex, modIndex);
     }
 
     void setStepModValue(int stepIndex, int modIndex, int value) {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return;
-        if (modIndex < 0 || modIndex >= ParamConstants::NUM_MODULATIONS) return;
-        setIntParam(Params::Keys::ID::stepModValue(stepIndex, modIndex), juce::jlimit(0, 127, value));
+        internalState.setStepModValue(stepIndex, modIndex, value);
     }
 
     bool getStepModSelected(int stepIndex, int modIndex) const {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return false;
-        if (modIndex < 0 || modIndex >= ParamConstants::NUM_MODULATIONS) return false;
-        return getBoolParam(Params::Keys::ID::stepModSelected(stepIndex, modIndex));
+        return internalState.getStepModSelected(stepIndex, modIndex);
     }
 
     void setStepModSelected(int stepIndex, int modIndex, bool selected) {
-        if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return;
-        if (modIndex < 0 || modIndex >= ParamConstants::NUM_MODULATIONS) return;
-        setBoolParam(Params::Keys::ID::stepModSelected(stepIndex, modIndex), selected);
+        internalState.setStepModSelected(stepIndex, modIndex, selected);
     }
 
     /**
@@ -536,29 +509,23 @@ public:
 
 
     // ========================================
-    // NOTE COLOURS
+    // NOTE COLOURS (delegated to InternalState)
     // ========================================
 
     /**
      * Get the colour for a chromatic note (0-11)
-     * Reads from APVTS parameter, allowing per-preset customization
+     * Reads from InternalState, allowing per-preset customization
      */
     juce::Colour getNoteColour(int chromaticNote) const {
-        int index = chromaticNote % 12;
-        if (index < 0) index += 12;
-        int argb = getIntParam(Params::Keys::ID::noteColour(index));
-        return juce::Colour(static_cast<juce::uint32>(argb));
+        return internalState.getNoteColour(chromaticNote);
     }
 
     /**
      * Set the colour for a chromatic note (0-11)
-     * Writes to APVTS parameter so it's saved with presets
+     * Writes to InternalState so it's saved with presets
      */
     void setNoteColour(int chromaticNote, juce::Colour colour) {
-        int index = chromaticNote % 12;
-        if (index < 0) index += 12;
-        setIntParam(Params::Keys::ID::noteColour(index),
-                    static_cast<int>(colour.getARGB()));
+        internalState.setNoteColour(chromaticNote, colour);
     }
 
     // ========================================
@@ -791,13 +758,8 @@ public:
 
         while (readIdx != writeIdx) {
             auto& entry = pendingNoteBuffer[readIdx % PENDING_NOTE_BUFFER_SIZE];
-            // Write directly to the parameter atomic, bypassing setValueNotifyingHost.
-            // This avoids triggering the full APVTS listener cascade which can crash.
-            // The UI reads via getRawParameterValue()->load() so it still sees the update.
-            auto paramId = Params::Keys::ID::stepNote(entry.stepIndex, entry.substepIndex);
-            if (auto* raw = apvts.getRawParameterValue(paramId)) {
-                raw->store(static_cast<float>(entry.noteValue), std::memory_order_release);
-            }
+            // Write to InternalState (step notes are now stored there, not in APVTS)
+            internalState.setStepNote(entry.stepIndex, entry.substepIndex, entry.noteValue);
             readIdx++;
             pendingNoteReadIndex.store(readIdx, std::memory_order_release);
         }
@@ -809,6 +771,7 @@ public:
 
 private:
     APVTS& apvts;
+    InternalState& internalState;
 
     // Lock-free SPSC ring buffer for deferring note writes from audio to message thread
     struct PendingNoteWrite {

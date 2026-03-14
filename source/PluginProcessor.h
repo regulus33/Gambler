@@ -2,6 +2,7 @@
 
 #include "backend/Clock.h"
 #include "backend/DawSync.h"
+#include "backend/InternalState.h"
 #include "backend/MidiLearnRegistry.h"
 #include "backend/PresetManager.h"
 #include "backend/SequenceState.h"
@@ -57,6 +58,10 @@ public:
     SequenceState& getState() noexcept { return *sequenceState; }
     const SequenceState& getState() const noexcept { return *sequenceState; }
 
+    // Access to InternalState (ValueTree-backed, for non-MIDI-mappable state)
+    InternalState& getInternalState() noexcept { return internalState; }
+    const InternalState& getInternalState() const noexcept { return internalState; }
+
     Clock& getClock() noexcept { return clock; }
     const Clock& getClock() const noexcept { return clock; }
 
@@ -71,6 +76,11 @@ public:
     // Callback for UI updates when MIDI learn mapping is created (called from audio thread)
     // The callback should be thread-safe (e.g., trigger an AsyncUpdater)
     std::function<void()> onMidiLearned;
+
+    // Callbacks for preset cycling (triggered by MIDI or DAW automation)
+    // These should be wired up by the UI to cycle through presets
+    std::function<void()> onPresetCycleUp;
+    std::function<void()> onPresetCycleDown;
 
     /**
      * Trigger MIDI note for a specific step (for UI preview/audition)
@@ -172,11 +182,14 @@ private:
     // Application Layer - Controller
     // ========================================
 
-    // Persistence layer (APVTS) - single source of truth for all state
+    // Persistence layer (APVTS) - single source of truth for MIDI-mappable state
     APVTS apvts;
 
     // APVTS-backed state accessor (thread-safe)
     std::unique_ptr<SequenceState> sequenceState;
+
+    // ValueTree-backed state for non-MIDI-mappable parameters
+    InternalState internalState;
 
     // Clock and DAW synchronization
     Clock clock; // clock just tells us if we shouldTick()

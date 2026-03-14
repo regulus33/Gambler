@@ -120,6 +120,8 @@ add_library(SharedCode INTERFACE
         source/backend/InternalClock.h
         source/backend/Clock.h
         source/backend/DawSync.h
+        source/backend/InternalState.h
+        source/backend/InternalState.cpp
         source/ui/PianoRollComponent.h
 )
 

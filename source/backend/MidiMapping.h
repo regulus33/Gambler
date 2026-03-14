@@ -89,6 +89,10 @@ enum class MidiControlId {
     // ========== NAVIGATION ==========
     SETTINGS_TOGGLE,  // Toggle settings screen
 
+    // ========== PRESET CONTROLS ==========
+    PRESET_CYCLE_UP,    // Cycle to next preset
+    PRESET_CYCLE_DOWN,  // Cycle to previous preset
+
     // ========== Total count ==========
     COUNT
 };
@@ -217,6 +221,10 @@ inline std::string getMidiControlName(MidiControlId id) {
 
         // Navigation
         case MidiControlId::SETTINGS_TOGGLE: return "Settings Toggle";
+
+        // Preset Controls
+        case MidiControlId::PRESET_CYCLE_UP: return "Preset Cycle Up";
+        case MidiControlId::PRESET_CYCLE_DOWN: return "Preset Cycle Down";
 
         default: return "Unknown Control";
     }
