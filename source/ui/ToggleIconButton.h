@@ -1,6 +1,9 @@
 #pragma once
 
 #include "Icons.h"
+#include "MidiLearnOverlayPainter.h"
+#include "../backend/MidiLearnRegistry.h"
+#include "../backend/MidiMapping.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
@@ -49,6 +52,14 @@ public:
     {
     }
 
+    void setMidiControlId(MidiControlId controlId) {
+        midiControlId_ = controlId;
+    }
+
+    void setRegistry(MidiLearnRegistry* reg) {
+        registry_ = reg;
+    }
+
     void paint (juce::Graphics& g) override {
         using namespace ToggleIconButtonConstants;
 
@@ -61,9 +72,19 @@ public:
             Icons::strokeIcon(g, path, iconArea, color, 1.5f, true, iconScale);
         else
             Icons::drawIcon(g, path, iconArea, color, true, iconScale);
+
+        // Draw MIDI learn overlay on top
+        MidiLearnOverlayPainter::paint(g, getLocalBounds(), registry_, midiControlId_, 0.0f);
     }
 
     void mouseDown (const juce::MouseEvent& /*event*/) override {
+        // Handle MIDI learn mode first
+        if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT) {
+            registry_->setLearningControl(midiControlId_);
+            repaint();
+            return;
+        }
+
         // Only auto-toggle if enabled
         if (autoToggleEnabled) {
             isToggled = !isToggled;
@@ -124,5 +145,7 @@ private:
     juce::Colour color2;  // Color for state 2 (toggled)
     float iconScale1;     // Scale factor for icon 1
     float iconScale2;     // Scale factor for icon 2
+    MidiControlId midiControlId_ = MidiControlId::COUNT;
+    MidiLearnRegistry* registry_ = nullptr;
 };
 

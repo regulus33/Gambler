@@ -1444,26 +1444,6 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             break;
         }
 
-        // ========== CC LANE VALUES ==========
-        case MidiControlId::CC_LANE_0_VALUE:
-        case MidiControlId::CC_LANE_1_VALUE:
-        case MidiControlId::CC_LANE_2_VALUE:
-        case MidiControlId::CC_LANE_3_VALUE:
-        case MidiControlId::CC_LANE_4_VALUE:
-        case MidiControlId::CC_LANE_5_VALUE:
-        case MidiControlId::CC_LANE_6_VALUE: {
-            int laneIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::CC_LANE_0_VALUE);
-            int ccValue = static_cast<int> (normalizedValue * 127.0f);
-            if (laneIndex >= 0 && laneIndex < ParamConstants::NUM_MODULATIONS) {
-                int selectedStep = state.getSelectedStepForEditing();
-                state.setStepModValue (selectedStep, laneIndex, ccValue);
-                DBG ("  → CC Lane " << laneIndex << " value set to " << ccValue);
-            }
-            if (onSequenceTick)
-                onSequenceTick();
-            break;
-        }
-
         // ========== PIANO ROLL SCALE NOTES ==========
         case MidiControlId::SCALE_NOTE_C:
         case MidiControlId::SCALE_NOTE_Db:
@@ -1490,114 +1470,7 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             break;
         }
 
-
-
-        // ========== CC LANE TOGGLES ==========
-        case MidiControlId::CC_LANE_0_TOGGLE:
-        case MidiControlId::CC_LANE_1_TOGGLE:
-        case MidiControlId::CC_LANE_2_TOGGLE:
-        case MidiControlId::CC_LANE_3_TOGGLE:
-        case MidiControlId::CC_LANE_4_TOGGLE:
-        case MidiControlId::CC_LANE_5_TOGGLE:
-        case MidiControlId::CC_LANE_6_TOGGLE: {
-            if (isNoteOnOrCCPositive) {
-                int laneIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::CC_LANE_0_TOGGLE);
-                if (laneIndex >= 0 && laneIndex < ParamConstants::NUM_MODULATIONS) {
-                    int selectedStep = state.getSelectedStepForEditing();
-                    bool currentSelected = state.getStepModSelected (selectedStep, laneIndex);
-                    state.setStepModSelected (selectedStep, laneIndex, !currentSelected);
-                    DBG ("  → CC Lane " << laneIndex << " toggled to " << (!currentSelected ? "ON" : "OFF"));
-                }
-                if (onSequenceTick)
-                    onSequenceTick();
-            }
-            break;
-        }
-
-        // ========== SEQUENCE GRID (64 absolute steps) ==========
-        case MidiControlId::GRID_STEP_0:
-        case MidiControlId::GRID_STEP_1:
-        case MidiControlId::GRID_STEP_2:
-        case MidiControlId::GRID_STEP_3:
-        case MidiControlId::GRID_STEP_4:
-        case MidiControlId::GRID_STEP_5:
-        case MidiControlId::GRID_STEP_6:
-        case MidiControlId::GRID_STEP_7:
-        case MidiControlId::GRID_STEP_8:
-        case MidiControlId::GRID_STEP_9:
-        case MidiControlId::GRID_STEP_10:
-        case MidiControlId::GRID_STEP_11:
-        case MidiControlId::GRID_STEP_12:
-        case MidiControlId::GRID_STEP_13:
-        case MidiControlId::GRID_STEP_14:
-        case MidiControlId::GRID_STEP_15:
-        case MidiControlId::GRID_STEP_16:
-        case MidiControlId::GRID_STEP_17:
-        case MidiControlId::GRID_STEP_18:
-        case MidiControlId::GRID_STEP_19:
-        case MidiControlId::GRID_STEP_20:
-        case MidiControlId::GRID_STEP_21:
-        case MidiControlId::GRID_STEP_22:
-        case MidiControlId::GRID_STEP_23:
-        case MidiControlId::GRID_STEP_24:
-        case MidiControlId::GRID_STEP_25:
-        case MidiControlId::GRID_STEP_26:
-        case MidiControlId::GRID_STEP_27:
-        case MidiControlId::GRID_STEP_28:
-        case MidiControlId::GRID_STEP_29:
-        case MidiControlId::GRID_STEP_30:
-        case MidiControlId::GRID_STEP_31:
-        case MidiControlId::GRID_STEP_32:
-        case MidiControlId::GRID_STEP_33:
-        case MidiControlId::GRID_STEP_34:
-        case MidiControlId::GRID_STEP_35:
-        case MidiControlId::GRID_STEP_36:
-        case MidiControlId::GRID_STEP_37:
-        case MidiControlId::GRID_STEP_38:
-        case MidiControlId::GRID_STEP_39:
-        case MidiControlId::GRID_STEP_40:
-        case MidiControlId::GRID_STEP_41:
-        case MidiControlId::GRID_STEP_42:
-        case MidiControlId::GRID_STEP_43:
-        case MidiControlId::GRID_STEP_44:
-        case MidiControlId::GRID_STEP_45:
-        case MidiControlId::GRID_STEP_46:
-        case MidiControlId::GRID_STEP_47:
-        case MidiControlId::GRID_STEP_48:
-        case MidiControlId::GRID_STEP_49:
-        case MidiControlId::GRID_STEP_50:
-        case MidiControlId::GRID_STEP_51:
-        case MidiControlId::GRID_STEP_52:
-        case MidiControlId::GRID_STEP_53:
-        case MidiControlId::GRID_STEP_54:
-        case MidiControlId::GRID_STEP_55:
-        case MidiControlId::GRID_STEP_56:
-        case MidiControlId::GRID_STEP_57:
-        case MidiControlId::GRID_STEP_58:
-        case MidiControlId::GRID_STEP_59:
-        case MidiControlId::GRID_STEP_60:
-        case MidiControlId::GRID_STEP_61:
-        case MidiControlId::GRID_STEP_62:
-        case MidiControlId::GRID_STEP_63: {
-            if (isNoteOnOrCCPositive) {
-                int gridStepIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::GRID_STEP_0);
-                state.setSelectedStepForEditing (gridStepIndex);
-                DBG ("  → Grid step " << gridStepIndex << " selected for editing");
-                if (onSequenceTick)
-                    onSequenceTick();
-            }
-            break;
-        }
-
         // ========== NAVIGATION ==========
-        case MidiControlId::VIEW_TOGGLE: {
-            if (isNoteOnOrCCPositive) {
-                // This is purely a UI concern - would need UI callback
-                DBG ("  → View toggle (UI only)");
-            }
-            break;
-        }
-
         case MidiControlId::SETTINGS_TOGGLE: {
             if (isNoteOnOrCCPositive) {
                 // This is purely a UI concern - would need UI callback

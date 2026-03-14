@@ -2,6 +2,9 @@
 
 #include "BinaryData.h"
 #include "StateListenerComponent.h"
+#include "MidiLearnOverlayPainter.h"
+#include "../backend/MidiLearnRegistry.h"
+#include "../backend/MidiMapping.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 #include <array>
@@ -56,7 +59,7 @@ namespace SubsequenceControlsConstants {
 
 /**
  * SingleBar - Individual clickable rectangle component
- *
+ * Supports MIDI learn mode for mapping to SUBSEQ_BAR_0 through SUBSEQ_BAR_7
  */
 class SingleBar : public juce::Component {
 public:
@@ -66,22 +69,40 @@ public:
     {
     }
 
+    void setMidiControlId(MidiControlId controlId) {
+        midiControlId_ = controlId;
+    }
+
+    void setRegistry(MidiLearnRegistry* reg) {
+        registry_ = reg;
+    }
+
     void paint (juce::Graphics& g) override {
-        using namespace SubsequenceControlsConstants; // provide the constants
-        auto bounds = getLocalBounds().toFloat(); // get local bounds
+        using namespace SubsequenceControlsConstants;
+        auto bounds = getLocalBounds().toFloat();
 
         // Fill bar with color
-        g.setColour (color); // whatever the colour is
-        g.fillRoundedRectangle (bounds, barCornerRadius); //
+        g.setColour (color);
+        g.fillRoundedRectangle (bounds, barCornerRadius);
 
         // Draw white border if enabled
         if (hasBorder) {
             g.setColour (juce::Colours::white);
             g.drawRoundedRectangle (bounds.reduced (0.5f), barCornerRadius, borderWidth);
         }
+
+        // Draw MIDI learn overlay on top
+        MidiLearnOverlayPainter::paint(g, getLocalBounds(), registry_, midiControlId_, barCornerRadius);
     }
 
     void mouseDown (const juce::MouseEvent& /*event*/) override {
+        // Handle MIDI learn mode first
+        if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT) {
+            registry_->setLearningControl(midiControlId_);
+            repaint();
+            return;
+        }
+
         if (onClick)
             onClick();
     }
@@ -109,6 +130,8 @@ public:
 private:
     juce::Colour color;
     bool hasBorder;
+    MidiControlId midiControlId_ = MidiControlId::COUNT;
+    MidiLearnRegistry* registry_ = nullptr;
 };
 
 /**
@@ -122,11 +145,24 @@ public:
             bars[i] = std::make_unique<SingleBar>();
             addAndMakeVisible (bars[i].get());
 
+            // Set MIDI control ID (SUBSEQ_BAR_0 through SUBSEQ_BAR_7)
+            bars[i]->setMidiControlId(static_cast<MidiControlId>(
+                static_cast<int>(MidiControlId::SUBSEQ_BAR_0) + i));
+
             // Setup click callback for each bar
             bars[i]->onClick = [this, i]() {
                 if (onBarClicked)
                     onBarClicked (i);
             };
+        }
+    }
+
+    /**
+     * Set the MIDI learn registry for all bars
+     */
+    void setRegistry(MidiLearnRegistry* reg) {
+        for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
+            bars[i]->setRegistry(reg);
         }
     }
 
@@ -212,6 +248,7 @@ private:
 
 /**
  * SubsequenceButton - Simple button for +/- actions
+ * Supports MIDI learn mode for mapping to SUBSEQ_MINUS and SUBSEQ_PLUS
  */
 class SubsequenceButton : public juce::Component {
 public:
@@ -221,6 +258,14 @@ public:
         interTypeface = juce::Typeface::createSystemTypefaceFor (
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
+    }
+
+    void setMidiControlId(MidiControlId controlId) {
+        midiControlId_ = controlId;
+    }
+
+    void setRegistry(MidiLearnRegistry* reg) {
+        registry_ = reg;
     }
 
     void paint (juce::Graphics& g) override {
@@ -237,9 +282,19 @@ public:
         font.setBold (true);
         g.setFont (font);
         g.drawText (label, bounds.toNearestInt(), juce::Justification::centred);
+
+        // Draw MIDI learn overlay on top
+        MidiLearnOverlayPainter::paint(g, getLocalBounds(), registry_, midiControlId_, buttonCornerRadius);
     }
 
     void mouseDown (const juce::MouseEvent& /*event*/) override {
+        // Handle MIDI learn mode first
+        if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT) {
+            registry_->setLearningControl(midiControlId_);
+            repaint();
+            return;
+        }
+
         if (onClick)
             onClick();
     }
@@ -249,6 +304,8 @@ public:
 private:
     juce::String label;
     juce::Typeface::Ptr interTypeface;
+    MidiControlId midiControlId_ = MidiControlId::COUNT;
+    MidiLearnRegistry* registry_ = nullptr;
 };
 
 /**
@@ -262,6 +319,9 @@ private:
  * Observer Pattern:
  * - Listens to selected step and substep parameters
  * - Automatically updates UI when substep data changes
+ *
+ * MIDI Learn:
+ * - Supports MIDI mapping for SUBSEQ_BAR_0-7, SUBSEQ_MINUS, SUBSEQ_PLUS
  */
 class SubsequenceControlsComponent : public StateListenerComponent {
 public:
@@ -273,6 +333,10 @@ public:
         addAndMakeVisible (subsequenceBar);
         addAndMakeVisible (minusButton);
         addAndMakeVisible (plusButton);
+
+        // Set MIDI control IDs for buttons
+        minusButton.setMidiControlId(MidiControlId::SUBSEQ_MINUS);
+        plusButton.setMidiControlId(MidiControlId::SUBSEQ_PLUS);
 
         // Setup bar click callback
         subsequenceBar.onBarClicked = [this] (int index) {
@@ -299,6 +363,15 @@ public:
         // Subscribe to note colour changes
         for (int i = 0; i < 12; ++i)
             listenToParameter(Params::Keys::ID::noteColour(i));
+    }
+
+    /**
+     * Set the MIDI learn registry for all child components
+     */
+    void setMidiLearnRegistry(MidiLearnRegistry* registry) {
+        subsequenceBar.setRegistry(registry);
+        minusButton.setRegistry(registry);
+        plusButton.setRegistry(registry);
     }
 
     void resized() override {

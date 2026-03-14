@@ -86,32 +86,7 @@ enum class MidiControlId {
     // ========== CLOCK CONTROLS ==========
     SUBDIVISION_SLIDER,  // 0-3 (quarter, eighth, sixteenth, thirty-second)
 
-    // ========== MIDI DATA PER STEP (14 controls: 7 values + 7 toggles) ==========
-    CC_LANE_0_VALUE, CC_LANE_1_VALUE, CC_LANE_2_VALUE, CC_LANE_3_VALUE,
-    CC_LANE_4_VALUE, CC_LANE_5_VALUE, CC_LANE_6_VALUE,
-    CC_LANE_0_TOGGLE, CC_LANE_1_TOGGLE, CC_LANE_2_TOGGLE, CC_LANE_3_TOGGLE,
-    CC_LANE_4_TOGGLE, CC_LANE_5_TOGGLE, CC_LANE_6_TOGGLE,
-
-    // ========== SEQUENCE GRID (64 steps: absolute positions 0-63) ==========
-    GRID_STEP_0,  GRID_STEP_1,  GRID_STEP_2,  GRID_STEP_3,
-    GRID_STEP_4,  GRID_STEP_5,  GRID_STEP_6,  GRID_STEP_7,
-    GRID_STEP_8,  GRID_STEP_9,  GRID_STEP_10, GRID_STEP_11,
-    GRID_STEP_12, GRID_STEP_13, GRID_STEP_14, GRID_STEP_15,
-    GRID_STEP_16, GRID_STEP_17, GRID_STEP_18, GRID_STEP_19,
-    GRID_STEP_20, GRID_STEP_21, GRID_STEP_22, GRID_STEP_23,
-    GRID_STEP_24, GRID_STEP_25, GRID_STEP_26, GRID_STEP_27,
-    GRID_STEP_28, GRID_STEP_29, GRID_STEP_30, GRID_STEP_31,
-    GRID_STEP_32, GRID_STEP_33, GRID_STEP_34, GRID_STEP_35,
-    GRID_STEP_36, GRID_STEP_37, GRID_STEP_38, GRID_STEP_39,
-    GRID_STEP_40, GRID_STEP_41, GRID_STEP_42, GRID_STEP_43,
-    GRID_STEP_44, GRID_STEP_45, GRID_STEP_46, GRID_STEP_47,
-    GRID_STEP_48, GRID_STEP_49, GRID_STEP_50, GRID_STEP_51,
-    GRID_STEP_52, GRID_STEP_53, GRID_STEP_54, GRID_STEP_55,
-    GRID_STEP_56, GRID_STEP_57, GRID_STEP_58, GRID_STEP_59,
-    GRID_STEP_60, GRID_STEP_61, GRID_STEP_62, GRID_STEP_63,
-
     // ========== NAVIGATION ==========
-    VIEW_TOGGLE,      // Toggle between piano roll and MIDI data view
     SETTINGS_TOGGLE,  // Toggle settings screen
 
     // ========== Total count ==========
@@ -241,7 +216,6 @@ inline std::string getMidiControlName(MidiControlId id) {
         case MidiControlId::SUBDIVISION_SLIDER: return "Subdivision";
 
         // Navigation
-        case MidiControlId::VIEW_TOGGLE:     return "View Toggle";
         case MidiControlId::SETTINGS_TOGGLE: return "Settings Toggle";
 
         default: return "Unknown Control";

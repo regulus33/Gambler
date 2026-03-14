@@ -140,6 +140,7 @@ public:
 
         // Add settings button
         addAndMakeVisible(settingsButton);
+        settingsButton.setMidiControlId(MidiControlId::SETTINGS_TOGGLE);
         settingsButton.onClick = [this](bool toggled) {
             if (onSettingsClicked) {
                 onSettingsClicked();
@@ -297,6 +298,11 @@ public:
 
     // Access to subdivision slider for MIDI learn wiring
     SubdivisionSlider& getSubdivisionSlider() { return subdivisionSlider; }
+
+    // Set the MIDI learn registry for the settings button
+    void setSettingsButtonRegistry(MidiLearnRegistry* registry) {
+        settingsButton.setRegistry(registry);
+    }
 
 private:
     PluginProcessor& processorRef;

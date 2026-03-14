@@ -425,6 +425,9 @@ public:
 
 private:
     void setupSubsequenceCallbacks() {
+        // Wire up MIDI learn registry for subsequence controls
+        subsequenceControls.setMidiLearnRegistry(&processorRef.getMidiLearnRegistry());
+
         // Setup callbacks for subsequence controls
         subsequenceControls.onBarClicked = [this](int index) {
             // Queue command to modify state on audio thread, with completion callback for UI update
@@ -505,6 +508,9 @@ private:
         navBar.getSubdivisionSlider().onMidiLearnSelected = [this]() {
             if (onAsyncUpdateNeeded) onAsyncUpdateNeeded();
         };
+
+        // Wire up MIDI learn registry for settings button in navbar
+        navBar.setSettingsButtonRegistry(&processorRef.getMidiLearnRegistry());
 
         // Wire up callback for when a control is selected for MIDI learning
         // This triggers a repaint of all MIDI learn components to update borders
