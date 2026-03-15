@@ -130,10 +130,19 @@ public:
         }
 
         // Draw MIDI learn overlays on top of everything (so borders are fully visible)
+        // Draw non-active overlays first, then the active one last so its yellow border
+        // is never obscured by a neighbouring key's overlay.
         if (registry_ && registry_->isLearning()) {
+            int activeOverlayIndex = -1;
             for (int i = 0; i < 12; i++) {
+                if (registry_->getLearningControl() == keyMidiControlIds_[i]) {
+                    activeOverlayIndex = i;
+                    continue;
+                }
                 paintMidiLearnOverlayForKey(g, keys[i]->path.getBounds(), i);
             }
+            if (activeOverlayIndex >= 0)
+                paintMidiLearnOverlayForKey(g, keys[activeOverlayIndex]->path.getBounds(), activeOverlayIndex);
         }
     }
 
