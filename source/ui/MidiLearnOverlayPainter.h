@@ -16,7 +16,7 @@
 class MidiLearnOverlayPainter {
 public:
     // MIDI Learn overlay colors (centralized)
-    static inline const juce::Colour overlayColor = juce::Colour(0x6680CCFF);      // Blue with ~40% opacity
+    static inline const juce::Colour overlayColor = juce::Colour(0xBB2255CC).darker ();      // Blue with ~73% opacity
     static inline const juce::Colour activeStrokeColor = juce::Colour(0xFFFFD700); // Yellow/gold stroke
     static inline const juce::Colour textColor = juce::Colour(0xFFFFD700);         // Yellow/gold text
     static constexpr float strokeWidth = 4.0f;
