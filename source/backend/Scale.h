@@ -31,20 +31,45 @@ public:
     int getRangeMax() const { return rangeMax; }
 
     // Window-based helpers (static utility functions)
-    // These compute min/max from window offset and size
-    static int computeMinFromWindow(int offset, int size) {
-        (void)size;  // Unused - min is just the offset
-        return juce::jlimit(MIN_MIDI_NOTE, MAX_MIDI_NOTE, offset);
+    //
+    // The APVTS params SCALE_WINDOW_OFFSET (0-127) and SCALE_WINDOW_SIZE (1-128) are
+    // user-facing knob values, NOT direct MIDI note indices.
+    //
+    // SCALE_WINDOW_SIZE maps linearly to the number of MIDI notes in the window (1-128).
+    //
+    // SCALE_WINDOW_OFFSET is a percentage-style value: it maps 0-127 across the
+    // available headroom [0, 128 - size], so the window can never exceed note 127
+    // regardless of the offset knob position. This means the two knobs are fully
+    // independent — turning the offset knob never shrinks the window.
+    //
+    // Actual MIDI min = round(offset / 127.0 * (128 - size))
+    // Actual MIDI max = min + size - 1
+
+    static int computeActualOffset(int rawOffset, int size) {
+        int headroom = 128 - size;          // how many start positions are valid (0..headroom)
+        if (headroom <= 0) return 0;        // size == 128: only one valid start position
+        double t = static_cast<double>(rawOffset) / 127.0;
+        return static_cast<int>(std::round(t * static_cast<double>(headroom)));
     }
 
-    static int computeMaxFromWindow(int offset, int size) {
-        int maxNote = offset + size - 1;  // -1 because range is inclusive
-        return juce::jlimit(MIN_MIDI_NOTE, MAX_MIDI_NOTE, maxNote);
+    static int computeMinFromWindow(int rawOffset, int size) {
+        return juce::jlimit(MIN_MIDI_NOTE, MAX_MIDI_NOTE, computeActualOffset(rawOffset, size));
     }
 
+    static int computeMaxFromWindow(int rawOffset, int size) {
+        int minNote = computeMinFromWindow(rawOffset, size);
+        return juce::jlimit(MIN_MIDI_NOTE, MAX_MIDI_NOTE, minNote + size - 1);
+    }
+
+    // Inverse helpers: given a real MIDI min/max, compute the raw param values.
+    // Used when setting range programmatically (e.g. from MIDI CC).
     static int computeOffsetFromRange(int minNote, int maxNote) {
-        (void)maxNote;  // Unused - offset is just the min
-        return juce::jlimit(MIN_MIDI_NOTE, MAX_MIDI_NOTE, minNote);
+        int size = computeSizeFromRange(minNote, maxNote);
+        int headroom = 128 - size;
+        if (headroom <= 0) return 0;
+        double t = static_cast<double>(juce::jlimit(MIN_MIDI_NOTE, MAX_MIDI_NOTE, minNote))
+                   / static_cast<double>(headroom);
+        return juce::jlimit(0, 127, static_cast<int>(std::round(t * 127.0)));
     }
 
     static int computeSizeFromRange(int minNote, int maxNote) {
