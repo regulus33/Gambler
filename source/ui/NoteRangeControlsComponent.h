@@ -99,6 +99,9 @@ public:
  * - Green: in range but NOT in scale
  * - Blue: in range AND in scale (actually playable)
  * - White: currently playing note (only while note is active)
+ *
+ * The coloured window area is draggable: clicking and dragging vertically
+ * moves the window offset, keeping the window size fixed.
  */
 class NoteRangeGauge : public juce::Component {
 public:
@@ -111,6 +114,13 @@ public:
         minNote = newMin;
         maxNote = newMax;
         repaint();
+    }
+
+    /** Called by the parent whenever the raw APVTS param values change,
+     *  so the gauge can do accurate drag-to-offset conversion. */
+    void setRawParams (int rawOffset, int size) {
+        rawOffset_ = rawOffset;
+        size_ = size;
     }
 
     void setScaleNotes(const std::array<bool, 12>& notes) {
@@ -131,6 +141,9 @@ public:
             repaint();
         }
     }
+
+    /** Callback invoked during drag with the new raw offset value (0-127). */
+    std::function<void(int newRawOffset)> onOffsetDragged;
 
     void paint (juce::Graphics& g) override {
         using namespace NoteRangeControlsConstants;
@@ -170,11 +183,79 @@ public:
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Drag-to-move window interaction
+
+    void mouseMove (const juce::MouseEvent& e) override {
+        setMouseCursor (isInsideWindow (e.y) ? juce::MouseCursor::UpDownResizeCursor
+                                             : juce::MouseCursor::NormalCursor);
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override {
+        if (!isInsideWindow (e.y)) {
+            dragging_ = false;
+            return;
+        }
+        dragging_ = true;
+        dragStartY_ = e.y;
+        dragStartRawOffset_ = rawOffset_;
+    }
+
+    void mouseDrag (const juce::MouseEvent& e) override {
+        if (!dragging_ || !onOffsetDragged) return;
+
+        using namespace NoteRangeControlsConstants;
+        float noteHeight = static_cast<float>(getHeight()) / static_cast<float>(midiNoteCount);
+
+        // Positive dy = dragged downward = lower notes = smaller offset
+        float dy = static_cast<float>(e.y - dragStartY_);
+        float notesDelta = dy / noteHeight;   // how many MIDI notes we've moved
+
+        // Convert note delta to raw-offset delta.
+        // actualOffset = rawOffset / 127.0 * headroom  →  rawOffset = actualOffset * 127.0 / headroom
+        int headroom = 128 - size_;
+        if (headroom <= 0) return;
+
+        float rawDelta = -notesDelta * 127.0f / static_cast<float>(headroom);
+        int newRaw = juce::jlimit (0, 127, static_cast<int>(std::round (
+            static_cast<float>(dragStartRawOffset_) + rawDelta)));
+
+        onOffsetDragged (newRaw);
+    }
+
+    void mouseUp (const juce::MouseEvent&) override {
+        dragging_ = false;
+        setMouseCursor (juce::MouseCursor::NormalCursor);
+    }
+
+    void mouseExit (const juce::MouseEvent&) override {
+        setMouseCursor (juce::MouseCursor::NormalCursor);
+    }
+
 private:
+    /** Returns true if the given y pixel coordinate falls within the coloured window band. */
+    bool isInsideWindow (int y) const {
+        using namespace NoteRangeControlsConstants;
+        float noteHeight = static_cast<float>(getHeight()) / static_cast<float>(midiNoteCount);
+        // Note 127 is at the top; note 0 is at the bottom
+        float windowTopY    = static_cast<float>(midiNoteCount - 1 - maxNote) * noteHeight;
+        float windowBottomY = static_cast<float>(midiNoteCount - minNote)     * noteHeight;
+        return static_cast<float>(y) >= windowTopY && static_cast<float>(y) <= windowBottomY;
+    }
+
     int minNote = 0;
     int maxNote = 127;
     int activeNote = -1;  // -1 means no active note
     std::array<bool, 12> scaleNotes;  // Which pitch classes are in the scale
+
+    // Raw APVTS param values — needed for accurate drag conversion
+    int rawOffset_ = 0;
+    int size_ = 128;
+
+    // Drag state
+    bool dragging_ = false;
+    int  dragStartY_ = 0;
+    int  dragStartRawOffset_ = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NoteRangeGauge)
 };
@@ -227,6 +308,12 @@ public:
         // Setup range gauge
         addAndMakeVisible (rangeGauge);
 
+        // Wire gauge drag → APVTS offset param (goes through the same path as the rotary knob)
+        rangeGauge.onOffsetDragged = [this] (int newRawOffset) {
+            if (auto* param = getProcessor().getAPVTS().getParameter (Params::Keys::ID::SCALE_WINDOW_OFFSET))
+                param->setValueNotifyingHost (param->convertTo0to1 (static_cast<float>(newRawOffset)));
+        };
+
         // Setup MIDI learn overlays (hidden by default, shown during learn mode)
         addAndMakeVisible(offsetOverlay_);
         offsetOverlay_.setVisible(false);
@@ -258,6 +345,7 @@ public:
      */
     void setWindow(int offset, int size) {
         // Sliders are synced via APVTS attachments, just update the gauge
+        rangeGauge.setRawParams(offset, size);
         int minNote = Scale::computeMinFromWindow(offset, size);
         int maxNote = Scale::computeMaxFromWindow(offset, size);
         rangeGauge.setRange(minNote, maxNote);
@@ -397,6 +485,9 @@ protected:
         auto& state = getState();
         int offset = state.getScaleWindowOffset();
         int size = state.getScaleWindowSize();
+
+        // Keep gauge's raw param copy up to date (needed for drag conversion)
+        rangeGauge.setRawParams(offset, size);
 
         // Update range
         int minNote = Scale::computeMinFromWindow(offset, size);
