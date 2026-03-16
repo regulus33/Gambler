@@ -21,6 +21,10 @@ public:
                  MusicConstants::toJuceArray(MusicConstants::OCTAVE_COLOURS)),
           midiControlId_(MidiControlId::OCTAVE_SLIDER)
     {
+        // Initialize with full octave range (0-9)
+        for (int i = 0; i < 10; i++)
+            octaveIndices_.add(i);
+
         addAndMakeVisible(slider_);
 
         // Add invisible overlay for MIDI learn mode (sits on top, initially hidden)
@@ -44,7 +48,7 @@ public:
         slider_.getSlider().onValueChange = [this] {
             slider_.repaint();
             if (onOctaveChanged) {
-                onOctaveChanged(getSelectedIndex());
+                onOctaveChanged(getActualOctaveIndex());
             }
         };
     }
@@ -69,20 +73,57 @@ public:
     std::function<void(int)> onOctaveChanged;
 
     /**
-     * Set the current octave (0-9)
+     * Set the current octave by actual octave index (0-9).
+     * Finds the corresponding slider position based on the current octave options.
      */
     void setOctave(int octaveIndex) {
-        if (octaveIndex >= 0 && octaveIndex < 10) {
-            slider_.getSlider().setValue(static_cast<double>(octaveIndex), juce::dontSendNotification);
+        for (int i = 0; i < octaveIndices_.size(); i++) {
+            if (octaveIndices_[i] == octaveIndex) {
+                slider_.getSlider().setValue(static_cast<double>(i), juce::dontSendNotification);
+                slider_.repaint();
+                return;
+            }
+        }
+        // If not found, default to first available octave
+        if (!octaveIndices_.isEmpty()) {
+            slider_.getSlider().setValue(0.0, juce::dontSendNotification);
             slider_.repaint();
         }
     }
 
     /**
-     * Get the currently selected octave index (0-9)
+     * Get the actual octave index (0-9) for the currently selected slider position.
+     * Accounts for filtered octave options.
+     */
+    int getActualOctaveIndex() const {
+        int sliderIndex = slider_.getSelectedIndex();
+        if (sliderIndex >= 0 && sliderIndex < octaveIndices_.size())
+            return octaveIndices_[sliderIndex];
+        return sliderIndex;
+    }
+
+    /**
+     * Get the currently selected slider index (not the actual octave index).
      */
     int getSelectedIndex() const {
         return slider_.getSelectedIndex();
+    }
+
+    /**
+     * Update the octave slider to only show octaves reachable within the current note range.
+     * @param octaveLabels  Labels to display (e.g., {"3", "4", "5"})
+     * @param octaveColours Colours for each label (must match octaveLabels size)
+     * @param octaveIndices Actual octave indices (0-9) for each label, used for mapping
+     */
+    void updateOctaveOptions(const juce::Array<juce::String>& octaveLabels,
+                             const juce::Array<juce::Colour>& octaveColours,
+                             const juce::Array<int>& octaveIndices) {
+        if (octaveLabels.isEmpty() || octaveLabels.size() != octaveColours.size() ||
+            octaveLabels.size() != octaveIndices.size())
+            return;
+
+        octaveIndices_ = octaveIndices;
+        slider_.updateOptions(octaveLabels, octaveColours);
     }
 
     void paint(juce::Graphics& g) override {
@@ -160,6 +201,11 @@ private:
 
     NotchedSlider slider_;
     MidiLearnOverlay midiLearnOverlay_;
+
+    // Mapping from slider index to actual octave index (0-9)
+    // Allows the slider to show only reachable octaves while maintaining correct mapping
+    juce::Array<int> octaveIndices_;
+
     MidiControlId midiControlId_ = MidiControlId::COUNT;
     MidiLearnRegistry* registry_ = nullptr;
 };

@@ -296,6 +296,12 @@ public:
      */
     std::function<void()> onMidiLearnSelected;
 
+    /**
+     * Callback fired (on the message thread) whenever the note range changes.
+     * Subscribers can use this to update dependent UI (e.g. note/octave sliders).
+     */
+    std::function<void()> onRangeChanged;
+
     ~NoteRangeControlsComponent() override {
         windowWidthSlider.setLookAndFeel (nullptr);
         windowOffsetSlider.setLookAndFeel (nullptr);
@@ -406,6 +412,10 @@ protected:
 
         // Force immediate repaint of the gauge to ensure visual feedback
         rangeGauge.repaint();
+
+        // Notify subscribers that the range has changed
+        if (onRangeChanged)
+            onRangeChanged();
     }
 
 private:

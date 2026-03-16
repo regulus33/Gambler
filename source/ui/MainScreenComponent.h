@@ -107,8 +107,10 @@ public:
             auto selectedNames = pianoRoll.getSelectedNoteNames();
             auto selectedColours = pianoRoll.getSelectedNoteColours();
 
-            // Update the note slider options
-            mainControls.getNoteControls().updateNoteOptions(selectedNames, selectedColours, selectedIndices);
+            // Update note/octave slider options to reflect new scale + current range
+            int selectedStep = processorRef.getState().getSelectedStepForEditing();
+            int selectedNote = processorRef.getState().getCurrentNoteForStep(selectedStep);
+            updateNoteControlOptions(selectedNote);
 
             // Trigger async update to refresh all UI components with new quantization
             if (onAsyncUpdateNeeded)
@@ -118,12 +120,11 @@ public:
         // Add main controls component (note/octave + probability/grid)
         addAndMakeVisible(mainControls);
 
-        // Initialize note controls with the current scale
+        // Initialize note/octave controls with the current scale and range
         {
-            auto selectedIndices = pianoRoll.getSelectedNoteIndices();
-            auto selectedNames = pianoRoll.getSelectedNoteNames();
-            auto selectedColours = pianoRoll.getSelectedNoteColours();
-            mainControls.getNoteControls().updateNoteOptions(selectedNames, selectedColours, selectedIndices);
+            int selectedStep = processorRef.getState().getSelectedStepForEditing();
+            int selectedNote = processorRef.getState().getCurrentNoteForStep(selectedStep);
+            updateNoteControlOptions(selectedNote);
         }
 
         // Wire up note controls callbacks to update the selected step's note
@@ -396,6 +397,9 @@ public:
         mainControls.getNoteControls().setFromMidiNote(selectedNote);
         mainControls.getNoteControls().setRestOverlay(selectedNote < 0);
 
+        // Update note/octave slider options to reflect current scale + range
+        updateNoteControlOptions(selectedNote);
+
         // Update the sequence overview grid to show all 64 steps
         // - White fill indicates current step (playback position)
         // - White border indicates selected step for editing
@@ -424,6 +428,83 @@ public:
     std::function<void()> onAsyncUpdateNeeded;
 
 private:
+    /**
+     * Recompute and push filtered note and octave options to the NoteControlsComponent.
+     *
+     * Note slider  – shows only pitch classes that have at least one MIDI note within
+     *                [rangeMin, rangeMax] AND are enabled in the global scale.
+     * Octave slider – shows only octaves where (octave * 12 + currentPitchClass) falls
+     *                 within [rangeMin, rangeMax].
+     *
+     * @param currentMidiNote  The MIDI note currently shown in the controls (used to
+     *                         determine the pitch class for octave filtering).
+     */
+    void updateNoteControlOptions(int currentMidiNote) {
+        auto& state = processorRef.getState();
+        int rangeMin = state.getScaleRangeMin();
+        int rangeMax = state.getScaleRangeMax();
+
+        // --- Note slider: pitch classes reachable in range AND in scale ---
+        juce::Array<juce::String> noteNames;
+        juce::Array<juce::Colour> noteColours;
+        juce::Array<int>          noteIndices;
+
+        for (int pc = 0; pc < 12; ++pc) {
+            if (!state.getGlobalScaleNote(pc))
+                continue;
+
+            // Check whether any MIDI note with this pitch class falls inside the range
+            bool reachable = false;
+            for (int midi = pc; midi <= 127; midi += 12) {
+                if (midi >= rangeMin && midi <= rangeMax) {
+                    reachable = true;
+                    break;
+                }
+            }
+            if (!reachable)
+                continue;
+
+            noteNames.add(MusicConstants::CHROMATIC_NOTE_NAMES[static_cast<size_t>(pc)]);
+            noteColours.add(state.getNoteColour(pc));
+            noteIndices.add(pc);
+        }
+
+        // Fall back to full scale if nothing is reachable (shouldn't happen in practice)
+        if (noteNames.isEmpty()) {
+            auto selectedIndices  = pianoRoll.getSelectedNoteIndices();
+            auto selectedNames    = pianoRoll.getSelectedNoteNames();
+            auto selectedColours  = pianoRoll.getSelectedNoteColours();
+            mainControls.getNoteControls().updateNoteOptions(selectedNames, selectedColours, selectedIndices);
+        } else {
+            mainControls.getNoteControls().updateNoteOptions(noteNames, noteColours, noteIndices);
+        }
+
+        // --- Octave slider: octaves where (octave*12 + pitchClass) is in range ---
+        int pitchClass = (currentMidiNote >= 0) ? (currentMidiNote % 12) : 0;
+
+        juce::Array<juce::String> octaveLabels;
+        juce::Array<juce::Colour> octaveColours;
+        juce::Array<int>          octaveIndices;
+
+        for (int oct = 0; oct < 10; ++oct) {
+            int midi = oct * 12 + pitchClass;
+            if (midi >= rangeMin && midi <= rangeMax) {
+                octaveLabels.add(MusicConstants::OCTAVE_LABELS[static_cast<size_t>(oct)]);
+                octaveColours.add(MusicConstants::OCTAVE_COLOURS[static_cast<size_t>(oct)]);
+                octaveIndices.add(oct);
+            }
+        }
+
+        // Fall back to all octaves if none are reachable
+        if (octaveLabels.isEmpty()) {
+            octaveLabels  = MusicConstants::toJuceArray(MusicConstants::OCTAVE_LABELS);
+            octaveColours = MusicConstants::toJuceArray(MusicConstants::OCTAVE_COLOURS);
+            for (int i = 0; i < 10; ++i) octaveIndices.add(i);
+        }
+
+        mainControls.getNoteControls().updateOctaveOptions(octaveLabels, octaveColours, octaveIndices);
+    }
+
     void setupSubsequenceCallbacks() {
         // Wire up MIDI learn registry for subsequence controls
         subsequenceControls.setMidiLearnRegistry(&processorRef.getMidiLearnRegistry());
@@ -536,6 +617,16 @@ private:
         noteRangeControls.setMidiLearnSelectedCallback([this]() {
             if (onAsyncUpdateNeeded) onAsyncUpdateNeeded();
         });
+
+        // When the range changes, refresh note/octave slider options
+        noteRangeControls.onRangeChanged = [this]() {
+            auto& state = processorRef.getState();
+            int selectedStep = state.getSelectedStepForEditing();
+            int selectedNote = state.getCurrentNoteForStep(selectedStep);
+            updateNoteControlOptions(selectedNote);
+            // Re-display the current note so the slider snaps to the nearest valid option
+            mainControls.getNoteControls().setFromMidiNote(selectedNote);
+        };
 
         // Initialize note range controls with current scale window parameters
         noteRangeControls.setWindow(

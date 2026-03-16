@@ -84,20 +84,32 @@ public:
      */
     int getMidiNote() const {
         int pitchClass = noteSlider_.getChromaticPitchClass();
-        int octave = octaveSlider_.getSelectedIndex();
+        int octave = octaveSlider_.getActualOctaveIndex();
         return octave * 12 + pitchClass;
     }
 
     /**
-     * Update the note slider to only show notes from the selected scale
-     * @param noteNames Array of note names to display (e.g., {"C", "D", "E"})
-     * @param noteColours Array of colours for each note (must match noteNames size)
-     * @param noteIndices Array of chromatic indices (0-11) for each note, used for mapping
+     * Update the note slider to only show notes reachable within the current scale and range.
+     * @param noteNames   Note names to display (e.g., {"C", "D", "E"})
+     * @param noteColours Colours for each note (must match noteNames size)
+     * @param noteIndices Chromatic indices (0-11) for each note, used for mapping
      */
     void updateNoteOptions(const juce::Array<juce::String>& noteNames,
                           const juce::Array<juce::Colour>& noteColours,
                           const juce::Array<int>& noteIndices) {
         noteSlider_.updateNoteOptions(noteNames, noteColours, noteIndices);
+    }
+
+    /**
+     * Update the octave slider to only show octaves reachable within the current note range.
+     * @param octaveLabels  Labels to display (e.g., {"3", "4", "5"})
+     * @param octaveColours Colours for each label (must match octaveLabels size)
+     * @param octaveIndices Actual octave indices (0-9) for each label, used for mapping
+     */
+    void updateOctaveOptions(const juce::Array<juce::String>& octaveLabels,
+                             const juce::Array<juce::Colour>& octaveColours,
+                             const juce::Array<int>& octaveIndices) {
+        octaveSlider_.updateOctaveOptions(octaveLabels, octaveColours, octaveIndices);
     }
 
     /**
