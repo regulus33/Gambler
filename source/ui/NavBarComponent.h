@@ -107,7 +107,7 @@ public:
     explicit NavBarComponent(PluginProcessor& processor)
         : processorRef(processor),
           settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false, NavBarConstants::settingsIconScale, Icons::closeIconScale),
-          midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, true),
+          midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, false, true),
           playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
           scaleLatchButton(processor),

@@ -40,7 +40,7 @@ public:
         using namespace ScaleLatchButtonConstants;
         auto path = isParamOn() ? Icons::createLockClosedIcon() : Icons::createLockOpenIcon();
         auto iconArea = juce::Rectangle<float>(padding, padding, contentSize, contentSize);
-        Icons::strokeIcon(g, path, iconArea, juce::Colours::white, 1.5f, true, 1.0f);
+        Icons::drawIcon(g, path, iconArea, juce::Colours::white, true, 1.0f);
     }
 
     void mouseDown(const juce::MouseEvent&) override {
