@@ -144,27 +144,27 @@ public:
         int rightEdge = area.getRight() - iconsRightPadding;
 
         if (isTicked) {
-            // Draw checkmark on far right
-            auto checkBounds = juce::Rectangle<float>(
-                static_cast<float>(rightEdge - checkmarkSize),
-                static_cast<float>(area.getCentreY() - checkmarkSize / 2),
-                static_cast<float>(checkmarkSize),
-                static_cast<float>(checkmarkSize));
-
-            auto checkPath = Icons::createCheckmarkIcon();
-            Icons::strokeIcon(g, checkPath, checkBounds, juce::Colours::white, 1.5f);
-
-            // Delete X goes to the left of checkmark
+            // Delete X on far right (aligned with non-selected items)
             auto deleteBounds = juce::Rectangle<float>(
-                static_cast<float>(rightEdge - checkmarkSize - iconSpacing - deleteIconSize),
+                static_cast<float>(rightEdge - deleteIconSize),
                 static_cast<float>(area.getCentreY() - deleteIconSize / 2),
                 static_cast<float>(deleteIconSize),
                 static_cast<float>(deleteIconSize));
 
             auto deletePath = Icons::createCloseIcon();
             Icons::strokeIcon(g, deletePath, deleteBounds, juce::Colours::white.withAlpha(0.6f), 1.5f, true, Icons::closeIconScale);
+
+            // Checkmark goes to the left of the delete X
+            auto checkBounds = juce::Rectangle<float>(
+                static_cast<float>(rightEdge - deleteIconSize - iconSpacing - checkmarkSize),
+                static_cast<float>(area.getCentreY() - checkmarkSize / 2),
+                static_cast<float>(checkmarkSize),
+                static_cast<float>(checkmarkSize));
+
+            auto checkPath = Icons::createCheckmarkIcon();
+            Icons::strokeIcon(g, checkPath, checkBounds, juce::Colours::white, 1.5f);
         } else {
-            // Delete X goes where checkmark would be (far right)
+            // Delete X on far right
             auto deleteBounds = juce::Rectangle<float>(
                 static_cast<float>(rightEdge - deleteIconSize),
                 static_cast<float>(area.getCentreY() - deleteIconSize / 2),

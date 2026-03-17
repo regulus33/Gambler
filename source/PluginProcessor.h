@@ -82,6 +82,11 @@ public:
     std::function<void()> onPresetCycleUp;
     std::function<void()> onPresetCycleDown;
 
+    // Callbacks for transport controls (triggered by MIDI or DAW automation)
+    // These should be wired up by the UI to update button visual state
+    std::function<void()> onPlayPauseTriggered;
+    std::function<void()> onStopTriggered;
+
     /**
      * Trigger MIDI note for a specific step (for UI preview/audition)
      * This sets the current index to the given step and sends MIDI note on/off.

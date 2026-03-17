@@ -726,6 +726,25 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
         DBG ("PRESET_CYCLE_DOWN triggered");
     }
 
+    // ========== TRANSPORT CONTROLS ==========
+    // These are trigger params - action happens on the ON transition
+
+    if (parameterID == Params::Keys::ID::PLAY_PAUSE && isOn) {
+        togglePlayPause();
+        if (onPlayPauseTriggered) {
+            onPlayPauseTriggered();
+        }
+        DBG ("PLAY_PAUSE triggered");
+    }
+
+    if (parameterID == Params::Keys::ID::STOP && isOn) {
+        stopSequencer();
+        if (onStopTriggered) {
+            onStopTriggered();
+        }
+        DBG ("STOP triggered");
+    }
+
     // ========== CLOCK PARAMETERS ==========
 
     if (parameterID == Params::Keys::ID::CLOCK_MODE) {
@@ -1530,6 +1549,23 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             if (auto* param = apvts.getParameter (Params::Keys::ID::PRESET_CYCLE_DOWN)) {
                 param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
                 DBG ("  → PRESET_CYCLE_DOWN param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            }
+            break;
+        }
+
+        // ========== TRANSPORT CONTROLS ==========
+        case MidiControlId::PLAY_PAUSE: {
+            if (auto* param = apvts.getParameter (Params::Keys::ID::PLAY_PAUSE)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → PLAY_PAUSE param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            }
+            break;
+        }
+
+        case MidiControlId::STOP: {
+            if (auto* param = apvts.getParameter (Params::Keys::ID::STOP)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → STOP param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
             }
             break;
         }

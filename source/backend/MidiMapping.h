@@ -93,6 +93,10 @@ enum class MidiControlId {
     PRESET_CYCLE_UP,    // Cycle to next preset
     PRESET_CYCLE_DOWN,  // Cycle to previous preset
 
+    // ========== TRANSPORT CONTROLS ==========
+    PLAY_PAUSE,  // Toggle play/pause
+    STOP,        // Stop sequencer
+
     // ========== Total count ==========
     COUNT
 };
@@ -225,6 +229,10 @@ inline std::string getMidiControlName(MidiControlId id) {
         // Preset Controls
         case MidiControlId::PRESET_CYCLE_UP: return "Preset Cycle Up";
         case MidiControlId::PRESET_CYCLE_DOWN: return "Preset Cycle Down";
+
+        // Transport Controls
+        case MidiControlId::PLAY_PAUSE: return "Play/Pause";
+        case MidiControlId::STOP: return "Stop";
 
         default: return "Unknown Control";
     }

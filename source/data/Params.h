@@ -153,6 +153,10 @@ namespace Params
             inline const String PRESET_CYCLE_UP = "preset_cycle_up";
             inline const String PRESET_CYCLE_DOWN = "preset_cycle_down";
 
+            // Transport controls (MIDI-mappable)
+            inline const String PLAY_PAUSE = "play_pause";
+            inline const String STOP = "stop";
+
 #if GAMBLER_HAS_SYNTH
             // ========================================
             // BUILT-IN SYNTH ENGINE
@@ -261,6 +265,10 @@ namespace Params
             // Preset cycling triggers
             inline const String PRESET_CYCLE_UP = "Preset Cycle Up";
             inline const String PRESET_CYCLE_DOWN = "Preset Cycle Down";
+
+            // Transport controls
+            inline const String PLAY_PAUSE = "Play/Pause";
+            inline const String STOP = "Stop";
 
 #if GAMBLER_HAS_SYNTH
             // Built-in synth engine labels
@@ -426,6 +434,10 @@ namespace Params
         // Preset cycling triggers (MIDI-mappable)
         params.push_back(createBoolParam(Keys::ID::PRESET_CYCLE_UP, Keys::LABEL::PRESET_CYCLE_UP, false));
         params.push_back(createBoolParam(Keys::ID::PRESET_CYCLE_DOWN, Keys::LABEL::PRESET_CYCLE_DOWN, false));
+
+        // Transport controls (MIDI-mappable)
+        params.push_back(createBoolParam(Keys::ID::PLAY_PAUSE, Keys::LABEL::PLAY_PAUSE, false));
+        params.push_back(createBoolParam(Keys::ID::STOP, Keys::LABEL::STOP, false));
 
 #if GAMBLER_HAS_SYNTH
         // ========================================

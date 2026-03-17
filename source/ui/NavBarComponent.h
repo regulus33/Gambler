@@ -83,14 +83,88 @@ namespace NavBarConstants {
     constexpr int buttonSize = ToggleIconButtonConstants::totalSize;  // 36px
     constexpr int buttonGap = 10;
     constexpr int presetSelectorGap = 20;
-    constexpr int versionLabelWidth = 60;
-    constexpr int versionLabelHeight = 20;
-
+    // Settings icon scale factor - tweak this to adjust the settings gear icon size
+    constexpr float settingsIconScale = 1.0f;
+    // Preset cycle button constants
+    constexpr int presetCycleButtonSize = 20;       // Width and height of the triangle button hit area
+    constexpr float presetCycleTriangleScale = 0.5f; // Scale of the equilateral triangle within the hit area (tweak to adjust size)
+    constexpr int presetCycleButtonGap = 6;          // Horizontal gap between cycle buttons and preset selector
     // Transport button colors
     const juce::Colour inactiveColor = juce::Colours::white;
     const juce::Colour activePlayColor = juce::Colour(0xff4ade80);
     const juce::Colour activeStopColor = juce::Colour(0xfff87171);
 }
+
+/**
+ * PresetCycleButton
+ *
+ * A simple button that draws a filled equilateral triangle pointing left or right.
+ * Used to cycle through presets in the NavBar.
+ * Tweak presetCycleTriangleScale and presetCycleButtonSize in NavBarConstants.
+ */
+class PresetCycleButton : public juce::Component {
+public:
+    enum class Direction { Left, Right };
+
+    explicit PresetCycleButton(Direction dir) : direction(dir) {}
+
+    void paint(juce::Graphics& g) override {
+        using namespace NavBarConstants;
+
+        float w = static_cast<float>(getWidth());
+        float h = static_cast<float>(getHeight());
+        // side length of the equilateral triangle
+        float side = juce::jmin(w, h) * presetCycleTriangleScale;
+
+        // For an equilateral triangle pointing sideways:
+        //   - half-height (perpendicular to the pointing axis) = side / 2
+        //   - depth (along the pointing axis) = side * sqrt(3)/2 ≈ side * 0.866
+        float halfH = side / 2.0f;
+        float depth = side * 0.866f;
+
+        float cx = w / 2.0f;
+        float cy = h / 2.0f;
+
+        juce::Path triangle;
+        if (direction == Direction::Right) {
+            // Tip on right, flat edge on left
+            triangle.startNewSubPath(cx + depth / 2.0f, cy);
+            triangle.lineTo(cx - depth / 2.0f, cy - halfH);
+            triangle.lineTo(cx - depth / 2.0f, cy + halfH);
+        } else {
+            // Tip on left, flat edge on right
+            triangle.startNewSubPath(cx - depth / 2.0f, cy);
+            triangle.lineTo(cx + depth / 2.0f, cy - halfH);
+            triangle.lineTo(cx + depth / 2.0f, cy + halfH);
+        }
+        triangle.closeSubPath();
+
+        g.setColour(juce::Colours::white.withAlpha(isHovered ? 1.0f : 0.7f));
+        g.fillPath(triangle);
+    }
+
+    void mouseEnter(const juce::MouseEvent&) override {
+        isHovered = true;
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        repaint();
+    }
+
+    void mouseExit(const juce::MouseEvent&) override {
+        isHovered = false;
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+        repaint();
+    }
+
+    void mouseUp(const juce::MouseEvent&) override {
+        if (onClick) onClick();
+    }
+
+    std::function<void()> onClick;
+
+private:
+    Direction direction;
+    bool isHovered = false;
+};
 
 /**
  * NavBarComponent
@@ -107,7 +181,7 @@ class NavBarComponent : public juce::Component {
 public:
     explicit NavBarComponent(PluginProcessor& processor)
         : processorRef(processor),
-          settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false, 0.75f, Icons::closeIconScale),
+          settingsButton(Icons::createSettingsIcon, Icons::createCloseIcon, true, false, NavBarConstants::settingsIconScale, Icons::closeIconScale),
           midiLearnButton(Icons::createMidiLearnIcon, Icons::createMidiLearnIcon, true, true),
           playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
@@ -117,18 +191,18 @@ public:
         // Add logo component
         addAndMakeVisible(logo);
 
-        // Add preset selector
+        // Add preset cycle buttons (left/right of preset selector)
+        addAndMakeVisible(presetCycleDownButton);
+        presetCycleDownButton.onClick = [this]() {
+            if (onPresetCycleDown) onPresetCycleDown();
+        };
+
         addAndMakeVisible(presetSelector);
 
-        // Add version label
-        addAndMakeVisible(versionLabel);
-        versionLabel.setText("v" VERSION, juce::dontSendNotification);
-        auto interBoldFont = juce::Typeface::createSystemTypefaceFor(
-            BinaryData::Inter_28ptBold_ttf,
-            BinaryData::Inter_28ptBold_ttfSize);
-        versionLabel.setFont(juce::FontOptions(interBoldFont).withHeight(11.0f));
-        versionLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.5f));
-        versionLabel.setJustificationType(juce::Justification::centredRight);
+        addAndMakeVisible(presetCycleUpButton);
+        presetCycleUpButton.onClick = [this]() {
+            if (onPresetCycleUp) onPresetCycleUp();
+        };
 
         // Add MIDI learn button
         addAndMakeVisible(midiLearnButton);
@@ -149,6 +223,7 @@ public:
 
         // Add play/pause button
         addAndMakeVisible(playPauseButton);
+        playPauseButton.setMidiControlId(MidiControlId::PLAY_PAUSE);
         playPauseButton.onClick = [this](bool toggled) {
             if (onPlayPauseClicked) {
                 onPlayPauseClicked();
@@ -157,6 +232,7 @@ public:
 
         // Add stop button
         addAndMakeVisible(stopButton);
+        stopButton.setMidiControlId(MidiControlId::STOP);
         stopButton.onClick = [this](bool toggled) {
             if (onStopClicked) {
                 onStopClicked();
@@ -220,15 +296,19 @@ public:
         fb.flexDirection = juce::FlexBox::Direction::row;
         fb.alignItems = juce::FlexBox::AlignItems::center;
 
-        // Left group: logo + preset selector
+        // Left group: logo + [◀ preset selector ▶]
+        float pcbs = static_cast<float>(presetCycleButtonSize);
+        float pcbg = static_cast<float>(presetCycleButtonGap);
         addItem(fb, logo, static_cast<float>(logo.getCalculatedWidth()), static_cast<float>(logo.getCalculatedHeight()));
+        addItem(fb, presetCycleDownButton, pcbs, pcbs, presetSelectorGap);
         addItem(fb, presetSelector, static_cast<float>(presetSelector.getCalculatedWidth()),
-                static_cast<float>(presetSelector.getCalculatedHeight()), presetSelectorGap);
+                static_cast<float>(presetSelector.getCalculatedHeight()), pcbg);
+        addItem(fb, presetCycleUpButton, pcbs, pcbs, pcbg);
 
         // Flexible spacer pushes remaining items to the right
         fb.items.add(juce::FlexItem().withFlex(1.0f));
 
-        // Right group: tool buttons, transport, version, settings
+        // Right group: tool buttons, transport, settings
         float bs = static_cast<float>(buttonSize);
         float bg = static_cast<float>(buttonGap);
         float ss = static_cast<float>(SubdivisionSliderConstants::totalSize);
@@ -239,12 +319,15 @@ public:
         addItem(fb, scaleLatchButton, bs, bs, bg);
         addItem(fb, playPauseButton, bs, bs, bg);
         addItem(fb, stopButton, bs, bs, bg);
-        addItem(fb, versionLabel, static_cast<float>(versionLabelWidth), static_cast<float>(versionLabelHeight), bg);
         addItem(fb, midiLearnButton, bs, bs, bg);
         addItem(fb, settingsButton, bs, bs, bg);
 
         fb.performLayout(area.toFloat());
     }
+
+    // Callbacks for preset cycle buttons
+    std::function<void()> onPresetCycleUp;
+    std::function<void()> onPresetCycleDown;
 
     // Callback when settings button is clicked
     std::function<void()> onSettingsClicked;
@@ -307,8 +390,9 @@ public:
 private:
     PluginProcessor& processorRef;
     LogoComponent logo;
+    PresetCycleButton presetCycleDownButton { PresetCycleButton::Direction::Left };
     PresetSelectorComponent presetSelector;
-    juce::Label versionLabel;
+    PresetCycleButton presetCycleUpButton { PresetCycleButton::Direction::Right };
     ToggleIconButton midiLearnButton;
     ToggleIconButton settingsButton;
     ToggleIconButton playPauseButton;

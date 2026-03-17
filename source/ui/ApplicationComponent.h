@@ -107,6 +107,18 @@ public:
         processorRef.onMidiLearned = [this]() {
             triggerAsyncUpdate();
         };
+
+        // Wire up transport callbacks (triggered by MIDI or DAW automation via params)
+        processorRef.onPlayPauseTriggered = [this]() {
+            juce::MessageManager::callAsync([this]() {
+                updatePlayPauseButtonState();
+            });
+        };
+        processorRef.onStopTriggered = [this]() {
+            juce::MessageManager::callAsync([this]() {
+                updatePlayPauseButtonState();
+            });
+        };
     }
 
     ~ApplicationComponent() override {
@@ -114,6 +126,8 @@ public:
         processorRef.onSequenceTick = nullptr;
         processorRef.onNoteOff = nullptr;
         processorRef.onMidiLearned = nullptr;
+        processorRef.onPlayPauseTriggered = nullptr;
+        processorRef.onStopTriggered = nullptr;
         cancelPendingUpdate();
     }
 
@@ -356,6 +370,7 @@ private:
 
     void setupPresetSelector() {
         auto& presetSelector = mainScreen.getNavBar().getPresetSelector();
+        auto& navBar = mainScreen.getNavBar();
 
         // Set this component as the dialog parent for proper centering
         presetSelector.setDialogParent(this);
@@ -377,6 +392,45 @@ private:
         presetSelector.onDeletePreset = [this](int index) {
             deletePreset(index);
         };
+
+        // Wire up NavBar cycle buttons
+        navBar.onPresetCycleUp = [this]() { cyclePresetUp(); };
+        navBar.onPresetCycleDown = [this]() { cyclePresetDown(); };
+
+        // Wire up processor MIDI-triggered cycle callbacks
+        processorRef.onPresetCycleUp = [this]() {
+            juce::MessageManager::callAsync([this]() { cyclePresetUp(); });
+        };
+        processorRef.onPresetCycleDown = [this]() {
+            juce::MessageManager::callAsync([this]() { cyclePresetDown(); });
+        };
+    }
+
+    void cyclePresetUp() {
+        auto& presetManager = processorRef.getPresetManager();
+        const auto& presets = presetManager.getPresets();
+        if (presets.empty()) return;
+
+        int currentIndex = presetManager.getPresetIndex(presetManager.getCurrentPresetName());
+        int nextIndex = (currentIndex + 1) % static_cast<int>(presets.size());
+        loadPreset(nextIndex);
+
+        auto& presetSelector = mainScreen.getNavBar().getPresetSelector();
+        presetSelector.selectPresetByName(presets[static_cast<size_t>(nextIndex)].name, false);
+    }
+
+    void cyclePresetDown() {
+        auto& presetManager = processorRef.getPresetManager();
+        const auto& presets = presetManager.getPresets();
+        if (presets.empty()) return;
+
+        int currentIndex = presetManager.getPresetIndex(presetManager.getCurrentPresetName());
+        int count = static_cast<int>(presets.size());
+        int prevIndex = (currentIndex - 1 + count) % count;
+        loadPreset(prevIndex);
+
+        auto& presetSelector = mainScreen.getNavBar().getPresetSelector();
+        presetSelector.selectPresetByName(presets[static_cast<size_t>(prevIndex)].name, false);
     }
 
     void refreshPresetList() {
