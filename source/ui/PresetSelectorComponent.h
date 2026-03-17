@@ -14,11 +14,61 @@ namespace PresetSelectorConstants {
     constexpr int saveButtonSize = 31;  // 24 * 1.3
     constexpr int gapBetweenDropdownAndButton = 10;  // 8 * 1.3
     constexpr int saveIconSize = 17;  // 13 * 1.3
+    constexpr int cycleButtonSize = 20;   // Width and height of the cycle arrow hit area
+    constexpr float cycleIconScale = 0.75f; // Scale factor applied to the index arrow icon
+    constexpr int cycleButtonGap = 6;     // Gap between cycle buttons and the dropdown
 }
 
 /**
+ * PresetCycleButton
+ *
+ * A small icon button that draws a scaled-down index left or right arrow icon.
+ * Used to cycle through presets inside PresetSelectorComponent.
+ */
+class PresetCycleButton : public juce::Component {
+public:
+    enum class Direction { Left, Right };
+
+    explicit PresetCycleButton(Direction dir) : direction(dir) {
+        icon = (direction == Direction::Left)
+            ? Icons::createIndexLeftIcon()
+            : Icons::createIndexRightIcon();
+    }
+
+    void paint(juce::Graphics& g) override {
+        using namespace PresetSelectorConstants;
+        float alpha = isHovered ? 1.0f : 0.7f;
+        Icons::drawIcon(g, icon, getLocalBounds().toFloat(),
+                        juce::Colours::white.withAlpha(alpha), true, cycleIconScale);
+    }
+
+    void mouseEnter(const juce::MouseEvent&) override {
+        isHovered = true;
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        repaint();
+    }
+
+    void mouseExit(const juce::MouseEvent&) override {
+        isHovered = false;
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+        repaint();
+    }
+
+    void mouseUp(const juce::MouseEvent&) override {
+        if (onClick) onClick();
+    }
+
+    std::function<void()> onClick;
+
+private:
+    Direction direction;
+    juce::Path icon;
+    bool isHovered = false;
+};
+
+/**
  * SavePresetButton
- * 
+ *
  * A simple icon button that displays the save icon
  */
 class SavePresetButton : public juce::Component {
@@ -62,16 +112,28 @@ private:
  * PresetSelectorComponent
  * 
  * A component that combines:
- * - Preset dropdown selector (left)
- * - Save button (right)
- * 
+ * - Left cycle button (◀) to go to the previous preset
+ * - Preset dropdown selector
+ * - Right cycle button (▶) to go to the next preset
+ * - Save button (rightmost)
+ *
  * Handles showing the save dialog as a popup overlay.
  */
 class PresetSelectorComponent : public juce::Component {
 public:
     PresetSelectorComponent() {
+        addAndMakeVisible(cycleDownButton);
         addAndMakeVisible(dropdown);
+        addAndMakeVisible(cycleUpButton);
         addAndMakeVisible(saveButton);
+
+        // Wire up cycle buttons
+        cycleDownButton.onClick = [this]() {
+            if (onCycleDown) onCycleDown();
+        };
+        cycleUpButton.onClick = [this]() {
+            if (onCycleUp) onCycleUp();
+        };
 
         // Wire up dropdown selection
         dropdown.onPresetSelected = [this](int index) {
@@ -95,15 +157,21 @@ public:
 
     void resized() override {
         using namespace PresetSelectorConstants;
-        
+
         auto area = getLocalBounds();
-        
+
+        // Left cycle button
+        cycleDownButton.setBounds(area.removeFromLeft(cycleButtonSize));
+        area.removeFromLeft(cycleButtonGap);
+
         // Save button on the right
         saveButton.setBounds(area.removeFromRight(saveButtonSize));
-        
-        // Gap
         area.removeFromRight(gapBetweenDropdownAndButton);
-        
+
+        // Right cycle button (between dropdown and save button)
+        cycleUpButton.setBounds(area.removeFromRight(cycleButtonSize));
+        area.removeFromRight(cycleButtonGap);
+
         // Dropdown takes remaining space (or fixed width if area is larger)
         int dropdownW = juce::jmin(area.getWidth(), dropdownWidth);
         dropdown.setBounds(area.removeFromLeft(dropdownW));
@@ -114,7 +182,10 @@ public:
      */
     int getCalculatedWidth() const {
         using namespace PresetSelectorConstants;
-        return dropdownWidth + gapBetweenDropdownAndButton + saveButtonSize;
+        return cycleButtonSize + cycleButtonGap
+             + dropdownWidth
+             + cycleButtonGap + cycleButtonSize
+             + gapBetweenDropdownAndButton + saveButtonSize;
     }
 
     /**
@@ -151,6 +222,16 @@ public:
     void clearSelection() {
         dropdown.clearSelection();
     }
+
+    /**
+     * Callback to cycle to the previous preset (left arrow)
+     */
+    std::function<void()> onCycleDown;
+
+    /**
+     * Callback to cycle to the next preset (right arrow)
+     */
+    std::function<void()> onCycleUp;
 
     /**
      * Callback when a preset is selected from the dropdown
@@ -233,7 +314,9 @@ private:
         }
     }
 
+    PresetCycleButton cycleDownButton { PresetCycleButton::Direction::Left };
     PresetDropdownComponent dropdown;
+    PresetCycleButton cycleUpButton { PresetCycleButton::Direction::Right };
     SavePresetButton saveButton;
     std::unique_ptr<SavePresetDialogComponent> saveDialog;
     juce::Component* dialogParent = nullptr;

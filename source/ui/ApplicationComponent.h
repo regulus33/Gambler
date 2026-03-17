@@ -393,9 +393,9 @@ private:
             deletePreset(index);
         };
 
-        // Wire up NavBar cycle buttons
-        navBar.onPresetCycleUp = [this]() { cyclePresetUp(); };
-        navBar.onPresetCycleDown = [this]() { cyclePresetDown(); };
+        // Wire up preset cycle buttons (now owned by PresetSelectorComponent)
+        presetSelector.onCycleUp = [this]() { cyclePresetUp(); };
+        presetSelector.onCycleDown = [this]() { cyclePresetDown(); };
 
         // Wire up processor MIDI-triggered cycle callbacks
         processorRef.onPresetCycleUp = [this]() {

@@ -85,86 +85,11 @@ namespace NavBarConstants {
     constexpr int presetSelectorGap = 20;
     // Settings icon scale factor - tweak this to adjust the settings gear icon size
     constexpr float settingsIconScale = 1.0f;
-    // Preset cycle button constants
-    constexpr int presetCycleButtonSize = 20;       // Width and height of the triangle button hit area
-    constexpr float presetCycleTriangleScale = 0.5f; // Scale of the equilateral triangle within the hit area (tweak to adjust size)
-    constexpr int presetCycleButtonGap = 6;          // Horizontal gap between cycle buttons and preset selector
     // Transport button colors
     const juce::Colour inactiveColor = juce::Colours::white;
     const juce::Colour activePlayColor = juce::Colour(0xff4ade80);
     const juce::Colour activeStopColor = juce::Colour(0xfff87171);
 }
-
-/**
- * PresetCycleButton
- *
- * A simple button that draws a filled equilateral triangle pointing left or right.
- * Used to cycle through presets in the NavBar.
- * Tweak presetCycleTriangleScale and presetCycleButtonSize in NavBarConstants.
- */
-class PresetCycleButton : public juce::Component {
-public:
-    enum class Direction { Left, Right };
-
-    explicit PresetCycleButton(Direction dir) : direction(dir) {}
-
-    void paint(juce::Graphics& g) override {
-        using namespace NavBarConstants;
-
-        float w = static_cast<float>(getWidth());
-        float h = static_cast<float>(getHeight());
-        // side length of the equilateral triangle
-        float side = juce::jmin(w, h) * presetCycleTriangleScale;
-
-        // For an equilateral triangle pointing sideways:
-        //   - half-height (perpendicular to the pointing axis) = side / 2
-        //   - depth (along the pointing axis) = side * sqrt(3)/2 ≈ side * 0.866
-        float halfH = side / 2.0f;
-        float depth = side * 0.866f;
-
-        float cx = w / 2.0f;
-        float cy = h / 2.0f;
-
-        juce::Path triangle;
-        if (direction == Direction::Right) {
-            // Tip on right, flat edge on left
-            triangle.startNewSubPath(cx + depth / 2.0f, cy);
-            triangle.lineTo(cx - depth / 2.0f, cy - halfH);
-            triangle.lineTo(cx - depth / 2.0f, cy + halfH);
-        } else {
-            // Tip on left, flat edge on right
-            triangle.startNewSubPath(cx - depth / 2.0f, cy);
-            triangle.lineTo(cx + depth / 2.0f, cy - halfH);
-            triangle.lineTo(cx + depth / 2.0f, cy + halfH);
-        }
-        triangle.closeSubPath();
-
-        g.setColour(juce::Colours::white.withAlpha(isHovered ? 1.0f : 0.7f));
-        g.fillPath(triangle);
-    }
-
-    void mouseEnter(const juce::MouseEvent&) override {
-        isHovered = true;
-        setMouseCursor(juce::MouseCursor::PointingHandCursor);
-        repaint();
-    }
-
-    void mouseExit(const juce::MouseEvent&) override {
-        isHovered = false;
-        setMouseCursor(juce::MouseCursor::NormalCursor);
-        repaint();
-    }
-
-    void mouseUp(const juce::MouseEvent&) override {
-        if (onClick) onClick();
-    }
-
-    std::function<void()> onClick;
-
-private:
-    Direction direction;
-    bool isHovered = false;
-};
 
 /**
  * NavBarComponent
@@ -191,18 +116,7 @@ public:
         // Add logo component
         addAndMakeVisible(logo);
 
-        // Add preset cycle buttons (left/right of preset selector)
-        addAndMakeVisible(presetCycleDownButton);
-        presetCycleDownButton.onClick = [this]() {
-            if (onPresetCycleDown) onPresetCycleDown();
-        };
-
         addAndMakeVisible(presetSelector);
-
-        addAndMakeVisible(presetCycleUpButton);
-        presetCycleUpButton.onClick = [this]() {
-            if (onPresetCycleUp) onPresetCycleUp();
-        };
 
         // Add MIDI learn button
         addAndMakeVisible(midiLearnButton);
@@ -296,14 +210,10 @@ public:
         fb.flexDirection = juce::FlexBox::Direction::row;
         fb.alignItems = juce::FlexBox::AlignItems::center;
 
-        // Left group: logo + [◀ preset selector ▶]
-        float pcbs = static_cast<float>(presetCycleButtonSize);
-        float pcbg = static_cast<float>(presetCycleButtonGap);
+        // Left group: logo + preset selector (cycle buttons are inside the selector)
         addItem(fb, logo, static_cast<float>(logo.getCalculatedWidth()), static_cast<float>(logo.getCalculatedHeight()));
-        addItem(fb, presetCycleDownButton, pcbs, pcbs, presetSelectorGap);
         addItem(fb, presetSelector, static_cast<float>(presetSelector.getCalculatedWidth()),
-                static_cast<float>(presetSelector.getCalculatedHeight()), pcbg);
-        addItem(fb, presetCycleUpButton, pcbs, pcbs, pcbg);
+                static_cast<float>(presetSelector.getCalculatedHeight()), presetSelectorGap);
 
         // Flexible spacer pushes remaining items to the right
         fb.items.add(juce::FlexItem().withFlex(1.0f));
@@ -324,10 +234,6 @@ public:
 
         fb.performLayout(area.toFloat());
     }
-
-    // Callbacks for preset cycle buttons
-    std::function<void()> onPresetCycleUp;
-    std::function<void()> onPresetCycleDown;
 
     // Callback when settings button is clicked
     std::function<void()> onSettingsClicked;
@@ -390,9 +296,7 @@ public:
 private:
     PluginProcessor& processorRef;
     LogoComponent logo;
-    PresetCycleButton presetCycleDownButton { PresetCycleButton::Direction::Left };
     PresetSelectorComponent presetSelector;
-    PresetCycleButton presetCycleUpButton { PresetCycleButton::Direction::Right };
     ToggleIconButton midiLearnButton;
     ToggleIconButton settingsButton;
     ToggleIconButton playPauseButton;
