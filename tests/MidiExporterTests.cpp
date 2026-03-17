@@ -348,8 +348,9 @@ TEST_CASE("MidiExporter respects note range") {
         state.setStepNote(0, 0, 90);  // well above range
 
         // Set range to 60-72 (one octave around middle C)
-        state.setScaleWindowOffset(60);
-        state.setScaleWindowSize(13);  // 60 to 72 inclusive
+        // Use range setters which handle the percentage-based window math
+        state.setScaleRangeMin(60);
+        state.setScaleRangeMax(72);
 
         auto midi = f.exportMidi();
         auto notes = f.getNoteOns(midi);
@@ -362,8 +363,8 @@ TEST_CASE("MidiExporter respects note range") {
         state.setLength(1);
         state.setStepNote(0, 0, 30);  // below range
 
-        state.setScaleWindowOffset(60);
-        state.setScaleWindowSize(13);
+        state.setScaleRangeMin(60);
+        state.setScaleRangeMax(72);
 
         auto midi = f.exportMidi();
         auto notes = f.getNoteOns(midi);

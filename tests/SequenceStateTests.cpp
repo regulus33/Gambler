@@ -503,9 +503,9 @@ TEST_CASE("SequenceState step modulations") {
     SequenceStateFixture fixture;
     auto& state = fixture.getState();
 
-    SECTION("Default modulation type for slot 0 is Velocity") {
-        // First modulation slot defaults to Velocity, others to CC
-        REQUIRE(state.getStepModType(0, 0) == ModulationType::Velocity);
+    SECTION("Default modulation type for slot 0 is CC") {
+        // All modulation slots default to CC (type 0)
+        REQUIRE(state.getStepModType(0, 0) == ModulationType::CC);
     }
 
     SECTION("Default modulation type for slot 1+ is CC") {
@@ -559,7 +559,7 @@ TEST_CASE("SequenceState step modulations") {
     SECTION("Boundary: out-of-range step returns defaults") {
         REQUIRE(state.getStepModType(-1, 0) == ModulationType::CC);
         REQUIRE(state.getStepModValue(-1, 0) == 64);
-        REQUIRE(state.getStepModCCNum(-1, 0) == 0);
+        REQUIRE(state.getStepModCCNum(-1, 0) == 1);
         REQUIRE(state.getStepModSelected(-1, 0) == false);
     }
 

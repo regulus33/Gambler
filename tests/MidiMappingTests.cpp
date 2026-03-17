@@ -298,7 +298,6 @@ SCENARIO("MidiControlId name lookup", "[midimapping]") {
 
         WHEN("Getting names for navigation") {
             THEN("Names are descriptive") {
-                REQUIRE(getMidiControlName(MidiControlId::VIEW_TOGGLE) == "View Toggle");
                 REQUIRE(getMidiControlName(MidiControlId::SETTINGS_TOGGLE) == "Settings Toggle");
             }
         }

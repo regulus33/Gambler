@@ -941,20 +941,22 @@ TEST_CASE("Scale additional coverage") {
     }
 
     SECTION("Static window utility functions") {
-        SECTION("computeMinFromWindow returns offset clamped to valid range") {
-            REQUIRE(Scale::computeMinFromWindow(60, 24) == 60);
+        SECTION("computeMinFromWindow maps percentage offset across headroom") {
+            // offset 60/127 * (128-24) = 49.13 -> 49
+            REQUIRE(Scale::computeMinFromWindow(60, 24) == 49);
             REQUIRE(Scale::computeMinFromWindow(-5, 24) == 0);
             REQUIRE(Scale::computeMinFromWindow(200, 24) == 127);
         }
 
-        SECTION("computeMaxFromWindow returns offset+size-1 clamped to valid range") {
-            REQUIRE(Scale::computeMaxFromWindow(60, 24) == 83);  // 60 + 24 - 1
-            REQUIRE(Scale::computeMaxFromWindow(120, 20) == 127);  // Clamped
+        SECTION("computeMaxFromWindow returns min+size-1 clamped to valid range") {
+            REQUIRE(Scale::computeMaxFromWindow(60, 24) == 72);  // 49 + 24 - 1
+            REQUIRE(Scale::computeMaxFromWindow(120, 20) == 121);  // 102 + 20 - 1
             REQUIRE(Scale::computeMaxFromWindow(0, 1) == 0);  // 0 + 1 - 1
         }
 
-        SECTION("computeOffsetFromRange returns min clamped to valid range") {
-            REQUIRE(Scale::computeOffsetFromRange(60, 72) == 60);
+        SECTION("computeOffsetFromRange returns raw offset for given MIDI range") {
+            // Inverse of computeMinFromWindow: 60/115 * 127 = 66.26 -> 66
+            REQUIRE(Scale::computeOffsetFromRange(60, 72) == 66);
             REQUIRE(Scale::computeOffsetFromRange(-5, 72) == 0);
         }
 
