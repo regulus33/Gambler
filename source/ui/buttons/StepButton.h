@@ -7,12 +7,14 @@
 #include "../../backend/MidiLearnRegistry.h"
 #include "../../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_animation/juce_animation.h>
 
 namespace StepButtonConstants {
     constexpr float cornerRadius = 4.4f;
     constexpr float borderWidthSelected = 3.0f;  // Border width for selected step
     constexpr float fontSize = 13.0f;
     constexpr float activeCircleRadius = 20.0f;
+    constexpr float colourFadeSpeed = 8.0f;  // Lerp speed (higher = faster fade)
 
     // Colors
     const juce::Colour restStepColor = juce::Colour(0xff505050);      // Lighter grey for rest steps
@@ -116,30 +118,44 @@ public:
 
         auto bounds = getLocalBounds().toFloat();
 
+        // Determine the target fill color
+        juce::Colour targetColor;
+        int midiNote = -1;
+        bool isRest = true;
+
         if (isWithinSequence) {
-            // Get the quantized current note for this step (accounts for scale quantization)
-            int midiNote = state.getCurrentNoteForStep(absoluteStepIndex);
+            midiNote = state.getCurrentNoteForStep(absoluteStepIndex);
+            isRest = (midiNote < 0);
 
-            // Check if quantized note is a rest (-1)
-            // This happens when: 1) stored note is a rest, or 2) no scale notes are selected
-            bool isRest = (midiNote < 0);
-
-            // Determine the fill color
-            juce::Colour fillColor;
             if (isCurrent) {
-                // Current step (playback position) - white fill
-                fillColor = UIConstants::stepIndicatorWhite;
+                targetColor = UIConstants::stepIndicatorWhite;
             } else if (isRest) {
-                fillColor = StepButtonConstants::restStepColor;
+                targetColor = StepButtonConstants::restStepColor;
             } else {
                 int chromaticNote = midiNote % 12;
-                fillColor = getState().getNoteColour(chromaticNote);
+                targetColor = getState().getNoteColour(chromaticNote);
             }
+        } else {
+            targetColor = StepButtonConstants::emptyStepColor;
+        }
 
-            // Fill background
-            g.setColour(fillColor);
-            g.fillRoundedRectangle(bounds, cornerRadius);
+        // Animate: lerp displayColour_ toward targetColor
+        if (!displayColourInitialised_) {
+            displayColour_ = targetColor;
+            displayColourInitialised_ = true;
+        } else if (displayColour_ != targetColor) {
+            float t = juce::jmin(1.0f, colourFadeSpeed * frameDeltaSec_);
+            displayColour_ = displayColour_.interpolatedWith(targetColor, t);
+            // Keep repainting until we converge
+            if (displayColour_ != targetColor)
+                needsAnimationRepaint_ = true;
+        }
 
+        // Fill background with animated color
+        g.setColour(displayColour_);
+        g.fillRoundedRectangle(bounds, cornerRadius);
+
+        if (isWithinSequence) {
             // Draw white border on selected step (for editing)
             if (isSelected) {
                 g.setColour(UIConstants::stepIndicatorWhite);
@@ -158,10 +174,6 @@ public:
             if (isCurrent && !isRest) {
                 drawActiveCircle(g, bounds, midiNote);
             }
-        } else {
-            // Step is beyond sequence length - draw as empty/inactive
-            g.setColour(StepButtonConstants::emptyStepColor);
-            g.fillRoundedRectangle(bounds, cornerRadius);
         }
 
         // Draw MIDI learn overlay on top of everything
@@ -196,6 +208,25 @@ public:
                     state.setCurrentIndex(absoluteStepIndex);
                 }
             }
+        }
+    }
+
+    void parentHierarchyChanged() override {
+        // Set up VBlank-driven animation when added to a visible parent
+        if (getTopLevelComponent() != nullptr && vBlankAttachment_ == nullptr) {
+            vBlankAttachment_ = std::make_unique<juce::VBlankAttachment>(
+                this, [this](double timestampSec) {
+                    double delta = (lastVBlankTimestamp_ > 0.0)
+                        ? (timestampSec - lastVBlankTimestamp_)
+                        : (1.0 / 60.0);
+                    lastVBlankTimestamp_ = timestampSec;
+                    frameDeltaSec_ = static_cast<float>(juce::jlimit(0.001, 0.1, delta));
+
+                    if (needsAnimationRepaint_) {
+                        needsAnimationRepaint_ = false;
+                        repaint();
+                    }
+                });
         }
     }
 
@@ -264,6 +295,14 @@ private:
     int localIndex_;  // 0-7 (fixed, never changes)
     MidiControlId midiControlId_ = MidiControlId::COUNT;
     MidiLearnRegistry* registry_ = nullptr;
+
+    // Colour fade animation state
+    juce::Colour displayColour_ { StepButtonConstants::emptyStepColor };
+    bool displayColourInitialised_ = false;
+    bool needsAnimationRepaint_ = false;
+    float frameDeltaSec_ = 1.0f / 60.0f;
+    double lastVBlankTimestamp_ = 0.0;
+    std::unique_ptr<juce::VBlankAttachment> vBlankAttachment_;
 };
 
 

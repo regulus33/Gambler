@@ -3,6 +3,7 @@
 #include "../backend/SequenceState.h"
 #include "UIConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_animation/juce_animation.h>
 #include <array>
 
 namespace SequenceGridConstants {
@@ -19,6 +20,7 @@ namespace SequenceGridConstants {
     constexpr juce::uint32 dragPreviewOrangeHex = 0xFFFF8C00; // Orange color for drag preview
     // Window row opacity (for non-visible rows)
     constexpr float nonVisibleRowOpacity = 0.3f;  // Non-visible rows at 30% opacity
+    constexpr float colourFadeSpeed = 8.0f;  // Lerp speed for colour transitions
     // Calculated dimensions
     constexpr int gridWidth = gridCols * squareSize + (gridCols - 1) * squareSpacing;   // 196px (was 157px)
     constexpr int gridHeight = gridRows * squareSize + (gridRows - 1) * squareSpacing;  // 196px (was 157px)
@@ -52,15 +54,19 @@ class SequenceGrid : public juce::Component {
 public:
     SequenceGrid() : currentWindowRow(-1) {
         // Initialize all squares to default grey
+        auto defaultColour = juce::Colour(SequenceGridConstants::defaultGreyHex);
         for (int row = 0; row < SequenceGridConstants::gridRows; ++row) {
             for (int col = 0; col < SequenceGridConstants::gridCols; ++col) {
                 squareStates[row][col] = SquareState();
+                displayColours_[row][col] = defaultColour;
             }
         }
     }
 
     void paint (juce::Graphics& g) override {
         using namespace SequenceGridConstants;
+
+        bool stillAnimating = false;
 
         for (int row = 0; row < gridRows; ++row) {
             for (int col = 0; col < gridCols; ++col) {
@@ -76,33 +82,37 @@ public:
                     static_cast<float> (squareSize),
                     static_cast<float> (squareSize));
 
-                // Determine the fill color
-                juce::Colour displayColor;
+                // Determine the target fill color
+                juce::Colour targetColor;
                 if (state.isCurrent) {
-                    // Current step (playback position) - white fill (always full opacity)
-                    displayColor = UIConstants::stepIndicatorWhite;
+                    targetColor = UIConstants::stepIndicatorWhite;
                 } else {
-                    displayColor = state.color;
+                    targetColor = state.color;
 
-                    // Reduce opacity if outside current window row (but not for current step)
                     if (currentWindowRow >= 0 && row != currentWindowRow) {
-                        displayColor = displayColor.withAlpha(nonVisibleRowOpacity);
+                        targetColor = targetColor.withAlpha(nonVisibleRowOpacity);
                     }
 
-                    // During drag: show preview of new length
                     if (isDraggingLength) {
                         if (stepIndex < dragTargetLength) {
-                            // Squares within the new length - show in orange
-                            displayColor = juce::Colour(dragPreviewOrangeHex);
+                            targetColor = juce::Colour(dragPreviewOrangeHex);
                         } else {
-                            // Squares beyond the new length - show in grey
-                            displayColor = juce::Colour(outOfBoundsGreyHex);
+                            targetColor = juce::Colour(outOfBoundsGreyHex);
                         }
                     }
                 }
 
-                // Fill square with color
-                g.setColour (displayColor);
+                // Animate display colour toward target
+                auto& dc = displayColours_[row][col];
+                if (dc != targetColor) {
+                    float t = juce::jmin(1.0f, colourFadeSpeed * frameDeltaSec_);
+                    dc = dc.interpolatedWith(targetColor, t);
+                    if (dc != targetColor)
+                        stillAnimating = true;
+                }
+
+                // Fill square with animated color
+                g.setColour (dc);
                 g.fillRoundedRectangle (squareBounds, squareCornerRadius);
 
                 // Draw white border if enabled (selected step for editing)
@@ -117,6 +127,26 @@ public:
                     g.drawRoundedRectangle (squareBounds.reduced (1.0f), squareCornerRadius, 1.5f);
                 }
             }
+        }
+
+        needsAnimationRepaint_ = stillAnimating;
+    }
+
+    void parentHierarchyChanged() override {
+        if (getTopLevelComponent() != nullptr && vBlankAttachment_ == nullptr) {
+            vBlankAttachment_ = std::make_unique<juce::VBlankAttachment>(
+                this, [this](double timestampSec) {
+                    double delta = (lastVBlankTimestamp_ > 0.0)
+                        ? (timestampSec - lastVBlankTimestamp_)
+                        : (1.0 / 60.0);
+                    lastVBlankTimestamp_ = timestampSec;
+                    frameDeltaSec_ = static_cast<float>(juce::jlimit(0.001, 0.1, delta));
+
+                    if (needsAnimationRepaint_) {
+                        needsAnimationRepaint_ = false;
+                        repaint();
+                    }
+                });
         }
     }
 
@@ -461,5 +491,13 @@ private:
     }
 
     SequenceState* stateRef = nullptr;
+
+    // Colour fade animation state
+    std::array<std::array<juce::Colour, SequenceGridConstants::gridCols>,
+               SequenceGridConstants::gridRows> displayColours_;
+    bool needsAnimationRepaint_ = false;
+    float frameDeltaSec_ = 1.0f / 60.0f;
+    double lastVBlankTimestamp_ = 0.0;
+    std::unique_ptr<juce::VBlankAttachment> vBlankAttachment_;
 };
 

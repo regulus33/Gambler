@@ -215,6 +215,7 @@ target_link_libraries(SharedCode
     juce_audio_processors
     juce_gui_basics
     juce_gui_extra
+    juce_animation
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
