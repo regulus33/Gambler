@@ -37,21 +37,16 @@ public:
 
     void paint(juce::Graphics& g) override {
         using namespace PresetSelectorConstants;
-        float alpha = isHovered ? 1.0f : 0.7f;
         Icons::drawIcon(g, icon, getLocalBounds().toFloat(),
-                        juce::Colours::white.withAlpha(alpha), true, cycleIconScale);
+                        juce::Colours::white, true, cycleIconScale);
     }
 
     void mouseEnter(const juce::MouseEvent&) override {
-        isHovered = true;
         setMouseCursor(juce::MouseCursor::PointingHandCursor);
-        repaint();
     }
 
     void mouseExit(const juce::MouseEvent&) override {
-        isHovered = false;
         setMouseCursor(juce::MouseCursor::NormalCursor);
-        repaint();
     }
 
     void mouseUp(const juce::MouseEvent&) override {
@@ -63,7 +58,6 @@ public:
 private:
     Direction direction;
     juce::Path icon;
-    bool isHovered = false;
 };
 
 /**
