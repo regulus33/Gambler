@@ -245,16 +245,18 @@ public:
         using namespace MainScreenLayout;
         g.fillAll(juce::Colour(bgColourHex));
 
-        // Draw section titles in the title row (above their respective panels)
-        g.setFont(titleFont);
-        g.setColour(juce::Colours::white);
+        // Draw section titles only when top row panels are visible
+        if (!compactMode_ || showingTopRow_) {
+            g.setFont(titleFont);
+            g.setColour(juce::Colours::white);
 
-        auto titleRect = [&](const juce::Component& comp) {
-            return juce::Rectangle<int>(comp.getX(), comp.getY() - titleRowHeight, comp.getWidth(), titleRowHeight);
-        };
-        g.drawText("Main Controls", titleRect(mainControls), juce::Justification::centred, false);
-        g.drawText("Sequence", titleRect(sequenceOverview), juce::Justification::centred, false);
-        g.drawText("Subseq", titleRect(subsequenceControls), juce::Justification::centred, false);
+            auto titleRect = [&](const juce::Component& comp) {
+                return juce::Rectangle<int>(comp.getX(), comp.getY() - titleRowHeight, comp.getWidth(), titleRowHeight);
+            };
+            g.drawText("Main Controls", titleRect(mainControls), juce::Justification::centred, false);
+            g.drawText("Sequence", titleRect(sequenceOverview), juce::Justification::centred, false);
+            g.drawText("Subseq", titleRect(subsequenceControls), juce::Justification::centred, false);
+        }
     }
 
     void resized() override {
@@ -265,38 +267,78 @@ public:
         // Row 1: Navbar
         navBar.setBounds(area.removeFromTop(NavBarConstants::height));
 
-        // Row 2: Title row (just reserves space — titles drawn in paint)
-        area.removeFromTop(titleRowHeight);
+        if (compactMode_) {
+            // Compact mode: show only one row directly below navbar
+            if (showingTopRow_) {
+                // Title row
+                area.removeFromTop(titleRowHeight);
 
-        // Row 3: Top content (piano roll + panels)
-        auto topRow = area.removeFromTop(topContentHeight);
-        topRow.removeFromLeft(marginLeft);
-        topRow.removeFromRight(marginRight);
+                // Top content row
+                auto topRow = area.removeFromTop(topContentHeight);
+                topRow.removeFromLeft(marginLeft);
+                topRow.removeFromRight(marginRight);
 
-        pianoRoll.setBounds(topRow.removeFromLeft(pianoRollWidth).withHeight(pianoRollHeight));
-        topRow.removeFromLeft(topRowGap);
-        mainControls.setBounds(topRow.removeFromLeft(mainControlsWidth));
-        topRow.removeFromLeft(topRowGap);
-        sequenceOverview.setBounds(topRow.removeFromLeft(sequenceOverviewWidth));
-        topRow.removeFromLeft(subsequenceExtraGap);
-        subsequenceControls.setBounds(topRow.removeFromLeft(subsequenceControlsWidth));
+                pianoRoll.setBounds(topRow.removeFromLeft(pianoRollWidth).withHeight(pianoRollHeight));
+                topRow.removeFromLeft(topRowGap);
+                mainControls.setBounds(topRow.removeFromLeft(mainControlsWidth));
+                topRow.removeFromLeft(topRowGap);
+                sequenceOverview.setBounds(topRow.removeFromLeft(sequenceOverviewWidth));
+                topRow.removeFromLeft(subsequenceExtraGap);
+                subsequenceControls.setBounds(topRow.removeFromLeft(subsequenceControlsWidth));
+            } else {
+                // Bottom row directly below navbar
+                area.removeFromTop(gapAboveSequencer);
 
-        // Row 4 & 5: Sequencer steps + controls with note range on the right
-        area.removeFromTop(gapAboveSequencer);
+                auto bottomArea = area;
+                bottomArea.removeFromLeft(marginLeft);
+                bottomArea.removeFromRight(marginRight);
 
-        auto bottomArea = area;
-        bottomArea.removeFromLeft(marginLeft);
-        bottomArea.removeFromRight(marginRight);
+                auto sequencerArea = bottomArea.removeFromLeft(sequencerWidth);
+                bottomArea.removeFromLeft(noteRangeGap);
+                auto noteRangeArea = bottomArea;
 
-        auto sequencerArea = bottomArea.removeFromLeft(sequencerWidth);
-        bottomArea.removeFromLeft(noteRangeGap);
-        auto noteRangeArea = bottomArea;
+                sequencerSteps.setBounds(sequencerArea.removeFromTop(stepHeight));
+                sequencerArea.removeFromTop(gapBetweenStepRows);
+                sequencerControls.setBounds(sequencerArea.removeFromTop(stepHeight));
 
-        sequencerSteps.setBounds(sequencerArea.removeFromTop(stepHeight));
-        sequencerArea.removeFromTop(gapBetweenStepRows);
-        sequencerControls.setBounds(sequencerArea.removeFromTop(stepHeight));
+                noteRangeControls.setBounds(noteRangeArea.withHeight(stepHeight * 2 + gapBetweenStepRows));
+            }
+        } else {
+            // Full view: both rows visible
 
-        noteRangeControls.setBounds(noteRangeArea.withHeight(stepHeight * 2 + gapBetweenStepRows));
+            // Row 2: Title row (just reserves space — titles drawn in paint)
+            area.removeFromTop(titleRowHeight);
+
+            // Row 3: Top content (piano roll + panels)
+            auto topRow = area.removeFromTop(topContentHeight);
+            topRow.removeFromLeft(marginLeft);
+            topRow.removeFromRight(marginRight);
+
+            pianoRoll.setBounds(topRow.removeFromLeft(pianoRollWidth).withHeight(pianoRollHeight));
+            topRow.removeFromLeft(topRowGap);
+            mainControls.setBounds(topRow.removeFromLeft(mainControlsWidth));
+            topRow.removeFromLeft(topRowGap);
+            sequenceOverview.setBounds(topRow.removeFromLeft(sequenceOverviewWidth));
+            topRow.removeFromLeft(subsequenceExtraGap);
+            subsequenceControls.setBounds(topRow.removeFromLeft(subsequenceControlsWidth));
+
+            // Row 4 & 5: Sequencer steps + controls with note range on the right
+            area.removeFromTop(gapAboveSequencer);
+
+            auto bottomArea = area;
+            bottomArea.removeFromLeft(marginLeft);
+            bottomArea.removeFromRight(marginRight);
+
+            auto sequencerArea = bottomArea.removeFromLeft(sequencerWidth);
+            bottomArea.removeFromLeft(noteRangeGap);
+            auto noteRangeArea = bottomArea;
+
+            sequencerSteps.setBounds(sequencerArea.removeFromTop(stepHeight));
+            sequencerArea.removeFromTop(gapBetweenStepRows);
+            sequencerControls.setBounds(sequencerArea.removeFromTop(stepHeight));
+
+            noteRangeControls.setBounds(noteRangeArea.withHeight(stepHeight * 2 + gapBetweenStepRows));
+        }
     }
 
     // Accessors for testing
@@ -304,6 +346,31 @@ public:
     PianoRollComponent& getPianoRoll() { return pianoRoll; }
     SequencerControlsComponent& getSequencerControls() { return sequencerControls; }
     SequencerStepsComponent& getSequencerSteps() { return sequencerSteps; }
+
+    /**
+     * Set compact view mode — shows only one row at a time
+     * @param compact true to enter compact mode, false for full view
+     */
+    void setCompactMode(bool compact) {
+        if (compactMode_ == compact) return;
+        compactMode_ = compact;
+        if (!compact) showingTopRow_ = false; // reset to bottom row default
+        updateRowVisibility();
+        resized();
+        repaint();
+    }
+
+    /**
+     * In compact mode, swap which row is visible
+     * @param showTop true = show top row (piano roll, main controls, etc.), false = show bottom row (sequencer)
+     */
+    void setShowingTopRow(bool showTop) {
+        if (showingTopRow_ == showTop) return;
+        showingTopRow_ = showTop;
+        updateRowVisibility();
+        resized();
+        repaint();
+    }
 
     // Helper to set active step and update piano roll
     void setActiveStepAndNote(int stepIndex) {
@@ -714,6 +781,40 @@ private:
             }
         });
     }
+
+    void updateRowVisibility() {
+        if (!compactMode_) {
+            // Full view — everything visible
+            pianoRoll.setVisible(true);
+            mainControls.setVisible(true);
+            sequenceOverview.setVisible(true);
+            subsequenceControls.setVisible(true);
+            sequencerSteps.setVisible(true);
+            sequencerControls.setVisible(true);
+            noteRangeControls.setVisible(true);
+        } else if (showingTopRow_) {
+            // Compact mode showing top row
+            pianoRoll.setVisible(true);
+            mainControls.setVisible(true);
+            sequenceOverview.setVisible(true);
+            subsequenceControls.setVisible(true);
+            sequencerSteps.setVisible(false);
+            sequencerControls.setVisible(false);
+            noteRangeControls.setVisible(false);
+        } else {
+            // Compact mode showing bottom row (default)
+            pianoRoll.setVisible(false);
+            mainControls.setVisible(false);
+            sequenceOverview.setVisible(false);
+            subsequenceControls.setVisible(false);
+            sequencerSteps.setVisible(true);
+            sequencerControls.setVisible(true);
+            noteRangeControls.setVisible(true);
+        }
+    }
+
+    bool compactMode_ = false;
+    bool showingTopRow_ = false;
 
     PluginProcessor& processorRef;
     juce::Font titleFont;

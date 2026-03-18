@@ -85,6 +85,16 @@ public:
         // Setup preset selector callbacks
         setupPresetSelector();
 
+        // Setup compact view toggle callback
+        mainScreen.getNavBar().onCompactViewToggled = [this](bool compact) {
+            mainScreen.setCompactMode(compact);
+        };
+
+        // Setup swap row callback (in compact mode, swap between top/bottom row)
+        mainScreen.getNavBar().onSwapRowClicked = [this](bool showingTop) {
+            mainScreen.setShowingTopRow(showingTop);
+        };
+
         // Setup async update callback for main screen
         mainScreen.onAsyncUpdateNeeded = [this]() {
             triggerAsyncUpdate();

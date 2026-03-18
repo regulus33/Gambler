@@ -111,7 +111,9 @@ public:
           playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
           scaleLatchButton(processor),
-          scaleClearButton(processor)
+          scaleClearButton(processor),
+          compactViewButton(Icons::createCompactViewIcon, Icons::createCompactViewIcon, true, true),
+          swapRowButton(Icons::createSwapRowsIcon, Icons::createSwapRowsIcon, true, true)
     {
         // Add logo component
         addAndMakeVisible(logo);
@@ -175,6 +177,28 @@ public:
             return {};
         };
 
+        // Add compact view toggle button
+        addAndMakeVisible(compactViewButton);
+        compactViewButton.onClick = [this](bool toggled) {
+            // Show/hide swap button based on compact state
+            swapRowButton.setVisible(toggled);
+            if (!toggled) {
+                // Reset swap state when exiting compact mode
+                swapRowButton.setToggled(false);
+            }
+            if (onCompactViewToggled) {
+                onCompactViewToggled(toggled);
+            }
+        };
+
+        // Add swap row button (hidden by default, shown in compact mode)
+        addChildComponent(swapRowButton);
+        swapRowButton.onClick = [this](bool toggled) {
+            if (onSwapRowClicked) {
+                onSwapRowClicked(toggled);
+            }
+        };
+
         // Add subdivision slider with APVTS attachment
         addAndMakeVisible(subdivisionSlider);
         subdivisionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
@@ -223,7 +247,10 @@ public:
         float bg = static_cast<float>(buttonGap);
         float ss = static_cast<float>(SubdivisionSliderConstants::totalSize);
 
-        addItem(fb, subdivisionSlider, ss, ss);
+        addItem(fb, compactViewButton, bs, bs);
+        if (swapRowButton.isVisible())
+            addItem(fb, swapRowButton, bs, bs, bg);
+        addItem(fb, subdivisionSlider, ss, ss, bg);
         addItem(fb, exportButton, bs, bs, bg);
         addItem(fb, scaleClearButton, bs, bs, bg);
         addItem(fb, scaleLatchButton, bs, bs, bg);
@@ -253,6 +280,14 @@ public:
 
     // Callback when export button is dragged (returns temp MIDI file for D&D)
     std::function<juce::File()> onExportDragStarted;
+
+    // Callback when compact view button is toggled
+    // Parameter: true = compact mode ON, false = compact mode OFF
+    std::function<void(bool)> onCompactViewToggled;
+
+    // Callback when swap row button is clicked in compact mode
+    // Parameter: true = showing top row, false = showing bottom row
+    std::function<void(bool)> onSwapRowClicked;
 
     // Public method to set settings button toggle state (for ApplicationComponent)
     void setSettingsToggled(bool toggled) {
@@ -303,6 +338,8 @@ private:
     ToggleIconButton stopButton;
     ScaleLatchButton scaleLatchButton;
     ScaleClearButton scaleClearButton;
+    ToggleIconButton compactViewButton;
+    ToggleIconButton swapRowButton;
     ExportButton exportButton;
     SubdivisionSlider subdivisionSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> subdivisionAttachment;

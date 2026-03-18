@@ -1826,4 +1826,38 @@ public:
         return path;
     }
 
+    /**
+     * Creates a "compact view" icon — two horizontal bars suggesting collapsed rows
+     * Used to toggle between full view and compact (single-row) view
+     */
+    static juce::Path createCompactViewIcon() {
+        juce::Path path;
+        // Top bar
+        path.addRoundedRectangle(0.0f, 0.0f, 20.0f, 4.0f, 1.5f);
+        // Bottom bar
+        path.addRoundedRectangle(0.0f, 8.0f, 20.0f, 4.0f, 1.5f);
+        // Down arrow beneath bars
+        path.startNewSubPath(5.0f, 15.0f);
+        path.lineTo(10.0f, 20.0f);
+        path.lineTo(15.0f, 15.0f);
+        return path;
+    }
+
+    /**
+     * Creates a "swap rows" icon — up/down arrows
+     * Used to swap between top row and bottom row in compact view
+     */
+    static juce::Path createSwapRowsIcon() {
+        juce::Path path;
+        // Up arrow
+        path.startNewSubPath(5.0f, 8.0f);
+        path.lineTo(10.0f, 2.0f);
+        path.lineTo(15.0f, 8.0f);
+        // Down arrow
+        path.startNewSubPath(5.0f, 14.0f);
+        path.lineTo(10.0f, 20.0f);
+        path.lineTo(15.0f, 14.0f);
+        return path;
+    }
+
 };
