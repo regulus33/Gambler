@@ -48,7 +48,7 @@ private:
     bool isAdjustingSize = false;
 
     // Current design height (changes with compact mode)
-    int currentDesignHeight = 514;
+    int currentDesignHeight = MainScreenComponent::fullDesignHeight;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginEditor)
 };

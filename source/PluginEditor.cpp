@@ -6,7 +6,7 @@ namespace PluginEditorLayout {
     constexpr juce::uint32 bgColourHex = 0xFF1E1E1E;
     // Editor size
     constexpr int editorWidth = 1012;
-    constexpr int editorHeight = 514;  // Reduced from 560 to eliminate bottom gap (content ends at ~494px + 20px margin)
+    constexpr int editorHeight = MainScreenComponent::fullDesignHeight;
     // Inspector button
     constexpr int inspectorButtonWidth = 100;
     constexpr int inspectorButtonHeight = 25;

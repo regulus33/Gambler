@@ -43,6 +43,7 @@ namespace MainScreenLayout {
     constexpr int stepHeight = 92;
     constexpr int gapBetweenStepRows = 14;
     constexpr int noteRangeGap = 18;
+    constexpr int bottomPadding = 24;   // padding below sequencer row / bottom of window
 }
 
 /**
@@ -383,12 +384,16 @@ public:
             return fullDesignHeight;
 
         if (showingTopRow_)
-            return NavBarConstants::height + titleRowHeight + topContentHeight + 20;
+            return NavBarConstants::height + titleRowHeight + topContentHeight + bottomPadding;
         else
-            return NavBarConstants::height + gapAboveSequencer + stepHeight + gapBetweenStepRows + stepHeight + 20;
+            return NavBarConstants::height + gapAboveSequencer + stepHeight + gapBetweenStepRows + stepHeight + bottomPadding;
     }
 
-    static constexpr int fullDesignHeight = 514;
+    // Full design height: navbar + title + top content + gap + 2 step rows + gap + bottom padding
+    static constexpr int fullDesignHeight = NavBarConstants::height + MainScreenLayout::titleRowHeight
+        + MainScreenLayout::topContentHeight + MainScreenLayout::gapAboveSequencer
+        + MainScreenLayout::stepHeight + MainScreenLayout::gapBetweenStepRows
+        + MainScreenLayout::stepHeight + MainScreenLayout::bottomPadding;
 
     // Callback when ideal height changes (for window resizing)
     std::function<void(int)> onIdealHeightChanged;
