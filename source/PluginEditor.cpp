@@ -46,14 +46,24 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     // Make window resizable with aspect ratio constraints
     setResizable (true, true);
 
-    // Set minimum size (50% of design size)
+    // Set minimum size (50% of design size, min height allows compact mode)
     setResizeLimits (PluginEditorLayout::editorWidth / 2,
-                     PluginEditorLayout::editorHeight / 2,
+                     150,  // Allow compact mode heights
                      PluginEditorLayout::editorWidth * 4,
                      PluginEditorLayout::editorHeight * 4);
 
     // Add component listener to self for aspect ratio constraint
     addComponentListener (this);
+
+    // Wire up compact mode design height callback
+    applicationComponent.onDesignHeightChanged = [this](int newDesignHeight) {
+        currentDesignHeight = newDesignHeight;
+        isAdjustingSize = true;
+        float scale = static_cast<float>(getWidth()) / static_cast<float>(PluginEditorLayout::editorWidth);
+        int newWindowHeight = juce::roundToInt(static_cast<float>(newDesignHeight) * scale);
+        setSize(getWidth(), newWindowHeight);
+        isAdjustingSize = false;
+    };
 
     setSize (PluginEditorLayout::editorWidth, PluginEditorLayout::editorHeight);
 }
@@ -73,9 +83,9 @@ void PluginEditor::resized() {
     // Calculate scale factor
     float scale = getScaleFactor();
 
-        // Calculate the scaled dimensions
+    // Calculate the scaled dimensions
     int scaledWidth = juce::roundToInt (editorWidth * scale);
-    int scaledHeight = juce::roundToInt (editorHeight * scale);
+    int scaledHeight = juce::roundToInt (currentDesignHeight * scale);
 
     // Center the scaled content within the available space
     int offsetX = (getWidth() - scaledWidth) / 2;
@@ -83,7 +93,7 @@ void PluginEditor::resized() {
 
     // Set the application component to the design size
     // It will be scaled by the transform
-    applicationComponent.setBounds (0, 0, editorWidth, editorHeight);
+    applicationComponent.setBounds (0, 0, editorWidth, currentDesignHeight);
 
     // Apply scaling transform with centering offset to the application component
     applicationComponent.setTransform (juce::AffineTransform::scale (scale)
@@ -93,7 +103,7 @@ void PluginEditor::resized() {
 #if SHOW_INSPECTOR
     // Inspector button in bottom right corner (uses scaled coordinates)
     inspectButton.setBounds (editorWidth - inspectorButtonMarginRight,
-                             editorHeight - inspectorButtonMarginBottom,
+                             currentDesignHeight - inspectorButtonMarginBottom,
                              inspectorButtonWidth, inspectorButtonHeight);
 
     // Apply same scaling transform with centering offset to inspector button
@@ -122,7 +132,7 @@ float PluginEditor::getScaleFactor() const {
 
     // Calculate scale based on width (height will be constrained by aspect ratio)
     float scaleX = static_cast<float>(getWidth()) / static_cast<float>(editorWidth);
-    float scaleY = static_cast<float>(getHeight()) / static_cast<float>(editorHeight);
+    float scaleY = static_cast<float>(getHeight()) / static_cast<float>(currentDesignHeight);
 
     // Use the smaller scale to ensure everything fits
     return juce::jmin (scaleX, scaleY);
@@ -140,8 +150,8 @@ void PluginEditor::componentMovedOrResized (juce::Component& component, bool was
     // On desktop: enforce aspect ratio by adjusting window size
     // On iOS: let the host control the size (hosts won't allow size changes)
 
-    // Calculate aspect ratio
-    const float aspectRatio = static_cast<float>(editorWidth) / static_cast<float>(editorHeight);
+    // Calculate aspect ratio using current design height (changes with compact mode)
+    const float aspectRatio = static_cast<float>(editorWidth) / static_cast<float>(currentDesignHeight);
 
     // Get current size
     int currentWidth = getWidth();

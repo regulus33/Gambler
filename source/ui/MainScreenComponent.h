@@ -358,6 +358,7 @@ public:
         updateRowVisibility();
         resized();
         repaint();
+        if (onIdealHeightChanged) onIdealHeightChanged(getIdealHeight());
     }
 
     /**
@@ -370,7 +371,27 @@ public:
         updateRowVisibility();
         resized();
         repaint();
+        if (onIdealHeightChanged) onIdealHeightChanged(getIdealHeight());
     }
+
+    /**
+     * Get the ideal design height for the current view mode
+     */
+    int getIdealHeight() const {
+        using namespace MainScreenLayout;
+        if (!compactMode_)
+            return fullDesignHeight;
+
+        if (showingTopRow_)
+            return NavBarConstants::height + titleRowHeight + topContentHeight + 20;
+        else
+            return NavBarConstants::height + gapAboveSequencer + stepHeight + gapBetweenStepRows + stepHeight + 20;
+    }
+
+    static constexpr int fullDesignHeight = 514;
+
+    // Callback when ideal height changes (for window resizing)
+    std::function<void(int)> onIdealHeightChanged;
 
     // Helper to set active step and update piano roll
     void setActiveStepAndNote(int stepIndex) {

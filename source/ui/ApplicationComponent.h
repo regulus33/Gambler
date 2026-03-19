@@ -95,6 +95,11 @@ public:
             mainScreen.setShowingTopRow(showingTop);
         };
 
+        // Forward ideal height changes to the editor for window resizing
+        mainScreen.onIdealHeightChanged = [this](int newHeight) {
+            if (onDesignHeightChanged) onDesignHeightChanged(newHeight);
+        };
+
         // Setup async update callback for main screen
         mainScreen.onAsyncUpdateNeeded = [this]() {
             triggerAsyncUpdate();
@@ -157,6 +162,9 @@ public:
 
     // Get main screen for external access (e.g., for keyboard shortcuts)
     MainScreenComponent& getMainScreen() { return mainScreen; }
+
+    // Callback when the design height changes (compact mode toggle)
+    std::function<void(int)> onDesignHeightChanged;
 
 private:
     void handleAsyncUpdate() override {

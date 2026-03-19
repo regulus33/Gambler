@@ -47,5 +47,8 @@ private:
     // Track if we're currently adjusting size (to prevent recursion)
     bool isAdjustingSize = false;
 
+    // Current design height (changes with compact mode)
+    int currentDesignHeight = 514;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginEditor)
 };
