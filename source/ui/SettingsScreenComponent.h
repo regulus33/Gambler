@@ -5,11 +5,70 @@
 #include "NavBarComponent.h"
 #include "NoteColourPickerComponent.h"
 #include "SettingsGroup.h"
+#include "UIConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_gui_extra/juce_gui_extra.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <functional>
 
 class PluginProcessor;
+
+/** A small clickable colour swatch that opens a ColourSelector in a CallOutBox. */
+class ColourSwatchComponent : public juce::Component {
+public:
+    ColourSwatchComponent(juce::Colour initial) : currentColour(initial) {}
+
+    void paint(juce::Graphics& g) override {
+        auto b = swatchBounds();
+        g.setColour(currentColour);
+        g.fillRoundedRectangle(b, 3.0f);
+        g.setColour(juce::Colours::grey);
+        g.drawRoundedRectangle(b.reduced(0.5f), 3.0f, 1.0f);
+    }
+
+    void mouseDown(const juce::MouseEvent& e) override {
+        if (!swatchBounds().contains(e.position))
+            return;
+        auto* selector = new juce::ColourSelector(
+            juce::ColourSelector::showColourAtTop
+            | juce::ColourSelector::showSliders
+            | juce::ColourSelector::showColourspace);
+        selector->setSize(300, 400);
+        selector->setCurrentColour(currentColour);
+        selector->addChangeListener(&changeForwarder);
+        changeForwarder.onColourChanged = [this, selector]() {
+            currentColour = selector->getCurrentColour();
+            repaint();
+            if (onColourChanged)
+                onColourChanged(currentColour);
+        };
+        juce::CallOutBox::launchAsynchronously(
+            std::unique_ptr<juce::Component>(selector), getScreenBounds(), nullptr);
+    }
+
+    void setCurrentColour(juce::Colour c) { currentColour = c; repaint(); }
+    juce::Colour getCurrentColour() const { return currentColour; }
+
+    std::function<void(juce::Colour)> onColourChanged;
+
+private:
+    static constexpr float swatchSize = 15.0f;
+
+    juce::Rectangle<float> swatchBounds() const {
+        float y = (getHeight() - swatchSize) * 0.5f;
+        return { 0.0f, y, swatchSize, swatchSize };
+    }
+
+    juce::Colour currentColour;
+
+    struct ChangeForwarder : public juce::ChangeListener {
+        std::function<void()> onColourChanged;
+        void changeListenerCallback(juce::ChangeBroadcaster*) override {
+            if (onColourChanged) onColourChanged();
+        }
+    };
+    ChangeForwarder changeForwarder;
+};
 
 namespace SettingsScreenConstants {
     constexpr int padding = 40;  // Padding around settings content
@@ -224,12 +283,26 @@ public:
         scaleQuantizerGroup->addCustomControl(*globalScaleQuantizer_, 100);
         addAndMakeVisible(*scaleQuantizerGroup);
 
-        // TODO: Replace placeholder text with actual Group 6 settings/controls
-        group6 = std::make_unique<SettingsGroup>("Group 6");
-        group6PlaceholderLabel.setText("Group 6 settings coming soon...", juce::dontSendNotification);
-        group6PlaceholderLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.5f));
-        group6PlaceholderLabel.setJustificationType(juce::Justification::centred);
-        group6->addControl(group6PlaceholderLabel);
+        // Step Colours group
+        selectedStepOutlineLabel.setText("Selected step outline", juce::dontSendNotification);
+        selectedStepOutlineLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+        selectedStepOutlineLabel.setJustificationType(juce::Justification::centredLeft);
+
+        selectedStepSwatch.onColourChanged = [](juce::Colour c) {
+            UIConstants::selectedStepOutlineColour = c;
+        };
+
+        activeStepLabel.setText("Active step colour", juce::dontSendNotification);
+        activeStepLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+        activeStepLabel.setJustificationType(juce::Justification::centredLeft);
+
+        activeStepSwatch.onColourChanged = [](juce::Colour c) {
+            UIConstants::activeStepColour = c;
+        };
+
+        group6 = std::make_unique<SettingsGroup>("Step Colours");
+        group6->addLabeledControl(selectedStepOutlineLabel, selectedStepSwatch);
+        group6->addLabeledControl(activeStepLabel, activeStepSwatch);
         addAndMakeVisible(*group6);
     }
 
@@ -397,7 +470,10 @@ private:
     // Global scale quantizer
     std::unique_ptr<GlobalScaleQuantizerComponent> globalScaleQuantizer_;
 
-    // Placeholder labels (TODO: replace with actual controls)
-    juce::Label group6PlaceholderLabel;
+    // Step colour controls
+    juce::Label selectedStepOutlineLabel;
+    ColourSwatchComponent selectedStepSwatch { UIConstants::selectedStepOutlineColour };
+    juce::Label activeStepLabel;
+    ColourSwatchComponent activeStepSwatch { UIConstants::activeStepColour };
 };
 
