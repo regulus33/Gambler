@@ -85,7 +85,7 @@ public:
                 // Determine the target fill color
                 juce::Colour targetColor;
                 if (state.isCurrent) {
-                    targetColor = UIConstants::stepIndicatorWhite;
+                    targetColor = UIConstants::activeStepColour;
                 } else {
                     targetColor = state.color;
 
@@ -117,7 +117,7 @@ public:
 
                 // Draw white border if enabled (selected step for editing)
                 if (state.hasBorder) {
-                    g.setColour (UIConstants::stepIndicatorWhite);
+                    g.setColour (UIConstants::selectedStepOutlineColour);
                     g.drawRoundedRectangle (squareBounds.reduced (0.5f), squareCornerRadius, borderWidth);
                 }
 

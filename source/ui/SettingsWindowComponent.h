@@ -1,13 +1,15 @@
 #pragma once
 
 #include "BinaryData.h"
+#include "UIConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_gui_extra/juce_gui_extra.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <functional>
 
 namespace SettingsWindowConstants {
     constexpr int windowWidth = 400;
-    constexpr int windowHeight = 350;  // Increased height for MIDI device selector
+    constexpr int windowHeight = 440;  // Increased height for colour pickers
     constexpr int padding = 20;
     constexpr int controlHeight = 30;
     constexpr int controlSpacing = 15;
@@ -16,6 +18,54 @@ namespace SettingsWindowConstants {
     constexpr float labelFontSize = 14.0f;
     constexpr float sliderTextBoxWidth = 60.0f;
 }
+
+/** A small clickable colour swatch that opens a ColourSelector in a CallOutBox. */
+class ColourSwatchComponent : public juce::Component {
+public:
+    ColourSwatchComponent(juce::Colour initial) : currentColour(initial) {}
+
+    void paint(juce::Graphics& g) override {
+        auto b = getLocalBounds().toFloat();
+        g.setColour(currentColour);
+        g.fillRoundedRectangle(b, 3.0f);
+        g.setColour(juce::Colours::grey);
+        g.drawRoundedRectangle(b.reduced(0.5f), 3.0f, 1.0f);
+    }
+
+    void mouseDown(const juce::MouseEvent&) override {
+        auto* selector = new juce::ColourSelector(
+            juce::ColourSelector::showColourAtTop
+            | juce::ColourSelector::showSliders
+            | juce::ColourSelector::showColourspace);
+        selector->setSize(300, 400);
+        selector->setCurrentColour(currentColour);
+        selector->addChangeListener(&changeForwarder);
+        changeForwarder.onColourChanged = [this, selector]() {
+            currentColour = selector->getCurrentColour();
+            repaint();
+            if (onColourChanged)
+                onColourChanged(currentColour);
+        };
+        juce::CallOutBox::launchAsynchronously(
+            std::unique_ptr<juce::Component>(selector), getScreenBounds(), nullptr);
+    }
+
+    void setCurrentColour(juce::Colour c) { currentColour = c; repaint(); }
+    juce::Colour getCurrentColour() const { return currentColour; }
+
+    std::function<void(juce::Colour)> onColourChanged;
+
+private:
+    juce::Colour currentColour;
+
+    struct ChangeForwarder : public juce::ChangeListener {
+        std::function<void()> onColourChanged;
+        void changeListenerCallback(juce::ChangeBroadcaster*) override {
+            if (onColourChanged) onColourChanged();
+        }
+    };
+    ChangeForwarder changeForwarder;
+};
 
 /**
  * SettingsWindowComponent
@@ -163,6 +213,32 @@ public:
         };
         addAndMakeVisible(midiClockDeviceSelector);
 
+        // Setup selected step outline colour picker
+        selectedStepLabel.setText("Selected step outline", juce::dontSendNotification);
+        selectedStepLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+        selectedStepLabel.setJustificationType(juce::Justification::centredLeft);
+        addAndMakeVisible(selectedStepLabel);
+
+        selectedStepSwatch.onColourChanged = [this](juce::Colour c) {
+            UIConstants::selectedStepOutlineColour = c;
+            if (onSelectedStepColourChanged)
+                onSelectedStepColourChanged(c);
+        };
+        addAndMakeVisible(selectedStepSwatch);
+
+        // Setup active step colour picker
+        activeStepLabel.setText("Active step colour", juce::dontSendNotification);
+        activeStepLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+        activeStepLabel.setJustificationType(juce::Justification::centredLeft);
+        addAndMakeVisible(activeStepLabel);
+
+        activeStepSwatch.onColourChanged = [this](juce::Colour c) {
+            UIConstants::activeStepColour = c;
+            if (onActiveStepColourChanged)
+                onActiveStepColourChanged(c);
+        };
+        addAndMakeVisible(activeStepSwatch);
+
         setSize(SettingsWindowConstants::windowWidth, SettingsWindowConstants::windowHeight);
     }
 
@@ -224,6 +300,21 @@ public:
         auto midiClockRow = area.removeFromTop(controlHeight);
         midiClockDeviceLabel.setBounds(midiClockRow.removeFromLeft(labelWidth));
         midiClockDeviceSelector.setBounds(midiClockRow);
+
+        area.removeFromTop(controlSpacing);
+
+        // Selected step outline colour row
+        constexpr int swatchSize = 15;
+        auto selectedStepRow = area.removeFromTop(controlHeight);
+        selectedStepLabel.setBounds(selectedStepRow.removeFromLeft(labelWidth + 40));
+        selectedStepSwatch.setBounds(selectedStepRow.getX(), selectedStepRow.getY() + (controlHeight - swatchSize) / 2, swatchSize, swatchSize);
+
+        area.removeFromTop(controlSpacing);
+
+        // Active step colour row
+        auto activeStepRow = area.removeFromTop(controlHeight);
+        activeStepLabel.setBounds(activeStepRow.removeFromLeft(labelWidth + 40));
+        activeStepSwatch.setBounds(activeStepRow.getX(), activeStepRow.getY() + (controlHeight - swatchSize) / 2, swatchSize, swatchSize);
     }
 
     // Callbacks for state changes
@@ -235,6 +326,8 @@ public:
     std::function<void(bool)> onPreviewNotesChanged;
     std::function<void(bool)> onFollowStepChanged;
     std::function<void(int)> onMidiClockDeviceChanged;
+    std::function<void(juce::Colour)> onSelectedStepColourChanged;
+    std::function<void(juce::Colour)> onActiveStepColourChanged;
 
     // Accessors for current values
     bool isInternalClockEnabled() const { return internalClockToggle.getToggleState(); }
@@ -297,6 +390,10 @@ private:
     juce::ToggleButton followStepToggle;
     juce::Label midiClockDeviceLabel;
     juce::ComboBox midiClockDeviceSelector;
+    juce::Label selectedStepLabel;
+    ColourSwatchComponent selectedStepSwatch { UIConstants::selectedStepOutlineColour };
+    juce::Label activeStepLabel;
+    ColourSwatchComponent activeStepSwatch { UIConstants::activeStepColour };
 };
 
 /**

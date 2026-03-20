@@ -1,29 +1,41 @@
-Run the project tests, analyze results, and fix any issues.
+---
+name: dev:verify
+description: Build, run CMake tests, check JUCE assertions, and auto-fix regressions.
+model: claude-sonnet-4-20250514
+allowed-tools:
+  - Bash
+  - Read
+  - Grep
+  - Glob
+---
 
-## Steps
+<objective>
+Execute a full validation suite: compile the project, run CTest/GoogleTest binaries, analyze regressions from the last commit, and audit JUCE-specific assertion reports.
+</objective>
 
-1. **Build and run tests:**
-   Run the full test pipeline:
-   ```
-   cmake -B build && cmake --build build --target Tests && ./build/Tests
-   ```
+<process>
+1. **Build & Execute:** Run the pipeline: `cmake -B build && cmake --build build --target Tests && ./build/Tests`.
+   
+2. **Regression Analysis:**
+   If tests fail:
+   - Run `git diff HEAD~1` to isolate recent changes.
+   - Compare failing test cases against the diff to determine if the current work introduced the bug.
+   
+3. **Reactive Fixing:**
+   - If a failure is linked to the recent diff, attempt a surgical fix in the source code.
+   - Immediately re-run the build/test command to verify the fix.
+   
+4. **JUCE Audit:**
+   Read `tests/jassert_report.md`.
+   - **Actionable:** If "actionable count" > 0, extract the file paths and hit counts.
+   - **Benign:** If counts are zero or suppressed, simply acknowledge the clean state.
 
-2. **Analyze test results:**
-   - If any tests fail, identify the failing test(s) and root cause.
-   - Check `git diff HEAD~1` to see what changed in the last commit — determine if the failure was introduced by the most recent change.
+5. **Final Briefing:**
+   Provide a structured summary of: Test Status, Regressions Fixed, and JUCE Assertion Health.
+</process>
 
-3. **Fix bugs if introduced by last change:**
-   - If a test failure was introduced by the last commit, fix the bug in the source code.
-   - Re-run the tests to confirm the fix works.
-   - Report what was broken and how it was fixed.
-
-4. **Check JUCE assertion report:**
-   Read `tests/jassert_report.md` and review its contents:
-   - If there are **actionable assertions** (non-zero actionable count), report each unique location, hit count, and propose a fix if the cause is apparent.
-   - If all assertions are **suppressed/known-benign**, briefly confirm that no actionable assertions were found.
-
-5. **Report summary to user:**
-   Provide a concise summary:
-   - Test pass/fail status
-   - Any bugs found and fixed
-   - JUCE assertion report highlights
+<guardrails>
+- **Build Cleanliness:** If `cmake` fails, check for missing dependencies or compiler errors before blaming the test logic.
+- **Context Preservation:** Do not delete the `build` directory unless a full clean is required to resolve a linking error.
+- **Reporting:** Always provide the specific line number for `jassert` failures to save the human time.
+</guardrails>

@@ -128,7 +128,7 @@ public:
             isRest = (midiNote < 0);
 
             if (isCurrent) {
-                targetColor = UIConstants::stepIndicatorWhite;
+                targetColor = UIConstants::activeStepColour;
             } else if (isRest) {
                 targetColor = StepButtonConstants::restStepColor;
             } else {
@@ -158,7 +158,7 @@ public:
         if (isWithinSequence) {
             // Draw white border on selected step (for editing)
             if (isSelected) {
-                g.setColour(UIConstants::stepIndicatorWhite);
+                g.setColour(UIConstants::selectedStepOutlineColour);
                 float inset = borderWidthSelected * 0.5f;
                 juce::Rectangle<float> borderBounds = bounds.reduced(inset);
                 float borderRadiusInner = juce::jmax(0.0f, cornerRadius - inset);
