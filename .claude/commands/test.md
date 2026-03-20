@@ -1,7 +1,6 @@
 ---
 name: dev:verify
 description: Build, run CMake tests, check JUCE assertions, and auto-fix regressions.
-model: claude-sonnet-4-20250514
 allowed-tools:
   - Bash
   - Read

@@ -1,7 +1,6 @@
 ---
 name: git:publish
 description: Review, stage, commit with clean identity, and push to main.
-model: claude-sonnet-4-20250514
 allowed-tools:
   - Bash
 ---
