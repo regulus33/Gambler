@@ -6,6 +6,7 @@
 #include "../../backend/MidiLearnRegistry.h"
 #include "../../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_animation/juce_animation.h>
 
 // Use the same constants as SequencerControlsComponent for visual consistency
 namespace SequencerButtonConstants {
@@ -19,6 +20,7 @@ namespace SequencerButtonConstants {
     constexpr float fontSize = 13.0f;         // Match SequencerControlsConstants
     constexpr float textYOffset = 13.0f;      // Match SequencerControlsConstants
     constexpr float textHeight = 13.0f;       // Match SequencerControlsConstants
+    constexpr float colourFadeSpeed = 8.0f;   // Lerp speed (higher = faster fade)
 }
 
 /**
@@ -71,12 +73,32 @@ public:
 
         // Visual state is driven by APVTS parameter
         bool isActive = isParamOn();
-        juce::Colour bgColor = isActive ? juce::Colour(bgColorActive) : juce::Colour(bgColorInactive);
-        juce::Colour borderColor = juce::Colours::white;
-        juce::Colour contentColor = isActive ? juce::Colours::black : juce::Colours::white;
+        juce::Colour targetBg = isActive ? juce::Colour(bgColorActive) : juce::Colour(bgColorInactive);
+        juce::Colour targetContent = isActive ? juce::Colours::black : juce::Colours::white;
 
-        // Fill background
-        g.setColour(bgColor);
+        // Animate: lerp display colours toward targets
+        if (!displayColoursInitialised_) {
+            displayBgColour_ = targetBg;
+            displayContentColour_ = targetContent;
+            displayColoursInitialised_ = true;
+        } else {
+            float t = juce::jmin(1.0f, colourFadeSpeed * frameDeltaSec_);
+            if (displayBgColour_ != targetBg) {
+                displayBgColour_ = displayBgColour_.interpolatedWith(targetBg, t);
+                if (displayBgColour_ != targetBg)
+                    needsAnimationRepaint_ = true;
+            }
+            if (displayContentColour_ != targetContent) {
+                displayContentColour_ = displayContentColour_.interpolatedWith(targetContent, t);
+                if (displayContentColour_ != targetContent)
+                    needsAnimationRepaint_ = true;
+            }
+        }
+
+        juce::Colour borderColor = juce::Colours::white;
+
+        // Fill background with animated color
+        g.setColour(displayBgColour_);
         g.fillRoundedRectangle(bounds, cornerRadius);
 
         // Draw border
@@ -86,7 +108,7 @@ public:
 
         // Draw icon
         if (iconPath_.has_value()) {
-            g.setColour(contentColor);
+            g.setColour(displayContentColour_);
             auto iconBounds = iconPath_->getBounds();
             float longestSide = juce::jmax(iconBounds.getWidth(), iconBounds.getHeight());
             float scale = maxIconSize / longestSide;
@@ -104,7 +126,7 @@ public:
 
         // Draw label
         if (label_.isNotEmpty()) {
-            g.setColour(contentColor);
+            g.setColour(displayContentColour_);
             juce::Font font{juce::FontOptions(fontSize)};
             font.setBold(true);
             g.setFont(font);
@@ -134,9 +156,27 @@ public:
         setParamOn(false);
     }
 
+    void parentHierarchyChanged() override {
+        if (getTopLevelComponent() != nullptr && vBlankAttachment_ == nullptr) {
+            vBlankAttachment_ = std::make_unique<juce::VBlankAttachment>(
+                this, [this](double timestampSec) {
+                    double delta = (lastVBlankTimestamp_ > 0.0)
+                        ? (timestampSec - lastVBlankTimestamp_)
+                        : (1.0 / 60.0);
+                    lastVBlankTimestamp_ = timestampSec;
+                    frameDeltaSec_ = static_cast<float>(juce::jlimit(0.001, 0.1, delta));
+
+                    if (needsAnimationRepaint_) {
+                        needsAnimationRepaint_ = false;
+                        repaint();
+                    }
+                });
+        }
+    }
+
 protected:
     void onStateChanged() override {
-        // Parameter changed - repaint to reflect new state
+        // Parameter changed - repaint to start animation toward new state
         repaint();
     }
 
@@ -164,5 +204,14 @@ private:
     juce::String label_;
     std::optional<juce::Path> iconPath_;
     MidiLearnRegistry* registry_ = nullptr;
+
+    // Colour fade animation state
+    juce::Colour displayBgColour_ { SequencerButtonConstants::bgColorInactive };
+    juce::Colour displayContentColour_ { juce::Colours::white };
+    bool displayColoursInitialised_ = false;
+    bool needsAnimationRepaint_ = false;
+    float frameDeltaSec_ = 1.0f / 60.0f;
+    double lastVBlankTimestamp_ = 0.0;
+    std::unique_ptr<juce::VBlankAttachment> vBlankAttachment_;
 };
 
