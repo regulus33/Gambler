@@ -79,14 +79,25 @@ namespace NavBarConstants {
     constexpr int marginLeft = 8;
     constexpr int marginRight = 10;
 
-    // Component sizing — tweak these to resize individual controls
-    constexpr float buttonScale = 0.85f;                                     // scale for icon buttons
-    constexpr int buttonSize = static_cast<int>(ToggleIconButtonConstants::totalSize * buttonScale);
-    constexpr float presetScale = 0.85f;                                     // scale for preset selector
+    // Per-component scale factors — tweak individually to resize each control
+    constexpr float presetScale        = 0.85f;   // preset selector (dropdown + arrows + save)
+    constexpr float compactViewScale   = 0.85f;   // compact view toggle button
+    constexpr float swapRowScale       = 0.85f;   // swap row button
+    constexpr float subdivisionScale   = 0.85f;   // subdivision slider
+    constexpr float exportScale        = 0.85f;   // export / drag-to-DAW button
+    constexpr float scaleLatchScale    = 0.85f;   // scale latch button
+    constexpr float playPauseScale     = 0.85f;   // play / pause button
+    constexpr float stopScale          = 0.85f;   // stop button
+    constexpr float midiLearnScale     = 0.85f;   // MIDI learn button
+    constexpr float settingsScale      = 0.85f;   // settings gear button
+
+    // Base sizes (before scaling)
+    constexpr float baseButtonSize     = static_cast<float>(ToggleIconButtonConstants::totalSize);
+    constexpr float baseSubdivSize     = static_cast<float>(SubdivisionSliderConstants::totalSize);
 
     // Spacing — tweak these to adjust gaps
-    constexpr int buttonGap = 6;                                             // gap between icon buttons
-    constexpr int presetSelectorGap = 10;                                    // gap after preset selector
+    constexpr int buttonGap = 6;                   // gap between icon buttons
+    constexpr int presetSelectorGap = 10;           // gap after preset selector
 
     // Settings icon scale factor - tweak this to adjust the settings gear icon size
     constexpr float settingsIconScale = 1.0f;
@@ -239,21 +250,21 @@ public:
         // Flexible spacer pushes remaining items to the right
         fb.items.add(juce::FlexItem().withFlex(1.0f));
 
-        // Right group: tool buttons, transport, settings
-        float bs = static_cast<float>(buttonSize);
+        // Right group: tool buttons, transport, settings (each with its own scale)
         float bg = static_cast<float>(buttonGap);
-        float ss = static_cast<float>(SubdivisionSliderConstants::totalSize);
+        auto sz = [](float scale) { return baseButtonSize * scale; };
+        float ss = baseSubdivSize * subdivisionScale;
 
-        addItem(fb, compactViewButton, bs, bs);
+        addItem(fb, compactViewButton, sz(compactViewScale), sz(compactViewScale));
         if (swapRowButton.isVisible())
-            addItem(fb, swapRowButton, bs, bs, bg);
+            addItem(fb, swapRowButton, sz(swapRowScale), sz(swapRowScale), bg);
         addItem(fb, subdivisionSlider, ss, ss, bg);
-        addItem(fb, exportButton, bs, bs, bg);
-        addItem(fb, scaleLatchButton, bs, bs, bg);
-        addItem(fb, playPauseButton, bs, bs, bg);
-        addItem(fb, stopButton, bs, bs, bg);
-        addItem(fb, midiLearnButton, bs, bs, bg);
-        addItem(fb, settingsButton, bs, bs, bg);
+        addItem(fb, exportButton, sz(exportScale), sz(exportScale), bg);
+        addItem(fb, scaleLatchButton, sz(scaleLatchScale), sz(scaleLatchScale), bg);
+        addItem(fb, playPauseButton, sz(playPauseScale), sz(playPauseScale), bg);
+        addItem(fb, stopButton, sz(stopScale), sz(stopScale), bg);
+        addItem(fb, midiLearnButton, sz(midiLearnScale), sz(midiLearnScale), bg);
+        addItem(fb, settingsButton, sz(settingsScale), sz(settingsScale), bg);
 
         fb.performLayout(area.toFloat());
     }
