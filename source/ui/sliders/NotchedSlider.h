@@ -222,8 +222,8 @@ private:
             currentIndex = juce::jlimit (0, dotCount - 1, currentIndex);
 
             for (int i = 0; i < dotCount; ++i) {
-                // When there's only one dot, place it at the midpoint of the arc
-                const float fraction = (dotCount <= 1) ? 0.5f : (float) i / (float) (dotCount - 1);
+                // When there's only one dot, place it at the start of the arc (matching slider value 0)
+                const float fraction = (dotCount <= 1) ? 0.0f : (float) i / (float) (dotCount - 1);
                 const auto angle = juce::jmap (fraction, rotaryStartAngle, rotaryEndAngle);
                 const auto point = centre.getPointOnCircumference (dotRingRadius, angle);
 
