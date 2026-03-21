@@ -38,7 +38,7 @@ namespace MainScreenLayout {
     constexpr int topContentHeight = 225;  // sequence grid (196) + padding
 
     // Sequencer rows
-    constexpr int gapAboveSequencer = 20;
+    constexpr int gapAboveSequencer = 0;
     constexpr int sequencerWidth = 862;
     constexpr int stepHeight = 92;
     constexpr int gapBetweenStepRows = 14;
