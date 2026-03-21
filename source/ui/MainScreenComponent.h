@@ -32,7 +32,7 @@ namespace MainScreenLayout {
     constexpr int sequenceOverviewWidth = 198;
     constexpr int subsequenceControlsWidth = SubsequenceControlsConstants::containerWidth;
     constexpr int topRowGap = 18;            // horizontal gap between panels
-    constexpr int subsequenceExtraGap = 22;  // extra gap before subsequence
+    constexpr int subsequenceExtraGap = 32;  // hack to make it look centered over note range conrols.
 
     // Top content row height (tallest panel determines the row height)
     constexpr int topContentHeight = 225;  // sequence grid (196) + padding

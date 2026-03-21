@@ -24,7 +24,7 @@ namespace SubsequenceControlsConstants {
     constexpr int baseGapAboveButtons = 16;
 
     // Scaled dimensions
-    constexpr int gapBelowTitle = static_cast<int>(baseGapBelowTitle * heightScaleFactor);  // ~11px
+    constexpr int gapBelowTitle = 3;
     constexpr float barWidth = baseBarWidth * heightScaleFactor;  // ~42.8px
     constexpr int barHeight = static_cast<int>(baseBarHeight * heightScaleFactor);  // ~14px
     constexpr int barSpacing = static_cast<int>(baseBarSpacing * heightScaleFactor);  // ~2px
