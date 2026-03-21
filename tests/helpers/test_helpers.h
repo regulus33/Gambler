@@ -1,4 +1,5 @@
 #pragma once
+#include <PluginEditor.h>
 #include <PluginProcessor.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_graphics/juce_graphics.h>
@@ -6,6 +7,49 @@
 #include <ctime>
 
 using std::make_unique;
+
+// ============================================================================
+// JUCE MessageManager RAII initialiser — required for any test that creates
+// UI components. Instantiate once (static or local) before building any UI.
+// ============================================================================
+class GamblerTestInitialiser {
+public:
+    GamblerTestInitialiser() { juce::MessageManager::getInstance(); }
+    ~GamblerTestInitialiser() { juce::MessageManager::deleteInstance(); }
+};
+
+// ============================================================================
+// Test fixture — creates a fully initialised PluginProcessor + PluginEditor.
+// Requires a live GamblerTestInitialiser to exist before construction.
+// ============================================================================
+class PluginTestFixture {
+public:
+    PluginTestFixture() : editor (processor) {
+        juce::MessageManager::getInstance()->runDispatchLoopUntil (10);
+    }
+    ~PluginTestFixture() {
+        juce::MessageManager::getInstance()->runDispatchLoopUntil (10);
+    }
+
+    PluginProcessor& getProcessor() { return processor; }
+    PluginEditor& getEditor() { return editor; }
+    SequenceState& getState() { return processor.getState(); }
+    MainScreenComponent& getMainScreen() {
+        return editor.getApplicationComponent().getMainScreen();
+    }
+    void processMessages (int timeoutMs = 50) {
+        juce::MessageManager::getInstance()->runDispatchLoopUntil (timeoutMs);
+    }
+    void simulateAudioBlock (int numSamples = 512) {
+        juce::AudioBuffer<float> buffer (2, numSamples);
+        juce::MidiBuffer midiBuffer;
+        processor.processBlock (buffer, midiBuffer);
+    }
+
+private:
+    PluginProcessor processor;
+    PluginEditor editor;
+};
 
 // ============================================================================
 // Snapshot Testing Helper

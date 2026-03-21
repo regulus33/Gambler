@@ -516,6 +516,7 @@ public:
 
     // Accessors for testing
     SequenceOverviewComponent& getSequenceOverview() { return sequenceOverview; }
+    SubsequenceControlsComponent& getSubsequenceControls() { return subsequenceControls; }
 
     // Callback for when async update is needed
     std::function<void()> onAsyncUpdateNeeded;

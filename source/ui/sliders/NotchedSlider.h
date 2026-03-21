@@ -119,8 +119,20 @@ public:
             slider.setValue(optionNames.size() - 1, juce::dontSendNotification);
         }
 
+        // Lock slider when there's only one option — no point in dragging
+        locked_ = (optionNames.size() == 1);
+        if (locked_) {
+            jassert(getSelectedIndex() == 0);
+            slider.setInterceptsMouseClicks(false, false);
+        } else {
+            slider.setInterceptsMouseClicks(true, true);
+        }
+
         repaint();
     }
+
+    /** Returns true when the slider has only one option and is locked from interaction. */
+    bool isLocked() const { return locked_; }
 
     void paint (juce::Graphics& g) override {
         using namespace NotchedSliderConstants;
@@ -209,9 +221,9 @@ private:
             currentIndex = juce::jlimit (0, dotCount - 1, currentIndex);
 
             for (int i = 0; i < dotCount; ++i) {
-                const auto angle = juce::jmap ((float) i / (float) (dotCount - 1),
-                    rotaryStartAngle,
-                    rotaryEndAngle);
+                // When there's only one dot, place it at the midpoint of the arc
+                const float fraction = (dotCount <= 1) ? 0.5f : (float) i / (float) (dotCount - 1);
+                const auto angle = juce::jmap (fraction, rotaryStartAngle, rotaryEndAngle);
                 const auto point = centre.getPointOnCircumference (dotRingRadius, angle);
 
                 float diameter = dotDiameter;
@@ -250,4 +262,5 @@ private:
     LookAndFeel lookAndFeel { this };
     juce::Rectangle<int> labelBounds;
     juce::Rectangle<int> gaugeBounds;
+    bool locked_ = false;
 };

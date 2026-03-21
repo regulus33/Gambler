@@ -20,68 +20,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <juce_gui_basics/juce_gui_basics.h>
 
-/**
- * RAII helper to initialize JUCE's MessageManager for GUI tests.
- * This is required for any test that creates UI components.
- */
-class GamblerTestInitialiser {
-public:
-    GamblerTestInitialiser() {
-        juce::MessageManager::getInstance();
-    }
-    ~GamblerTestInitialiser() {
-        juce::MessageManager::deleteInstance();
-    }
-};
-
-/**
- * Test fixture that provides a fully initialized plugin with UI.
- * Use this as the base for E2E-style tests.
- */
-class PluginTestFixture {
-public:
-    PluginTestFixture()
-        : editor (processor) {
-        // Give components a chance to initialize
-        juce::MessageManager::getInstance()->runDispatchLoopUntil (10);
-    }
-
-    ~PluginTestFixture() {
-        // Process any pending messages before destruction
-        juce::MessageManager::getInstance()->runDispatchLoopUntil (10);
-    }
-
-    // Access the processor (state, clock, etc.)
-    PluginProcessor& getProcessor() { return processor; }
-
-    // Access the editor (UI hierarchy)
-    PluginEditor& getEditor() { return editor; }
-
-    // Convenience: get the APVTS-backed state
-    SequenceState& getState() { return processor.getState(); }
-
-    // Convenience: get the main screen component
-    MainScreenComponent& getMainScreen() {
-        return editor.getApplicationComponent().getMainScreen();
-    }
-
-    // Helper to process pending messages (simulates event loop)
-    void processMessages (int timeoutMs = 50) {
-        juce::MessageManager::getInstance()->runDispatchLoopUntil (timeoutMs);
-    }
-
-    // Helper to simulate a full "tick" cycle (process audio block)
-    void simulateAudioBlock (int numSamples = 512) {
-        juce::AudioBuffer<float> buffer (2, numSamples);
-        juce::MidiBuffer midiBuffer;
-        processor.processBlock (buffer, midiBuffer);
-    }
-
-private:
-    PluginProcessor processor;
-    PluginEditor editor;
-};
-
 // ============================================================================
 // E2E Test Scenarios
 // ============================================================================

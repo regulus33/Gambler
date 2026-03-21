@@ -187,19 +187,21 @@ public:
             return;
         }
 
+        if (slider_.isLocked()) return;
+
         // Forward to slider
         slider_.mouseDown(event.withNewPosition(event.position - slider_.getPosition().toFloat()));
     }
 
     void mouseDrag(const juce::MouseEvent& event) override {
-        // Forward to slider (unless in MIDI learn mode)
         if (registry_ && registry_->isLearning()) return;
+        if (slider_.isLocked()) return;
         slider_.mouseDrag(event.withNewPosition(event.position - slider_.getPosition().toFloat()));
     }
 
     void mouseUp(const juce::MouseEvent& event) override {
-        // Forward to slider (unless in MIDI learn mode)
         if (registry_ && registry_->isLearning()) return;
+        if (slider_.isLocked()) return;
         slider_.mouseUp(event.withNewPosition(event.position - slider_.getPosition().toFloat()));
     }
 
