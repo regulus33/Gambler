@@ -557,7 +557,7 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
                     param->setValueNotifyingHost(prefsXml->getBoolAttribute("previewNotesOnEdit", true) ? 1.0f : 0.0f);
                 }
                 if (auto* param = apvts.getParameter(Params::Keys::ID::PREF_FOLLOW_STEP)) {
-                    param->setValueNotifyingHost(prefsXml->getBoolAttribute("followStep", true) ? 1.0f : 0.0f);
+                    param->setValueNotifyingHost(prefsXml->getBoolAttribute("followStep", false) ? 1.0f : 0.0f);
                 }
                 if (auto* param = apvts.getParameter(Params::Keys::ID::PREF_NOTE_LENGTH)) {
                     float noteLength = static_cast<float>(prefsXml->getDoubleAttribute("defaultNoteLength", 0.9));

@@ -227,7 +227,7 @@ public:
         followStepToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
         followStepToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
         followStepToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
-        followStepToggle.setToggleState(true, juce::dontSendNotification); // Enabled by default
+        followStepToggle.setToggleState(false, juce::dontSendNotification); // Disabled by default
         followStepToggle.onClick = [this] {
             if (onFollowStepChanged)
                 onFollowStepChanged(followStepToggle.getToggleState());

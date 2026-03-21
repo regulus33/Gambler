@@ -32,6 +32,7 @@ public:
         slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
         slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
         slider.setLookAndFeel(&lf);
+        slider.setScrollWheelEnabled(false);
         slider.setRange(0.0, 3.0, 1.0);
         slider.setValue(2.0); // default: 16th notes
         addAndMakeVisible(slider);
