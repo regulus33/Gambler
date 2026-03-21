@@ -1,7 +1,6 @@
 #pragma once
 
 #include "BinaryData.h"
-#include "LogoComponent.h"
 #include "PresetSelectorComponent.h"
 #include "ToggleIconButton.h"
 #include "ScaleLatchButton.h"
@@ -77,11 +76,18 @@ private:
 
 namespace NavBarConstants {
     constexpr int height = 45;
-    constexpr int marginLeft = 22;
+    constexpr int marginLeft = 8;
     constexpr int marginRight = 10;
-    constexpr int buttonSize = ToggleIconButtonConstants::totalSize;  // 36px
-    constexpr int buttonGap = 10;
-    constexpr int presetSelectorGap = 20;
+
+    // Component sizing — tweak these to resize individual controls
+    constexpr float buttonScale = 0.85f;                                     // scale for icon buttons
+    constexpr int buttonSize = static_cast<int>(ToggleIconButtonConstants::totalSize * buttonScale);
+    constexpr float presetScale = 0.85f;                                     // scale for preset selector
+
+    // Spacing — tweak these to adjust gaps
+    constexpr int buttonGap = 6;                                             // gap between icon buttons
+    constexpr int presetSelectorGap = 10;                                    // gap after preset selector
+
     // Settings icon scale factor - tweak this to adjust the settings gear icon size
     constexpr float settingsIconScale = 1.0f;
     // Transport button colors
@@ -113,9 +119,6 @@ public:
           compactViewButton(Icons::createCompactViewIcon, Icons::createCompactViewIcon, true, true),
           swapRowButton(Icons::createSwapRowsIcon, Icons::createSwapRowsIcon, true, true)
     {
-        // Add logo component
-        addAndMakeVisible(logo);
-
         addAndMakeVisible(presetSelector);
 
         // Add MIDI learn button
@@ -228,10 +231,10 @@ public:
         fb.flexDirection = juce::FlexBox::Direction::row;
         fb.alignItems = juce::FlexBox::AlignItems::center;
 
-        // Left group: preset selector + logo
-        addItem(fb, presetSelector, static_cast<float>(presetSelector.getCalculatedWidth()),
-                static_cast<float>(presetSelector.getCalculatedHeight()));
-        addItem(fb, logo, static_cast<float>(logo.getCalculatedWidth()), static_cast<float>(logo.getCalculatedHeight()), presetSelectorGap);
+        // Left group: preset selector
+        addItem(fb, presetSelector,
+                static_cast<float>(presetSelector.getCalculatedWidth()) * presetScale,
+                static_cast<float>(presetSelector.getCalculatedHeight()) * presetScale);
 
         // Flexible spacer pushes remaining items to the right
         fb.items.add(juce::FlexItem().withFlex(1.0f));
@@ -326,7 +329,6 @@ public:
 
 private:
     PluginProcessor& processorRef;
-    LogoComponent logo;
     PresetSelectorComponent presetSelector;
     ToggleIconButton midiLearnButton;
     ToggleIconButton settingsButton;

@@ -2,6 +2,7 @@
 
 #include "../PluginProcessor.h"
 #include "BinaryData.h"
+#include "LogoComponent.h"
 #include "NavBarComponent.h"
 #include "PianoRollComponent.h"
 #include "SequencerStepsComponent.h"
@@ -85,6 +86,9 @@ public:
     {
         // Add navbar
         addAndMakeVisible(navBar);
+
+        // Add logo (above piano roll, left-aligned)
+        addAndMakeVisible(logo);
 
         // Add piano roll component
         addAndMakeVisible(pianoRoll);
@@ -265,8 +269,12 @@ public:
 
         auto area = getLocalBounds();
 
-        // Row 1: Navbar
-        navBar.setBounds(area.removeFromTop(NavBarConstants::height));
+        // Row 1: Logo (above piano roll) + Navbar (from mainControls x to right edge)
+        auto navRow = area.removeFromTop(NavBarConstants::height);
+        int navBarX = marginLeft + pianoRollWidth + topRowGap;
+        logo.setBounds(navRow.getX() + marginLeft, navRow.getY(),
+                        navBarX - marginLeft, NavBarConstants::height);
+        navBar.setBounds(navRow.withLeft(navBarX));
 
         if (compactMode_) {
             // Compact mode: show only one row directly below navbar
@@ -847,6 +855,7 @@ private:
     juce::Font titleFont;
 
     NavBarComponent navBar;
+    LogoComponent logo;
     PianoRollComponent pianoRoll;
     SequencerStepsComponent sequencerSteps;
     SequencerControlsComponent sequencerControls;
