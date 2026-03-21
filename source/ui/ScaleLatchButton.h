@@ -2,7 +2,10 @@
 
 #include "../PluginProcessor.h"
 #include "../data/Params.h"
+#include "../backend/MidiLearnRegistry.h"
+#include "../backend/MidiMapping.h"
 #include "StateListenerComponent.h"
+#include "MidiLearnOverlayPainter.h"
 #include "Icons.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -20,15 +23,13 @@ namespace ScaleLatchButtonConstants {
  * - Locked: Keys are latched - click to toggle on/off
  *
  * Syncs with SCALE_LATCH APVTS parameter.
- * 
- * Visual:
- * - Unlocked icon when false (momentary mode)
- * - Locked icon when true (latched mode)
+ * Supports MIDI learn overlay.
  */
 class ScaleLatchButton : public StateListenerComponent {
 public:
     explicit ScaleLatchButton(PluginProcessor& processor)
-        : StateListenerComponent(processor)
+        : StateListenerComponent(processor),
+          midiControlId_(MidiControlId::SCALE_LATCH)
     {
         setSize(ScaleLatchButtonConstants::buttonSize, ScaleLatchButtonConstants::buttonSize);
 
@@ -36,14 +37,30 @@ public:
         listenToParameter(Params::Keys::ID::SCALE_LATCH);
     }
 
+    void setRegistry(MidiLearnRegistry* reg) {
+        registry_ = reg;
+    }
+
     void paint(juce::Graphics& g) override {
         using namespace ScaleLatchButtonConstants;
         auto path = isParamOn() ? Icons::createLockClosedIcon() : Icons::createLockOpenIcon();
         auto iconArea = juce::Rectangle<float>(padding, padding, contentSize, contentSize);
         Icons::drawIcon(g, path, iconArea, juce::Colours::white, true, 1.0f);
+
+        // Paint MIDI learn overlay if in learn mode
+        if (registry_ && registry_->isLearning()) {
+            MidiLearnOverlayPainter::paint(g, getLocalBounds(), registry_, midiControlId_, 0.0f);
+        }
     }
 
     void mouseDown(const juce::MouseEvent&) override {
+        // Handle MIDI learn mode
+        if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT) {
+            registry_->setLearningControl(midiControlId_);
+            repaint();
+            return;
+        }
+
         // Toggle the parameter
         setParamOn(!isParamOn());
     }
@@ -71,6 +88,8 @@ private:
         }
     }
 
+    MidiControlId midiControlId_ = MidiControlId::COUNT;
+    MidiLearnRegistry* registry_ = nullptr;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ScaleLatchButton)
 };
-

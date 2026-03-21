@@ -97,6 +97,9 @@ enum class MidiControlId {
     PLAY_PAUSE,  // Toggle play/pause
     STOP,        // Stop sequencer
 
+    // ========== SCALE CONTROLS ==========
+    SCALE_LATCH, // Toggle scale latch mode
+
     // ========== Total count ==========
     COUNT
 };
@@ -233,6 +236,8 @@ inline std::string getMidiControlName(MidiControlId id) {
         // Transport Controls
         case MidiControlId::PLAY_PAUSE: return "Play/Pause";
         case MidiControlId::STOP: return "Stop";
+
+        case MidiControlId::SCALE_LATCH: return "Scale Latch";
 
         default: return "Unknown Control";
     }

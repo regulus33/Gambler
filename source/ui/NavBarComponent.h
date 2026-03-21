@@ -316,9 +316,12 @@ public:
     // Access to subdivision slider for MIDI learn wiring
     SubdivisionSlider& getSubdivisionSlider() { return subdivisionSlider; }
 
-    // Set the MIDI learn registry for the settings button
+    // Set the MIDI learn registry for navbar buttons
     void setSettingsButtonRegistry(MidiLearnRegistry* registry) {
         settingsButton.setRegistry(registry);
+        playPauseButton.setRegistry(registry);
+        stopButton.setRegistry(registry);
+        scaleLatchButton.setRegistry(registry);
     }
 
 private:

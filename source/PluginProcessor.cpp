@@ -1570,6 +1570,14 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             break;
         }
 
+        case MidiControlId::SCALE_LATCH: {
+            if (auto* param = apvts.getParameter (Params::Keys::ID::SCALE_LATCH)) {
+                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
+                DBG ("  → SCALE_LATCH param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
+            }
+            break;
+        }
+
         case MidiControlId::COUNT:
             // This is just a sentinel value, not an actual control
             break;
