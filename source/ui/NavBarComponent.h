@@ -85,16 +85,16 @@ namespace NavBarConstants {
     constexpr int marginRight = 10;
 
     // Per-component scale factors — tweak individually to resize each control
-    constexpr float presetScale        = 0.85f;   // preset selector (dropdown + arrows + save)
-    constexpr float compactViewScale   = 0.85f;   // compact view toggle button
-    constexpr float swapRowScale       = 0.85f;   // swap row button
-    constexpr float subdivisionScale   = 0.85f;   // subdivision slider
-    constexpr float exportScale        = 0.85f;   // export / drag-to-DAW button
-    constexpr float scaleLatchScale    = 0.85f;   // scale latch button
-    constexpr float playPauseScale     = 0.85f;   // play / pause button
-    constexpr float stopScale          = 0.85f;   // stop button
-    constexpr float midiLearnScale     = 0.85f;   // MIDI learn button
-    constexpr float settingsScale      = 0.85f;   // settings gear button
+    constexpr float presetScale        = 0.8f;   // preset selector (dropdown + arrows + save)
+    constexpr float compactViewScale   = 0.8f;   // compact view toggle button
+    constexpr float swapRowScale       = 0.8f;   // swap row button
+    constexpr float subdivisionScale   = 0.8f;   // subdivision slider
+    constexpr float exportScale        = 0.8f;   // export / drag-to-DAW button
+    constexpr float scaleLatchScale    = 0.8f;   // scale latch button
+    constexpr float playPauseScale     = 0.8f;   // play / pause button
+    constexpr float stopScale          = 0.8f;   // stop button
+    constexpr float midiLearnScale     = 0.8f;   // MIDI learn button
+    constexpr float settingsScale      = 0.8f;   // settings gear button
 
     // Base sizes (before scaling)
     constexpr float baseButtonSize     = static_cast<float>(ToggleIconButtonConstants::totalSize);
