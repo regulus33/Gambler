@@ -29,7 +29,12 @@ public:
     void paint(juce::Graphics& g) override {
         using namespace ToggleIconButtonConstants;
         auto path = Icons::createExportIcon();
-        auto iconArea = juce::Rectangle<float>(padding, padding, contentSize, contentSize);
+        // Derive padding and content from actual bounds so the icon scales with the component
+        float boundsSize = static_cast<float>(juce::jmin(getWidth(), getHeight()));
+        float paddingRatio = static_cast<float>(padding) / static_cast<float>(totalSize);
+        float actualPadding = boundsSize * paddingRatio;
+        float actualContent = boundsSize - actualPadding * 2.0f;
+        auto iconArea = juce::Rectangle<float>(actualPadding, actualPadding, actualContent, actualContent);
         Icons::strokeIcon(g, path, iconArea, juce::Colours::white, 1.5f, true, 1.0f);
     }
 

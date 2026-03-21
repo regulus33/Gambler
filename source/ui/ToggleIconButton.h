@@ -66,7 +66,13 @@ public:
         auto path = isToggled ? iconPath2() : iconPath1();
         auto color = isToggled ? color2 : color1;
         float iconScale = isToggled ? iconScale2 : iconScale1;
-        auto iconArea = juce::Rectangle<float>(padding, padding, contentSize, contentSize);
+
+        // Derive padding and content from actual bounds so the icon scales with the component
+        float boundsSize = static_cast<float>(juce::jmin(getWidth(), getHeight()));
+        float paddingRatio = static_cast<float>(padding) / static_cast<float>(totalSize);
+        float actualPadding = boundsSize * paddingRatio;
+        float actualContent = boundsSize - actualPadding * 2.0f;
+        auto iconArea = juce::Rectangle<float>(actualPadding, actualPadding, actualContent, actualContent);
 
         if (drawWithStroke)
             Icons::strokeIcon(g, path, iconArea, color, 1.5f, true, iconScale);

@@ -108,12 +108,21 @@ private:
             auto bounds = juce::Rectangle<int>(x, y, width, height).toFloat();
             auto centre = bounds.getCentre();
 
+            // Scale everything relative to actual bounds vs design size
+            float scale = juce::jmin(bounds.getWidth(), bounds.getHeight()) / static_cast<float>(totalSize);
+            float scaledKnobRadius = knobRadius * scale;
+            float scaledKnobDiameter = knobDiameter * scale;
+            float scaledDotRingRadius = dotRingRadius * scale;
+            float scaledDotDiameter = dotDiameter * scale;
+            float scaledStrokeWidth = knobStrokeWidth * scale;
+            float scaledPointerWidth = pointerWidth * scale;
+
             // Hollow knob ring
             g.setColour(juce::Colours::white);
-            g.drawEllipse(centre.getX() - knobRadius,
-                          centre.getY() - knobRadius,
-                          knobDiameter, knobDiameter,
-                          knobStrokeWidth);
+            g.drawEllipse(centre.getX() - scaledKnobRadius,
+                          centre.getY() - scaledKnobRadius,
+                          scaledKnobDiameter, scaledKnobDiameter,
+                          scaledStrokeWidth);
 
             int currentIndex = juce::jlimit(0, numNotches - 1,
                                             (int) std::round(s.getValue()));
@@ -122,8 +131,8 @@ private:
             for (int i = 0; i < numNotches; ++i) {
                 float angle = juce::jmap((float) i / (float) (numNotches - 1),
                                          startAngle, endAngle);
-                auto pt = centre.getPointOnCircumference(dotRingRadius, angle);
-                float d = (i == currentIndex) ? dotDiameter * dotSelectedScale : dotDiameter;
+                auto pt = centre.getPointOnCircumference(scaledDotRingRadius, angle);
+                float d = (i == currentIndex) ? scaledDotDiameter * dotSelectedScale : scaledDotDiameter;
 
                 g.setColour(dotColours[i]);
                 g.fillEllipse(pt.getX() - d * 0.5f,
@@ -133,15 +142,15 @@ private:
 
             // White pointer
             float pointerAngle = startAngle + sliderPos * (endAngle - startAngle);
-            auto outer = centre.getPointOnCircumference(knobRadius - 1.5f, pointerAngle);
-            auto inner = centre.getPointOnCircumference(knobRadius * 0.55f, pointerAngle);
+            auto outer = centre.getPointOnCircumference(scaledKnobRadius - 1.5f * scale, pointerAngle);
+            auto inner = centre.getPointOnCircumference(scaledKnobRadius * 0.55f, pointerAngle);
 
             juce::Path pointer;
             pointer.startNewSubPath(outer);
             pointer.lineTo(inner);
 
             g.setColour(juce::Colours::white);
-            g.strokePath(pointer, juce::PathStrokeType(pointerWidth,
+            g.strokePath(pointer, juce::PathStrokeType(scaledPointerWidth,
                 juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
     };

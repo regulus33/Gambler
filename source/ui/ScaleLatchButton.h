@@ -44,7 +44,12 @@ public:
     void paint(juce::Graphics& g) override {
         using namespace ScaleLatchButtonConstants;
         auto path = isParamOn() ? Icons::createLockClosedIcon() : Icons::createLockOpenIcon();
-        auto iconArea = juce::Rectangle<float>(padding, padding, contentSize, contentSize);
+        // Derive padding and content from actual bounds so the icon scales with the component
+        float boundsSize = static_cast<float>(juce::jmin(getWidth(), getHeight()));
+        float paddingRatio = static_cast<float>(padding) / static_cast<float>(buttonSize);
+        float actualPadding = boundsSize * paddingRatio;
+        float actualContent = boundsSize - actualPadding * 2.0f;
+        auto iconArea = juce::Rectangle<float>(actualPadding, actualPadding, actualContent, actualContent);
         Icons::drawIcon(g, path, iconArea, juce::Colours::white, true, 1.0f);
 
         // Paint MIDI learn overlay if in learn mode
