@@ -228,10 +228,10 @@ public:
         fb.flexDirection = juce::FlexBox::Direction::row;
         fb.alignItems = juce::FlexBox::AlignItems::center;
 
-        // Left group: logo + preset selector (cycle buttons are inside the selector)
-        addItem(fb, logo, static_cast<float>(logo.getCalculatedWidth()), static_cast<float>(logo.getCalculatedHeight()));
+        // Left group: preset selector + logo
         addItem(fb, presetSelector, static_cast<float>(presetSelector.getCalculatedWidth()),
-                static_cast<float>(presetSelector.getCalculatedHeight()), presetSelectorGap);
+                static_cast<float>(presetSelector.getCalculatedHeight()));
+        addItem(fb, logo, static_cast<float>(logo.getCalculatedWidth()), static_cast<float>(logo.getCalculatedHeight()), presetSelectorGap);
 
         // Flexible spacer pushes remaining items to the right
         fb.items.add(juce::FlexItem().withFlex(1.0f));
