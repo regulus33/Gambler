@@ -57,7 +57,7 @@ public:
         slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         slider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
         slider.setLookAndFeel (&lookAndFeel);
-        slider.setRange (0.0, 1.0, 0.0); // Continuous range 0.0 to 1.0
+        slider.setRange (0.0, 1.0, 0.01); // 1% steps for consistent scroll-wheel behavior
         slider.setValue (0.0);
 
         addAndMakeVisible (slider);
@@ -271,9 +271,22 @@ private:
         AnalogueSlider* parent;
     };
 
+    /** Slider subclass that steps exactly 1 interval per scroll tick. */
+    class SteppedRotarySlider : public juce::Slider {
+    public:
+        void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override {
+            juce::ignoreUnused (e);
+            auto delta = (std::abs (wheel.deltaX) > std::abs (wheel.deltaY)) ? -wheel.deltaX : wheel.deltaY;
+            if (delta == 0.0f) return;
+            auto step = getInterval();
+            if (step <= 0.0) step = 0.01;
+            setValue (getValue() + (delta > 0.0f ? step : -step), juce::sendNotificationSync);
+        }
+    };
+
     juce::String labelText;
     juce::Typeface::Ptr interFont;
-    juce::Slider slider;
+    SteppedRotarySlider slider;
     LookAndFeel lookAndFeel { this };
     juce::Rectangle<int> labelBounds;
     juce::Rectangle<int> gaugeBounds;

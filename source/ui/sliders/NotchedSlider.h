@@ -254,11 +254,24 @@ private:
         NotchedSlider* parent;
     };
 
+    /** Slider subclass that steps exactly 1 interval per scroll tick. */
+    class SteppedRotarySlider : public juce::Slider {
+    public:
+        void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override {
+            juce::ignoreUnused (e);
+            auto delta = (std::abs (wheel.deltaX) > std::abs (wheel.deltaY)) ? -wheel.deltaX : wheel.deltaY;
+            if (delta == 0.0f) return;
+            auto step = getInterval();
+            if (step <= 0.0) step = 1.0;
+            setValue (getValue() + (delta > 0.0f ? step : -step), juce::sendNotificationSync);
+        }
+    };
+
     juce::String labelText;
     juce::Array<juce::String> optionNames;
     juce::Array<juce::Colour> optionColours;
     juce::Typeface::Ptr interFont;
-    juce::Slider slider;
+    SteppedRotarySlider slider;
     LookAndFeel lookAndFeel { this };
     juce::Rectangle<int> labelBounds;
     juce::Rectangle<int> gaugeBounds;
