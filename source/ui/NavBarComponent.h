@@ -5,7 +5,6 @@
 #include "PresetSelectorComponent.h"
 #include "ToggleIconButton.h"
 #include "ScaleLatchButton.h"
-#include "ScaleClearButton.h"
 #include "sliders/SubdivisionSlider.h"
 #include "../data/Params.h"
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -111,7 +110,6 @@ public:
           playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
           scaleLatchButton(processor),
-          scaleClearButton(processor),
           compactViewButton(Icons::createCompactViewIcon, Icons::createCompactViewIcon, true, true),
           swapRowButton(Icons::createSwapRowsIcon, Icons::createSwapRowsIcon, true, true)
     {
@@ -158,10 +156,6 @@ public:
         // Add scale latch button
         addAndMakeVisible(scaleLatchButton);
         // Note: No callback needed - syncs with APVTS parameter
-
-        // Add scale clear button
-        addAndMakeVisible(scaleClearButton);
-        // Note: No callback needed - triggers clear action via APVTS parameter
 
         // Add export button (supports click-to-save and drag-to-DAW)
         addAndMakeVisible(exportButton);
@@ -252,7 +246,6 @@ public:
             addItem(fb, swapRowButton, bs, bs, bg);
         addItem(fb, subdivisionSlider, ss, ss, bg);
         addItem(fb, exportButton, bs, bs, bg);
-        addItem(fb, scaleClearButton, bs, bs, bg);
         addItem(fb, scaleLatchButton, bs, bs, bg);
         addItem(fb, playPauseButton, bs, bs, bg);
         addItem(fb, stopButton, bs, bs, bg);
@@ -337,7 +330,6 @@ private:
     ToggleIconButton playPauseButton;
     ToggleIconButton stopButton;
     ScaleLatchButton scaleLatchButton;
-    ScaleClearButton scaleClearButton;
     ToggleIconButton compactViewButton;
     ToggleIconButton swapRowButton;
     ExportButton exportButton;

@@ -15,7 +15,6 @@
 #include "../source/ui/NoteColourPickerComponent.h"
 #include "../source/ui/PresetDropdownComponent.h"
 #include "../source/ui/SavePresetDialogComponent.h"
-#include "../source/ui/ScaleClearButton.h"
 #include "../source/ui/ScaleLatchButton.h"
 #include "../source/ui/SettingsGroup.h"
 #include "../source/ui/SettingsScreenComponent.h"
@@ -192,15 +191,6 @@ TEST_CASE ("Visual - ScaleLatchButton", "[visual]")
     ScaleLatchButton comp (f.getProcessor());
     // ScaleLatchButton sets its own size in its constructor
     snap (comp, "scale_latch_button");
-}
-
-TEST_CASE ("Visual - ScaleClearButton", "[visual]")
-{
-    getJuceInit();
-    PluginTestFixture f;
-    ScaleClearButton comp (f.getProcessor());
-    comp.setSize (30, 30);
-    snap (comp, "scale_clear_button");
 }
 
 TEST_CASE ("Visual - GlobalScaleQuantizerComponent", "[visual]")
