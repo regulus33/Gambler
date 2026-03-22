@@ -24,12 +24,15 @@ namespace NotchedSliderConstants {
     constexpr float knobStrokeWidth = 3.0f;
     constexpr float pointerWidth = 3.0f;
     constexpr int sliderYOffset = 6;
-    // Dots
-    constexpr float dotRingRadius = 27.0f;
-    constexpr float dotDiameter = 3.0f;
-    constexpr float dotSelectedScale = 2.0f;
-    // Interaction area: knob + enough space for dot ring + padding
-    constexpr int sliderInteractionPadding = static_cast<int>(dotRingRadius * 2) - knobDiameter + 5;  // 21
+    // Tick marks (radial lines around the knob)
+    constexpr float tickRingRadius = 25.0f;      // distance from centre to tick midpoint
+    constexpr float tickLength = 3.0f;            // length of each tick
+    constexpr float tickWidth = 1.5f;            // stroke width of each tick
+    constexpr float tickSelectedLength = 5.0f;   // length of the selected tick
+    constexpr float tickSelectedWidth = 2.5f;    // stroke width of the selected tick
+    constexpr float tickGap = 2.0f;              // gap between knob circumference and inner tick edge
+    // Interaction area: knob + enough space for tick ring + padding
+    constexpr int sliderInteractionPadding = static_cast<int>(tickRingRadius * 2) - knobDiameter + 5;
     // Label
     constexpr int labelWidth = 28;
     constexpr int labelGap = 24;
@@ -224,27 +227,30 @@ private:
             g.setColour (juce::Colours::white);
             g.drawEllipse (centre.getX() - knobRadius, centre.getY() - knobRadius, knobRadius * 2.0f, knobRadius * 2.0f, knobStrokeWidth);
 
-            // Draw coloured dots around the knob
-            const int dotCount = parent->optionNames.size();
+            // Draw radial tick marks around the knob
+            const int tickCount = parent->optionNames.size();
 
             int currentIndex = (int) std::round (slider.getValue());
-            currentIndex = juce::jlimit (0, dotCount - 1, currentIndex);
+            currentIndex = juce::jlimit (0, tickCount - 1, currentIndex);
 
-            for (int i = 0; i < dotCount; ++i) {
-                // When there's only one dot, place it at the start of the arc (matching slider value 0)
-                const float fraction = (dotCount <= 1) ? 0.0f : (float) i / (float) (dotCount - 1);
+            for (int i = 0; i < tickCount; ++i) {
+                const float fraction = (tickCount <= 1) ? 0.0f : (float) i / (float) (tickCount - 1);
                 const auto angle = juce::jmap (fraction, rotaryStartAngle, rotaryEndAngle);
-                const auto point = centre.getPointOnCircumference (dotRingRadius, angle);
 
-                float diameter = dotDiameter;
-                if (i == currentIndex)
-                    diameter = dotDiameter * dotSelectedScale;
+                bool isSelected = (i == currentIndex);
+                float len = isSelected ? tickSelectedLength : tickLength;
+                float w   = isSelected ? tickSelectedWidth  : tickWidth;
+
+                float innerR = knobRadius + tickGap;
+                auto inner = centre.getPointOnCircumference (innerR, angle);
+                auto outer = centre.getPointOnCircumference (innerR + len, angle);
+
+                juce::Path tick;
+                tick.startNewSubPath (inner);
+                tick.lineTo (outer);
 
                 g.setColour (parent->optionColours[i]);
-                g.fillEllipse (point.getX() - diameter * 0.5f,
-                    point.getY() - diameter * 0.5f,
-                    diameter,
-                    diameter);
+                g.strokePath (tick, juce::PathStrokeType (w, juce::PathStrokeType::curved, juce::PathStrokeType::square));
             }
 
             // Draw white notch pointer
