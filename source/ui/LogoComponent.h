@@ -10,7 +10,10 @@ namespace LogoConstants {
     constexpr float componentScale = 1.2f;
 
     // Vertical padding from the top of the parent component
-    constexpr int topPadding = 0;
+    constexpr int topPadding = 5;
+
+    // Scale factor for compact bottom row mode (logo shares space with step buttons)
+    constexpr float compactBottomScale = 0.75f;
 
     // Fine-tune offsets for positioning within the allocated bounds (applied after centering)
     constexpr float offsetX = 0.0f;
@@ -65,9 +68,10 @@ public:
         g.setColour(juce::Colours::white);
 
         // Compute scaled content dimensions
-        float scaledTextScale = logoTextScale * componentScale;
-        float scaledDiceSize = diceSize * componentScale;
-        float scaledPadding = textToDicePadding * componentScale;
+        float es = effectiveScale();
+        float scaledTextScale = logoTextScale * es;
+        float scaledDiceSize = diceSize * es;
+        float scaledPadding = textToDicePadding * es;
 
         float textH = logoTextOriginalHeight * scaledTextScale;
         float textW = logoTextOriginalWidth * scaledTextScale;
@@ -86,7 +90,7 @@ public:
 
         // Draw dice icon to the right of text
         float diceX = startX + textW + scaledPadding;
-        float diceY = startY + (contentH - scaledDiceSize) * 0.5f + diceYOffset * componentScale;
+        float diceY = startY + (contentH - scaledDiceSize) * 0.5f + diceYOffset * es;
 
         float diceScaleFactor = scaledDiceSize / juce::jmax(diceOriginalWidth, diceOriginalHeight);
         juce::AffineTransform diceTransform = juce::AffineTransform::scale(diceScaleFactor)
@@ -100,13 +104,30 @@ public:
     // Returns the calculated height of the component
     int getCalculatedHeight() const { return static_cast<int>(totalHeight); }
 
+    /**
+     * Set an extra scale multiplier (e.g. for compact bottom row mode).
+     * Defaults to 1.0 (no extra scaling).
+     */
+    void setModeScale(float scale) {
+        if (modeScale_ != scale) {
+            modeScale_ = scale;
+            calculateSize();
+            repaint();
+        }
+    }
+
 private:
+    float effectiveScale() const {
+        return LogoConstants::componentScale * modeScale_;
+    }
+
     void calculateSize() {
         using namespace LogoConstants;
 
-        float scaledTextScale = logoTextScale * componentScale;
-        float scaledDiceSize = diceSize * componentScale;
-        float scaledPadding = textToDicePadding * componentScale;
+        float es = effectiveScale();
+        float scaledTextScale = logoTextScale * es;
+        float scaledDiceSize = diceSize * es;
+        float scaledPadding = textToDicePadding * es;
 
         float textW = logoTextOriginalWidth * scaledTextScale;
         float textH = logoTextOriginalHeight * scaledTextScale;
@@ -114,6 +135,7 @@ private:
         totalHeight = juce::jmax(textH, scaledDiceSize);
     }
 
+    float modeScale_ = 1.0f;
     juce::Path logoTextIcon;
     juce::Path diceIcon;
     float totalWidth = 0.0f;

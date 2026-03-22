@@ -272,6 +272,11 @@ public:
         // Row 1: Logo (above piano roll) + Navbar (from mainControls x to right edge)
         auto navRow = area.removeFromTop(NavBarConstants::height);
         int navBarX = marginLeft + pianoRollWidth + topRowGap;
+
+        // Scale logo down in compact bottom row mode to avoid colliding with step buttons
+        bool isCompactBottom = compactMode_ && !showingTopRow_;
+        logo.setModeScale(isCompactBottom ? LogoConstants::compactBottomScale : 1.0f);
+
         // Centre logo horizontally over the piano roll area, sized to fit its content
         int logoH = logo.getCalculatedHeight();
         int logoY = navRow.getY() + LogoConstants::topPadding;

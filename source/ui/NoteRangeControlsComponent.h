@@ -19,6 +19,7 @@ namespace NoteRangeControlsConstants {
     constexpr int sliderDiameter = 25;
     constexpr int sliderPadding = 8;
     constexpr int sliderVerticalSpacing = 6;
+    constexpr int extraSliderGap = 4;          // Additional gap to prevent accidental touches on iPad
     // Slider appearance
     constexpr float trackStrokeWidth = 3.0f;
     constexpr float thumbWidth = 2.0f;
@@ -460,7 +461,7 @@ public:
 
         // Position WindowOffsetSlider directly above WindowWidthSlider with vertical spacing
         int offsetSliderX = sliderPadding + contentPaddingLeft;
-        int offsetSliderY = widthSliderY - sliderVerticalSpacing - sliderDiameter;
+        int offsetSliderY = widthSliderY - sliderVerticalSpacing - sliderDiameter - extraSliderGap;
         windowOffsetSlider.setBounds (offsetSliderX, offsetSliderY, sliderDiameter, sliderDiameter);
 
         // Position MIDI learn overlays on top of their respective sliders
