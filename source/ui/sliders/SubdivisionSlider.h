@@ -90,13 +90,6 @@ private:
 
     static constexpr int numNotches = 4;
 
-    static inline const juce::Colour dotColours[numNotches] = {
-        juce::Colour(0xffa78bfa), // purple  – 1/4
-        juce::Colour(0xff60a5fa), // blue    – 1/8
-        juce::Colour(0xff4ade80), // green   – 1/16
-        juce::Colour(0xfffbbf24), // amber   – 1/32
-    };
-
     class LookAndFeel : public juce::LookAndFeel_V4 {
     public:
         void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
@@ -134,7 +127,7 @@ private:
                 auto pt = centre.getPointOnCircumference(scaledDotRingRadius, angle);
                 float d = (i == currentIndex) ? scaledDotDiameter * dotSelectedScale : scaledDotDiameter;
 
-                g.setColour(dotColours[i]);
+                g.setColour(juce::Colours::white);
                 g.fillEllipse(pt.getX() - d * 0.5f,
                               pt.getY() - d * 0.5f,
                               d, d);
