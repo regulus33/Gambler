@@ -86,8 +86,8 @@ namespace NavBarConstants {
 
     // Per-component scale factors — tweak individually to resize each control
     constexpr float presetScale        = 0.8f;   // preset selector (dropdown + arrows + save)
-    constexpr float compactViewScale   = 0.8f;   // compact view toggle button
-    constexpr float swapRowScale       = 0.8f;   // swap row button
+    constexpr float compactTopScale    = 0.8f;   // compact top row toggle button
+    constexpr float compactBottomScale = 0.8f;   // compact bottom row toggle button
     constexpr float subdivisionScale   = 0.8f;   // subdivision slider
     constexpr float exportScale        = 0.8f;   // export / drag-to-DAW button
     constexpr float scaleLatchScale    = 0.8f;   // scale latch button
@@ -132,8 +132,8 @@ public:
           playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
           scaleLatchButton(processor),
-          compactViewButton(Icons::createCompactViewIcon, Icons::createCompactViewIcon, true, true),
-          swapRowButton(Icons::createSwapRowsIcon, Icons::createSwapRowsIcon, true, true)
+          compactTopButton(Icons::createCompactTopIcon, Icons::createCompactTopIcon, true, true),
+          compactBottomButton(Icons::createCompactViewIcon, Icons::createCompactViewIcon, true, true)
     {
         addAndMakeVisible(presetSelector);
 
@@ -190,25 +190,31 @@ public:
             return {};
         };
 
-        // Add compact view toggle button
-        addAndMakeVisible(compactViewButton);
-        compactViewButton.onClick = [this](bool toggled) {
-            // Show/hide swap button based on compact state
-            swapRowButton.setVisible(toggled);
-            if (!toggled) {
-                // Reset swap state when exiting compact mode
-                swapRowButton.setToggled(false);
-            }
-            if (onCompactViewToggled) {
-                onCompactViewToggled(toggled);
+        // Compact top button: toggles Default ↔ Compact Top Row
+        addAndMakeVisible(compactTopButton);
+        compactTopButton.onClick = [this](bool /*toggled*/) {
+            if (compactTopButton.getToggled()) {
+                // Entering compact top mode — untoggle bottom if active
+                compactBottomButton.setToggled(false);
+                if (onCompactViewToggled) onCompactViewToggled(true);
+                if (onSwapRowClicked) onSwapRowClicked(true);
+            } else {
+                // Returning to default
+                if (onCompactViewToggled) onCompactViewToggled(false);
             }
         };
 
-        // Add swap row button (hidden by default, shown in compact mode)
-        addChildComponent(swapRowButton);
-        swapRowButton.onClick = [this](bool toggled) {
-            if (onSwapRowClicked) {
-                onSwapRowClicked(toggled);
+        // Compact bottom button: toggles Default ↔ Compact Bottom Row
+        addAndMakeVisible(compactBottomButton);
+        compactBottomButton.onClick = [this](bool /*toggled*/) {
+            if (compactBottomButton.getToggled()) {
+                // Entering compact bottom mode — untoggle top if active
+                compactTopButton.setToggled(false);
+                if (onCompactViewToggled) onCompactViewToggled(true);
+                if (onSwapRowClicked) onSwapRowClicked(false);
+            } else {
+                // Returning to default
+                if (onCompactViewToggled) onCompactViewToggled(false);
             }
         };
 
@@ -260,9 +266,8 @@ public:
         auto sz = [](float scale) { return baseButtonSize * scale; };
         float ss = baseSubdivSize * subdivisionScale;
 
-        addItem(fb, compactViewButton, sz(compactViewScale), sz(compactViewScale));
-        if (swapRowButton.isVisible())
-            addItem(fb, swapRowButton, sz(swapRowScale), sz(swapRowScale), bg);
+        addItem(fb, compactTopButton, sz(compactTopScale), sz(compactTopScale));
+        addItem(fb, compactBottomButton, sz(compactBottomScale), sz(compactBottomScale), bg);
         addItem(fb, subdivisionSlider, ss, ss, bg);
         addItem(fb, exportButton, sz(exportScale), sz(exportScale), bg);
         addItem(fb, scaleLatchButton, sz(scaleLatchScale), sz(scaleLatchScale), bg);
@@ -351,8 +356,8 @@ private:
     ToggleIconButton playPauseButton;
     ToggleIconButton stopButton;
     ScaleLatchButton scaleLatchButton;
-    ToggleIconButton compactViewButton;
-    ToggleIconButton swapRowButton;
+    ToggleIconButton compactTopButton;
+    ToggleIconButton compactBottomButton;
     ExportButton exportButton;
     SubdivisionSlider subdivisionSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> subdivisionAttachment;

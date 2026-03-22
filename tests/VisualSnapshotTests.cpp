@@ -254,3 +254,33 @@ TEST_CASE ("Visual - SettingsGroup", "[visual]")
     comp.setSize (300, 120);
     snap (comp, "settings_group");
 }
+
+// ============================================================================
+// Compact mode snapshots — iOS AUv3 hosting window (~3:1 aspect ratio)
+// ============================================================================
+
+TEST_CASE ("Visual - Compact Top Row", "[visual]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    auto& mainScreen = f.getMainScreen();
+    mainScreen.setCompactMode(true);
+    mainScreen.setShowingTopRow(true);
+    int h = mainScreen.getIdealHeight();
+    mainScreen.setSize(1012, h);
+    f.processMessages(20);
+    snap (mainScreen, "compact_top_row");
+}
+
+TEST_CASE ("Visual - Compact Bottom Row", "[visual]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    auto& mainScreen = f.getMainScreen();
+    mainScreen.setCompactMode(true);
+    mainScreen.setShowingTopRow(false);
+    int h = mainScreen.getIdealHeight();
+    mainScreen.setSize(1012, h);
+    f.processMessages(20);
+    snap (mainScreen, "compact_bottom_row");
+}

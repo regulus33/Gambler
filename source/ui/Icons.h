@@ -1868,6 +1868,23 @@ public:
     }
 
     /**
+     * Creates a "compact top" icon — two bars with an up arrow above
+     * Same as compact view icon but rotated 180° (arrow points up)
+     */
+    static juce::Path createCompactTopIcon() {
+        juce::Path path;
+        // Up arrow above bars
+        path.startNewSubPath(5.0f, 5.0f);
+        path.lineTo(10.0f, 0.0f);
+        path.lineTo(15.0f, 5.0f);
+        // Top bar
+        path.addRoundedRectangle(0.0f, 8.0f, 20.0f, 4.0f, 1.5f);
+        // Bottom bar
+        path.addRoundedRectangle(0.0f, 16.0f, 20.0f, 4.0f, 1.5f);
+        return path;
+    }
+
+    /**
      * Creates a "swap rows" icon — up/down arrows
      * Used to swap between top row and bottom row in compact view
      */
