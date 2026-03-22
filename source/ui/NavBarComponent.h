@@ -346,6 +346,7 @@ public:
         playPauseButton.setRegistry(registry);
         stopButton.setRegistry(registry);
         scaleLatchButton.setRegistry(registry);
+        presetSelector.setRegistry(registry);
     }
 
 private:

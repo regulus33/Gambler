@@ -2,9 +2,12 @@
 
 #include "BinaryData.h"
 #include "Icons.h"
+#include "MidiLearnOverlayPainter.h"
 #include "PresetDropdownComponent.h"
 #include "SavePresetDialogComponent.h"
 #include "../backend/PresetManager.h"
+#include "../backend/MidiLearnRegistry.h"
+#include "../backend/MidiMapping.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
@@ -50,6 +53,9 @@ public:
         g.setColour(juce::Colours::white);
         g.strokePath(icon, juce::PathStrokeType(chevronStrokeWidth,
             juce::PathStrokeType::curved, juce::PathStrokeType::rounded), transform);
+
+        // Draw MIDI learn overlay on top
+        MidiLearnOverlayPainter::paint(g, getLocalBounds(), registry_, midiControlId_, 0.0f);
     }
 
     void mouseEnter(const juce::MouseEvent&) override {
@@ -61,14 +67,25 @@ public:
     }
 
     void mouseUp(const juce::MouseEvent&) override {
+        // Handle MIDI learn mode first
+        if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT) {
+            registry_->setLearningControl(midiControlId_);
+            repaint();
+            return;
+        }
         if (onClick) onClick();
     }
+
+    void setMidiControlId(MidiControlId controlId) { midiControlId_ = controlId; }
+    void setRegistry(MidiLearnRegistry* reg) { registry_ = reg; }
 
     std::function<void()> onClick;
 
 private:
     Direction direction;
     juce::Path icon;
+    MidiControlId midiControlId_ = MidiControlId::COUNT;
+    MidiLearnRegistry* registry_ = nullptr;
 };
 
 /**
@@ -131,6 +148,10 @@ public:
         addAndMakeVisible(dropdown);
         addAndMakeVisible(cycleUpButton);
         addAndMakeVisible(saveButton);
+
+        // Set MIDI control IDs for cycle buttons
+        cycleDownButton.setMidiControlId(MidiControlId::PRESET_CYCLE_DOWN);
+        cycleUpButton.setMidiControlId(MidiControlId::PRESET_CYCLE_UP);
 
         // Wire up cycle buttons
         cycleDownButton.onClick = [this]() {
@@ -255,6 +276,14 @@ public:
      * Parameter: 0-based index of the preset to delete
      */
     std::function<void(int)> onDeletePreset;
+
+    /**
+     * Set the MIDI learn registry for preset cycle buttons
+     */
+    void setRegistry(MidiLearnRegistry* registry) {
+        cycleDownButton.setRegistry(registry);
+        cycleUpButton.setRegistry(registry);
+    }
 
     /**
      * Set the parent component for showing the save dialog
