@@ -16,7 +16,7 @@
 class OctaveSlider : public juce::Component {
 public:
     OctaveSlider()
-        : slider_("Oct",
+        : slider_("Octave",
                  MusicConstants::toJuceArray(MusicConstants::OCTAVE_LABELS),
                  MusicConstants::toJuceArray(MusicConstants::OCTAVE_COLOURS)),
           midiControlId_(MidiControlId::OCTAVE_SLIDER)

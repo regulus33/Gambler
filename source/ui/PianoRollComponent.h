@@ -14,6 +14,8 @@ namespace PianoRollConstants {
     // Base (unscaled) font and active circle — scaled dynamically to match component size
     constexpr float baseFontSize = 12.0f;
     constexpr float baseActiveCircleRadius = 13.0f;
+    // Scale factor for note text on keys (tweak to resize labels)
+    constexpr float noteTextScale = 1.2f;
     // Key border
     constexpr float keyBorderWidth = 1.0f;
     // Black key positioning (in unscaled path coordinates)
@@ -105,6 +107,9 @@ public:
             listenToParameter(Params::Keys::ID::noteColour(i));
 
         setSize (componentWidth, componentHeight);
+
+        // Sync UI with current APVTS state (e.g. preset colours loaded before listeners attached)
+        triggerAsyncUpdate();
     }
 
     ~PianoRollComponent() override {
@@ -450,8 +455,8 @@ private:
         // Check if this is the active note
         bool isActive = (keyIndex == activeNoteIndex);
 
-        float scaledFontSize = baseFontSize * derivedScale_;
-        float scaledCircleRadius = baseActiveCircleRadius * derivedScale_;
+        float scaledFontSize = baseFontSize * derivedScale_ * noteTextScale;
+        float scaledCircleRadius = baseActiveCircleRadius * derivedScale_ * noteTextScale;
 
         if (isActive) {
             // Draw black circle behind the text

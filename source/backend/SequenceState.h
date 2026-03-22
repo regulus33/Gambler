@@ -546,12 +546,8 @@ public:
         currentIndex = (currentIndex + 1) % length;
         setCurrentIndex(currentIndex);
 
-        // Always generate a random probability index for UI visualization
-        // Use thread_local to avoid data races between audio and UI threads
-        thread_local std::random_device rd;
-        thread_local std::mt19937 gen(rd());
-        std::uniform_int_distribution<> dis(0, ParamConstants::MAX_STEPS - 1);
-        int probabilityIndex = dis(gen);
+        // Advance probability index sequentially, wrapping at MAX_STEPS
+        int probabilityIndex = (getLastProbabilityIndex() + 1) % ParamConstants::MAX_STEPS;
         setLastProbabilityIndex(probabilityIndex);
 
         // If random mode (roll) is enabled, use the probability for play/rest decisions

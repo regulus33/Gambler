@@ -6,7 +6,7 @@
 #include <functional>
 
 namespace PresetDropdownConstants {
-    constexpr float fontSize = 12.0f;
+    constexpr float fontSize = 14.0f;
     constexpr int dropdownHeight = 24;
     constexpr int dropdownMinWidth = 120;
     constexpr int iconSize = 8;

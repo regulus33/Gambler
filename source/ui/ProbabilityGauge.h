@@ -44,44 +44,42 @@ public:
 
     void paint (juce::Graphics& g) override {
         using namespace ProbabilityGaugeConstants;
-        const int cellSize = circleDiameter + circleSpacing;
+
+        // Scale circles to fill available bounds
+        const auto bounds = getLocalBounds();
+        const float boundsW = static_cast<float>(bounds.getWidth());
+        const float boundsH = static_cast<float>(bounds.getHeight());
+        const float cellW = boundsW / static_cast<float>(gridSize);
+        const float cellH = boundsH / static_cast<float>(gridSize);
+        const float cellSize = std::min(cellW, cellH);
+        const float diameter = cellSize * 0.6f;
+        const float padding = (cellSize - diameter) * 0.5f;
+
+        // Centre the grid within bounds
+        const float totalGridSize = cellSize * static_cast<float>(gridSize);
+        const float offsetX = (boundsW - totalGridSize) * 0.5f;
+        const float offsetY = (boundsH - totalGridSize) * 0.5f;
 
         for (int i = 0; i < maxCircles; ++i)
         {
-            // Calculate grid position (left-to-right, top-to-bottom)
+            const bool isVisible = (i < totalCircles);
+            if (!isVisible) continue;
+
             const int col = i % gridSize;
             const int row = i / gridSize;
 
-            const int x = col * cellSize;
-            const int y = row * cellSize;
+            const float x = offsetX + static_cast<float>(col) * cellSize + padding;
+            const float y = offsetY + static_cast<float>(row) * cellSize + padding;
 
-            // Determine if this circle should be visible
-            const bool isVisible = (i < totalCircles);
+            const bool isHighlighted = (i == highlightedCircleIndex);
+            const bool isActive = circleStates[static_cast<size_t>(i)];
 
-            if (isVisible)
-            {
-                // Check if this circle is currently highlighted
-                const bool isHighlighted = (i == highlightedCircleIndex);
+            if (isHighlighted)
+                g.setColour(isActive ? highlightPlayColour : highlightRestColour);
+            else
+                g.setColour(isActive ? activeColour : inactiveColour);
 
-                if (isHighlighted)
-                {
-                    // Highlighted circle: yellow if active (playing), white if inactive (resting)
-                    const bool isActive = circleStates[static_cast<size_t> (i)];
-                    g.setColour (isActive ? highlightPlayColour : highlightRestColour);
-                }
-                else
-                {
-                    // Normal state: red if active, grey if inactive
-                    const bool isActive = circleStates[static_cast<size_t> (i)];
-                    g.setColour (isActive ? activeColour : inactiveColour);
-                }
-
-                g.fillEllipse (static_cast<float> (x),
-                               static_cast<float> (y),
-                               static_cast<float> (circleDiameter),
-                               static_cast<float> (circleDiameter));
-            }
-            // If not visible, don't draw anything (circle is hidden)
+            g.fillEllipse(x, y, diameter, diameter);
         }
     }
 

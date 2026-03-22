@@ -24,6 +24,7 @@ public:
               BinaryData::Inter_24ptBold_ttf,
               BinaryData::Inter_24ptBold_ttfSize))
     {
+        setPaintingIsUnclipped(true);
         addAndMakeVisible(octaveSlider_);
         addAndMakeVisible(noteSlider_);
 

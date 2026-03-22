@@ -11,7 +11,8 @@ class PluginProcessor;
 namespace ProbabilityControlsConstants {
     constexpr float borderStrokeWidth = 2.5f;
     constexpr float cornerRadius = 3.0f;
-    constexpr int gaugeSize = 56;
+    constexpr int gaugeSize = 56;        // legacy fixed size (unused)
+    constexpr float gaugeScale = 0.7f;   // scale factor for gauge within its padded area
     constexpr int containerHeight = 94;  // Height of the component
 }
 

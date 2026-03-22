@@ -811,6 +811,30 @@ public:
     }
 
     /**
+     * Creates a chevron-left icon (simple < shape)
+     * ViewBox: 0 0 7 12
+     */
+    static juce::Path createChevronLeftIcon() {
+        juce::Path path;
+        path.startNewSubPath (6.0f, 1.0f);
+        path.lineTo (1.0f, 6.0f);
+        path.lineTo (6.0f, 11.0f);
+        return path;
+    }
+
+    /**
+     * Creates a chevron-right icon (simple > shape)
+     * ViewBox: 0 0 7 12
+     */
+    static juce::Path createChevronRightIcon() {
+        juce::Path path;
+        path.startNewSubPath (1.0f, 1.0f);
+        path.lineTo (6.0f, 6.0f);
+        path.lineTo (1.0f, 11.0f);
+        return path;
+    }
+
+    /**
      * Creates a checkmark icon for selection indicators
      * Original SVG viewBox: 0 0 12 10
      * Simple checkmark shape

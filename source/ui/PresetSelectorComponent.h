@@ -12,11 +12,12 @@ namespace PresetSelectorConstants {
     constexpr int height = 31;  // 24 * 1.3
     constexpr int dropdownWidth = 182;  // 140 * 1.3
     constexpr int saveButtonSize = 31;  // 24 * 1.3
-    constexpr int gapBetweenDropdownAndButton = 10;  // 8 * 1.3
     constexpr int saveIconSize = 17;  // 13 * 1.3
     constexpr int cycleButtonSize = 20;   // Width and height of the cycle arrow hit area
-    constexpr float cycleIconScale = 0.75f; // Scale factor applied to the index arrow icon
+    constexpr float cycleIconScale = 0.125f; // Scale factor applied to the chevron icon
     constexpr int cycleButtonGap = 6;     // Gap between cycle buttons and the dropdown
+    constexpr int saveButtonGap = 4;      // Gap between right cycle button and save button
+    constexpr float chevronStrokeWidth = 2.0f; // Stroke width for chevron icons
 }
 
 /**
@@ -31,14 +32,24 @@ public:
 
     explicit PresetCycleButton(Direction dir) : direction(dir) {
         icon = (direction == Direction::Left)
-            ? Icons::createIndexLeftIcon()
-            : Icons::createIndexRightIcon();
+            ? Icons::createChevronLeftIcon()
+            : Icons::createChevronRightIcon();
     }
 
     void paint(juce::Graphics& g) override {
         using namespace PresetSelectorConstants;
-        Icons::drawIcon(g, icon, getLocalBounds().toFloat(),
-                        juce::Colours::white, true, cycleIconScale);
+        // Scale the chevron path to fit the button, centred
+        auto bounds = getLocalBounds().toFloat().reduced(
+            getWidth() * (1.0f - cycleIconScale) * 0.5f,
+            getHeight() * (1.0f - cycleIconScale) * 0.5f);
+        auto pathBounds = icon.getBounds();
+        auto transform = juce::AffineTransform::scale(
+            bounds.getWidth() / pathBounds.getWidth(),
+            bounds.getHeight() / pathBounds.getHeight())
+            .translated(bounds.getX(), bounds.getY());
+        g.setColour(juce::Colours::white);
+        g.strokePath(icon, juce::PathStrokeType(chevronStrokeWidth,
+            juce::PathStrokeType::curved, juce::PathStrokeType::rounded), transform);
     }
 
     void mouseEnter(const juce::MouseEvent&) override {
@@ -160,7 +171,7 @@ public:
 
         // Save button on the right
         saveButton.setBounds(area.removeFromRight(saveButtonSize));
-        area.removeFromRight(gapBetweenDropdownAndButton);
+        area.removeFromRight(saveButtonGap);
 
         // Right cycle button (between dropdown and save button)
         cycleUpButton.setBounds(area.removeFromRight(cycleButtonSize));
@@ -179,7 +190,7 @@ public:
         return cycleButtonSize + cycleButtonGap
              + dropdownWidth
              + cycleButtonGap + cycleButtonSize
-             + gapBetweenDropdownAndButton + saveButtonSize;
+             + saveButtonGap + saveButtonSize;
     }
 
     /**

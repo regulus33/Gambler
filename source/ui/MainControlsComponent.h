@@ -27,6 +27,7 @@ public:
     explicit MainControlsComponent(PluginProcessor& processor)
         : probabilityControls(processor)
     {
+        setPaintingIsUnclipped(true);
         addAndMakeVisible (noteControls);
         addAndMakeVisible (probabilityControls);
     }

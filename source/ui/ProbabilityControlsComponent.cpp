@@ -5,6 +5,7 @@ ProbabilityControlsComponent::ProbabilityControlsComponent(PluginProcessor& proc
     : StateListenerComponent(processor)
     , probabilitySlider("Probability")
 {
+    setPaintingIsUnclipped(true);
     addAndMakeVisible(probabilitySlider);
     addAndMakeVisible(probabilityGauge);
 
@@ -58,13 +59,15 @@ void ProbabilityControlsComponent::resized() {
     auto leftHalf = bounds.removeFromLeft(halfWidth);
     auto rightHalf = bounds;
 
-    // Center the slider within the left half (use full height of left half)
+    // Center the slider within the left half
     auto sliderArea = leftHalf.withSizeKeepingCentre(leftHalf.getWidth(), leftHalf.getHeight());
     probabilitySlider.setBounds(sliderArea);
 
-    // Center the gauge within the right half
-    auto gaugeArea = rightHalf.withSizeKeepingCentre(gaugeSize, gaugeSize);
-    probabilityGauge.setBounds(gaugeArea);
+    // Gauge fills right half with 5px padding, then scaled down
+    constexpr int gaugePadding = 5;
+    auto gaugeArea = rightHalf.reduced(gaugePadding);
+    int side = static_cast<int>(std::min(gaugeArea.getWidth(), gaugeArea.getHeight()) * gaugeScale);
+    probabilityGauge.setBounds(gaugeArea.withSizeKeepingCentre(side, side));
 }
 
 void ProbabilityControlsComponent::onStateChanged() {

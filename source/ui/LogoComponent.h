@@ -6,6 +6,16 @@
 #include "../utility/ComponentSnapshotUtility.h"
 
 namespace LogoConstants {
+    // Overall component scale factor (applies to everything)
+    constexpr float componentScale = 1.2f;
+
+    // Vertical padding from the top of the parent component
+    constexpr int topPadding = 0;
+
+    // Fine-tune offsets for positioning within the allocated bounds (applied after centering)
+    constexpr float offsetX = 0.0f;
+    constexpr float offsetY = 0.0f;
+
     // Scale factor for the vectorized "Gambler" text path (tweak to adjust text size)
     constexpr float logoTextScale = 0.65f;
 
@@ -54,20 +64,31 @@ public:
 
         g.setColour(juce::Colours::white);
 
-        // Draw vectorized "Gambler" text, scaled and vertically centered
-        float textH = logoTextOriginalHeight * logoTextScale;
-        float textW = logoTextOriginalWidth * logoTextScale;
-        float textY = (getHeight() - textH) / 2.0f;
+        // Compute scaled content dimensions
+        float scaledTextScale = logoTextScale * componentScale;
+        float scaledDiceSize = diceSize * componentScale;
+        float scaledPadding = textToDicePadding * componentScale;
 
-        juce::AffineTransform textTransform = juce::AffineTransform::scale(logoTextScale)
-            .translated(0.0f, textY);
+        float textH = logoTextOriginalHeight * scaledTextScale;
+        float textW = logoTextOriginalWidth * scaledTextScale;
+        float contentW = textW + scaledPadding + scaledDiceSize;
+        float contentH = juce::jmax(textH, scaledDiceSize);
+
+        // Centre content within component bounds, then apply offsets
+        float startX = (static_cast<float>(getWidth()) - contentW) * 0.5f + offsetX;
+        float startY = (static_cast<float>(getHeight()) - contentH) * 0.5f + offsetY;
+
+        // Draw vectorized "Gambler" text
+        float textY = startY + (contentH - textH) * 0.5f;
+        juce::AffineTransform textTransform = juce::AffineTransform::scale(scaledTextScale)
+            .translated(startX, textY);
         g.fillPath(logoTextIcon, textTransform);
 
         // Draw dice icon to the right of text
-        float diceX = textW + textToDicePadding;
-        float diceY = (getHeight() - diceSize) / 2.0f + diceYOffset;
+        float diceX = startX + textW + scaledPadding;
+        float diceY = startY + (contentH - scaledDiceSize) * 0.5f + diceYOffset * componentScale;
 
-        float diceScaleFactor = diceSize / juce::jmax(diceOriginalWidth, diceOriginalHeight);
+        float diceScaleFactor = scaledDiceSize / juce::jmax(diceOriginalWidth, diceOriginalHeight);
         juce::AffineTransform diceTransform = juce::AffineTransform::scale(diceScaleFactor)
             .translated(diceX, diceY);
         g.fillPath(diceIcon, diceTransform);
@@ -83,10 +104,14 @@ private:
     void calculateSize() {
         using namespace LogoConstants;
 
-        float textW = logoTextOriginalWidth * logoTextScale;
-        float textH = logoTextOriginalHeight * logoTextScale;
-        totalWidth = textW + textToDicePadding + diceSize;
-        totalHeight = juce::jmax(textH, diceSize);
+        float scaledTextScale = logoTextScale * componentScale;
+        float scaledDiceSize = diceSize * componentScale;
+        float scaledPadding = textToDicePadding * componentScale;
+
+        float textW = logoTextOriginalWidth * scaledTextScale;
+        float textH = logoTextOriginalHeight * scaledTextScale;
+        totalWidth = textW + scaledPadding + scaledDiceSize;
+        totalHeight = juce::jmax(textH, scaledDiceSize);
     }
 
     juce::Path logoTextIcon;

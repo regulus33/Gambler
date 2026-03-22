@@ -54,6 +54,7 @@ public:
         const juce::Array<juce::String>& optionNames,
         const juce::Array<juce::Colour>& optionColours)
         : labelText (labelText), optionNames (optionNames), optionColours (optionColours) {
+        setPaintingIsUnclipped(true);
         interFont = juce::Typeface::createSystemTypefaceFor (
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
@@ -189,10 +190,18 @@ public:
         sliderBounds.translate (0, -sliderYOffset);
         slider.setBounds (sliderBounds);
 
-        // Position label to the left of the slider
-        const int labelX = sliderBounds.getX() - labelGap;
-        const int labelY = sliderBounds.getCentreY() - labelYOffset;
-        labelBounds = juce::Rectangle<int> (labelX, labelY, labelWidth, labelWidth);
+        // Position label to the left of the slider, rotated 90° CCW.
+        // drawText clips to the rect, so we use a wide rect (for the text) with
+        // narrow height (the visual width after rotation). The rotation around the
+        // centre maps width→vertical and height→horizontal.
+        const int labelLongSide = area.getHeight();
+        const int labelCentreX = sliderBounds.getX() - labelGap + labelWidth / 2;
+        const int labelCentreY = sliderBounds.getCentreY();
+        labelBounds = juce::Rectangle<int> (
+            labelCentreX - labelLongSide / 2,
+            labelCentreY - labelWidth / 2,
+            labelLongSide,
+            labelWidth);
 
         // Position gauge below the slider
         const int sliderVisualBottom = sliderBounds.getCentreY() + knobDiameter / 2;
