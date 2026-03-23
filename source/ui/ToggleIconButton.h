@@ -23,7 +23,8 @@ namespace ToggleIconButtonConstants {
  * Background: Transparent
  * Icon: White stroked path
  */
-class ToggleIconButton : public juce::Component {
+class ToggleIconButton : public juce::Component,
+                         private juce::Timer {
 public:
     /**
      * Constructor
@@ -64,7 +65,7 @@ public:
         using namespace ToggleIconButtonConstants;
 
         auto path = isToggled ? iconPath2() : iconPath1();
-        auto color = isToggled ? color2 : color1;
+        auto color = pulsing ? pulseCurrentColor : (isToggled ? color2 : color1);
         float iconScale = isToggled ? iconScale2 : iconScale1;
 
         // Derive padding and content from actual bounds so the icon scales with the component
@@ -141,7 +142,45 @@ public:
     // Parameter: true if toggled on, false if toggled off
     std::function<void(bool)> onClick;
 
+    /**
+     * Start a pulsing glow animation that fades the icon color between
+     * its current color and the target color over the given cycle duration.
+     * Useful for drawing attention to a button (e.g. compact mode exit hint).
+     */
+    void startPulse(juce::Colour target, float cycleDurationSeconds = 2.5f) {
+        pulseTarget = target;
+        // Full cycle = fade in + fade out, so timer period drives a sine wave
+        pulseCycleSamples = static_cast<int>(cycleDurationSeconds * 1000.0f / pulseTimerMs);
+        pulseCounter = 0;
+        pulsing = true;
+        startTimerHz(static_cast<int>(1000.0f / pulseTimerMs));
+    }
+
+    /** Stop the pulsing animation and restore the original color. */
+    void stopPulse() {
+        if (!pulsing) return;
+        pulsing = false;
+        stopTimer();
+        repaint();
+    }
+
+    bool isPulsing() const { return pulsing; }
+
 private:
+    void timerCallback() override {
+        if (!pulsing) { stopTimer(); return; }
+        pulseCounter++;
+        if (pulseCounter >= pulseCycleSamples) pulseCounter = 0;
+        // Sine wave 0..1 over the cycle
+        float t = std::sin(static_cast<float>(pulseCounter) / static_cast<float>(pulseCycleSamples)
+                           * juce::MathConstants<float>::twoPi) * 0.5f + 0.5f;
+        pulseCurrentColor = baseColor1().interpolatedWith(pulseTarget, t);
+        repaint();
+    }
+
+    // Helper to get the base (non-pulsed) color for current state
+    juce::Colour baseColor1() const { return color1; }
+
     std::function<juce::Path()> iconPath1;  // Icon for state 1 (not toggled)
     std::function<juce::Path()> iconPath2;  // Icon for state 2 (toggled)
     bool drawWithStroke;
@@ -153,5 +192,13 @@ private:
     float iconScale2;     // Scale factor for icon 2
     MidiControlId midiControlId_ = MidiControlId::COUNT;
     MidiLearnRegistry* registry_ = nullptr;
+
+    // Pulse animation state
+    static constexpr float pulseTimerMs = 30.0f;  // ~33 Hz refresh
+    bool pulsing = false;
+    juce::Colour pulseTarget;
+    juce::Colour pulseCurrentColor;
+    int pulseCycleSamples = 0;
+    int pulseCounter = 0;
 };
 

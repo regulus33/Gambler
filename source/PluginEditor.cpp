@@ -12,6 +12,16 @@ namespace PluginEditorLayout {
     constexpr int inspectorButtonHeight = 25;
     constexpr int inspectorButtonMarginRight = 110;
     constexpr int inspectorButtonMarginBottom = 35;
+
+    // Auto-compact: aspect ratio thresholds (width/height)
+    // If the window aspect ratio exceeds this, auto-enter compact bottom mode.
+    // Separate constants for iOS AUv3 vs desktop VST3 — tweak independently.
+    // TODO: Iterate on these values with real-device testing.
+#if JUCE_IOS
+    constexpr float autoCompactAspectRatio = 2.8f;
+#else
+    constexpr float autoCompactAspectRatio = 2.8f;
+#endif
 }
 
 PluginEditor::PluginEditor (PluginProcessor& p)
@@ -80,6 +90,12 @@ void PluginEditor::paint (juce::Graphics& g) {
 void PluginEditor::resized() {
     using namespace PluginEditorLayout;
 
+    // On first real layout, check if we should auto-enter compact mode
+    if (!autoCompactApplied && getWidth() > 0 && getHeight() > 0) {
+        autoCompactApplied = true;
+        checkAutoCompact();
+    }
+
     // Calculate scale factor
     float scale = getScaleFactor();
 
@@ -87,9 +103,9 @@ void PluginEditor::resized() {
     int scaledWidth = juce::roundToInt (editorWidth * scale);
     int scaledHeight = juce::roundToInt (currentDesignHeight * scale);
 
-    // Center the scaled content within the available space
+    // Horizontal: center; Vertical: anchor to bottom when content doesn't fill the window
     int offsetX = (getWidth() - scaledWidth) / 2;
-    int offsetY = (getHeight() - scaledHeight) / 2;
+    int offsetY = getHeight() - scaledHeight;  // bottom-anchor
 
     // Set the application component to the design size
     // It will be scaled by the transform
@@ -111,6 +127,17 @@ void PluginEditor::resized() {
                                                      .translated (static_cast<float>(offsetX),
                                                                  static_cast<float>(offsetY)));
 #endif
+}
+
+void PluginEditor::checkAutoCompact() {
+    using namespace PluginEditorLayout;
+
+    float aspectRatio = static_cast<float>(getWidth()) / static_cast<float>(getHeight());
+
+    if (aspectRatio >= autoCompactAspectRatio) {
+        // Window is wide and short — auto-enter compact bottom mode
+        applicationComponent.getMainScreen().getNavBar().enterCompactBottomMode();
+    }
 }
 
 

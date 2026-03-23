@@ -405,6 +405,8 @@ public:
             return NavBarConstants::height + gapAboveSequencer + stepHeight + gapBetweenStepRows + stepHeight + bottomPadding;
     }
 
+    bool isCompactMode() const { return compactMode_; }
+
     // Full design height: navbar + title + top content + gap + 2 step rows + gap + bottom padding
     static constexpr int fullDesignHeight = NavBarConstants::height + MainScreenLayout::titleRowHeight
         + MainScreenLayout::topContentHeight + MainScreenLayout::gapAboveSequencer

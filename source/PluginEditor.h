@@ -50,5 +50,11 @@ private:
     // Current design height (changes with compact mode)
     int currentDesignHeight = MainScreenComponent::fullDesignHeight;
 
+    // Whether auto-compact has already been applied (so we only do it once on first layout)
+    bool autoCompactApplied = false;
+
+    // Check aspect ratio and auto-enter compact mode if needed
+    void checkAutoCompact();
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginEditor)
 };

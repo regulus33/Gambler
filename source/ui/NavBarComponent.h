@@ -110,6 +110,9 @@ namespace NavBarConstants {
     const juce::Colour inactiveColor = juce::Colours::white;
     const juce::Colour activePlayColor = juce::Colour(0xff4ade80);
     const juce::Colour activeStopColor = juce::Colour(0xfff87171);
+
+    // Compact mode pulse glow color (gold)
+    const juce::Colour compactPulseColor = juce::Colour(0xFFFFD700);
 }
 
 /**
@@ -196,10 +199,13 @@ public:
             if (compactTopButton.getToggled()) {
                 // Entering compact top mode — untoggle bottom if active
                 compactBottomButton.setToggled(false);
+                compactBottomButton.stopPulse();
+                compactTopButton.startPulse(NavBarConstants::compactPulseColor);
                 if (onCompactViewToggled) onCompactViewToggled(true);
                 if (onSwapRowClicked) onSwapRowClicked(true);
             } else {
                 // Returning to default
+                compactTopButton.stopPulse();
                 if (onCompactViewToggled) onCompactViewToggled(false);
             }
         };
@@ -210,10 +216,13 @@ public:
             if (compactBottomButton.getToggled()) {
                 // Entering compact bottom mode — untoggle top if active
                 compactTopButton.setToggled(false);
+                compactTopButton.stopPulse();
+                compactBottomButton.startPulse(NavBarConstants::compactPulseColor);
                 if (onCompactViewToggled) onCompactViewToggled(true);
                 if (onSwapRowClicked) onSwapRowClicked(false);
             } else {
                 // Returning to default
+                compactBottomButton.stopPulse();
                 if (onCompactViewToggled) onCompactViewToggled(false);
             }
         };
@@ -305,6 +314,18 @@ public:
     // Callback when swap row button is clicked in compact mode
     // Parameter: true = showing top row, false = showing bottom row
     std::function<void(bool)> onSwapRowClicked;
+
+    // Programmatically enter compact bottom row mode (same as clicking compactBottomButton)
+    void enterCompactBottomMode() {
+        if (!compactBottomButton.getToggled()) {
+            compactBottomButton.setToggled(true);
+            compactTopButton.setToggled(false);
+            compactTopButton.stopPulse();
+            compactBottomButton.startPulse(NavBarConstants::compactPulseColor);
+            if (onCompactViewToggled) onCompactViewToggled(true);
+            if (onSwapRowClicked) onSwapRowClicked(false);
+        }
+    }
 
     // Public method to set settings button toggle state (for ApplicationComponent)
     void setSettingsToggled(bool toggled) {

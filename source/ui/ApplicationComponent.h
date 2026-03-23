@@ -210,6 +210,13 @@ private:
     }
 
     void showSettingsScreen() {
+        // If in compact mode, temporarily expand to full height for settings
+        wasCompactBeforeSettings = mainScreen.isCompactMode();
+        if (wasCompactBeforeSettings) {
+            if (onDesignHeightChanged)
+                onDesignHeightChanged(MainScreenComponent::fullDesignHeight);
+        }
+
         if (!settingsScreen) {
             settingsScreen = std::make_unique<SettingsScreenComponent>(processorRef);
 
@@ -384,6 +391,13 @@ private:
         // Sync MIDI Learn button state from registry
         bool midiLearnActive = processorRef.getMidiLearnRegistry().isLearning();
         mainScreen.getNavBar().setMidiLearnToggled(midiLearnActive);
+
+        // Restore compact mode height if we were compact before opening settings
+        if (wasCompactBeforeSettings) {
+            wasCompactBeforeSettings = false;
+            if (onDesignHeightChanged)
+                onDesignHeightChanged(mainScreen.getIdealHeight());
+        }
     }
 
     void setupPresetSelector() {
@@ -555,5 +569,6 @@ private:
     MainScreenComponent mainScreen;
     std::unique_ptr<SettingsScreenComponent> settingsScreen;
     std::unique_ptr<juce::FileChooser> fileChooser;
+    bool wasCompactBeforeSettings = false;
 };
 
