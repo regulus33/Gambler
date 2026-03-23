@@ -6,6 +6,7 @@
 #include "MidiLearnOverlayPainter.h"
 #include "StateListenerComponent.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <map>
 
 namespace PianoRollConstants {
     // Component size
@@ -155,34 +156,36 @@ public:
         // Check if scale latch is enabled
         bool isLatched = isScaleLatchEnabled();
 
+        auto handleKey = [&](int i) {
+            // Handle MIDI learn mode first
+            if (registry_ && registry_->isLearning() && keyMidiControlIds_[i] != MidiControlId::COUNT) {
+                registry_->setLearningControl(keyMidiControlIds_[i]);
+                repaint();
+                return;
+            }
+
+            if (isLatched) {
+                // Latched mode: toggle the key on/off
+                if (tryToggleKey(i)) {
+                    repaint();
+                    if (onNoteChanged)
+                        onNoteChanged();
+                }
+            } else {
+                // Momentary mode: track this touch and turn the key ON
+                pressedKeys_[event.source.getIndex()] = i;
+                if (trySetKey(i, true)) {
+                    repaint();
+                    if (onNoteChanged)
+                        onNoteChanged();
+                }
+            }
+        };
+
         // Check white keys first (they're on top visually)
         for (int i = 0; i < 12; i++) {
             if (!keys[i]->isBlack && keys[i]->path.contains (event.position)) {
-                // Handle MIDI learn mode first
-                if (registry_ && registry_->isLearning() && keyMidiControlIds_[i] != MidiControlId::COUNT) {
-                    registry_->setLearningControl(keyMidiControlIds_[i]);
-                    repaint();
-                    return;
-                }
-
-                // Store the pressed key for momentary mode
-                pressedKeyIndex_ = i;
-
-                if (isLatched) {
-                    // Latched mode: toggle the key on/off
-                    if (tryToggleKey(i)) {
-                        repaint();
-                        if (onNoteChanged)
-                            onNoteChanged();
-                    }
-                } else {
-                    // Momentary mode: turn the key ON
-                    if (trySetKey(i, true)) {
-                        repaint();
-                        if (onNoteChanged)
-                            onNoteChanged();
-                    }
-                }
+                handleKey(i);
                 return;
             }
         }
@@ -190,45 +193,25 @@ public:
         // Then check black keys (only if click wasn't on a white key)
         for (int i = 0; i < 12; i++) {
             if (keys[i]->isBlack && keys[i]->path.contains (event.position)) {
-                // Handle MIDI learn mode first
-                if (registry_ && registry_->isLearning() && keyMidiControlIds_[i] != MidiControlId::COUNT) {
-                    registry_->setLearningControl(keyMidiControlIds_[i]);
-                    repaint();
-                    return;
-                }
-
-                // Store the pressed key for momentary mode
-                pressedKeyIndex_ = i;
-
-                if (isLatched) {
-                    // Latched mode: toggle the key on/off
-                    if (tryToggleKey(i)) {
-                        repaint();
-                        if (onNoteChanged)
-                            onNoteChanged();
-                    }
-                } else {
-                    // Momentary mode: turn the key ON
-                    if (trySetKey(i, true)) {
-                        repaint();
-                        if (onNoteChanged)
-                            onNoteChanged();
-                    }
-                }
+                handleKey(i);
                 return;
             }
         }
     }
 
     void mouseUp (const juce::MouseEvent& event) override {
-        // In momentary mode, turn the key OFF when mouse is released
-        if (!isScaleLatchEnabled() && pressedKeyIndex_ >= 0) {
-            if (trySetKey(pressedKeyIndex_, false)) {
-                repaint();
-                if (onNoteChanged)
-                    onNoteChanged();
+        // In momentary mode, turn the key OFF when this touch is released
+        if (!isScaleLatchEnabled()) {
+            auto it = pressedKeys_.find(event.source.getIndex());
+            if (it != pressedKeys_.end()) {
+                int keyIndex = it->second;
+                pressedKeys_.erase(it);
+                if (trySetKey(keyIndex, false)) {
+                    repaint();
+                    if (onNoteChanged)
+                        onNoteChanged();
+                }
             }
-            pressedKeyIndex_ = -1;
         }
     }
 
@@ -682,8 +665,9 @@ private:
     MidiLearnRegistry* registry_ = nullptr;
     std::array<MidiControlId, 12> keyMidiControlIds_;
 
-    // Momentary key press tracking
-    int pressedKeyIndex_ = -1;  // -1 means no key is pressed, 0-11 for chromatic scale
+    // Momentary key press tracking — maps touch source index to key index
+    // Supports multi-touch so each finger releases its own key
+    std::map<int, int> pressedKeys_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
 };
