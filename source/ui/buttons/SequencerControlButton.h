@@ -14,6 +14,7 @@ namespace SequencerButtonConstants {
     constexpr float borderWidth = 2.2f;
     constexpr juce::uint32 bgColorActive = 0xffffffff;     // White when active
     constexpr juce::uint32 bgColorInactive = 0xff303030;  // Dark grey when inactive
+    constexpr juce::uint32 bgColorLocked = 0xff5a1a1a;    // Dark maroon when locked
     constexpr float maxIconSize = 26.0f;
     constexpr float textAreaHeight = 33.0f;   // Match SequencerControlsConstants
     constexpr float iconVerticalOffset = 13.0f;
@@ -71,10 +72,8 @@ public:
         using namespace SequencerButtonConstants;
         auto bounds = getLocalBounds().toFloat();
 
-        // Visual state is driven by APVTS parameter
-        bool isActive = isParamOn();
-        juce::Colour targetBg = isActive ? juce::Colour(bgColorActive) : juce::Colour(bgColorInactive);
-        juce::Colour targetContent = isActive ? juce::Colours::black : juce::Colours::white;
+        // Visual state is driven by APVTS parameter (overridable by subclass)
+        auto [targetBg, targetContent] = getTargetColours();
 
         // Animate: lerp display colours toward targets
         if (!displayColoursInitialised_) {
@@ -175,6 +174,13 @@ public:
     }
 
 protected:
+    virtual std::pair<juce::Colour, juce::Colour> getTargetColours() const {
+        using namespace SequencerButtonConstants;
+        bool isActive = isParamOn();
+        return { isActive ? juce::Colour(bgColorActive) : juce::Colour(bgColorInactive),
+                 isActive ? juce::Colours::black : juce::Colours::white };
+    }
+
     void onStateChanged() override {
         // Parameter changed - repaint to start animation toward new state
         repaint();
