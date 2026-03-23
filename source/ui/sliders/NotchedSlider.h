@@ -26,11 +26,11 @@ namespace NotchedSliderConstants {
     constexpr int sliderYOffset = 6;
     // Tick marks (radial lines around the knob)
     constexpr float tickRingRadius = 25.0f;      // distance from centre to tick midpoint
-    constexpr float tickLength = 3.0f;            // length of each tick
+    constexpr float tickLength = 2.0f;            // length of each tick
     constexpr float tickWidth = 1.5f;            // stroke width of each tick
-    constexpr float tickSelectedLength = 5.0f;   // length of the selected tick
+    constexpr float tickSelectedLength = 3.0f;   // length of the selected tick
     constexpr float tickSelectedWidth = 2.5f;    // stroke width of the selected tick
-    constexpr float tickGap = 2.0f;              // gap between knob circumference and inner tick edge
+    constexpr float tickGap = 6.0f;              // gap between knob circumference and inner tick edge
     // Interaction area: knob + enough space for tick ring + padding
     constexpr int sliderInteractionPadding = static_cast<int>(tickRingRadius * 2) - knobDiameter + 5;
     // Label
