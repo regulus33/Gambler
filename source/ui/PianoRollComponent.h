@@ -7,6 +7,7 @@
 #include "StateListenerComponent.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <map>
+#include <set>
 
 namespace PianoRollConstants {
     // Component size
@@ -156,6 +157,9 @@ public:
         // Check if scale latch is enabled
         bool isLatched = isScaleLatchEnabled();
 
+        // Reset drag tracking for this new gesture
+        draggedKeys_.clear();
+
         auto handleKey = [&](int i) {
             // Handle MIDI learn mode first
             if (registry_ && registry_->isLearning() && keyMidiControlIds_[i] != MidiControlId::COUNT) {
@@ -166,6 +170,7 @@ public:
 
             if (isLatched) {
                 // Latched mode: toggle the key on/off
+                draggedKeys_.insert(i);
                 if (tryToggleKey(i)) {
                     repaint();
                     if (onNoteChanged)
@@ -174,6 +179,7 @@ public:
             } else {
                 // Momentary mode: track this touch and turn the key ON
                 pressedKeys_[event.source.getIndex()] = i;
+                draggedKeys_.insert(i);
                 if (trySetKey(i, true)) {
                     repaint();
                     if (onNoteChanged)
@@ -211,6 +217,59 @@ public:
                     if (onNoteChanged)
                         onNoteChanged();
                 }
+            }
+        }
+        draggedKeys_.clear();
+    }
+
+    void mouseDrag (const juce::MouseEvent& event) override {
+        // Find which key the finger is currently over (white keys first, then black)
+        int hitKey = -1;
+        for (int i = 0; i < 12; i++) {
+            if (!keys[i]->isBlack && keys[i]->path.contains (event.position)) {
+                hitKey = i;
+                break;
+            }
+        }
+        if (hitKey < 0) {
+            for (int i = 0; i < 12; i++) {
+                if (keys[i]->isBlack && keys[i]->path.contains (event.position)) {
+                    hitKey = i;
+                    break;
+                }
+            }
+        }
+        if (hitKey < 0) return;
+
+        // Skip if we already handled this key during this drag gesture
+        if (draggedKeys_.count(hitKey)) return;
+        draggedKeys_.insert(hitKey);
+
+        bool isLatched = isScaleLatchEnabled();
+
+        if (isLatched) {
+            // Latched mode: toggle the new key
+            if (tryToggleKey(hitKey)) {
+                repaint();
+                if (onNoteChanged)
+                    onNoteChanged();
+            }
+        } else {
+            // Momentary mode: turn off previous key, turn on new key
+            auto it = pressedKeys_.find(event.source.getIndex());
+            if (it != pressedKeys_.end()) {
+                int prevKey = it->second;
+                if (trySetKey(prevKey, false)) {
+                    repaint();
+                    if (onNoteChanged)
+                        onNoteChanged();
+                }
+            }
+            pressedKeys_[event.source.getIndex()] = hitKey;
+            if (trySetKey(hitKey, true)) {
+                repaint();
+                if (onNoteChanged)
+                    onNoteChanged();
             }
         }
     }
@@ -668,6 +727,9 @@ private:
     // Momentary key press tracking — maps touch source index to key index
     // Supports multi-touch so each finger releases its own key
     std::map<int, int> pressedKeys_;
+
+    // Keys already toggled during the current drag gesture (prevents re-toggling)
+    std::set<int> draggedKeys_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
 };
