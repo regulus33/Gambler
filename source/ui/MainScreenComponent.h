@@ -45,6 +45,11 @@ namespace MainScreenLayout {
     constexpr int gapBetweenStepRows = 14;
     constexpr int noteRangeGap = 18;
     constexpr int bottomPadding = 24;   // padding below sequencer row / bottom of window
+
+    // Compact bottom row: extra gap between navbar/logo and sequencer rows
+    constexpr int compactBottomGapAboveSequencer = 32;
+    // Compact bottom row: extra top padding for logo to avoid clipping
+    constexpr int compactBottomLogoExtraTopPadding = 4;
 }
 
 /**
@@ -279,7 +284,8 @@ public:
 
         // Centre logo horizontally over the piano roll area, sized to fit its content
         int logoH = logo.getCalculatedHeight();
-        int logoY = navRow.getY() + LogoConstants::topPadding;
+        int extraLogoPad = isCompactBottom ? compactBottomLogoExtraTopPadding : 0;
+        int logoY = navRow.getY() + LogoConstants::topPadding + extraLogoPad;
         logo.setBounds(navRow.getX() + marginLeft, logoY,
                         pianoRollWidth, logoH);
         navBar.setBounds(navRow.withLeft(navBarX));
@@ -304,7 +310,7 @@ public:
                 subsequenceControls.setBounds(topRow.removeFromLeft(subsequenceControlsWidth));
             } else {
                 // Bottom row directly below navbar
-                area.removeFromTop(gapAboveSequencer);
+                area.removeFromTop(compactBottomGapAboveSequencer);
 
                 auto bottomArea = area;
                 bottomArea.removeFromLeft(marginLeft);
@@ -402,7 +408,7 @@ public:
         if (showingTopRow_)
             return NavBarConstants::height + titleRowHeight + topContentHeight + bottomPadding;
         else
-            return NavBarConstants::height + gapAboveSequencer + stepHeight + gapBetweenStepRows + stepHeight + bottomPadding;
+            return NavBarConstants::height + compactBottomGapAboveSequencer + stepHeight + gapBetweenStepRows + stepHeight + bottomPadding;
     }
 
     bool isCompactMode() const { return compactMode_; }
