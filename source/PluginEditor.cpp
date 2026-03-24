@@ -53,8 +53,13 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     addKeyListener (this);
     setWantsKeyboardFocus (true);
 
-    // Make window resizable with aspect ratio constraints
+    // Make window resizable. On iOS the host controls sizing so skip the
+    // corner drag-handle (second param) — it's non-functional and just wastes space.
+#if JUCE_IOS
+    setResizable (true, false);
+#else
     setResizable (true, true);
+#endif
 
     // Set minimum size (50% of design size, min height allows compact mode)
     setResizeLimits (PluginEditorLayout::editorWidth / 2,
