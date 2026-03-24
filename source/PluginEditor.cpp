@@ -90,10 +90,12 @@ void PluginEditor::paint (juce::Graphics& g) {
 void PluginEditor::resized() {
     using namespace PluginEditorLayout;
 
-    // On first real layout, check if we should auto-enter compact mode
+    // On first real layout, defer auto-compact check to run after this resized() completes.
+    // This ensures the editor has its final host-provided dimensions before we trigger
+    // compact mode, which matters on iOS where setSize() is a no-op.
     if (!autoCompactApplied && getWidth() > 0 && getHeight() > 0) {
         autoCompactApplied = true;
-        checkAutoCompact();
+        juce::MessageManager::callAsync([this]() { checkAutoCompact(); });
     }
 
     // In compact mode, scale to fit the width only — ignore the height constraint
