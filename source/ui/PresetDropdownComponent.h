@@ -500,6 +500,7 @@ private:
         // Show menu
         auto options = juce::PopupMenu::Options()
             .withTargetComponent(this)
+            .withParentComponent(getTopLevelComponent())
             .withMinimumWidth(getWidth())
             .withMaximumNumColumns(1);
 
