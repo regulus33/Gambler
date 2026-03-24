@@ -110,14 +110,11 @@ void PluginEditor::resized() {
     float scaleX = static_cast<float>(getWidth()) / static_cast<float>(editorWidth);
     float scale = isCompact ? scaleX : getScaleFactor();
 
-    // Calculate the scaled dimensions
+    // Horizontal: center; Vertical: anchor to top — excess space falls below,
+    // which is where the window grows/shrinks from.
     int scaledWidth = juce::roundToInt (editorWidth * scale);
-    int scaledHeight = juce::roundToInt (currentDesignHeight * scale);
-
-    // Horizontal: center; Vertical: anchor to bottom in full mode,
-    // anchor to top in compact mode (so navbar is always visible)
     int offsetX = (getWidth() - scaledWidth) / 2;
-    int offsetY = isCompact ? 0 : (getHeight() - scaledHeight);
+    int offsetY = 0;
 
     // Set the application component to the design size
     // It will be scaled by the transform
