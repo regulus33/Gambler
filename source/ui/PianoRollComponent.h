@@ -7,7 +7,6 @@
 #include "StateListenerComponent.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <map>
-#include <set>
 
 namespace PianoRollConstants {
     // Component size
@@ -158,7 +157,7 @@ public:
         bool isLatched = isScaleLatchEnabled();
 
         // Reset drag tracking for this new gesture
-        draggedKeys_.clear();
+        lastDragKey_ = -1;
 
         auto handleKey = [&](int i) {
             // Handle MIDI learn mode first
@@ -168,9 +167,10 @@ public:
                 return;
             }
 
+            lastDragKey_ = i;
+
             if (isLatched) {
                 // Latched mode: toggle the key on/off
-                draggedKeys_.insert(i);
                 if (tryToggleKey(i)) {
                     repaint();
                     if (onNoteChanged)
@@ -179,7 +179,6 @@ public:
             } else {
                 // Momentary mode: track this touch and turn the key ON
                 pressedKeys_[event.source.getIndex()] = i;
-                draggedKeys_.insert(i);
                 if (trySetKey(i, true)) {
                     repaint();
                     if (onNoteChanged)
@@ -219,7 +218,7 @@ public:
                 }
             }
         }
-        draggedKeys_.clear();
+        lastDragKey_ = -1;
     }
 
     void mouseDrag (const juce::MouseEvent& event) override {
@@ -241,9 +240,9 @@ public:
         }
         if (hitKey < 0) return;
 
-        // Skip if we already handled this key during this drag gesture
-        if (draggedKeys_.count(hitKey)) return;
-        draggedKeys_.insert(hitKey);
+        // Skip if still on the same key as last event
+        if (hitKey == lastDragKey_) return;
+        lastDragKey_ = hitKey;
 
         bool isLatched = isScaleLatchEnabled();
 
@@ -728,8 +727,8 @@ private:
     // Supports multi-touch so each finger releases its own key
     std::map<int, int> pressedKeys_;
 
-    // Keys already toggled during the current drag gesture (prevents re-toggling)
-    std::set<int> draggedKeys_;
+    // Last key hit during the current drag gesture (prevents duplicate triggers on same key)
+    int lastDragKey_ = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
 };
