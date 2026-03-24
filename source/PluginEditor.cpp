@@ -96,18 +96,21 @@ void PluginEditor::resized() {
         checkAutoCompact();
     }
 
-    // In compact mode, don't scale the UI down — show at native size, bottom-anchored.
-    // In full mode, scale to fit the window as before.
+    // In compact mode, scale to fit the width only — ignore the height constraint
+    // so the short compact content isn't shrunk to fit a tall window's aspect ratio.
+    // In full mode, scale to fit both dimensions as before.
     bool isCompact = (currentDesignHeight != MainScreenComponent::fullDesignHeight);
-    float scale = isCompact ? 1.0f : getScaleFactor();
+    float scaleX = static_cast<float>(getWidth()) / static_cast<float>(editorWidth);
+    float scale = isCompact ? scaleX : getScaleFactor();
 
     // Calculate the scaled dimensions
     int scaledWidth = juce::roundToInt (editorWidth * scale);
     int scaledHeight = juce::roundToInt (currentDesignHeight * scale);
 
-    // Horizontal: center; Vertical: anchor to bottom
+    // Horizontal: center; Vertical: anchor to bottom in full mode,
+    // anchor to top in compact mode (so navbar is always visible)
     int offsetX = (getWidth() - scaledWidth) / 2;
-    int offsetY = getHeight() - scaledHeight;
+    int offsetY = isCompact ? 0 : (getHeight() - scaledHeight);
 
     // Set the application component to the design size
     // It will be scaled by the transform

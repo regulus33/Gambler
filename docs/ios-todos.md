@@ -7,4 +7,5 @@
 - feedback that you're pressing icon buttons. We need more iosiness 
 
 - can't click dropdown
+
 - remove the settings window toggle as a midi mappable
