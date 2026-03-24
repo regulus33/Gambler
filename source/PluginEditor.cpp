@@ -144,12 +144,19 @@ void PluginEditor::resized() {
 void PluginEditor::checkAutoCompact() {
     using namespace PluginEditorLayout;
 
+#if JUCE_IOS
+    // On iOS AUv3, hosts always show plugins in a constrained strip.
+    // getWidth()/getHeight() reflects our requested size, not the host's actual viewport,
+    // so aspect ratio detection doesn't work. Always start in compact mode.
+    applicationComponent.getMainScreen().getNavBar().enterCompactBottomMode();
+#else
     float aspectRatio = static_cast<float>(getWidth()) / static_cast<float>(getHeight());
 
     if (aspectRatio >= autoCompactAspectRatio) {
         // Window is wide and short — auto-enter compact bottom mode
         applicationComponent.getMainScreen().getNavBar().enterCompactBottomMode();
     }
+#endif
 }
 
 
