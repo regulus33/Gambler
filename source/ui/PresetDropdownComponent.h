@@ -508,6 +508,29 @@ private:
     void showPopupMenu() {
         using namespace PresetDropdownConstants;
 
+        // DEBUG: Try plain menu first to isolate custom item vs popup issue
+        juce::PopupMenu debugMenu;
+        for (int i = 0; i < presetNames.size(); ++i)
+            debugMenu.addItem(i + 1, presetNames[i], true, i == selectedIndex);
+        if (presetNames.isEmpty())
+            debugMenu.addItem(1, "No Presets", false);
+
+        auto options = juce::PopupMenu::Options()
+            .withTargetComponent(this)
+            .withParentComponent(popupParent ? popupParent : getTopLevelComponent())
+            .withMinimumWidth(getWidth())
+            .withMaximumNumColumns(1);
+
+        debugMenu.showMenuAsync(options, [this](int result) {
+            if (result > 0) {
+                int index = result - 1;
+                selectPresetByIndex(index, false);
+                if (onPresetSelected)
+                    onPresetSelected(index);
+            }
+        });
+
+        /* ORIGINAL — restore after debugging
         juce::PopupMenu menu;
         menu.setLookAndFeel(&menuLookAndFeel);
 
@@ -517,17 +540,15 @@ private:
 
             auto item = std::make_unique<PresetMenuItemComponent>(
                 presetNames[i],
-                false,  // isSelected (hover state handled internally)
+                false,
                 isCurrent,
                 [this, capturedIndex]() {
-                    // Select callback
                     selectPresetByIndex(capturedIndex, false);
                     if (onPresetSelected) {
                         onPresetSelected(capturedIndex);
                     }
                 },
                 [this, capturedIndex]() {
-                    // Delete callback
                     if (onPresetDeleteRequested) {
                         onPresetDeleteRequested(capturedIndex);
                     }
@@ -541,7 +562,6 @@ private:
             menu.addItem(1, "No Presets", false);
         }
 
-        // Show menu
         auto options = juce::PopupMenu::Options()
             .withTargetComponent(this)
             .withParentComponent(popupParent ? popupParent : getTopLevelComponent())
@@ -549,6 +569,7 @@ private:
             .withMaximumNumColumns(1);
 
         menu.showMenuAsync(options);
+        */
     }
 
     juce::StringArray presetNames;
