@@ -346,6 +346,89 @@ private:
 };
 
 /**
+ * PresetListComponent
+ *
+ * A simple list of presets shown inside a CallOutBox.
+ * Used instead of PopupMenu because PopupMenu is broken in iOS AUv3.
+ */
+class PresetListComponent : public juce::Component {
+public:
+    PresetListComponent(const juce::StringArray& names, int currentIndex,
+                        std::function<void(int)> onSelect,
+                        std::function<void(int)> onDelete)
+        : presetNames(names), selectedIndex(currentIndex),
+          selectCallback(std::move(onSelect)), deleteCallback(std::move(onDelete))
+    {
+        int itemH = 36;
+        int w = 200;
+        int h = juce::jmax(itemH, presetNames.size() * itemH);
+        setSize(w, juce::jmin(h, 400));
+    }
+
+    void paint(juce::Graphics& g) override {
+        g.fillAll(juce::Colour(0xFF1E1E1E));
+        int itemH = 36;
+
+        for (int i = 0; i < presetNames.size(); ++i) {
+            auto rowBounds = juce::Rectangle<int>(0, i * itemH, getWidth(), itemH);
+
+            // Highlight hovered row
+            if (i == hoveredIndex)
+                g.setColour(juce::Colours::white.withAlpha(0.1f));
+            else
+                g.setColour(juce::Colours::transparentBlack);
+            g.fillRect(rowBounds);
+
+            // Checkmark for current preset
+            if (i == selectedIndex) {
+                g.setColour(juce::Colours::white);
+                g.drawText(juce::String::charToString(0x2713),
+                           rowBounds.removeFromLeft(28), juce::Justification::centred);
+            } else {
+                rowBounds.removeFromLeft(28);
+            }
+
+            // Preset name
+            g.setColour(juce::Colours::white);
+            g.drawText(presetNames[i], rowBounds.withTrimmedRight(30),
+                       juce::Justification::centredLeft, true);
+        }
+    }
+
+    void mouseMove(const juce::MouseEvent& e) override {
+        int newHover = e.y / 36;
+        if (newHover != hoveredIndex) {
+            hoveredIndex = newHover;
+            repaint();
+        }
+    }
+
+    void mouseExit(const juce::MouseEvent&) override {
+        hoveredIndex = -1;
+        repaint();
+    }
+
+    void mouseUp(const juce::MouseEvent& e) override {
+        int index = e.y / 36;
+        if (index >= 0 && index < presetNames.size()) {
+            if (selectCallback)
+                selectCallback(index);
+
+            // Dismiss the CallOutBox
+            if (auto* callout = findParentComponentOfClass<juce::CallOutBox>())
+                callout->dismiss();
+        }
+    }
+
+private:
+    juce::StringArray presetNames;
+    int selectedIndex = -1;
+    int hoveredIndex = -1;
+    std::function<void(int)> selectCallback;
+    std::function<void(int)> deleteCallback;
+};
+
+/**
  * PresetDropdownComponent
  *
  * A custom dropdown for selecting presets with:
@@ -506,70 +589,24 @@ public:
 
 private:
     void showPopupMenu() {
-        using namespace PresetDropdownConstants;
-
-        // DEBUG: Try plain menu first to isolate custom item vs popup issue
-        juce::PopupMenu debugMenu;
-        for (int i = 0; i < presetNames.size(); ++i)
-            debugMenu.addItem(i + 1, presetNames[i], true, i == selectedIndex);
-        if (presetNames.isEmpty())
-            debugMenu.addItem(1, "No Presets", false);
-
-        auto options = juce::PopupMenu::Options()
-            .withTargetComponent(this)
-            .withParentComponent(popupParent ? popupParent : getTopLevelComponent())
-            .withMinimumWidth(getWidth())
-            .withMaximumNumColumns(1);
-
-        debugMenu.showMenuAsync(options, [this](int result) {
-            if (result > 0) {
-                int index = result - 1;
+        // Use CallOutBox instead of PopupMenu — PopupMenu is broken in iOS AUv3
+        auto* listBox = new PresetListComponent(presetNames, selectedIndex,
+            [this](int index) {
                 selectPresetByIndex(index, false);
                 if (onPresetSelected)
                     onPresetSelected(index);
-            }
-        });
+            },
+            [this](int index) {
+                if (onPresetDeleteRequested)
+                    onPresetDeleteRequested(index);
+            });
 
-        /* ORIGINAL — restore after debugging
-        juce::PopupMenu menu;
-        menu.setLookAndFeel(&menuLookAndFeel);
+        auto screenBounds = localAreaToGlobal(getLocalBounds());
 
-        for (int i = 0; i < presetNames.size(); ++i) {
-            bool isCurrent = (i == selectedIndex);
-            int capturedIndex = i;
-
-            auto item = std::make_unique<PresetMenuItemComponent>(
-                presetNames[i],
-                false,
-                isCurrent,
-                [this, capturedIndex]() {
-                    selectPresetByIndex(capturedIndex, false);
-                    if (onPresetSelected) {
-                        onPresetSelected(capturedIndex);
-                    }
-                },
-                [this, capturedIndex]() {
-                    if (onPresetDeleteRequested) {
-                        onPresetDeleteRequested(capturedIndex);
-                    }
-                }
-            );
-
-            menu.addCustomItem(-1, std::move(item), nullptr, presetNames[i]);
-        }
-
-        if (presetNames.isEmpty()) {
-            menu.addItem(1, "No Presets", false);
-        }
-
-        auto options = juce::PopupMenu::Options()
-            .withTargetComponent(this)
-            .withParentComponent(popupParent ? popupParent : getTopLevelComponent())
-            .withMinimumWidth(getWidth())
-            .withMaximumNumColumns(1);
-
-        menu.showMenuAsync(options);
-        */
+        juce::CallOutBox::launchAsynchronously(
+            std::unique_ptr<juce::Component>(listBox),
+            screenBounds,
+            getTopLevelComponent());
     }
 
     juce::StringArray presetNames;
