@@ -417,3 +417,12 @@ cmake -B build && cmake --build build --target Tests && ./build/Tests
 ```
 
 Visual snapshot tests live in `tests/VisualSnapshotTests.cpp`. Golden images are in `tests/snapshots/`.
+
+
+#### Docs
+
+ The .tex source is alongside it if you want to tweak anything. You can rebuild it with:                                                 
+ `cd docs && pdflatex gambler-codebase-guide.tex && pdflatex gambler-codebase-guide.tex`
+(two passes needed for the table of contents and cross-references)                                                                      
+                                                                       
+                                                                       ```
