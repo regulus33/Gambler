@@ -363,6 +363,24 @@ public:
         interFont = juce::Typeface::createSystemTypefaceFor(
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
+
+        // DEBUG: on-screen log label
+        debugLabel.setColour(juce::Label::backgroundColourId, juce::Colours::black.withAlpha(0.85f));
+        debugLabel.setColour(juce::Label::textColourId, juce::Colours::lime);
+        debugLabel.setFont(juce::Font(11.0f));
+        debugLabel.setJustificationType(juce::Justification::topLeft);
+        debugLabel.setBounds(0, 0, 800, 60);
+    }
+
+    void parentHierarchyChanged() override {
+        // Attach debug label to top-level component so it's always visible
+        if (auto* tlc = getTopLevelComponent()) {
+            if (debugLabel.getParentComponent() != tlc) {
+                tlc->addAndMakeVisible(debugLabel);
+                debugLabel.setBounds(0, 0, tlc->getWidth(), 60);
+                debugLabel.toFront(false);
+            }
+        }
     }
 
     void paint(juce::Graphics& g) override {
@@ -396,7 +414,23 @@ public:
     }
 
     void mouseDown(const juce::MouseEvent& /*event*/) override {
-        DBG("PresetDropdownComponent::mouseDown fired");
+        debugTapCount++;
+        auto* tlc = getTopLevelComponent();
+        auto* pp = popupParent;
+        juce::String info;
+        info << "TAP #" << debugTapCount
+             << " | popupParent=" << (pp ? pp->getName() : "null")
+             << " ptr=" << (pp != nullptr ? "SET" : "NIL")
+             << " | topLevel=" << (tlc ? tlc->getName() : "null")
+             << " ptr=" << (tlc != nullptr ? "SET" : "NIL")
+             << " | bounds=" << getBounds().toString()
+             << " | presets=" << presetNames.size()
+             << " | onScreen=" << juce::String(isShowing() ? "Y" : "N")
+             << " | parentChain=";
+        for (auto* p = getParentComponent(); p != nullptr; p = p->getParentComponent())
+            info << p->getName() << "(" << p->getWidth() << "x" << p->getHeight() << ") > ";
+
+        debugLabel.setText(info, juce::dontSendNotification);
         showPopupMenu();
     }
 
@@ -521,5 +555,9 @@ private:
     juce::Typeface::Ptr interFont;
     juce::Component* popupParent = nullptr;
     PresetDropdownLookAndFeel menuLookAndFeel;
+
+    // DEBUG: remove after iOS testing
+    juce::Label debugLabel;
+    int debugTapCount = 0;
 };
 
