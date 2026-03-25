@@ -366,8 +366,9 @@ public:
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
 
-        int h = juce::jmax(popupItemHeight, presetNames.size() * popupItemHeight);
-        setSize(200, juce::jmin(h, popupMaxHeight));
+        contentHeight_ = presetNames.size() * popupItemHeight;
+        int visibleHeight = juce::jmin(contentHeight_, popupMaxHeight);
+        setSize(200, juce::jmax(popupItemHeight, visibleHeight));
     }
 
     void paint(juce::Graphics& g) override {
@@ -379,10 +380,14 @@ public:
         g.setFont(font);
 
         for (int i = 0; i < presetNames.size(); ++i) {
-            auto row = juce::Rectangle<int>(0, i * popupItemHeight, getWidth(), popupItemHeight);
+            int y = i * popupItemHeight + scrollOffset_;
+            if (y + popupItemHeight < 0 || y > getHeight())
+                continue; // skip offscreen rows
 
-            // Hover highlight (skip if hovering over the delete button)
-            if (i == hoveredIndex && !isMouseOverDelete) {
+            auto row = juce::Rectangle<int>(0, y, getWidth(), popupItemHeight);
+
+            // Hover highlight (skip if hovering over delete button or dragging)
+            if (i == hoveredIndex && !isMouseOverDelete && !isDragging_) {
                 g.setColour(juce::Colours::white.withAlpha(0.1f));
                 g.fillRect(row);
             }
@@ -414,13 +419,13 @@ public:
                 static_cast<float>(deleteIconSize),
                 static_cast<float>(deleteIconSize));
 
-            bool hoveringThisDelete = (i == hoveredIndex && isMouseOverDelete);
+            bool hoveringThisDelete = (i == hoveredIndex && isMouseOverDelete && !isDragging_);
             float deleteAlpha = hoveringThisDelete ? 1.0f : 0.5f;
             Icons::strokeIcon(g, Icons::createCloseIcon(), deleteBounds,
                               juce::Colours::white.withAlpha(deleteAlpha), 1.5f,
                               true, Icons::closeIconScale);
 
-            // Store delete hit area for this row
+            // Store delete hit area for this row (in scrolled coordinates)
             if (i < maxRows)
                 deleteHitAreas[i] = juce::Rectangle<int>(
                     deleteX - 2, area.getCentreY() - deleteIconSize / 2 - 2,
@@ -433,11 +438,69 @@ public:
             g.setColour(juce::Colours::white);
             g.drawText(presetNames[i], textArea, juce::Justification::centredLeft, true);
         }
+
+        // Scroll fade indicators
+        if (scrollOffset_ < 0) {
+            g.setGradientFill(juce::ColourGradient(
+                juce::Colour(0xFF1E1E1E), 0.0f, 0.0f,
+                juce::Colours::transparentBlack, 0.0f, 12.0f, false));
+            g.fillRect(0, 0, getWidth(), 12);
+        }
+        if (scrollOffset_ + contentHeight_ > getHeight()) {
+            float bottomY = static_cast<float>(getHeight());
+            g.setGradientFill(juce::ColourGradient(
+                juce::Colours::transparentBlack, 0.0f, bottomY - 12.0f,
+                juce::Colour(0xFF1E1E1E), 0.0f, bottomY, false));
+            g.fillRect(0, getHeight() - 12, getWidth(), 12);
+        }
+    }
+
+    void mouseDown(const juce::MouseEvent& e) override {
+        dragStartY_ = e.y;
+        dragStartScrollOffset_ = scrollOffset_;
+        isDragging_ = false;
+    }
+
+    void mouseDrag(const juce::MouseEvent& e) override {
+        int delta = e.y - dragStartY_;
+        if (!isDragging_ && std::abs(delta) > dragThreshold)
+            isDragging_ = true;
+
+        if (isDragging_) {
+            scrollOffset_ = dragStartScrollOffset_ + delta;
+            clampScroll();
+            repaint();
+        }
+    }
+
+    void mouseUp(const juce::MouseEvent& e) override {
+        using namespace PresetDropdownConstants;
+        if (isDragging_) {
+            isDragging_ = false;
+            return;
+        }
+
+        int index = (e.y - scrollOffset_) / popupItemHeight;
+        if (index < 0 || index >= presetNames.size())
+            return;
+
+        if (index < maxRows && deleteHitAreas[index].contains(e.getPosition())) {
+            auto cb = deleteCallback;
+            if (auto* callout = findParentComponentOfClass<juce::CallOutBox>())
+                callout->dismiss();
+            if (cb)
+                juce::Timer::callAfterDelay(50, [cb, index]() { cb(index); });
+        } else {
+            if (selectCallback)
+                selectCallback(index);
+            if (auto* callout = findParentComponentOfClass<juce::CallOutBox>())
+                callout->dismiss();
+        }
     }
 
     void mouseMove(const juce::MouseEvent& e) override {
         using namespace PresetDropdownConstants;
-        int newHover = e.y / popupItemHeight;
+        int newHover = (e.y - scrollOffset_) / popupItemHeight;
         bool overDelete = false;
         if (newHover >= 0 && newHover < presetNames.size() && newHover < maxRows)
             overDelete = deleteHitAreas[newHover].contains(e.getPosition());
@@ -455,30 +518,16 @@ public:
         repaint();
     }
 
-    void mouseUp(const juce::MouseEvent& e) override {
-        using namespace PresetDropdownConstants;
-        int index = e.y / popupItemHeight;
-        if (index < 0 || index >= presetNames.size())
-            return;
-
-        if (index < maxRows && deleteHitAreas[index].contains(e.getPosition())) {
-            // Delete: dismiss first, then call back after a short delay
-            auto cb = deleteCallback;
-            if (auto* callout = findParentComponentOfClass<juce::CallOutBox>())
-                callout->dismiss();
-            if (cb)
-                juce::Timer::callAfterDelay(50, [cb, index]() { cb(index); });
-        } else {
-            // Select
-            if (selectCallback)
-                selectCallback(index);
-            if (auto* callout = findParentComponentOfClass<juce::CallOutBox>())
-                callout->dismiss();
-        }
+private:
+    void clampScroll() {
+        int maxScroll = 0;
+        int minScroll = juce::jmin(0, getHeight() - contentHeight_);
+        scrollOffset_ = juce::jlimit(minScroll, maxScroll, scrollOffset_);
     }
 
-private:
     static constexpr int maxRows = 64;
+    static constexpr int dragThreshold = 8;
+
     juce::StringArray presetNames;
     int selectedIndex = -1;
     int hoveredIndex = -1;
@@ -487,6 +536,12 @@ private:
     std::function<void(int)> deleteCallback;
     juce::Typeface::Ptr interFont;
     juce::Rectangle<int> deleteHitAreas[maxRows];
+
+    int contentHeight_ = 0;
+    int scrollOffset_ = 0;
+    int dragStartY_ = 0;
+    int dragStartScrollOffset_ = 0;
+    bool isDragging_ = false;
 };
 
 /**
