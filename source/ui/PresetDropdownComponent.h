@@ -348,8 +348,10 @@ private:
 /**
  * PresetListComponent
  *
- * A simple list of presets shown inside a CallOutBox.
+ * A styled list of presets shown inside a CallOutBox.
  * Used instead of PopupMenu because PopupMenu is broken in iOS AUv3.
+ * Matches the original PresetMenuItemComponent look: Inter font, stroke
+ * checkmark icon on the selected preset, delete X on every row.
  */
 class PresetListComponent : public juce::Component {
 public:
@@ -359,73 +361,132 @@ public:
         : presetNames(names), selectedIndex(currentIndex),
           selectCallback(std::move(onSelect)), deleteCallback(std::move(onDelete))
     {
-        int itemH = 36;
-        int w = 200;
-        int h = juce::jmax(itemH, presetNames.size() * itemH);
-        setSize(w, juce::jmin(h, 400));
+        using namespace PresetDropdownConstants;
+        interFont = juce::Typeface::createSystemTypefaceFor(
+            BinaryData::InterVariableFont_ttf,
+            BinaryData::InterVariableFont_ttfSize);
+
+        int h = juce::jmax(popupItemHeight, presetNames.size() * popupItemHeight);
+        setSize(200, juce::jmin(h, popupMaxHeight));
     }
 
     void paint(juce::Graphics& g) override {
+        using namespace PresetDropdownConstants;
         g.fillAll(juce::Colour(0xFF1E1E1E));
-        int itemH = 36;
+
+        juce::Font font(interFont);
+        font.setHeight(fontSize);
+        g.setFont(font);
 
         for (int i = 0; i < presetNames.size(); ++i) {
-            auto rowBounds = juce::Rectangle<int>(0, i * itemH, getWidth(), itemH);
+            auto row = juce::Rectangle<int>(0, i * popupItemHeight, getWidth(), popupItemHeight);
 
-            // Highlight hovered row
-            if (i == hoveredIndex)
+            // Hover highlight (skip if hovering over the delete button)
+            if (i == hoveredIndex && !isMouseOverDelete) {
                 g.setColour(juce::Colours::white.withAlpha(0.1f));
-            else
-                g.setColour(juce::Colours::transparentBlack);
-            g.fillRect(rowBounds);
-
-            // Checkmark for current preset
-            if (i == selectedIndex) {
-                g.setColour(juce::Colours::white);
-                g.drawText(juce::String::charToString(0x2713),
-                           rowBounds.removeFromLeft(28), juce::Justification::centred);
-            } else {
-                rowBounds.removeFromLeft(28);
+                g.fillRect(row);
             }
 
-            // Preset name
+            // Layout: [padding | text ... | deleteX | gap | checkmark? | padding]
+            auto area = row;
+            area.removeFromLeft(textLeftPadding);
+            int rightEdge = area.getRight() - iconsRightPadding;
+
+            // Checkmark icon for the currently selected preset
+            if (i == selectedIndex) {
+                auto checkBounds = juce::Rectangle<float>(
+                    static_cast<float>(rightEdge - checkmarkSize),
+                    static_cast<float>(area.getCentreY() - checkmarkSize / 2),
+                    static_cast<float>(checkmarkSize),
+                    static_cast<float>(checkmarkSize));
+                Icons::strokeIcon(g, Icons::createCheckmarkIcon(), checkBounds,
+                                  juce::Colours::white, 1.5f);
+            }
+
+            // Delete X icon
+            int deleteX = (i == selectedIndex)
+                ? rightEdge - checkmarkSize - iconSpacing - deleteIconSize
+                : rightEdge - deleteIconSize;
+
+            auto deleteBounds = juce::Rectangle<float>(
+                static_cast<float>(deleteX),
+                static_cast<float>(area.getCentreY() - deleteIconSize / 2),
+                static_cast<float>(deleteIconSize),
+                static_cast<float>(deleteIconSize));
+
+            bool hoveringThisDelete = (i == hoveredIndex && isMouseOverDelete);
+            float deleteAlpha = hoveringThisDelete ? 1.0f : 0.5f;
+            Icons::strokeIcon(g, Icons::createCloseIcon(), deleteBounds,
+                              juce::Colours::white.withAlpha(deleteAlpha), 1.5f,
+                              true, Icons::closeIconScale);
+
+            // Store delete hit area for this row
+            if (i < maxRows)
+                deleteHitAreas[i] = juce::Rectangle<int>(
+                    deleteX - 2, area.getCentreY() - deleteIconSize / 2 - 2,
+                    deleteIconSize + 4, deleteIconSize + 4);
+
+            // Preset name text
+            int iconsWidth = deleteIconSize + iconsRightPadding +
+                             (i == selectedIndex ? checkmarkSize + iconSpacing : 0);
+            auto textArea = row.withTrimmedLeft(textLeftPadding).withTrimmedRight(iconsWidth + iconsRightPadding);
             g.setColour(juce::Colours::white);
-            g.drawText(presetNames[i], rowBounds.withTrimmedRight(30),
-                       juce::Justification::centredLeft, true);
+            g.drawText(presetNames[i], textArea, juce::Justification::centredLeft, true);
         }
     }
 
     void mouseMove(const juce::MouseEvent& e) override {
-        int newHover = e.y / 36;
-        if (newHover != hoveredIndex) {
+        using namespace PresetDropdownConstants;
+        int newHover = e.y / popupItemHeight;
+        bool overDelete = false;
+        if (newHover >= 0 && newHover < presetNames.size() && newHover < maxRows)
+            overDelete = deleteHitAreas[newHover].contains(e.getPosition());
+
+        if (newHover != hoveredIndex || overDelete != isMouseOverDelete) {
             hoveredIndex = newHover;
+            isMouseOverDelete = overDelete;
             repaint();
         }
     }
 
     void mouseExit(const juce::MouseEvent&) override {
         hoveredIndex = -1;
+        isMouseOverDelete = false;
         repaint();
     }
 
     void mouseUp(const juce::MouseEvent& e) override {
-        int index = e.y / 36;
-        if (index >= 0 && index < presetNames.size()) {
+        using namespace PresetDropdownConstants;
+        int index = e.y / popupItemHeight;
+        if (index < 0 || index >= presetNames.size())
+            return;
+
+        if (index < maxRows && deleteHitAreas[index].contains(e.getPosition())) {
+            // Delete: dismiss first, then call back after a short delay
+            auto cb = deleteCallback;
+            if (auto* callout = findParentComponentOfClass<juce::CallOutBox>())
+                callout->dismiss();
+            if (cb)
+                juce::Timer::callAfterDelay(50, [cb, index]() { cb(index); });
+        } else {
+            // Select
             if (selectCallback)
                 selectCallback(index);
-
-            // Dismiss the CallOutBox
             if (auto* callout = findParentComponentOfClass<juce::CallOutBox>())
                 callout->dismiss();
         }
     }
 
 private:
+    static constexpr int maxRows = 64;
     juce::StringArray presetNames;
     int selectedIndex = -1;
     int hoveredIndex = -1;
+    bool isMouseOverDelete = false;
     std::function<void(int)> selectCallback;
     std::function<void(int)> deleteCallback;
+    juce::Typeface::Ptr interFont;
+    juce::Rectangle<int> deleteHitAreas[maxRows];
 };
 
 /**
