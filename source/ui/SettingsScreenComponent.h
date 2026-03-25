@@ -254,12 +254,11 @@ public:
         midiOutputChannelLabel.setColour(juce::Label::textColourId, juce::Colours::white);
         midiOutputChannelLabel.setJustificationType(juce::Justification::centredLeft);
 
-        midiOutputChannelComboBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF2A2A2A));
-        midiOutputChannelComboBox.setColour(juce::ComboBox::textColourId, juce::Colours::white);
-        midiOutputChannelComboBox.setColour(juce::ComboBox::outlineColourId, juce::Colours::grey);
-        midiOutputChannelComboBox.setColour(juce::ComboBox::arrowColourId, juce::Colours::white);
-        for (int i = 1; i <= 16; ++i) {
-            midiOutputChannelComboBox.addItem(juce::String(i), i);
+        {
+            juce::StringArray channelNames;
+            for (int i = 1; i <= 16; ++i)
+                channelNames.add(juce::String(i));
+            midiOutputChannelComboBox.setItems(channelNames);
         }
         midiOutputChannelComboBox.setSelectedId(1, juce::dontSendNotification);
         midiOutputChannelComboBox.onChange = [this] {
@@ -462,7 +461,7 @@ private:
 
     // MIDI controls
     juce::Label midiOutputChannelLabel;
-    juce::ComboBox midiOutputChannelComboBox;
+    CallOutDropdown midiOutputChannelComboBox;
 
     // Note colour picker
     std::unique_ptr<NoteColourPickerComponent> noteColourPicker;

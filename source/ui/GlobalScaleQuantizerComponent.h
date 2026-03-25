@@ -2,6 +2,7 @@
 
 #include "StateListenerComponent.h"
 #include "NoteColourPickerComponent.h"
+#include "CallOutDropdown.h"
 #include "../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <array>
@@ -47,20 +48,12 @@ public:
         scaleLabel_.setJustificationType(juce::Justification::centredRight);
         addAndMakeVisible(scaleLabel_);
 
-        scaleTypeDropdown_.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF2A2A2A));
-        scaleTypeDropdown_.setColour(juce::ComboBox::textColourId, juce::Colours::white);
-        scaleTypeDropdown_.setColour(juce::ComboBox::outlineColourId, juce::Colours::grey);
-        scaleTypeDropdown_.setColour(juce::ComboBox::arrowColourId, juce::Colours::white);
-
-        const juce::StringArray scaleNames = {
+        scaleTypeDropdown_.setItems({
             "Major", "Natural Minor", "Harmonic Minor", "Melodic Minor",
             "Pentatonic Major", "Pentatonic Minor", "Blues",
             "Dorian", "Mixolydian", "Lydian", "Phrygian", "Locrian",
             "Whole Tone", "Chromatic", "Custom"
-        };
-        for (int i = 0; i < scaleNames.size(); ++i)
-            scaleTypeDropdown_.addItem(scaleNames[i], i + 1);
-
+        });
         scaleTypeDropdown_.setSelectedId(14, juce::dontSendNotification); // Chromatic default
         scaleTypeDropdown_.onChange = [this] {
             if (!suppressDropdownUpdate_)
@@ -74,17 +67,9 @@ public:
         keyLabel_.setJustificationType(juce::Justification::centredRight);
         addAndMakeVisible(keyLabel_);
 
-        keyDropdown_.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF2A2A2A));
-        keyDropdown_.setColour(juce::ComboBox::textColourId, juce::Colours::white);
-        keyDropdown_.setColour(juce::ComboBox::outlineColourId, juce::Colours::grey);
-        keyDropdown_.setColour(juce::ComboBox::arrowColourId, juce::Colours::white);
-
-        const juce::StringArray keyNames = {
+        keyDropdown_.setItems({
             "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"
-        };
-        for (int i = 0; i < keyNames.size(); ++i)
-            keyDropdown_.addItem(keyNames[i], i + 1);
-
+        });
         keyDropdown_.setSelectedId(1, juce::dontSendNotification); // C default
         keyDropdown_.onChange = [this] {
             if (!suppressDropdownUpdate_)
@@ -176,8 +161,8 @@ public:
     }
 
 private:
-    juce::ComboBox scaleTypeDropdown_;
-    juce::ComboBox keyDropdown_;
+    CallOutDropdown scaleTypeDropdown_;
+    CallOutDropdown keyDropdown_;
     juce::Label scaleLabel_;
     juce::Label keyLabel_;
     std::array<bool, 12> keyStates_ {};
