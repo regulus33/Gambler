@@ -367,19 +367,19 @@ public:
         // DEBUG: on-screen log label
         debugLabel.setColour(juce::Label::backgroundColourId, juce::Colours::black.withAlpha(0.85f));
         debugLabel.setColour(juce::Label::textColourId, juce::Colours::lime);
-        debugLabel.setFont(juce::Font(11.0f));
+        debugLabel.setFont(juce::Font(13.0f));
         debugLabel.setJustificationType(juce::Justification::topLeft);
-        debugLabel.setBounds(0, 0, 800, 60);
+        debugLabel.setMinimumHorizontalScale(0.5f);
+        debugLabel.setBounds(0, 0, 800, 80);
     }
 
-    void parentHierarchyChanged() override {
-        // Attach debug label to top-level component so it's always visible
-        if (auto* tlc = getTopLevelComponent()) {
-            if (debugLabel.getParentComponent() != tlc) {
-                tlc->addAndMakeVisible(debugLabel);
-                debugLabel.setBounds(0, 0, tlc->getWidth(), 60);
-                debugLabel.toFront(false);
-            }
+    void attachDebugLabel() {
+        // Try popupParent first (ApplicationComponent), fall back to top-level
+        juce::Component* host = popupParent ? popupParent : getTopLevelComponent();
+        if (host && debugLabel.getParentComponent() != host) {
+            host->addAndMakeVisible(debugLabel);
+            debugLabel.setBounds(0, host->getHeight() / 2, host->getWidth(), 80);
+            debugLabel.toFront(false);
         }
     }
 
@@ -415,18 +415,20 @@ public:
 
     void mouseDown(const juce::MouseEvent& /*event*/) override {
         debugTapCount++;
+        attachDebugLabel();
+
         auto* tlc = getTopLevelComponent();
         auto* pp = popupParent;
+        auto* host = debugLabel.getParentComponent();
         juce::String info;
         info << "TAP #" << debugTapCount
-             << " | popupParent=" << (pp ? pp->getName() : "null")
-             << " ptr=" << (pp != nullptr ? "SET" : "NIL")
-             << " | topLevel=" << (tlc ? tlc->getName() : "null")
-             << " ptr=" << (tlc != nullptr ? "SET" : "NIL")
-             << " | bounds=" << getBounds().toString()
-             << " | presets=" << presetNames.size()
-             << " | onScreen=" << juce::String(isShowing() ? "Y" : "N")
-             << " | parentChain=";
+             << " | host=" << (host ? host->getName() : "null")
+             << " hostSize=" << (host ? host->getBounds().toString() : "?")
+             << "\npopupParent=" << (pp ? pp->getName() : "null")
+             << " topLevel=" << (tlc ? tlc->getName() : "null")
+             << " bounds=" << getBounds().toString()
+             << " presets=" << presetNames.size()
+             << "\nparentChain: ";
         for (auto* p = getParentComponent(); p != nullptr; p = p->getParentComponent())
             info << p->getName() << "(" << p->getWidth() << "x" << p->getHeight() << ") > ";
 
