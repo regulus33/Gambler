@@ -43,7 +43,7 @@ public:
                 onColourChanged(currentColour);
         };
         juce::CallOutBox::launchAsynchronously(
-            std::unique_ptr<juce::Component>(selector), getScreenBounds(), nullptr);
+            std::unique_ptr<juce::Component>(selector), getScreenBounds(), getTopLevelComponent());
     }
 
     void setCurrentColour(juce::Colour c) { currentColour = c; repaint(); }

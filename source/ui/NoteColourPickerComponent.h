@@ -151,7 +151,7 @@ private:
         juce::CallOutBox::launchAsynchronously(
             std::unique_ptr<juce::Component>(selector),
             screenBounds,
-            nullptr);
+            getTopLevelComponent());
     }
 
     /**
