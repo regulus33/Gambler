@@ -291,6 +291,7 @@ public:
      */
     void setDialogParent(juce::Component* parent) {
         dialogParent = parent;
+        dropdown.setPopupParent(parent);
     }
 
 private:

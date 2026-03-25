@@ -396,6 +396,7 @@ public:
     }
 
     void mouseDown(const juce::MouseEvent& /*event*/) override {
+        DBG("PresetDropdownComponent::mouseDown fired");
         showPopupMenu();
     }
 
@@ -460,6 +461,13 @@ public:
      */
     std::function<void(int)> onPresetDeleteRequested;
 
+    /**
+     * Set the parent component for popup menus (needed for iOS AUv3)
+     */
+    void setPopupParent(juce::Component* parent) {
+        popupParent = parent;
+    }
+
 private:
     void showPopupMenu() {
         using namespace PresetDropdownConstants;
@@ -500,7 +508,7 @@ private:
         // Show menu
         auto options = juce::PopupMenu::Options()
             .withTargetComponent(this)
-            .withParentComponent(getTopLevelComponent())
+            .withParentComponent(popupParent ? popupParent : getTopLevelComponent())
             .withMinimumWidth(getWidth())
             .withMaximumNumColumns(1);
 
@@ -511,6 +519,7 @@ private:
     juce::String currentPresetName;
     int selectedIndex = -1;
     juce::Typeface::Ptr interFont;
+    juce::Component* popupParent = nullptr;
     PresetDropdownLookAndFeel menuLookAndFeel;
 };
 
