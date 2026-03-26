@@ -2,6 +2,7 @@
 
 #include "BinaryData.h"
 #include "Icons.h"
+#include "../util/PlatformUtils.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
@@ -146,22 +147,48 @@ private:
 /**
  * CallOutDropdown
  *
- * A ComboBox replacement that uses CallOutBox for iOS AUv3 compatibility.
- * Renders as a styled button with text and a chevron, opens a CallOutDropdownList
- * in a CallOutBox on click.
+ * Drop-in ComboBox replacement.
+ * - Desktop: delegates to a native juce::ComboBox (PopupMenu works fine)
+ * - iOS: renders a custom button, opens a CallOutDropdownList in a CallOutBox
  */
 class CallOutDropdown : public juce::Component {
 public:
-    CallOutDropdown() = default;
+    CallOutDropdown() {
+        if (!PlatformUtils::isIOS()) {
+            comboBox_ = std::make_unique<juce::ComboBox>();
+            comboBox_->setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF2A2A2A));
+            comboBox_->setColour(juce::ComboBox::textColourId, juce::Colours::white);
+            comboBox_->setColour(juce::ComboBox::outlineColourId, juce::Colours::grey);
+            comboBox_->setColour(juce::ComboBox::arrowColourId, juce::Colours::white);
+            comboBox_->onChange = [this] {
+                selectedIndex_ = comboBox_->getSelectedId() - 1;
+                if (onChange) onChange();
+            };
+            addAndMakeVisible(*comboBox_);
+        }
+    }
+
+    void resized() override {
+        if (comboBox_)
+            comboBox_->setBounds(getLocalBounds());
+    }
 
     void setItems(const juce::StringArray& items) {
         items_ = items;
+        if (comboBox_) {
+            comboBox_->clear(juce::dontSendNotification);
+            for (int i = 0; i < items.size(); ++i)
+                comboBox_->addItem(items[i], i + 1);
+        }
     }
 
     void setSelectedIndex(int index, bool notify = false) {
         if (index >= 0 && index < items_.size()) {
             selectedIndex_ = index;
-            repaint();
+            if (comboBox_)
+                comboBox_->setSelectedId(index + 1, notify ? juce::sendNotification : juce::dontSendNotification);
+            else
+                repaint();
             if (notify && onChange)
                 onChange();
         }
@@ -169,13 +196,14 @@ public:
 
     int getSelectedIndex() const { return selectedIndex_; }
 
-    /** Returns 1-based ID for ComboBox compatibility */
     int getSelectedId() const { return selectedIndex_ + 1; }
 
-    /** Sets selection using 1-based ID for ComboBox compatibility */
     void setSelectedId(int id, juce::NotificationType notification = juce::sendNotification) {
         selectedIndex_ = id - 1;
-        repaint();
+        if (comboBox_)
+            comboBox_->setSelectedId(id, notification);
+        else
+            repaint();
         if (notification != juce::dontSendNotification && onChange)
             onChange();
     }
@@ -186,42 +214,36 @@ public:
         return {};
     }
 
+    // iOS-only rendering
     void paint(juce::Graphics& g) override {
-        auto bounds = getLocalBounds().toFloat();
+        if (comboBox_) return; // desktop uses ComboBox
 
-        // Background
+        auto bounds = getLocalBounds().toFloat();
         g.setColour(juce::Colour(0xFF2A2A2A));
         g.fillRoundedRectangle(bounds, 4.0f);
-
-        // Border
         g.setColour(juce::Colours::grey);
         g.drawRoundedRectangle(bounds.reduced(0.5f), 4.0f, 1.0f);
 
-        // Text
         g.setColour(juce::Colours::white);
-        auto textArea = getLocalBounds().reduced(6, 0).withTrimmedRight(16);
-        g.drawText(getSelectedText(), textArea, juce::Justification::centredLeft, true);
+        g.drawText(getSelectedText(), getLocalBounds().reduced(6, 0).withTrimmedRight(16),
+                   juce::Justification::centredLeft, true);
 
-        // Chevron
         auto iconBounds = juce::Rectangle<float>(
             static_cast<float>(getWidth() - 14),
-            static_cast<float>(getHeight() / 2 - 3),
-            8.0f, 6.0f);
-        auto chevron = Icons::createChevronDownIcon();
-        Icons::strokeIcon(g, chevron, iconBounds, juce::Colours::white, 1.5f);
+            static_cast<float>(getHeight() / 2 - 3), 8.0f, 6.0f);
+        Icons::strokeIcon(g, Icons::createChevronDownIcon(), iconBounds, juce::Colours::white, 1.5f);
     }
 
+    // iOS-only click handler
     void mouseDown(const juce::MouseEvent&) override {
-        auto* list = new CallOutDropdownList(items_, selectedIndex_,
-            [this](int index) {
-                setSelectedIndex(index, true);
-            });
+        if (comboBox_) return; // desktop uses ComboBox
 
-        auto screenBounds = localAreaToGlobal(getLocalBounds());
+        auto* list = new CallOutDropdownList(items_, selectedIndex_,
+            [this](int index) { setSelectedIndex(index, true); });
 
         juce::CallOutBox::launchAsynchronously(
             std::unique_ptr<juce::Component>(list),
-            screenBounds,
+            localAreaToGlobal(getLocalBounds()),
             getTopLevelComponent());
     }
 
@@ -230,4 +252,5 @@ public:
 private:
     juce::StringArray items_;
     int selectedIndex_ = -1;
+    std::unique_ptr<juce::ComboBox> comboBox_; // desktop only
 };

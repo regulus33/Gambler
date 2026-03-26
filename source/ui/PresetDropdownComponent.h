@@ -2,6 +2,7 @@
 
 #include "BinaryData.h"
 #include "Icons.h"
+#include "../util/PlatformUtils.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
@@ -563,23 +564,6 @@ public:
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
 
-        // DEBUG: on-screen log label
-        debugLabel.setColour(juce::Label::backgroundColourId, juce::Colours::black.withAlpha(0.85f));
-        debugLabel.setColour(juce::Label::textColourId, juce::Colours::lime);
-        debugLabel.setFont(juce::Font(13.0f));
-        debugLabel.setJustificationType(juce::Justification::topLeft);
-        debugLabel.setMinimumHorizontalScale(0.5f);
-        debugLabel.setBounds(0, 0, 800, 80);
-    }
-
-    void attachDebugLabel() {
-        // Try popupParent first (ApplicationComponent), fall back to top-level
-        juce::Component* host = popupParent ? popupParent : getTopLevelComponent();
-        if (host && debugLabel.getParentComponent() != host) {
-            host->addAndMakeVisible(debugLabel);
-            debugLabel.setBounds(0, host->getHeight() / 2, host->getWidth(), 80);
-            debugLabel.toFront(false);
-        }
     }
 
     void paint(juce::Graphics& g) override {
@@ -613,25 +597,6 @@ public:
     }
 
     void mouseDown(const juce::MouseEvent& /*event*/) override {
-        debugTapCount++;
-        attachDebugLabel();
-
-        auto* tlc = getTopLevelComponent();
-        auto* pp = popupParent;
-        auto* host = debugLabel.getParentComponent();
-        juce::String info;
-        info << "TAP #" << debugTapCount
-             << " | host=" << (host ? host->getName() : "null")
-             << " hostSize=" << (host ? host->getBounds().toString() : "?")
-             << "\npopupParent=" << (pp ? pp->getName() : "null")
-             << " topLevel=" << (tlc ? tlc->getName() : "null")
-             << " bounds=" << getBounds().toString()
-             << " presets=" << presetNames.size()
-             << "\nparentChain: ";
-        for (auto* p = getParentComponent(); p != nullptr; p = p->getParentComponent())
-            info << p->getName() << "(" << p->getWidth() << "x" << p->getHeight() << ") > ";
-
-        debugLabel.setText(info, juce::dontSendNotification);
         showPopupMenu();
     }
 
@@ -705,7 +670,53 @@ public:
 
 private:
     void showPopupMenu() {
-        // Use CallOutBox instead of PopupMenu — PopupMenu is broken in iOS AUv3
+        if (PlatformUtils::isIOS()) {
+            showPopupMenuIOS();
+        } else {
+            showPopupMenuDesktop();
+        }
+    }
+
+    void showPopupMenuDesktop() {
+        using namespace PresetDropdownConstants;
+
+        juce::PopupMenu menu;
+        menu.setLookAndFeel(&menuLookAndFeel);
+
+        for (int i = 0; i < presetNames.size(); ++i) {
+            bool isCurrent = (i == selectedIndex);
+            int capturedIndex = i;
+
+            auto item = std::make_unique<PresetMenuItemComponent>(
+                presetNames[i],
+                false,
+                isCurrent,
+                [this, capturedIndex]() {
+                    selectPresetByIndex(capturedIndex, false);
+                    if (onPresetSelected)
+                        onPresetSelected(capturedIndex);
+                },
+                [this, capturedIndex]() {
+                    if (onPresetDeleteRequested)
+                        onPresetDeleteRequested(capturedIndex);
+                }
+            );
+
+            menu.addCustomItem(-1, std::move(item), nullptr, presetNames[i]);
+        }
+
+        if (presetNames.isEmpty())
+            menu.addItem(1, "No Presets", false);
+
+        auto options = juce::PopupMenu::Options()
+            .withTargetComponent(this)
+            .withMinimumWidth(getWidth())
+            .withMaximumNumColumns(1);
+
+        menu.showMenuAsync(options);
+    }
+
+    void showPopupMenuIOS() {
         auto* listBox = new PresetListComponent(presetNames, selectedIndex,
             [this](int index) {
                 selectPresetByIndex(index, false);
@@ -717,11 +728,9 @@ private:
                     onPresetDeleteRequested(index);
             });
 
-        auto screenBounds = localAreaToGlobal(getLocalBounds());
-
         juce::CallOutBox::launchAsynchronously(
             std::unique_ptr<juce::Component>(listBox),
-            screenBounds,
+            localAreaToGlobal(getLocalBounds()),
             getTopLevelComponent());
     }
 
@@ -731,9 +740,5 @@ private:
     juce::Typeface::Ptr interFont;
     juce::Component* popupParent = nullptr;
     PresetDropdownLookAndFeel menuLookAndFeel;
-
-    // DEBUG: remove after iOS testing
-    juce::Label debugLabel;
-    int debugTapCount = 0;
 };
 
