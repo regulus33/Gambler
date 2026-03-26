@@ -68,7 +68,7 @@ TEST_CASE ("Visual - NavBarComponent", "[visual]")
 {
     getJuceInit();
     PluginTestFixture f;
-    snap (f.getMainScreen().getNavBar(), "nav_bar");
+    snap (f.getNavBar(), "nav_bar");
 }
 
 TEST_CASE ("Visual - PianoRollComponent", "[visual]")
@@ -152,14 +152,14 @@ TEST_CASE ("Visual - PresetSelectorComponent", "[visual]")
 {
     getJuceInit();
     PluginTestFixture f;
-    snap (f.getMainScreen().getNavBar().getPresetSelector(), "preset_selector");
+    snap (f.getNavBar().getPresetSelector(), "preset_selector");
 }
 
 TEST_CASE ("Visual - SubdivisionSlider", "[visual]")
 {
     getJuceInit();
     PluginTestFixture f;
-    snap (f.getMainScreen().getNavBar().getSubdivisionSlider(), "subdivision_slider");
+    snap (f.getNavBar().getSubdivisionSlider(), "subdivision_slider");
 }
 
 TEST_CASE ("Visual - StepButton", "[visual]")

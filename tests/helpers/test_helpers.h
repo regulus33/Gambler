@@ -37,6 +37,9 @@ public:
     MainScreenComponent& getMainScreen() {
         return editor.getApplicationComponent().getMainScreen();
     }
+    NavBarComponent& getNavBar() {
+        return editor.getApplicationComponent().getNavBar();
+    }
     void processMessages (int timeoutMs = 50) {
         juce::MessageManager::getInstance()->runDispatchLoopUntil (timeoutMs);
     }

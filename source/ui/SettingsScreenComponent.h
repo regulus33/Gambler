@@ -100,14 +100,10 @@ namespace SettingsScreenConstants {
 class SettingsScreenComponent : public juce::Component {
 public:
     explicit SettingsScreenComponent(PluginProcessor& processor)
-        : navBar(processor)
     {
         interTypeface = juce::Typeface::createSystemTypefaceFor(
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
-
-        // Add navbar
-        addAndMakeVisible(navBar);
 
         // Setup internal clock checkbox
         internalClockToggle.setButtonText("Internal clock");
@@ -317,8 +313,8 @@ public:
 
         auto area = getLocalBounds();
 
-        // Position navbar at the top
-        navBar.setBounds(area.removeFromTop(NavBarConstants::height));
+        // Reserve space for navbar (owned by ApplicationComponent)
+        area.removeFromTop(NavBarConstants::height);
 
         // Add some vertical spacing after navbar
         area.removeFromTop(30);
@@ -368,8 +364,7 @@ public:
         grid.performLayout(contentArea);
     }
 
-    // Accessors for navbar
-    NavBarComponent& getNavBar() { return navBar; }
+    // No navbar accessor — NavBar is owned by ApplicationComponent
 
     // Callbacks for state changes
     std::function<void(bool)> onInternalClockChanged;
@@ -435,8 +430,6 @@ public:
 
 private:
     juce::Typeface::Ptr interTypeface;
-
-    NavBarComponent navBar;
 
     // Settings groups
     std::unique_ptr<SettingsGroup> clockTimingGroup;
