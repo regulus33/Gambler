@@ -26,11 +26,11 @@ public:
           navBar(processor),
           mainScreen(processor)
     {
-        // Add navbar (single instance, always visible above screens)
-        addAndMakeVisible(navBar);
-
-        // Add main screen (visible by default)
+        // Add main screen first (visible by default)
         addAndMakeVisible(mainScreen);
+
+        // Add navbar last so it paints on top of screen components
+        addAndMakeVisible(navBar);
 
         // ========================================
         // NavBar callbacks (wired once, shared across screens)
