@@ -760,12 +760,18 @@ private:
 
         if (PlatformUtils::isIOS()) {
             // iOS AUv3: FileChooser opens an invisible modal dialog that blocks all input.
-            // Save directly to the app's documents directory instead.
-            auto docsDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
-            auto timestamp = juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S");
-            auto outputFile = docsDir.getChildFile("Gambler-Export-" + timestamp + ".mid");
+            // Write to a temp file, then present the iOS share sheet.
+            auto tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
+            auto outputFile = tempDir.getChildFile("Gambler-Export.mid");
             MidiExporter::writeToFile(midiFile, outputFile);
-            showExportConfirmation(outputFile.getFileName());
+
+            juce::Array<juce::URL> files;
+            files.add(juce::URL(outputFile));
+
+            activeShareSession = juce::ContentSharer::shareFilesScoped(
+                files,
+                [](bool /*success*/, const juce::String& /*error*/) {},
+                this);
         } else {
             fileChooser = std::make_unique<juce::FileChooser>(
                 "Save MIDI File",
@@ -784,27 +790,6 @@ private:
         }
     }
 
-    void showExportConfirmation(const juce::String& fileName) {
-        auto label = std::make_unique<juce::Label>();
-        label->setText("Saved: " + fileName, juce::dontSendNotification);
-        label->setColour(juce::Label::textColourId, juce::Colours::white);
-        label->setColour(juce::Label::backgroundColourId, juce::Colour(0xDD333333));
-        label->setJustificationType(juce::Justification::centred);
-        label->setSize(280, 36);
-
-        auto* rawLabel = label.get();
-        addAndMakeVisible(*rawLabel);
-        rawLabel->setCentrePosition(getWidth() / 2, getHeight() / 2);
-
-        // Auto-dismiss after 2 seconds
-        juce::Timer::callAfterDelay(2000, [this, rawLabel]() {
-            removeChildComponent(rawLabel);
-            exportConfirmLabel.reset();
-        });
-
-        exportConfirmLabel = std::move(label);
-    }
-
     // ========================================
     // Members
     // ========================================
@@ -813,6 +798,6 @@ private:
     MainScreenComponent mainScreen;
     std::unique_ptr<SettingsScreenComponent> settingsScreen;
     std::unique_ptr<juce::FileChooser> fileChooser;
-    std::unique_ptr<juce::Label> exportConfirmLabel;
+    juce::ScopedMessageBox activeShareSession;
     bool wasCompactBeforeSettings = false;
 };
