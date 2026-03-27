@@ -84,8 +84,15 @@ void iOSNativeDialogs::shareFile(juce::Component* parent,
     UIActivityViewController* avc = [[UIActivityViewController alloc] initWithActivityItems:items
                                                                       applicationActivities:nil];
 
-    // Present as form sheet (no popover arrow)
-    avc.modalPresentationStyle = UIModalPresentationFormSheet;
+    // iPad requires popover configuration — set sourceView to center of the
+    // parent view and hide the arrow.
+    UIView* view = (UIView*) parent->getWindowHandle();
+    if (avc.popoverPresentationController != nil && view != nil) {
+        avc.popoverPresentationController.sourceView = view;
+        avc.popoverPresentationController.sourceRect = CGRectMake(
+            view.bounds.size.width / 2, view.bounds.size.height / 2, 1, 1);
+        avc.popoverPresentationController.permittedArrowDirections = 0;
+    }
 
     auto doneCallback = std::make_shared<std::function<void()>>(std::move(onDone));
     avc.completionWithItemsHandler = ^(UIActivityType, BOOL, NSArray*, NSError*) {
