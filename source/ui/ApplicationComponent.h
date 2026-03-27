@@ -6,6 +6,7 @@
 #include "SettingsScreenComponent.h"
 #include "../backend/ClockMode.h"
 #include "../util/PlatformUtils.h"
+#include "ExportNameDialogComponent.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /**
@@ -756,29 +757,10 @@ private:
     }
 
     void exportMidiFile() {
-        auto midiFile = MidiExporter::createMidiFile(processorRef.getState());
-
         if (PlatformUtils::isIOS()) {
-            // iOS AUv3: FileChooser opens an invisible modal dialog that blocks all input.
-            // Write to a temp file, then present the iOS share sheet.
-            auto tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
-            auto outputFile = tempDir.getChildFile("Gambler-Export.mid");
-            MidiExporter::writeToFile(midiFile, outputFile);
-
-            juce::Array<juce::URL> files;
-            files.add(juce::URL(outputFile));
-
-            activeShareSession = juce::ContentSharer::shareFilesScoped(
-                files,
-                [this](bool /*success*/, const juce::String& /*error*/) {
-                    // Clear the session handle — JUCE may leave an invisible
-                    // modal overlay that blocks input if this stays alive.
-                    juce::MessageManager::callAsync([this]() {
-                        activeShareSession.close();
-                    });
-                },
-                this);
+            showExportNameDialog();
         } else {
+            auto midiFile = MidiExporter::createMidiFile(processorRef.getState());
             fileChooser = std::make_unique<juce::FileChooser>(
                 "Save MIDI File",
                 juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
@@ -794,6 +776,34 @@ private:
                     }
                 });
         }
+    }
+
+    void showExportNameDialog() {
+        auto* dialog = new ExportNameDialogComponent([this](const juce::String& fileName) {
+            auto midiFile = MidiExporter::createMidiFile(processorRef.getState());
+            auto tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
+            auto outputFile = tempDir.getChildFile(fileName + ".mid");
+            MidiExporter::writeToFile(midiFile, outputFile);
+
+            juce::Array<juce::URL> files;
+            files.add(juce::URL(outputFile));
+
+            activeShareSession = juce::ContentSharer::shareFilesScoped(
+                files,
+                [this](bool /*success*/, const juce::String& /*error*/) {
+                    juce::MessageManager::callAsync([this]() {
+                        activeShareSession.close();
+                    });
+                },
+                this);
+        });
+
+        auto exportBounds = navBar.getExportButtonScreenBounds();
+
+        juce::CallOutBox::launchAsynchronously(
+            std::unique_ptr<juce::Component>(dialog),
+            exportBounds,
+            getTopLevelComponent());
     }
 
     // ========================================

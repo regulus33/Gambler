@@ -327,6 +327,10 @@ public:
         }
     }
 
+    juce::Rectangle<int> getExportButtonScreenBounds() const {
+        return exportButton.localAreaToGlobal(exportButton.getLocalBounds());
+    }
+
     // Public method to set settings button toggle state (for ApplicationComponent)
     void setSettingsToggled(bool toggled) {
         settingsButton.setToggled(toggled);
