@@ -789,20 +789,10 @@ private:
                 auto name = fileName.trim().isEmpty() ? "Gambler-Export" : fileName.trim();
                 auto midiFile = MidiExporter::createMidiFile(processorRef.getState());
                 auto tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
-                auto outputFile = tempDir.getChildFile(name + ".mid");
-                MidiExporter::writeToFile(midiFile, outputFile);
+                exportedFile = tempDir.getChildFile(name + ".mid");
+                MidiExporter::writeToFile(midiFile, exportedFile);
 
-                juce::Array<juce::URL> files;
-                files.add(juce::URL(outputFile));
-
-                activeShareSession = juce::ContentSharer::shareFilesScoped(
-                    files,
-                    [this](bool /*success*/, const juce::String& /*error*/) {
-                        juce::MessageManager::callAsync([this]() {
-                            activeShareSession.close();
-                        });
-                    },
-                    navBar.getExportButton());
+                iOSNativeDialogs::shareFile(this, exportedFile, []() {});
             });
     }
 
@@ -814,6 +804,6 @@ private:
     MainScreenComponent mainScreen;
     std::unique_ptr<SettingsScreenComponent> settingsScreen;
     std::unique_ptr<juce::FileChooser> fileChooser;
-    juce::ScopedMessageBox activeShareSession;
+    juce::File exportedFile;
     bool wasCompactBeforeSettings = false;
 };

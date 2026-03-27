@@ -21,4 +21,15 @@ struct iOSNativeDialogs {
                                    const juce::String& placeholder,
                                    const juce::String& defaultText,
                                    std::function<void(juce::String)> onSave);
+
+    /**
+     * Shares a file using the native iOS share sheet (UIActivityViewController).
+     * Presented as a form sheet (no popover arrow).
+     * @param parent    JUCE component to present from (required for AUv3)
+     * @param file      The file to share
+     * @param onDone    Called when the share sheet is dismissed
+     */
+    static void shareFile(juce::Component* parent,
+                          const juce::File& file,
+                          std::function<void()> onDone);
 };

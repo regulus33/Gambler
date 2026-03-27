@@ -4,30 +4,32 @@
 
 #import <UIKit/UIKit.h>
 
+namespace {
+    UIViewController* findViewController(juce::Component* component) {
+        if (component == nullptr)
+            return nil;
+
+        UIView* view = (UIView*) component->getWindowHandle();
+        if (view == nil)
+            return nil;
+
+        UIResponder* responder = view;
+        while (responder != nil) {
+            if ([responder isKindOfClass:[UIViewController class]])
+                return (UIViewController*) responder;
+            responder = [responder nextResponder];
+        }
+        return nil;
+    }
+}
+
 void iOSNativeDialogs::showTextInputAlert(juce::Component* parent,
                                            const juce::String& title,
                                            const juce::String& placeholder,
                                            const juce::String& defaultText,
                                            std::function<void(juce::String)> onSave)
 {
-    if (parent == nullptr)
-        return;
-
-    // Get the UIViewController from the JUCE component's peer
-    UIView* view = (UIView*) parent->getWindowHandle();
-    if (view == nil)
-        return;
-
-    UIViewController* vc = nil;
-    UIResponder* responder = view;
-    while (responder != nil) {
-        if ([responder isKindOfClass:[UIViewController class]]) {
-            vc = (UIViewController*) responder;
-            break;
-        }
-        responder = [responder nextResponder];
-    }
-
+    UIViewController* vc = findViewController(parent);
     if (vc == nil)
         return;
 
@@ -43,7 +45,6 @@ void iOSNativeDialogs::showTextInputAlert(juce::Component* parent,
         textField.placeholder = nsPlaceholder;
         textField.text = nsDefault;
         textField.clearButtonMode = UITextFieldViewModeWhileEditing;
-        // Select all text so user can easily replace
         dispatch_async(dispatch_get_main_queue(), ^{
             [textField selectAll:nil];
         });
@@ -67,6 +68,34 @@ void iOSNativeDialogs::showTextInputAlert(juce::Component* parent,
     }]];
 
     [vc presentViewController:alert animated:YES completion:nil];
+}
+
+void iOSNativeDialogs::shareFile(juce::Component* parent,
+                                  const juce::File& file,
+                                  std::function<void()> onDone)
+{
+    UIViewController* vc = findViewController(parent);
+    if (vc == nil)
+        return;
+
+    NSURL* fileURL = [NSURL fileURLWithPath:[NSString stringWithUTF8String:file.getFullPathName().toRawUTF8()]];
+    NSArray* items = @[fileURL];
+
+    UIActivityViewController* avc = [[UIActivityViewController alloc] initWithActivityItems:items
+                                                                      applicationActivities:nil];
+
+    // Present as form sheet (no popover arrow)
+    avc.modalPresentationStyle = UIModalPresentationFormSheet;
+
+    auto doneCallback = std::make_shared<std::function<void()>>(std::move(onDone));
+    avc.completionWithItemsHandler = ^(UIActivityType, BOOL, NSArray*, NSError*) {
+        juce::MessageManager::callAsync([doneCallback]() {
+            if (*doneCallback)
+                (*doneCallback)();
+        });
+    };
+
+    [vc presentViewController:avc animated:YES completion:nil];
 }
 
 #endif
