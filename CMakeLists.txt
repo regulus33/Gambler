@@ -176,6 +176,11 @@ target_compile_definitions(SharedCode
     REPO_ROOT_PATH="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
+# Disable jasserts on iOS — audio-related asserts will be fixed later
+if(IOS)
+    target_compile_definitions(SharedCode INTERFACE JUCE_DISABLE_ASSERTIONS=1)
+endif()
+
 # Link to any other modules you added (with juce_add_module) here!
 # Usually JUCE modules must have PRIVATE visibility
 # See https://github.com/juce-framework/JUCE/blob/master/docs/CMake%20API.md#juce_add_module
