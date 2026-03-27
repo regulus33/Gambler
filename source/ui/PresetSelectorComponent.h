@@ -5,6 +5,8 @@
 #include "MidiLearnOverlayPainter.h"
 #include "PresetDropdownComponent.h"
 #include "SavePresetDialogComponent.h"
+#include "../native/iOSNativeDialogs.h"
+#include "../util/PlatformUtils.h"
 #include "../backend/PresetManager.h"
 #include "../backend/MidiLearnRegistry.h"
 #include "../backend/MidiMapping.h"
@@ -296,49 +298,55 @@ public:
 
 private:
     void showSaveDialog() {
-        // Find the top-level component to add the dialog to
-        juce::Component* parent = dialogParent;
-        if (!parent) {
-            parent = getTopLevelComponent();
-        }
-        
-        if (!parent) {
-            DBG("PresetSelectorComponent: No parent found for save dialog");
+        if (PlatformUtils::isIOS()) {
+            showSaveDialogIOS();
             return;
         }
-        
-        // Create dialog if needed
+
+        // Desktop: use the custom JUCE dialog
+        juce::Component* parent = dialogParent;
+        if (!parent)
+            parent = getTopLevelComponent();
+
+        if (!parent)
+            return;
+
         if (!saveDialog) {
             saveDialog = std::make_unique<SavePresetDialogComponent>();
-            
+
             saveDialog->onSave = [this, parent](const juce::String& name) {
-                if (onSavePreset) {
+                if (onSavePreset)
                     onSavePreset(name);
-                }
                 hideSaveDialog();
             };
-            
+
             saveDialog->onCancel = [this]() {
                 hideSaveDialog();
             };
         }
-        
-        // Clear and focus input
+
         saveDialog->clearInput();
-        
-        // Add to parent and center
         parent->addAndMakeVisible(*saveDialog);
-        
-        // Center the dialog in the parent
+
         int dialogX = (parent->getWidth() - saveDialog->getWidth()) / 2;
         int dialogY = (parent->getHeight() - saveDialog->getHeight()) / 2;
         saveDialog->setBounds(dialogX, dialogY, saveDialog->getWidth(), saveDialog->getHeight());
-        
-        // Focus the input field
+
         saveDialog->focusInput();
-        
-        // Bring to front
         saveDialog->toFront(true);
+    }
+
+    void showSaveDialogIOS() {
+        iOSNativeDialogs::showTextInputAlert(
+            getTopLevelComponent(),
+            "Save Preset",
+            "Preset name",
+            "",
+            [this](const juce::String& name) {
+                auto trimmed = name.trim();
+                if (trimmed.isNotEmpty() && onSavePreset)
+                    onSavePreset(trimmed);
+            });
     }
 
     void hideSaveDialog() {
