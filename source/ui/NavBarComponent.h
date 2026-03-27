@@ -331,6 +331,8 @@ public:
         return exportButton.localAreaToGlobal(exportButton.getLocalBounds());
     }
 
+    juce::Component* getExportButton() { return &exportButton; }
+
     // Public method to set settings button toggle state (for ApplicationComponent)
     void setSettingsToggled(bool toggled) {
         settingsButton.setToggled(toggled);

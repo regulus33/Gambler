@@ -7,6 +7,7 @@
 #include "../backend/ClockMode.h"
 #include "../util/PlatformUtils.h"
 #include "ExportNameDialogComponent.h"
+#include "../native/iOSNativeDialogs.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /**
@@ -779,31 +780,30 @@ private:
     }
 
     void showExportNameDialog() {
-        auto* dialog = new ExportNameDialogComponent([this](const juce::String& fileName) {
-            auto midiFile = MidiExporter::createMidiFile(processorRef.getState());
-            auto tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
-            auto outputFile = tempDir.getChildFile(fileName + ".mid");
-            MidiExporter::writeToFile(midiFile, outputFile);
+        iOSNativeDialogs::showTextInputAlert(
+            this,
+            "Export MIDI",
+            "File name",
+            "Gambler-Export",
+            [this](const juce::String& fileName) {
+                auto name = fileName.trim().isEmpty() ? "Gambler-Export" : fileName.trim();
+                auto midiFile = MidiExporter::createMidiFile(processorRef.getState());
+                auto tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
+                auto outputFile = tempDir.getChildFile(name + ".mid");
+                MidiExporter::writeToFile(midiFile, outputFile);
 
-            juce::Array<juce::URL> files;
-            files.add(juce::URL(outputFile));
+                juce::Array<juce::URL> files;
+                files.add(juce::URL(outputFile));
 
-            activeShareSession = juce::ContentSharer::shareFilesScoped(
-                files,
-                [this](bool /*success*/, const juce::String& /*error*/) {
-                    juce::MessageManager::callAsync([this]() {
-                        activeShareSession.close();
-                    });
-                },
-                this);
-        });
-
-        auto exportBounds = navBar.getExportButtonScreenBounds();
-
-        juce::CallOutBox::launchAsynchronously(
-            std::unique_ptr<juce::Component>(dialog),
-            exportBounds,
-            getTopLevelComponent());
+                activeShareSession = juce::ContentSharer::shareFilesScoped(
+                    files,
+                    [this](bool /*success*/, const juce::String& /*error*/) {
+                        juce::MessageManager::callAsync([this]() {
+                            activeShareSession.close();
+                        });
+                    },
+                    navBar.getExportButton());
+            });
     }
 
     // ========================================
