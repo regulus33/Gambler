@@ -770,7 +770,13 @@ private:
 
             activeShareSession = juce::ContentSharer::shareFilesScoped(
                 files,
-                [](bool /*success*/, const juce::String& /*error*/) {},
+                [this](bool /*success*/, const juce::String& /*error*/) {
+                    // Clear the session handle — JUCE may leave an invisible
+                    // modal overlay that blocks input if this stays alive.
+                    juce::MessageManager::callAsync([this]() {
+                        activeShareSession.close();
+                    });
+                },
                 this);
         } else {
             fileChooser = std::make_unique<juce::FileChooser>(
