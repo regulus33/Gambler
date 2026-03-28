@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ClickFlashMixin.h"
 #include "Icons.h"
 #include "MidiLearnOverlayPainter.h"
 #include "../backend/MidiLearnRegistry.h"
@@ -80,6 +81,10 @@ public:
         else
             Icons::drawIcon(g, path, iconArea, color, true, iconScale);
 
+        // Draw click flash overlay
+        if (flashEnabled_)
+            clickFlash_.paint(g, getLocalBounds());
+
         // Draw MIDI learn overlay on top
         MidiLearnOverlayPainter::paint(g, getLocalBounds(), registry_, midiControlId_, 0.0f);
     }
@@ -90,6 +95,12 @@ public:
             registry_->setLearningControl(midiControlId_);
             repaint();
             return;
+        }
+
+        // Click flash feedback
+        if (flashEnabled_) {
+            clickFlash_.trigger();
+            startTimerHz(60);
         }
 
         // Only auto-toggle if enabled
@@ -166,16 +177,32 @@ public:
 
     bool isPulsing() const { return pulsing; }
 
+    /** Enable or disable click flash feedback (default: enabled) */
+    void setFlashEnabled(bool enabled) { flashEnabled_ = enabled; }
+
 private:
     void timerCallback() override {
-        if (!pulsing) { stopTimer(); return; }
-        pulseCounter++;
-        if (pulseCounter >= pulseCycleSamples) pulseCounter = 0;
-        // Sine wave 0..1 over the cycle
-        float t = std::sin(static_cast<float>(pulseCounter) / static_cast<float>(pulseCycleSamples)
-                           * juce::MathConstants<float>::twoPi) * 0.5f + 0.5f;
-        pulseCurrentColor = baseColor1().interpolatedWith(pulseTarget, t);
-        repaint();
+        bool needsTimer = false;
+
+        // Tick pulse animation
+        if (pulsing) {
+            pulseCounter++;
+            if (pulseCounter >= pulseCycleSamples) pulseCounter = 0;
+            float t = std::sin(static_cast<float>(pulseCounter) / static_cast<float>(pulseCycleSamples)
+                               * juce::MathConstants<float>::twoPi) * 0.5f + 0.5f;
+            pulseCurrentColor = baseColor1().interpolatedWith(pulseTarget, t);
+            repaint();
+            needsTimer = true;
+        }
+
+        // Tick click flash animation
+        if (clickFlash_.tick()) {
+            repaint();
+            needsTimer = true;
+        }
+
+        if (!needsTimer)
+            stopTimer();
     }
 
     // Helper to get the base (non-pulsed) color for current state
@@ -192,6 +219,10 @@ private:
     float iconScale2;     // Scale factor for icon 2
     MidiControlId midiControlId_ = MidiControlId::COUNT;
     MidiLearnRegistry* registry_ = nullptr;
+
+    // Click flash
+    bool flashEnabled_ = true;
+    ClickFlash clickFlash_;
 
     // Pulse animation state
     static constexpr float pulseTimerMs = 30.0f;  // ~33 Hz refresh

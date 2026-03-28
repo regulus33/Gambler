@@ -22,7 +22,8 @@
  *
  * Renders the export icon using the same style as ToggleIconButton.
  */
-class ExportButton : public juce::Component {
+class ExportButton : public juce::Component,
+                     private juce::Timer {
 public:
     ExportButton() {}
 
@@ -36,6 +37,9 @@ public:
         float actualContent = boundsSize - actualPadding * 2.0f;
         auto iconArea = juce::Rectangle<float>(actualPadding, actualPadding, actualContent, actualContent);
         Icons::strokeIcon(g, path, iconArea, juce::Colours::white, 1.5f, true, 1.0f);
+
+        // Draw click flash overlay
+        clickFlash_.paint(g, getLocalBounds());
     }
 
     void mouseDown(const juce::MouseEvent&) override {
@@ -57,6 +61,8 @@ public:
 
     void mouseUp(const juce::MouseEvent&) override {
         if (!didDrag && onClicked) {
+            clickFlash_.trigger();
+            startTimerHz(60);
             onClicked();
         }
     }
@@ -76,7 +82,13 @@ public:
     std::function<juce::File()> onDragStarted;
 
 private:
+    void timerCallback() override {
+        if (!clickFlash_.tick()) stopTimer();
+        repaint();
+    }
+
     bool didDrag = false;
+    ClickFlash clickFlash_;
 };
 
 namespace NavBarConstants {
@@ -246,6 +258,10 @@ public:
         // Stop: white normally (we'll update this dynamically based on state)
         stopButton.setColor1(NavBarConstants::inactiveColor);
         stopButton.setColor2(NavBarConstants::inactiveColor);
+
+        // Disable click flash on transport buttons (they have their own color feedback)
+        playPauseButton.setFlashEnabled(false);
+        stopButton.setFlashEnabled(false);
     }
 
     void resized() override {

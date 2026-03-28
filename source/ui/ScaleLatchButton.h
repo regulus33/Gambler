@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../PluginProcessor.h"
+#include "ClickFlashMixin.h"
 #include "../data/Params.h"
 #include "../backend/MidiLearnRegistry.h"
 #include "../backend/MidiMapping.h"
@@ -25,7 +26,8 @@ namespace ScaleLatchButtonConstants {
  * Syncs with SCALE_LATCH APVTS parameter.
  * Supports MIDI learn overlay.
  */
-class ScaleLatchButton : public StateListenerComponent {
+class ScaleLatchButton : public StateListenerComponent,
+                         private juce::Timer {
 public:
     explicit ScaleLatchButton(PluginProcessor& processor)
         : StateListenerComponent(processor),
@@ -52,6 +54,9 @@ public:
         auto iconArea = juce::Rectangle<float>(actualPadding, actualPadding, actualContent, actualContent);
         Icons::drawIcon(g, path, iconArea, juce::Colours::white, true, 1.0f);
 
+        // Draw click flash overlay
+        clickFlash_.paint(g, getLocalBounds());
+
         // Paint MIDI learn overlay if in learn mode
         if (registry_ && registry_->isLearning()) {
             MidiLearnOverlayPainter::paint(g, getLocalBounds(), registry_, midiControlId_, 0.0f);
@@ -65,6 +70,10 @@ public:
             repaint();
             return;
         }
+
+        // Click flash feedback
+        clickFlash_.trigger();
+        startTimerHz(60);
 
         // Toggle the parameter
         setParamOn(!isParamOn());
@@ -93,8 +102,14 @@ private:
         }
     }
 
+    void timerCallback() override {
+        if (!clickFlash_.tick()) stopTimer();
+        repaint();
+    }
+
     MidiControlId midiControlId_ = MidiControlId::COUNT;
     MidiLearnRegistry* registry_ = nullptr;
+    ClickFlash clickFlash_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ScaleLatchButton)
 };

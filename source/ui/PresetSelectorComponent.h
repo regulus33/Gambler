@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BinaryData.h"
+#include "ClickFlashMixin.h"
 #include "Icons.h"
 #include "MidiLearnOverlayPainter.h"
 #include "PresetDropdownComponent.h"
@@ -31,7 +32,8 @@ namespace PresetSelectorConstants {
  * A small icon button that draws a scaled-down index left or right arrow icon.
  * Used to cycle through presets inside PresetSelectorComponent.
  */
-class PresetCycleButton : public juce::Component {
+class PresetCycleButton : public juce::Component,
+                          private juce::Timer {
 public:
     enum class Direction { Left, Right };
 
@@ -56,6 +58,9 @@ public:
         g.strokePath(icon, juce::PathStrokeType(chevronStrokeWidth,
             juce::PathStrokeType::curved, juce::PathStrokeType::rounded), transform);
 
+        // Draw click flash overlay
+        clickFlash_.paint(g, getLocalBounds());
+
         // Draw MIDI learn overlay on top
         MidiLearnOverlayPainter::paint(g, getLocalBounds(), registry_, midiControlId_, 0.0f);
     }
@@ -75,6 +80,8 @@ public:
             repaint();
             return;
         }
+        clickFlash_.trigger();
+        startTimerHz(60);
         if (onClick) onClick();
     }
 
@@ -84,8 +91,14 @@ public:
     std::function<void()> onClick;
 
 private:
+    void timerCallback() override {
+        if (!clickFlash_.tick()) stopTimer();
+        repaint();
+    }
+
     Direction direction;
     juce::Path icon;
+    ClickFlash clickFlash_;
     MidiControlId midiControlId_ = MidiControlId::COUNT;
     MidiLearnRegistry* registry_ = nullptr;
 };
@@ -95,7 +108,8 @@ private:
  *
  * A simple icon button that displays the save icon
  */
-class SavePresetButton : public juce::Component {
+class SavePresetButton : public juce::Component,
+                         private juce::Timer {
 public:
     SavePresetButton() {
         saveIcon = Icons::createSaveIcon();
@@ -110,9 +124,14 @@ public:
             (getHeight() - saveIconSize) / 2.0f);
 
         Icons::drawIcon(g, saveIcon, iconBounds, juce::Colours::white);
+
+        // Draw click flash overlay
+        clickFlash_.paint(g, getLocalBounds());
     }
 
     void mouseDown(const juce::MouseEvent& /*event*/) override {
+        clickFlash_.trigger();
+        startTimerHz(60);
         if (onClick) {
             onClick();
         }
@@ -129,7 +148,13 @@ public:
     std::function<void()> onClick;
 
 private:
+    void timerCallback() override {
+        if (!clickFlash_.tick()) stopTimer();
+        repaint();
+    }
+
     juce::Path saveIcon;
+    ClickFlash clickFlash_;
 };
 
 /**

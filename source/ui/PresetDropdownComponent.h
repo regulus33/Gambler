@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BinaryData.h"
+#include "ClickFlashMixin.h"
 #include "Icons.h"
 #include "../util/PlatformUtils.h"
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -557,7 +558,8 @@ private:
  *
  * Auto-loads presets when selected from the dropdown.
  */
-class PresetDropdownComponent : public juce::Component {
+class PresetDropdownComponent : public juce::Component,
+                                private juce::Timer {
 public:
     PresetDropdownComponent() {
         interFont = juce::Typeface::createSystemTypefaceFor(
@@ -585,18 +587,38 @@ public:
         textArea.removeFromRight(iconSize + iconRightPadding);
         g.drawText(displayText, textArea, juce::Justification::centredLeft, true);
 
-        // Draw chevron icon on the right
-        auto iconBounds = juce::Rectangle<float>(
-            static_cast<float>(getWidth() - iconSize - iconRightPadding),
-            static_cast<float>((getHeight() - iconSize) / 2),
-            static_cast<float>(iconSize),
-            static_cast<float>(iconSize));
+        // Draw chevron icon on the right (rotates when popup is open)
+        {
+            float cx = static_cast<float>(getWidth() - iconSize - iconRightPadding) + static_cast<float>(iconSize) * 0.5f;
+            float cy = static_cast<float>(getHeight()) * 0.5f;
+            auto iconBounds = juce::Rectangle<float>(
+                cx - static_cast<float>(iconSize) * 0.5f,
+                cy - static_cast<float>(iconSize) * 0.5f,
+                static_cast<float>(iconSize),
+                static_cast<float>(iconSize));
 
-        auto chevronPath = Icons::createChevronDownIcon();
-        Icons::strokeIcon(g, chevronPath, iconBounds, juce::Colours::white, 1.5f);
+            auto chevronPath = Icons::createChevronDownIcon();
+
+            // Apply rotation around center
+            if (std::abs(chevronAngle_) > 0.001f) {
+                g.saveState();
+                g.addTransform(juce::AffineTransform::rotation(chevronAngle_, cx, cy));
+            }
+
+            Icons::strokeIcon(g, chevronPath, iconBounds, juce::Colours::white, 1.5f);
+
+            if (std::abs(chevronAngle_) > 0.001f)
+                g.restoreState();
+        }
+
+        // Draw click flash overlay
+        clickFlash_.paint(g, getLocalBounds());
     }
 
     void mouseDown(const juce::MouseEvent& /*event*/) override {
+        clickFlash_.trigger();
+        setPopupOpen(true);
+        startTimerHz(60);
         showPopupMenu();
     }
 
@@ -713,12 +735,13 @@ private:
             .withMinimumWidth(getWidth())
             .withMaximumNumColumns(1);
 
-        menu.showMenuAsync(options);
+        menu.showMenuAsync(options, [this](int) { setPopupOpen(false); });
     }
 
     void showPopupMenuIOS() {
         auto* listBox = new PresetListComponent(presetNames, selectedIndex,
             [this](int index) {
+                setPopupOpen(false);
                 selectPresetByIndex(index, false);
                 if (onPresetSelected)
                     onPresetSelected(index);
@@ -734,11 +757,42 @@ private:
             getTopLevelComponent());
     }
 
+    void setPopupOpen(bool open) {
+        chevronTargetAngle_ = open ? juce::MathConstants<float>::pi : 0.0f;
+        if (!isTimerRunning()) startTimerHz(60);
+    }
+
+    void timerCallback() override {
+        bool needsTimer = false;
+
+        // Animate chevron rotation
+        float diff = chevronTargetAngle_ - chevronAngle_;
+        if (std::abs(diff) > 0.01f) {
+            chevronAngle_ += diff * 0.2f; // smooth ease
+            repaint();
+            needsTimer = true;
+        } else if (chevronAngle_ != chevronTargetAngle_) {
+            chevronAngle_ = chevronTargetAngle_;
+            repaint();
+        }
+
+        // Tick click flash
+        if (clickFlash_.tick()) {
+            repaint();
+            needsTimer = true;
+        }
+
+        if (!needsTimer) stopTimer();
+    }
+
     juce::StringArray presetNames;
     juce::String currentPresetName;
     int selectedIndex = -1;
     juce::Typeface::Ptr interFont;
     juce::Component* popupParent = nullptr;
     PresetDropdownLookAndFeel menuLookAndFeel;
+    ClickFlash clickFlash_;
+    float chevronAngle_ = 0.0f;
+    float chevronTargetAngle_ = 0.0f;
 };
 
