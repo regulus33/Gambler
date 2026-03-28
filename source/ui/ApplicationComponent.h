@@ -2,6 +2,7 @@
 
 #include "../PluginProcessor.h"
 #include "../backend/MidiExporter.h"
+#include "LogoComponent.h"
 #include "MainScreenComponent.h"
 #include "SettingsScreenComponent.h"
 #include "../backend/ClockMode.h"
@@ -32,7 +33,8 @@ public:
         // Add main screen first (visible by default)
         addAndMakeVisible(mainScreen);
 
-        // Add navbar last so it paints on top of screen components
+        // Add logo and navbar last so they paint on top of screen components
+        addAndMakeVisible(logo);
         addAndMakeVisible(navBar);
 
         // ========================================
@@ -78,10 +80,12 @@ public:
 
         navBar.onCompactViewToggled = [this](bool compact) {
             mainScreen.setCompactMode(compact);
+            updateLogoScale();
         };
 
         navBar.onSwapRowClicked = [this](bool showingTop) {
             mainScreen.setShowingTopRow(showingTop);
+            updateLogoScale();
         };
 
         // ========================================
@@ -263,9 +267,19 @@ public:
     void resized() override {
         auto area = getLocalBounds();
 
-        // NavBar spans the full width at the top
-        navBar.setBounds(area.removeFromTop(NavBarConstants::height)
-                            .withTrimmedLeft(MainScreenLayout::marginLeft + MainScreenLayout::pianoRollWidth + MainScreenLayout::topRowGap));
+        // NavBar row
+        auto navRow = area.removeFromTop(NavBarConstants::height);
+
+        // Logo: left-aligned in the navbar row, over the piano roll area
+        int logoH = logo.getCalculatedHeight();
+        int logoY = navRow.getY() + LogoConstants::topPadding;
+        if (mainScreen.isCompactMode() && !mainScreen.isShowingTopRow())
+            logoY += MainScreenLayout::compactBottomLogoExtraTopPadding;
+        logo.setBounds(navRow.getX() + MainScreenLayout::marginLeft, logoY,
+                       MainScreenLayout::pianoRollWidth, logoH);
+
+        // NavBar: right portion of the navbar row (after logo area)
+        navBar.setBounds(navRow.withTrimmedLeft(MainScreenLayout::marginLeft + MainScreenLayout::pianoRollWidth + MainScreenLayout::topRowGap));
 
         // Screens take up the full area (they reserve the navbar height internally for layout alignment)
         auto fullArea = getLocalBounds();
@@ -609,6 +623,10 @@ private:
         mainScreen.setVisible(false);
         settingsScreen->setVisible(true);
 
+        // Ensure logo and navbar stay on top of the settings screen
+        logo.toFront(false);
+        navBar.toFront(false);
+
         // Toggle settings button to show X icon
         navBar.setSettingsToggled(true);
 
@@ -796,10 +814,17 @@ private:
             });
     }
 
+    void updateLogoScale() {
+        bool isCompactBottom = mainScreen.isCompactMode() && !mainScreen.isShowingTopRow();
+        logo.setModeScale(isCompactBottom ? LogoConstants::compactBottomScale : 1.0f);
+        resized();
+    }
+
     // ========================================
     // Members
     // ========================================
     PluginProcessor& processorRef;
+    LogoComponent logo;
     NavBarComponent navBar;
     MainScreenComponent mainScreen;
     std::unique_ptr<SettingsScreenComponent> settingsScreen;

@@ -2,7 +2,6 @@
 
 #include "../PluginProcessor.h"
 #include "BinaryData.h"
-#include "LogoComponent.h"
 #include "NavBarComponent.h"
 #include "PianoRollComponent.h"
 #include "SequencerStepsComponent.h"
@@ -88,9 +87,6 @@ public:
           subsequenceControls(processor),
           noteRangeControls(processor)
     {
-        // Add logo (above piano roll, left-aligned)
-        addAndMakeVisible(logo);
-
         // Add piano roll component
         addAndMakeVisible(pianoRoll);
 
@@ -143,19 +139,8 @@ public:
 
         auto area = getLocalBounds();
 
-        // Row 1: Logo row (navbar is now owned by ApplicationComponent)
-        auto navRow = area.removeFromTop(NavBarConstants::height);
-
-        // Scale logo down in compact bottom row mode to avoid colliding with step buttons
-        bool isCompactBottom = compactMode_ && !showingTopRow_;
-        logo.setModeScale(isCompactBottom ? LogoConstants::compactBottomScale : 1.0f);
-
-        // Centre logo horizontally over the piano roll area, sized to fit its content
-        int logoH = logo.getCalculatedHeight();
-        int extraLogoPad = isCompactBottom ? compactBottomLogoExtraTopPadding : 0;
-        int logoY = navRow.getY() + LogoConstants::topPadding + extraLogoPad;
-        logo.setBounds(navRow.getX() + marginLeft, logoY,
-                        pianoRollWidth, logoH);
+        // Row 1: Reserve navbar height (logo + navbar owned by ApplicationComponent)
+        area.removeFromTop(NavBarConstants::height);
 
         if (compactMode_) {
             // Compact mode: show only one row directly below navbar
@@ -279,6 +264,7 @@ public:
     }
 
     bool isCompactMode() const { return compactMode_; }
+    bool isShowingTopRow() const { return showingTopRow_; }
 
     // Full design height: navbar + title + top content + gap + 2 step rows + gap + bottom padding
     static constexpr int fullDesignHeight = NavBarConstants::height + MainScreenLayout::titleRowHeight
@@ -453,7 +439,6 @@ private:
     PluginProcessor& processorRef;
     juce::Font titleFont;
 
-    LogoComponent logo;
     PianoRollComponent pianoRoll;
     SequencerStepsComponent sequencerSteps;
     SequencerControlsComponent sequencerControls;
