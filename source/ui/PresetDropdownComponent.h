@@ -360,9 +360,11 @@ class PresetListComponent : public juce::Component {
 public:
     PresetListComponent(const juce::StringArray& names, int currentIndex,
                         std::function<void(int)> onSelect,
-                        std::function<void(int)> onDelete)
+                        std::function<void(int)> onDelete,
+                        std::function<void()> onDismiss = nullptr)
         : presetNames(names), selectedIndex(currentIndex),
-          selectCallback(std::move(onSelect)), deleteCallback(std::move(onDelete))
+          selectCallback(std::move(onSelect)), deleteCallback(std::move(onDelete)),
+          dismissCallback(std::move(onDismiss))
     {
         using namespace PresetDropdownConstants;
         interFont = juce::Typeface::createSystemTypefaceFor(
@@ -372,6 +374,11 @@ public:
         contentHeight_ = presetNames.size() * popupItemHeight;
         int visibleHeight = juce::jmin(contentHeight_, popupMaxHeight);
         setSize(200, juce::jmax(popupItemHeight, visibleHeight));
+    }
+
+    ~PresetListComponent() override {
+        if (dismissCallback)
+            juce::MessageManager::callAsync(dismissCallback);
     }
 
     void paint(juce::Graphics& g) override {
@@ -537,6 +544,7 @@ private:
     bool isMouseOverDelete = false;
     std::function<void(int)> selectCallback;
     std::function<void(int)> deleteCallback;
+    std::function<void()> dismissCallback;
     juce::Typeface::Ptr interFont;
     juce::Rectangle<int> deleteHitAreas[maxRows];
 
@@ -746,7 +754,6 @@ private:
     void showPopupMenuIOS() {
         auto* listBox = new PresetListComponent(presetNames, selectedIndex,
             [this](int index) {
-                setPopupOpen(false);
                 selectPresetByIndex(index, false);
                 if (onPresetSelected)
                     onPresetSelected(index);
@@ -754,7 +761,8 @@ private:
             [this](int index) {
                 if (onPresetDeleteRequested)
                     onPresetDeleteRequested(index);
-            });
+            },
+            [this]() { setPopupOpen(false); });
 
         juce::CallOutBox::launchAsynchronously(
             std::unique_ptr<juce::Component>(listBox),
