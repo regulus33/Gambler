@@ -5,6 +5,7 @@
 #include "Icons.h"
 #include "../util/PlatformUtils.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_animation/juce_animation.h>
 #include <functional>
 
 namespace PresetDropdownConstants {
@@ -558,14 +559,12 @@ private:
  *
  * Auto-loads presets when selected from the dropdown.
  */
-class PresetDropdownComponent : public juce::Component,
-                                private juce::Timer {
+class PresetDropdownComponent : public juce::Component {
 public:
     PresetDropdownComponent() {
         interFont = juce::Typeface::createSystemTypefaceFor(
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
-
     }
 
     void paint(juce::Graphics& g) override {
@@ -618,8 +617,14 @@ public:
     void mouseDown(const juce::MouseEvent& /*event*/) override {
         clickFlash_.trigger();
         setPopupOpen(true);
-        startTimerHz(60);
         showPopupMenu();
+    }
+
+    void parentHierarchyChanged() override {
+        if (getTopLevelComponent() != nullptr) {
+            clickFlash_.attachTo(this);
+            ensureVBlank();
+        }
     }
 
     void mouseEnter(const juce::MouseEvent& /*event*/) override {
@@ -759,30 +764,36 @@ private:
 
     void setPopupOpen(bool open) {
         chevronTargetAngle_ = open ? juce::MathConstants<float>::pi : 0.0f;
-        if (!isTimerRunning()) startTimerHz(60);
+        needsChevronAnimation_ = true;
+        ensureVBlank();
     }
 
-    void timerCallback() override {
-        bool needsTimer = false;
+    void ensureVBlank() {
+        if (!vBlank_ && getTopLevelComponent() != nullptr) {
+            vBlank_ = std::make_unique<juce::VBlankAttachment>(
+                this, [this](double ts) { onVBlank(ts); });
+        }
+    }
 
-        // Animate chevron rotation
+    void onVBlank(double timestampSec) {
+        if (!needsChevronAnimation_) return;
+
+        double delta = (lastVBlankTimestamp_ > 0.0)
+            ? (timestampSec - lastVBlankTimestamp_)
+            : (1.0 / 60.0);
+        lastVBlankTimestamp_ = timestampSec;
+        float dt = static_cast<float>(juce::jlimit(0.001, 0.1, delta));
+
+        // Animate chevron rotation with framerate-independent easing
         float diff = chevronTargetAngle_ - chevronAngle_;
         if (std::abs(diff) > 0.01f) {
-            chevronAngle_ += diff * 0.2f; // smooth ease
+            chevronAngle_ += diff * 12.0f * dt; // ~0.2 per frame at 60fps
             repaint();
-            needsTimer = true;
-        } else if (chevronAngle_ != chevronTargetAngle_) {
+        } else {
             chevronAngle_ = chevronTargetAngle_;
+            needsChevronAnimation_ = false;
             repaint();
         }
-
-        // Tick click flash
-        if (clickFlash_.tick()) {
-            repaint();
-            needsTimer = true;
-        }
-
-        if (!needsTimer) stopTimer();
     }
 
     juce::StringArray presetNames;
@@ -794,5 +805,8 @@ private:
     ClickFlash clickFlash_;
     float chevronAngle_ = 0.0f;
     float chevronTargetAngle_ = 0.0f;
+    bool needsChevronAnimation_ = false;
+    double lastVBlankTimestamp_ = 0.0;
+    std::unique_ptr<juce::VBlankAttachment> vBlank_;
 };
 

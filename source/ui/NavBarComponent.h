@@ -22,8 +22,7 @@
  *
  * Renders the export icon using the same style as ToggleIconButton.
  */
-class ExportButton : public juce::Component,
-                     private juce::Timer {
+class ExportButton : public juce::Component {
 public:
     ExportButton() {}
 
@@ -62,7 +61,6 @@ public:
     void mouseUp(const juce::MouseEvent&) override {
         if (!didDrag && onClicked) {
             clickFlash_.trigger();
-            startTimerHz(60);
             onClicked();
         }
     }
@@ -75,6 +73,11 @@ public:
         setMouseCursor(juce::MouseCursor::NormalCursor);
     }
 
+    void parentHierarchyChanged() override {
+        if (getTopLevelComponent() != nullptr)
+            clickFlash_.attachTo(this);
+    }
+
     // Fired on click (no drag) — open file chooser
     std::function<void()> onClicked;
 
@@ -82,11 +85,6 @@ public:
     std::function<juce::File()> onDragStarted;
 
 private:
-    void timerCallback() override {
-        if (!clickFlash_.tick()) stopTimer();
-        repaint();
-    }
-
     bool didDrag = false;
     ClickFlash clickFlash_;
 };

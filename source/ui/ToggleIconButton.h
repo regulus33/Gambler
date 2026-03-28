@@ -6,6 +6,7 @@
 #include "../backend/MidiLearnRegistry.h"
 #include "../backend/MidiMapping.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_animation/juce_animation.h>
 #include <functional>
 
 namespace ToggleIconButtonConstants {
@@ -24,8 +25,7 @@ namespace ToggleIconButtonConstants {
  * Background: Transparent
  * Icon: White stroked path
  */
-class ToggleIconButton : public juce::Component,
-                         private juce::Timer {
+class ToggleIconButton : public juce::Component {
 public:
     /**
      * Constructor
@@ -66,7 +66,7 @@ public:
         using namespace ToggleIconButtonConstants;
 
         auto path = isToggled ? iconPath2() : iconPath1();
-        auto color = pulsing ? pulseCurrentColor : (isToggled ? color2 : color1);
+        auto color = pulsing_ ? pulseCurrentColor_ : (isToggled ? color2 : color1);
         float iconScale = isToggled ? iconScale2 : iconScale1;
 
         // Derive padding and content from actual bounds so the icon scales with the component
@@ -98,10 +98,8 @@ public:
         }
 
         // Click flash feedback
-        if (flashEnabled_) {
+        if (flashEnabled_)
             clickFlash_.trigger();
-            startTimerHz(60);
-        }
 
         // Only auto-toggle if enabled
         if (autoToggleEnabled) {
@@ -159,54 +157,54 @@ public:
      * Useful for drawing attention to a button (e.g. compact mode exit hint).
      */
     void startPulse(juce::Colour target, float cycleDurationSeconds = 2.5f) {
-        pulseTarget = target;
-        // Full cycle = fade in + fade out, so timer period drives a sine wave
-        pulseCycleSamples = static_cast<int>(cycleDurationSeconds * 1000.0f / pulseTimerMs);
-        pulseCounter = 0;
-        pulsing = true;
-        startTimerHz(static_cast<int>(1000.0f / pulseTimerMs));
+        pulseTarget_ = target;
+        pulseCycleDuration_ = cycleDurationSeconds;
+        pulseElapsed_ = 0.0;
+        pulsing_ = true;
+        ensureVBlank();
     }
 
     /** Stop the pulsing animation and restore the original color. */
     void stopPulse() {
-        if (!pulsing) return;
-        pulsing = false;
-        stopTimer();
+        if (!pulsing_) return;
+        pulsing_ = false;
         repaint();
     }
 
-    bool isPulsing() const { return pulsing; }
+    bool isPulsing() const { return pulsing_; }
 
     /** Enable or disable click flash feedback (default: enabled) */
     void setFlashEnabled(bool enabled) { flashEnabled_ = enabled; }
 
-private:
-    void timerCallback() override {
-        bool needsTimer = false;
-
-        // Tick pulse animation
-        if (pulsing) {
-            pulseCounter++;
-            if (pulseCounter >= pulseCycleSamples) pulseCounter = 0;
-            float t = std::sin(static_cast<float>(pulseCounter) / static_cast<float>(pulseCycleSamples)
-                               * juce::MathConstants<float>::twoPi) * 0.5f + 0.5f;
-            pulseCurrentColor = baseColor1().interpolatedWith(pulseTarget, t);
-            repaint();
-            needsTimer = true;
+    void parentHierarchyChanged() override {
+        if (getTopLevelComponent() != nullptr) {
+            clickFlash_.attachTo(this);
+            ensureVBlank();
         }
-
-        // Tick click flash animation
-        if (clickFlash_.tick()) {
-            repaint();
-            needsTimer = true;
-        }
-
-        if (!needsTimer)
-            stopTimer();
     }
 
-    // Helper to get the base (non-pulsed) color for current state
-    juce::Colour baseColor1() const { return color1; }
+private:
+    void ensureVBlank() {
+        if (!vBlank_ && getTopLevelComponent() != nullptr) {
+            vBlank_ = std::make_unique<juce::VBlankAttachment>(
+                this, [this](double ts) { onVBlank(ts); });
+        }
+    }
+
+    void onVBlank(double timestampSec) {
+        if (!pulsing_) return;
+
+        double delta = (lastVBlankTimestamp_ > 0.0)
+            ? (timestampSec - lastVBlankTimestamp_)
+            : (1.0 / 60.0);
+        lastVBlankTimestamp_ = timestampSec;
+
+        pulseElapsed_ += juce::jlimit(0.001, 0.1, delta);
+        float t = std::sin(static_cast<float>(pulseElapsed_ / pulseCycleDuration_)
+                           * juce::MathConstants<float>::twoPi) * 0.5f + 0.5f;
+        pulseCurrentColor_ = color1.interpolatedWith(pulseTarget_, t);
+        repaint();
+    }
 
     std::function<juce::Path()> iconPath1;  // Icon for state 1 (not toggled)
     std::function<juce::Path()> iconPath2;  // Icon for state 2 (toggled)
@@ -224,12 +222,12 @@ private:
     bool flashEnabled_ = true;
     ClickFlash clickFlash_;
 
-    // Pulse animation state
-    static constexpr float pulseTimerMs = 30.0f;  // ~33 Hz refresh
-    bool pulsing = false;
-    juce::Colour pulseTarget;
-    juce::Colour pulseCurrentColor;
-    int pulseCycleSamples = 0;
-    int pulseCounter = 0;
+    // Pulse animation state (VBlank-driven)
+    bool pulsing_ = false;
+    juce::Colour pulseTarget_;
+    juce::Colour pulseCurrentColor_;
+    float pulseCycleDuration_ = 2.5f;
+    double pulseElapsed_ = 0.0;
+    double lastVBlankTimestamp_ = 0.0;
+    std::unique_ptr<juce::VBlankAttachment> vBlank_;
 };
-

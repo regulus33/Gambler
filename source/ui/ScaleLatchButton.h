@@ -26,8 +26,7 @@ namespace ScaleLatchButtonConstants {
  * Syncs with SCALE_LATCH APVTS parameter.
  * Supports MIDI learn overlay.
  */
-class ScaleLatchButton : public StateListenerComponent,
-                         private juce::Timer {
+class ScaleLatchButton : public StateListenerComponent {
 public:
     explicit ScaleLatchButton(PluginProcessor& processor)
         : StateListenerComponent(processor),
@@ -73,7 +72,6 @@ public:
 
         // Click flash feedback
         clickFlash_.trigger();
-        startTimerHz(60);
 
         // Toggle the parameter
         setParamOn(!isParamOn());
@@ -81,6 +79,11 @@ public:
 
     // Get current toggle state from APVTS
     bool getToggled() const { return isParamOn(); }
+
+    void parentHierarchyChanged() override {
+        if (getTopLevelComponent() != nullptr)
+            clickFlash_.attachTo(this);
+    }
 
 protected:
     void onStateChanged() override {
@@ -100,11 +103,6 @@ private:
         if (auto* param = getProcessor().getAPVTS().getParameter(Params::Keys::ID::SCALE_LATCH)) {
             param->setValueNotifyingHost(on ? 1.0f : 0.0f);
         }
-    }
-
-    void timerCallback() override {
-        if (!clickFlash_.tick()) stopTimer();
-        repaint();
     }
 
     MidiControlId midiControlId_ = MidiControlId::COUNT;

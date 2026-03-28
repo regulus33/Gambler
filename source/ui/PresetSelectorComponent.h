@@ -32,8 +32,7 @@ namespace PresetSelectorConstants {
  * A small icon button that draws a scaled-down index left or right arrow icon.
  * Used to cycle through presets inside PresetSelectorComponent.
  */
-class PresetCycleButton : public juce::Component,
-                          private juce::Timer {
+class PresetCycleButton : public juce::Component {
 public:
     enum class Direction { Left, Right };
 
@@ -81,8 +80,12 @@ public:
             return;
         }
         clickFlash_.trigger();
-        startTimerHz(60);
         if (onClick) onClick();
+    }
+
+    void parentHierarchyChanged() override {
+        if (getTopLevelComponent() != nullptr)
+            clickFlash_.attachTo(this);
     }
 
     void setMidiControlId(MidiControlId controlId) { midiControlId_ = controlId; }
@@ -91,11 +94,6 @@ public:
     std::function<void()> onClick;
 
 private:
-    void timerCallback() override {
-        if (!clickFlash_.tick()) stopTimer();
-        repaint();
-    }
-
     Direction direction;
     juce::Path icon;
     ClickFlash clickFlash_;
@@ -108,8 +106,7 @@ private:
  *
  * A simple icon button that displays the save icon
  */
-class SavePresetButton : public juce::Component,
-                         private juce::Timer {
+class SavePresetButton : public juce::Component {
 public:
     SavePresetButton() {
         saveIcon = Icons::createSaveIcon();
@@ -131,7 +128,6 @@ public:
 
     void mouseDown(const juce::MouseEvent& /*event*/) override {
         clickFlash_.trigger();
-        startTimerHz(60);
         if (onClick) {
             onClick();
         }
@@ -145,14 +141,14 @@ public:
         setMouseCursor(juce::MouseCursor::NormalCursor);
     }
 
+    void parentHierarchyChanged() override {
+        if (getTopLevelComponent() != nullptr)
+            clickFlash_.attachTo(this);
+    }
+
     std::function<void()> onClick;
 
 private:
-    void timerCallback() override {
-        if (!clickFlash_.tick()) stopTimer();
-        repaint();
-    }
-
     juce::Path saveIcon;
     ClickFlash clickFlash_;
 };
