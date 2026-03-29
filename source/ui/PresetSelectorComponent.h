@@ -4,7 +4,7 @@
 #include "ClickFlashMixin.h"
 #include "Icons.h"
 #include "MidiLearnOverlayPainter.h"
-#include "PresetDropdownComponent.h"
+#include "StyledDropdown.h"
 #include "SavePresetDialogComponent.h"
 #include "../native/iOSNativeDialogs.h"
 #include "../util/PlatformUtils.h"
@@ -184,15 +184,19 @@ public:
             if (onCycleUp) onCycleUp();
         };
 
+        // Configure dropdown for preset mode (with delete buttons)
+        dropdown.setShowDeleteButtons(true);
+        dropdown.setPlaceholderText("Select Preset");
+
         // Wire up dropdown selection
-        dropdown.onPresetSelected = [this](int index) {
+        dropdown.onItemSelected = [this](int index) {
             if (onPresetSelected) {
                 onPresetSelected(index);
             }
         };
 
         // Wire up dropdown delete
-        dropdown.onPresetDeleteRequested = [this](int index) {
+        dropdown.onItemDeleteRequested = [this](int index) {
             if (onDeletePreset) {
                 onDeletePreset(index);
             }
@@ -248,21 +252,21 @@ public:
      * Update the list of presets
      */
     void setPresets(const juce::StringArray& presetNames) {
-        dropdown.setPresets(presetNames);
+        dropdown.setItems(presetNames);
     }
 
     /**
      * Select a preset by index
      */
     void selectPresetByIndex(int index, bool sendNotification = false) {
-        dropdown.selectPresetByIndex(index, sendNotification);
+        dropdown.setSelectedIndex(index, sendNotification);
     }
 
     /**
      * Select a preset by name
      */
     void selectPresetByName(const juce::String& name, bool sendNotification = false) {
-        dropdown.selectPresetByName(name, sendNotification);
+        dropdown.setSelectedByName(name, sendNotification);
     }
 
     /**
@@ -314,7 +318,6 @@ public:
      */
     void setDialogParent(juce::Component* parent) {
         dialogParent = parent;
-        dropdown.setPopupParent(parent);
     }
 
 private:
@@ -379,7 +382,7 @@ private:
     }
 
     PresetCycleButton cycleDownButton { PresetCycleButton::Direction::Left };
-    PresetDropdownComponent dropdown;
+    StyledDropdown dropdown;
     PresetCycleButton cycleUpButton { PresetCycleButton::Direction::Right };
     SavePresetButton saveButton;
     std::unique_ptr<SavePresetDialogComponent> saveDialog;

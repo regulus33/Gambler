@@ -13,7 +13,7 @@
 #include "../source/ui/GlobalScaleQuantizerComponent.h"
 #include "../source/ui/LogoComponent.h"
 #include "../source/ui/NoteColourPickerComponent.h"
-#include "../source/ui/PresetDropdownComponent.h"
+#include "../source/ui/StyledDropdown.h"
 #include "../source/ui/SavePresetDialogComponent.h"
 #include "../source/ui/ScaleLatchButton.h"
 #include "../source/ui/SettingsGroup.h"
@@ -223,12 +223,12 @@ TEST_CASE ("Visual - SavePresetDialogComponent", "[visual]")
     snap (comp, "save_preset_dialog");
 }
 
-TEST_CASE ("Visual - PresetDropdownComponent", "[visual]")
+TEST_CASE ("Visual - StyledDropdown", "[visual]")
 {
     getJuceInit();
-    PresetDropdownComponent comp;
+    StyledDropdown comp;
     comp.setSize (300, 300);
-    snap (comp, "preset_dropdown");
+    snap (comp, "styled_dropdown");
 }
 
 TEST_CASE ("Visual - LogoComponent", "[visual]")

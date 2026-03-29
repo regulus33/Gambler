@@ -2,7 +2,7 @@
 
 #include "StateListenerComponent.h"
 #include "NoteColourPickerComponent.h"
-#include "CallOutDropdown.h"
+#include "StyledDropdown.h"
 #include "../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <array>
@@ -161,8 +161,8 @@ public:
     }
 
 private:
-    CallOutDropdown scaleTypeDropdown_;
-    CallOutDropdown keyDropdown_;
+    StyledDropdown scaleTypeDropdown_;
+    StyledDropdown keyDropdown_;
     juce::Label scaleLabel_;
     juce::Label keyLabel_;
     std::array<bool, 12> keyStates_ {};

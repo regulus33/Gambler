@@ -454,7 +454,7 @@ private:
 
     // MIDI controls
     juce::Label midiOutputChannelLabel;
-    CallOutDropdown midiOutputChannelComboBox;
+    StyledDropdown midiOutputChannelComboBox;
 
     // Note colour picker
     std::unique_ptr<NoteColourPickerComponent> noteColourPicker;
