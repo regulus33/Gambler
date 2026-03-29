@@ -6,6 +6,7 @@
 #include "MidiLearnOverlayPainter.h"
 #include "StateListenerComponent.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_animation/juce_animation.h>
 #include <map>
 
 namespace PianoRollConstants {
@@ -25,6 +26,8 @@ namespace PianoRollConstants {
     // Unselected key colors
     const juce::Colour unselectedWhiteKeyColor = juce::Colours::white;
     const juce::Colour unselectedBlackKeyColor = juce::Colour (186, 186, 186);
+    // Colour fade animation
+    constexpr float colourFadeSpeed = 10.0f;  // Lerp speed (higher = faster fade)
 }
 
 /**
@@ -150,6 +153,8 @@ public:
             if (activeOverlayIndex >= 0)
                 paintMidiLearnOverlayForKey(g, keys[activeOverlayIndex]->path.getBounds(), activeOverlayIndex);
         }
+
+        displayColoursInitialised_ = true;
     }
 
     void mouseDown (const juce::MouseEvent& event) override {
@@ -275,6 +280,25 @@ public:
 
     void resized() override {
         // Nothing to do - we handle all rendering in paint()
+    }
+
+    void parentHierarchyChanged() override {
+        // Set up VBlank-driven animation when added to a visible parent
+        if (getTopLevelComponent() != nullptr && vBlankAttachment_ == nullptr) {
+            vBlankAttachment_ = std::make_unique<juce::VBlankAttachment>(
+                this, [this](double timestampSec) {
+                    double delta = (lastVBlankTimestamp_ > 0.0)
+                        ? (timestampSec - lastVBlankTimestamp_)
+                        : (1.0 / 60.0);
+                    lastVBlankTimestamp_ = timestampSec;
+                    frameDeltaSec_ = static_cast<float>(juce::jlimit(0.001, 0.1, delta));
+
+                    if (needsAnimationRepaint_) {
+                        needsAnimationRepaint_ = false;
+                        repaint();
+                    }
+                });
+        }
     }
 
     /**
@@ -473,14 +497,23 @@ private:
     void drawKey (juce::Graphics& g, const KeyData& key, int keyIndex) {
         using namespace PianoRollConstants;
 
-        // Fill the key with color
-        if (key.isToggled) {
-            // Selected keys: use their assigned color
-            g.setColour (key.color);
-        } else {
-            // Unselected keys: white for white keys, grey for black keys
-            g.setColour (key.isBlack ? unselectedBlackKeyColor : unselectedWhiteKeyColor);
+        // Determine target fill color
+        juce::Colour targetColor = key.isToggled
+            ? key.color
+            : (key.isBlack ? unselectedBlackKeyColor : unselectedWhiteKeyColor);
+
+        // Animate: lerp displayColours_ toward targetColor
+        if (!displayColoursInitialised_) {
+            displayColours_[keyIndex] = targetColor;
+        } else if (displayColours_[keyIndex] != targetColor) {
+            float t = juce::jmin(1.0f, colourFadeSpeed * frameDeltaSec_);
+            displayColours_[keyIndex] = displayColours_[keyIndex].interpolatedWith(targetColor, t);
+            if (displayColours_[keyIndex] != targetColor)
+                needsAnimationRepaint_ = true;
         }
+
+        // Fill the key with animated color
+        g.setColour (displayColours_[keyIndex]);
         g.fillPath (key.path);
 
         // Draw border
@@ -729,6 +762,14 @@ private:
 
     // Last key hit during the current drag gesture (prevents duplicate triggers on same key)
     int lastDragKey_ = -1;
+
+    // Colour fade animation state
+    std::array<juce::Colour, 12> displayColours_;
+    bool displayColoursInitialised_ = false;
+    bool needsAnimationRepaint_ = false;
+    float frameDeltaSec_ = 1.0f / 60.0f;
+    double lastVBlankTimestamp_ = 0.0;
+    std::unique_ptr<juce::VBlankAttachment> vBlankAttachment_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
 };
