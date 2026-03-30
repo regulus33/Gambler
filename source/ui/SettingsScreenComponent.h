@@ -274,8 +274,10 @@ public:
 
         // Scale Quantizer group - global scale setting for all steps
         globalScaleQuantizer_ = std::make_unique<GlobalScaleQuantizerComponent>(processor);
+
         scaleQuantizerGroup = std::make_unique<SettingsGroup>("Scale Quantizer");
-        scaleQuantizerGroup->addCustomControl(*globalScaleQuantizer_, 100);
+        scaleQuantizerGroup->addCustomControl(*globalScaleQuantizer_,
+            GlobalScaleQuantizerConstants::totalHeight);
         addAndMakeVisible(*scaleQuantizerGroup);
 
         // Step Colours group

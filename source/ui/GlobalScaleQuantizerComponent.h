@@ -24,9 +24,16 @@ namespace GlobalScaleQuantizerConstants {
     constexpr float borderWidth = NoteColourPickerConstants::borderWidth;
 
     // Layout
+    constexpr int keyboardWidth = 7 * (whiteKeyWidth + keySpacing) - keySpacing; // 216px
     constexpr int dropdownHeight = 28;
-    constexpr int dropdownSpacing = 8;
-    constexpr int keyboardTopMargin = 8;
+    constexpr int dropdownRowSpacing = 8;
+    constexpr int keyboardBottomMargin = 12;
+    constexpr int labelWidth = 50;
+    constexpr int labelDropdownGap = 6;
+
+    // Total height: keyboard + margin + 2 dropdown rows + spacing between them
+    constexpr int totalHeight = whiteKeyHeight + keyboardBottomMargin
+        + dropdownHeight + dropdownRowSpacing + dropdownHeight;
 }
 
 class GlobalScaleQuantizerComponent : public StateListenerComponent {
@@ -43,9 +50,9 @@ public:
         }
 
         // Scale type dropdown
-        scaleLabel_.setText("Scale:", juce::dontSendNotification);
+        scaleLabel_.setText("Scale", juce::dontSendNotification);
         scaleLabel_.setColour(juce::Label::textColourId, juce::Colours::white);
-        scaleLabel_.setJustificationType(juce::Justification::centredRight);
+        scaleLabel_.setJustificationType(juce::Justification::centredLeft);
         addAndMakeVisible(scaleLabel_);
 
         scaleTypeDropdown_.setItems({
@@ -54,7 +61,7 @@ public:
             "Dorian", "Mixolydian", "Lydian", "Phrygian", "Locrian",
             "Whole Tone", "Chromatic", "Custom"
         });
-        scaleTypeDropdown_.setSelectedId(14, juce::dontSendNotification); // Chromatic default
+        scaleTypeDropdown_.setSelectedId(14, juce::dontSendNotification);
         scaleTypeDropdown_.onChange = [this] {
             if (!suppressDropdownUpdate_)
                 onScaleOrKeyChanged();
@@ -62,15 +69,15 @@ public:
         addAndMakeVisible(scaleTypeDropdown_);
 
         // Key dropdown
-        keyLabel_.setText("Key:", juce::dontSendNotification);
+        keyLabel_.setText("Key", juce::dontSendNotification);
         keyLabel_.setColour(juce::Label::textColourId, juce::Colours::white);
-        keyLabel_.setJustificationType(juce::Justification::centredRight);
+        keyLabel_.setJustificationType(juce::Justification::centredLeft);
         addAndMakeVisible(keyLabel_);
 
         keyDropdown_.setItems({
             "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"
         });
-        keyDropdown_.setSelectedId(1, juce::dontSendNotification); // C default
+        keyDropdown_.setSelectedId(1, juce::dontSendNotification);
         keyDropdown_.onChange = [this] {
             if (!suppressDropdownUpdate_)
                 onScaleOrKeyChanged();
@@ -143,28 +150,25 @@ public:
     void resized() override {
         using namespace GlobalScaleQuantizerConstants;
 
-        auto area = getLocalBounds();
+        // Dropdown rows sit below the keyboard, right-aligned to keyboard width
+        int y = whiteKeyHeight + keyboardBottomMargin;
+        int dropdownWidth = keyboardWidth - labelWidth - labelDropdownGap;
 
-        // Dropdowns at the bottom
-        auto bottomRow = area.removeFromBottom(dropdownHeight);
+        // Scale row
+        scaleLabel_.setBounds(0, y, labelWidth, dropdownHeight);
+        scaleTypeDropdown_.setBounds(labelWidth + labelDropdownGap, y, dropdownWidth, dropdownHeight);
 
-        int scaleLabelWidth = 40;
-        int keyLabelWidth = 30;
-        int remainingWidth = bottomRow.getWidth() - scaleLabelWidth - keyLabelWidth - dropdownSpacing;
-        int dropdownWidth = remainingWidth / 2;
-
-        scaleLabel_.setBounds(bottomRow.removeFromLeft(scaleLabelWidth));
-        scaleTypeDropdown_.setBounds(bottomRow.removeFromLeft(dropdownWidth));
-        bottomRow.removeFromLeft(dropdownSpacing);
-        keyLabel_.setBounds(bottomRow.removeFromLeft(keyLabelWidth));
-        keyDropdown_.setBounds(bottomRow);
+        // Key row
+        y += dropdownHeight + dropdownRowSpacing;
+        keyLabel_.setBounds(0, y, labelWidth, dropdownHeight);
+        keyDropdown_.setBounds(labelWidth + labelDropdownGap, y, dropdownWidth, dropdownHeight);
     }
 
 private:
-    StyledDropdown scaleTypeDropdown_;
-    StyledDropdown keyDropdown_;
     juce::Label scaleLabel_;
+    StyledDropdown scaleTypeDropdown_;
     juce::Label keyLabel_;
+    StyledDropdown keyDropdown_;
     std::array<bool, 12> keyStates_ {};
     bool suppressDropdownUpdate_ = false;
 
@@ -244,10 +248,7 @@ private:
     }
 
     juce::Rectangle<float> getKeyboardArea() const {
-        using namespace GlobalScaleQuantizerConstants;
-        auto area = getLocalBounds();
-        area.removeFromBottom(dropdownHeight + keyboardTopMargin);
-        return area.toFloat();
+        return getLocalBounds().toFloat();
     }
 
     juce::Rectangle<float> getKeyBounds(int noteIndex, const juce::Rectangle<float>& keyboardArea) const {
