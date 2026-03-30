@@ -315,7 +315,7 @@ public:
         area.removeFromTop(NavBarConstants::height);
 
         // Add some vertical spacing after navbar
-        area.removeFromTop(20);
+        area.removeFromTop(12);
 
         // Create content area with padding
         auto contentArea = area.reduced(padding, 0);

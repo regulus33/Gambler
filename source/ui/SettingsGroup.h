@@ -8,11 +8,11 @@ namespace SettingsGroupConstants {
     constexpr float borderWidth = 1.5f;
     constexpr float dashLength = 4.0f;
     constexpr float gapLength = 3.0f;
-    constexpr float titleFontSize = 18.0f;
-    constexpr int titleHeight = 32;
-    constexpr int contentPaddingTop = 12;
+    constexpr float titleFontSize = 15.0f;
+    constexpr int titleHeight = 28;
+    constexpr int contentPaddingTop = 8;
     constexpr int contentPaddingHorizontal = 20;
-    constexpr int contentPaddingBottom = 20;
+    constexpr int contentPaddingBottom = 14;
 }
 
 /**
