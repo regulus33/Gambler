@@ -8,7 +8,6 @@
 #include "SavePresetDialogComponent.h"
 #include "../native/iOSNativeDialogs.h"
 #include "../util/PlatformUtils.h"
-#include "../backend/PresetManager.h"
 #include "../backend/MidiLearnRegistry.h"
 #include "../backend/MidiMapping.h"
 #include <juce_gui_basics/juce_gui_basics.h>
