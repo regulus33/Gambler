@@ -4,8 +4,10 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace SettingsGroupConstants {
-    constexpr float cornerRadius = 8.0f;
-    constexpr float borderWidth = 3.0f;  // 3px white border to match app style
+    constexpr float cornerRadius = 0.0f;
+    constexpr float borderWidth = 1.5f;
+    constexpr float dashLength = 4.0f;
+    constexpr float gapLength = 3.0f;
     constexpr float titleFontSize = 18.0f;
     constexpr int titleHeight = 32;
     constexpr int contentPaddingTop = 12;
@@ -61,15 +63,20 @@ public:
     void paint(juce::Graphics& g) override {
         using namespace SettingsGroupConstants;
 
-        auto bounds = getLocalBounds().toFloat();
+        auto bounds = getLocalBounds().toFloat().reduced(borderWidth * 0.5f);
 
-        // Draw white border (3px)
+        // Draw dotted border
         g.setColour(juce::Colours::white);
-        g.drawRoundedRectangle(bounds.reduced(borderWidth * 0.5f), cornerRadius, borderWidth);
+        float dashes[] = { dashLength, gapLength };
+        juce::Path borderPath;
+        borderPath.addRectangle(bounds);
+        juce::PathStrokeType strokeType(borderWidth);
+        juce::Path dashedPath;
+        strokeType.createDashedStroke(dashedPath, borderPath, dashes, 2);
+        g.fillPath(dashedPath);
 
         // Draw title
-        auto titleBounds = bounds.removeFromTop(static_cast<float>(titleHeight));
-        g.setColour(juce::Colours::white);
+        auto titleBounds = getLocalBounds().toFloat().removeFromTop(static_cast<float>(titleHeight));
         g.setFont(juce::FontOptions(interBoldFont).withHeight(titleFontSize));
         g.drawText(titleText, titleBounds.reduced(static_cast<float>(contentPaddingHorizontal), 0),
                    juce::Justification::centredLeft, false);

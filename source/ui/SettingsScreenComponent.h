@@ -78,8 +78,8 @@ namespace SettingsScreenConstants {
     constexpr juce::uint32 bgColourHex = 0xFF1E1E1E;  // Match main app background
     constexpr float labelFontSize = 14.0f;
     constexpr float sliderTextBoxWidth = 60.0f;
-    constexpr int groupSpacing = 20;  // Spacing between groups
-    constexpr int groupHorizontalSpacing = 20;  // Spacing between groups horizontally
+    constexpr int groupSpacing = 10;  // Spacing between groups (vertical)
+    constexpr int groupHorizontalSpacing = 10;  // Spacing between groups horizontally
     constexpr int maxGroupWidth = 500;  // Maximum width for each group
 }
 
@@ -232,6 +232,8 @@ public:
 
 
         // Create settings groups
+
+        // Clock & Timing
         clockTimingGroup = std::make_unique<SettingsGroup>("Clock & Timing");
         clockTimingGroup->addControl(internalClockToggle);
         clockTimingGroup->addLabeledControl(tempoLabel, tempoSlider);
@@ -239,14 +241,16 @@ public:
         clockTimingGroup->addControl(externalMidiClockToggle);
         addAndMakeVisible(*clockTimingGroup);
 
-        playbackGroup = std::make_unique<SettingsGroup>("Playback");
-        playbackGroup->addLabeledControl(noteLengthLabel, noteLengthSlider);
-        playbackGroup->addControl(previewNotesToggle);
-        playbackGroup->addControl(followStepToggle);
-        addAndMakeVisible(*playbackGroup);
+        // Scale Quantizer
+        globalScaleQuantizer_ = std::make_unique<GlobalScaleQuantizerComponent>(processor);
 
-        // Setup MIDI output channel dropdown
-        midiOutputChannelLabel.setText("Output Channel", juce::dontSendNotification);
+        scaleQuantizerGroup = std::make_unique<SettingsGroup>("Scale Quantizer");
+        scaleQuantizerGroup->addCustomControl(*globalScaleQuantizer_,
+            GlobalScaleQuantizerConstants::totalHeight);
+        addAndMakeVisible(*scaleQuantizerGroup);
+
+        // Playback & MIDI (merged)
+        midiOutputChannelLabel.setText("MIDI Channel", juce::dontSendNotification);
         midiOutputChannelLabel.setColour(juce::Label::textColourId, juce::Colours::white);
         midiOutputChannelLabel.setJustificationType(juce::Justification::centredLeft);
 
@@ -262,25 +266,16 @@ public:
                 onMidiOutputChannelChanged(midiOutputChannelComboBox.getSelectedId());
         };
 
-        midiGroup = std::make_unique<SettingsGroup>("MIDI");
-        midiGroup->addLabeledControl(midiOutputChannelLabel, midiOutputChannelComboBox);
-        addAndMakeVisible(*midiGroup);
+        playbackMidiGroup = std::make_unique<SettingsGroup>("Playback & MIDI");
+        playbackMidiGroup->addLabeledControl(noteLengthLabel, noteLengthSlider);
+        playbackMidiGroup->addControl(previewNotesToggle);
+        playbackMidiGroup->addControl(followStepToggle);
+        playbackMidiGroup->addLabeledControl(midiOutputChannelLabel, midiOutputChannelComboBox);
+        addAndMakeVisible(*playbackMidiGroup);
 
-        // Note Colours group - mini piano keyboard colour picker
+        // Colours (merged Note Colours + Step Colours)
         noteColourPicker = std::make_unique<NoteColourPickerComponent>(processor);
-        noteColoursGroup = std::make_unique<SettingsGroup>("Note Colours");
-        noteColoursGroup->addCustomControl(*noteColourPicker, 62);
-        addAndMakeVisible(*noteColoursGroup);
 
-        // Scale Quantizer group - global scale setting for all steps
-        globalScaleQuantizer_ = std::make_unique<GlobalScaleQuantizerComponent>(processor);
-
-        scaleQuantizerGroup = std::make_unique<SettingsGroup>("Scale Quantizer");
-        scaleQuantizerGroup->addCustomControl(*globalScaleQuantizer_,
-            GlobalScaleQuantizerConstants::totalHeight);
-        addAndMakeVisible(*scaleQuantizerGroup);
-
-        // Step Colours group
         selectedStepOutlineLabel.setText("Selected step outline", juce::dontSendNotification);
         selectedStepOutlineLabel.setColour(juce::Label::textColourId, juce::Colours::white);
         selectedStepOutlineLabel.setJustificationType(juce::Justification::centredLeft);
@@ -297,10 +292,11 @@ public:
             UIConstants::activeStepColour = c;
         };
 
-        group6 = std::make_unique<SettingsGroup>("Step Colours");
-        group6->addLabeledControl(selectedStepOutlineLabel, selectedStepSwatch);
-        group6->addLabeledControl(activeStepLabel, activeStepSwatch);
-        addAndMakeVisible(*group6);
+        coloursGroup = std::make_unique<SettingsGroup>("Colours");
+        coloursGroup->addCustomControl(*noteColourPicker, 62);
+        coloursGroup->addLabeledControl(selectedStepOutlineLabel, selectedStepSwatch);
+        coloursGroup->addLabeledControl(activeStepLabel, activeStepSwatch);
+        addAndMakeVisible(*coloursGroup);
     }
 
     void paint(juce::Graphics& g) override {
@@ -319,48 +315,39 @@ public:
         area.removeFromTop(NavBarConstants::height);
 
         // Add some vertical spacing after navbar
-        area.removeFromTop(30);
+        area.removeFromTop(20);
 
         // Create content area with padding
         auto contentArea = area.reduced(padding, 0);
 
-        // Calculate group heights
-        int clockTimingHeight = clockTimingGroup->getMinimumHeight();
-        int playbackHeight = playbackGroup->getMinimumHeight();
-        int midiHeight = midiGroup->getMinimumHeight();
-        int group4Height = noteColoursGroup->getMinimumHeight();
-        int group5Height = scaleQuantizerGroup->getMinimumHeight();
-        int group6Height = group6->getMinimumHeight();
-
-        // 3x2 Grid layout using Grid
+        // 2x2 Grid layout
         juce::Grid grid;
 
         using Track = juce::Grid::TrackInfo;
         using Fr = juce::Grid::Fr;
         using Px = juce::Grid::Px;
 
-        // Three equal columns
-        grid.templateColumns = { Track(Fr(1)), Track(Fr(1)), Track(Fr(1)) };
+        // Two equal columns
+        grid.templateColumns = { Track(Fr(1)), Track(Fr(1)) };
 
-        // Two rows with heights based on max height in each row
-        int row1Height = juce::jmax(clockTimingHeight, juce::jmax(playbackHeight, midiHeight));
-        int row2Height = juce::jmax(group4Height, juce::jmax(group5Height, group6Height));
+        // Two rows sized to tallest group in each row
+        int row1Height = juce::jmax(clockTimingGroup->getMinimumHeight(),
+                                     scaleQuantizerGroup->getMinimumHeight());
+        int row2Height = juce::jmax(playbackMidiGroup->getMinimumHeight(),
+                                     coloursGroup->getMinimumHeight());
         grid.templateRows = { Track(Px(row1Height)), Track(Px(row2Height)) };
 
         // Set gaps
         grid.columnGap = Px(groupHorizontalSpacing);
         grid.rowGap = Px(groupSpacing);
 
-        // Add items in 3x2 grid
-        // Row 1
+        // Row 1: Clock & Timing | Scale Quantizer
         grid.items.add(juce::GridItem(*clockTimingGroup).withArea(1, 1));
-        grid.items.add(juce::GridItem(*playbackGroup).withArea(1, 2));
-        grid.items.add(juce::GridItem(*midiGroup).withArea(1, 3));
+        grid.items.add(juce::GridItem(*scaleQuantizerGroup).withArea(1, 2));
 
-        // Row 2
-        grid.items.add(juce::GridItem(*noteColoursGroup).withArea(2, 1));
-        grid.items.add(juce::GridItem(*scaleQuantizerGroup).withArea(2, 2));
-        grid.items.add(juce::GridItem(*group6).withArea(2, 3));
+        // Row 2: Playback & MIDI | Colours
+        grid.items.add(juce::GridItem(*playbackMidiGroup).withArea(2, 1));
+        grid.items.add(juce::GridItem(*coloursGroup).withArea(2, 2));
 
         // Perform layout
         grid.performLayout(contentArea);
@@ -433,13 +420,11 @@ public:
 private:
     juce::Typeface::Ptr interTypeface;
 
-    // Settings groups
+    // Settings groups (2x2 layout)
     std::unique_ptr<SettingsGroup> clockTimingGroup;
-    std::unique_ptr<SettingsGroup> playbackGroup;
-    std::unique_ptr<SettingsGroup> midiGroup;
-    std::unique_ptr<SettingsGroup> noteColoursGroup;
     std::unique_ptr<SettingsGroup> scaleQuantizerGroup;
-    std::unique_ptr<SettingsGroup> group6;
+    std::unique_ptr<SettingsGroup> playbackMidiGroup;
+    std::unique_ptr<SettingsGroup> coloursGroup;
 
     // Clock & Timing controls
     juce::ToggleButton internalClockToggle;
