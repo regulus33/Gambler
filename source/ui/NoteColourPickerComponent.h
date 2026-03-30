@@ -31,11 +31,10 @@ public:
     explicit NoteColourPickerComponent(PluginProcessor& processor)
         : StateListenerComponent(processor)
     {
-        // Subscribe to all 12 note colour params
-        for (int i = 0; i < 12; ++i) {
-            listenToParameter(Params::Keys::ID::noteColour(i));
+        // Subscribe to InternalState changes (note colours live there, not APVTS)
+        listenToInternalState();
+        for (int i = 0; i < 12; ++i)
             keyColours_[i] = getState().getNoteColour(i);
-        }
 
         setInterceptsMouseClicks(true, false);
     }

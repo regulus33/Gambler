@@ -106,9 +106,8 @@ public:
         listenToGlobalScaleNotes();  // Global scale notes
         listenToScaleRange();  // Scale range min/max
 
-        // Subscribe to note colour changes
-        for (int i = 0; i < 12; ++i)
-            listenToParameter(Params::Keys::ID::noteColour(i));
+        // Subscribe to note colour changes (colours live in InternalState, not APVTS)
+        listenToInternalState();
 
         setSize (componentWidth, componentHeight);
 
