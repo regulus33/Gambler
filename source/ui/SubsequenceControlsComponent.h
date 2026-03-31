@@ -6,6 +6,7 @@
 #include "../backend/MidiLearnRegistry.h"
 #include "../backend/MidiMapping.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_animation/juce_animation.h>
 #include <functional>
 #include <array>
 
@@ -258,6 +259,10 @@ public:
         interTypeface = juce::Typeface::createSystemTypefaceFor (
             BinaryData::InterVariableFont_ttf,
             BinaryData::InterVariableFont_ttfSize);
+
+        vblank = std::make_unique<juce::VBlankAttachment>(this, [this](double ts) {
+            onVBlank(ts);
+        });
     }
 
     void setMidiControlId(MidiControlId controlId) {
@@ -272,12 +277,30 @@ public:
         using namespace SubsequenceControlsConstants;
         auto bounds = getLocalBounds().toFloat();
 
+        // Animate display colours toward targets
+        auto [targetBg, targetText] = getTargetColours();
+        if (!coloursInitialised_) {
+            displayBg_ = targetBg;
+            displayText_ = targetText;
+            coloursInitialised_ = true;
+        } else {
+            float t = juce::jmin(1.0f, colourFadeSpeed_ * frameDelta_);
+            if (displayBg_ != targetBg) {
+                displayBg_ = displayBg_.interpolatedWith(targetBg, t);
+                if (displayBg_ != targetBg) needsRepaint_ = true;
+            }
+            if (displayText_ != targetText) {
+                displayText_ = displayText_.interpolatedWith(targetText, t);
+                if (displayText_ != targetText) needsRepaint_ = true;
+            }
+        }
+
         // Background
-        g.setColour (juce::Colour (buttonBgHex));
-        g.fillRoundedRectangle (bounds, buttonCornerRadius);
+        g.setColour(displayBg_);
+        g.fillRoundedRectangle(bounds, buttonCornerRadius);
 
         // Text
-        g.setColour (juce::Colours::white);
+        g.setColour(displayText_);
         juce::Font font (juce::FontOptions (interTypeface).withHeight (buttonFontSize));
         font.setBold (true);
         g.setFont (font);
@@ -295,17 +318,58 @@ public:
             return;
         }
 
+        pressed_ = true;
+        needsRepaint_ = true;
+        repaint();
+
         if (onClick)
             onClick();
+    }
+
+    void mouseUp (const juce::MouseEvent& /*event*/) override {
+        pressed_ = false;
+        needsRepaint_ = true;
+        repaint();
     }
 
     std::function<void()> onClick;
 
 private:
+    static constexpr float colourFadeSpeed_ = 10.0f;
+
+    std::pair<juce::Colour, juce::Colour> getTargetColours() const {
+        if (pressed_)
+            return { juce::Colours::white, juce::Colour(SubsequenceControlsConstants::buttonBgHex) };
+        return { juce::Colour(SubsequenceControlsConstants::buttonBgHex), juce::Colours::white };
+    }
+
+    void onVBlank(double timestamp) {
+        if (lastVBlankTime_ > 0.0) {
+            double delta = timestamp - lastVBlankTime_;
+            frameDelta_ = static_cast<float>(juce::jlimit(0.001, 0.1, delta));
+        }
+        lastVBlankTime_ = timestamp;
+
+        if (needsRepaint_) {
+            needsRepaint_ = false;
+            repaint();
+        }
+    }
+
     juce::String label;
     juce::Typeface::Ptr interTypeface;
     MidiControlId midiControlId_ = MidiControlId::COUNT;
     MidiLearnRegistry* registry_ = nullptr;
+
+    // Animation state
+    std::unique_ptr<juce::VBlankAttachment> vblank;
+    bool pressed_ = false;
+    bool coloursInitialised_ = false;
+    bool needsRepaint_ = false;
+    juce::Colour displayBg_ { SubsequenceControlsConstants::buttonBgHex };
+    juce::Colour displayText_ { juce::Colours::white };
+    float frameDelta_ = 0.016f;
+    double lastVBlankTime_ = 0.0;
 };
 
 /**
