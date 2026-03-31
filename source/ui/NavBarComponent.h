@@ -92,7 +92,7 @@ private:
 namespace NavBarConstants {
     constexpr int height = 45;
     constexpr int marginLeft = 8;
-    constexpr int marginRight = 29;
+    constexpr int marginRight = 35;
 
     // Per-component scale factors — tweak individually to resize each control
     constexpr float presetScale        = 0.8f;   // preset selector (dropdown + arrows + save)
