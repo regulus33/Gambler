@@ -9,10 +9,10 @@ namespace SettingsGroupConstants {
     constexpr float dashLength = 4.0f;
     constexpr float gapLength = 3.0f;
     constexpr float titleFontSize = 15.0f;
-    constexpr int titleHeight = 28;
-    constexpr int contentPaddingTop = 8;
+    constexpr int titleHeight = 24;
+    constexpr int contentPaddingTop = 5;
     constexpr int contentPaddingHorizontal = 20;
-    constexpr int contentPaddingBottom = 14;
+    constexpr int contentPaddingBottom = 8;
 }
 
 /**
@@ -105,7 +105,7 @@ public:
     /**
      * Add a single control (e.g., checkbox) that spans the full width
      */
-    void addControl(juce::Component& control, int height = 30, int spacing = 12) {
+    void addControl(juce::Component& control, int height = 30, int spacing = 8) {
         addAndMakeVisible(control);
         controlItems.add(juce::FlexItem(control)
             .withHeight(static_cast<float>(height))
@@ -117,7 +117,7 @@ public:
      * Label will be on the left, control on the right
      */
     void addLabeledControl(juce::Component& label, juce::Component& control,
-                          int height = 30, int labelWidth = 120, int spacing = 12) {
+                          int height = 30, int labelWidth = 120, int spacing = 8) {
         // Create a container for the label + control row
         auto* container = new LabeledControlContainer(label, control, labelWidth);
         addAndMakeVisible(container);
@@ -131,7 +131,7 @@ public:
     /**
      * Add a custom component with full control over height and spacing
      */
-    void addCustomControl(juce::Component& control, int height, int spacing = 12) {
+    void addCustomControl(juce::Component& control, int height, int spacing = 8) {
         addAndMakeVisible(control);
         controlItems.add(juce::FlexItem(control)
             .withHeight(static_cast<float>(height))

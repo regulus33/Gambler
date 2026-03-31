@@ -314,8 +314,8 @@ public:
         // Reserve space for navbar (owned by ApplicationComponent)
         area.removeFromTop(NavBarConstants::height);
 
-        // Add some vertical spacing after navbar
-        area.removeFromTop(12);
+        // Add vertical spacing after navbar so content clears the logo
+        area.removeFromTop(28);
 
         // Create content area with padding
         auto contentArea = area.reduced(padding, 0);
