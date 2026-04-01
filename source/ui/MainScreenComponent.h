@@ -10,7 +10,6 @@
 #include "SequenceOverviewComponent.h"
 #include "SubsequenceControlsComponent.h"
 #include "NoteRangeControlsComponent.h"
-#include "MusicConstants.h"
 #include "../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
