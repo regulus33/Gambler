@@ -229,6 +229,24 @@ public:
                 onFollowStepChanged(followStepToggle.getToggleState());
         };
 
+        // Setup destructive scale checkbox
+        destructiveScaleToggle.setButtonText("Bake scale to steps");
+        destructiveScaleToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        destructiveScaleToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
+        destructiveScaleToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+        destructiveScaleToggle.setToggleState(false, juce::dontSendNotification);
+        destructiveScaleAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+            processor.getAPVTS(), Params::Keys::ID::PREF_DESTRUCTIVE_SCALE, destructiveScaleToggle);
+
+        // Setup destructive range checkbox
+        destructiveRangeToggle.setButtonText("Bake range to steps");
+        destructiveRangeToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        destructiveRangeToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
+        destructiveRangeToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+        destructiveRangeToggle.setToggleState(false, juce::dontSendNotification);
+        destructiveRangeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+            processor.getAPVTS(), Params::Keys::ID::PREF_DESTRUCTIVE_RANGE, destructiveRangeToggle);
+
 
 
         // Create settings groups
@@ -270,6 +288,8 @@ public:
         playbackMidiGroup->addLabeledControl(noteLengthLabel, noteLengthSlider);
         playbackMidiGroup->addControl(previewNotesToggle);
         playbackMidiGroup->addControl(followStepToggle);
+        playbackMidiGroup->addControl(destructiveScaleToggle);
+        playbackMidiGroup->addControl(destructiveRangeToggle);
         playbackMidiGroup->addLabeledControl(midiOutputChannelLabel, midiOutputChannelComboBox);
         addAndMakeVisible(*playbackMidiGroup);
 
@@ -438,6 +458,10 @@ private:
     juce::Slider noteLengthSlider;
     juce::ToggleButton previewNotesToggle;
     juce::ToggleButton followStepToggle;
+    juce::ToggleButton destructiveScaleToggle;
+    juce::ToggleButton destructiveRangeToggle;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> destructiveScaleAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> destructiveRangeAttachment;
 
     // MIDI controls
     juce::Label midiOutputChannelLabel;

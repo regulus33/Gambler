@@ -223,12 +223,12 @@ public:
 
     /**
      * Update the current note for a step (at its current substep index)
-     * Stores the exact value provided (typically from manual user edits)
+     * When destructive scale/range is enabled, the note is baked before storage.
      */
     void updateCurrentNoteForStep(int stepIndex, int noteNumber) {
         int substepIdx = getStepNotesCurrentIndex(stepIndex);
         if (substepIdx < 0) substepIdx = 0;
-        setStepNote(stepIndex, substepIdx, noteNumber);
+        setStepNote(stepIndex, substepIdx, bakeNoteForStorage(noteNumber));
     }
 
     /**
@@ -404,17 +404,26 @@ public:
 
     /**
      * Quantize a note to the global scale and clamp to note range.
-     * Range clamping and scale quantization are applied on-the-fly without
-     * modifying stored data — changing the range or scale affects playback
-     * immediately.
+     * When destructive mode is OFF (default), this applies both range clamping
+     * and scale quantization on-the-fly at playback time.
+     * When destructive mode is ON, the corresponding quantization is skipped
+     * here because it was already baked into the stored note at record time.
      * Returns -1 (rest) if no scale notes are enabled.
      */
     int quantizeNoteToGlobalScale(int noteNumber) const {
+        bool skipRange = getDestructiveRange();
+        bool skipScale = getDestructiveScale();
+
         int rangeMin = getScaleRangeMin();
         int rangeMax = getScaleRangeMax();
 
-        // Clamp to note range first
-        noteNumber = juce::jlimit(rangeMin, rangeMax, noteNumber);
+        // Clamp to note range (skip if already baked at record time)
+        if (!skipRange)
+            noteNumber = juce::jlimit(rangeMin, rangeMax, noteNumber);
+
+        // Skip scale quantization if already baked at record time
+        if (skipScale)
+            return noteNumber;
 
         // Check if any notes are enabled in the global scale
         bool anyEnabled = false;
@@ -430,20 +439,70 @@ public:
         // If already in scale and in range, return it
         if (isNoteInGlobalScale(noteNumber)) return noteNumber;
 
+        // Determine search bounds based on whether range is baked
+        int searchMin = skipRange ? 0 : rangeMin;
+        int searchMax = skipRange ? 127 : rangeMax;
+
         // Find nearest note in scale within the range (prefer lower when equidistant)
         for (int distance = 1; distance <= 127; distance++) {
             int downNote = noteNumber - distance;
-            if (downNote >= rangeMin && isNoteInGlobalScale(downNote)) return downNote;
+            if (downNote >= searchMin && isNoteInGlobalScale(downNote)) return downNote;
 
             int upNote = noteNumber + distance;
-            if (upNote <= rangeMax && isNoteInGlobalScale(upNote)) return upNote;
+            if (upNote <= searchMax && isNoteInGlobalScale(upNote)) return upNote;
 
             // Stop searching if both directions are out of range
-            if (downNote < rangeMin && upNote > rangeMax) break;
+            if (downNote < searchMin && upNote > searchMax) break;
         }
 
         // No scale note found in range — return as rest
         return -1;
+    }
+
+    /**
+     * Apply destructive quantization to a note before storage.
+     * When destructive scale/range is enabled, the note is quantized/clamped
+     * NOW so the baked value is stored. This allows the scale or range to
+     * change later without affecting previously recorded notes.
+     */
+    int bakeNoteForStorage(int noteNumber) const {
+        if (noteNumber < 0) return noteNumber;  // Don't bake rests
+
+        bool bakeRange = getDestructiveRange();
+        bool bakeScale = getDestructiveScale();
+
+        if (!bakeRange && !bakeScale)
+            return noteNumber;  // Nothing to bake
+
+        if (bakeRange) {
+            int rangeMin = getScaleRangeMin();
+            int rangeMax = getScaleRangeMax();
+            noteNumber = juce::jlimit(rangeMin, rangeMax, noteNumber);
+        }
+
+        if (bakeScale) {
+            // Check if any notes are enabled
+            bool anyEnabled = false;
+            for (int i = 0; i < 12; i++) {
+                if (getGlobalScaleNote(i)) { anyEnabled = true; break; }
+            }
+            if (!anyEnabled) return -1;
+
+            if (!isNoteInGlobalScale(noteNumber)) {
+                int rangeMin = bakeRange ? getScaleRangeMin() : 0;
+                int rangeMax = bakeRange ? getScaleRangeMax() : 127;
+                for (int distance = 1; distance <= 127; distance++) {
+                    int downNote = noteNumber - distance;
+                    if (downNote >= rangeMin && isNoteInGlobalScale(downNote)) return downNote;
+                    int upNote = noteNumber + distance;
+                    if (upNote <= rangeMax && isNoteInGlobalScale(upNote)) return upNote;
+                    if (downNote < rangeMin && upNote > rangeMax) break;
+                }
+                return -1;
+            }
+        }
+
+        return noteNumber;
     }
 
     // ========================================
@@ -506,7 +565,21 @@ public:
         setFloatParam(Params::Keys::ID::PREF_NOTE_LENGTH, juce::jlimit(0.0f, 1.0f, length));
     }
 
+    bool getDestructiveScale() const {
+        return getBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE);
+    }
 
+    void setDestructiveScale(bool enabled) {
+        setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE, enabled);
+    }
+
+    bool getDestructiveRange() const {
+        return getBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_RANGE);
+    }
+
+    void setDestructiveRange(bool enabled) {
+        setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_RANGE, enabled);
+    }
 
     // ========================================
     // NOTE COLOURS (delegated to InternalState)
@@ -563,10 +636,10 @@ public:
             }
 
             // Probability check passed - generate a random note
-            // Queue the unquantized note for deferred storage on message thread
+            // Bake if destructive mode is on, otherwise store raw
             // Return the quantized version for immediate playback
             int unquantizedNote = generateRandomNoteUnquantized();
-            queueNoteWrite(currentIndex, substepIdx, unquantizedNote);
+            queueNoteWrite(currentIndex, substepIdx, bakeNoteForStorage(unquantizedNote));
             return quantizeNoteToGlobalScale(unquantizedNote);
         }
 
@@ -637,8 +710,8 @@ public:
         std::uniform_int_distribution<> dis(rangeMin, rangeMax);
 
         int randomNote = dis(gen);
-        // Store the unquantized random note
-        // Quantization will happen on-the-fly when reading for playback/display
+        // Bake scale/range if destructive mode is on, otherwise store raw
+        randomNote = bakeNoteForStorage(randomNote);
 
         int substepIdx = getStepNotesCurrentIndex(stepIndex);
         if (substepIdx < 0) substepIdx = 0;

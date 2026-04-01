@@ -118,6 +118,8 @@ namespace Params
             inline const String PREF_PREVIEW_NOTES = "pref_preview_notes";
             inline const String PREF_FOLLOW_STEP = "pref_follow_step";
             inline const String PREF_NOTE_LENGTH = "pref_note_length";
+            inline const String PREF_DESTRUCTIVE_SCALE = "pref_destructive_scale";
+            inline const String PREF_DESTRUCTIVE_RANGE = "pref_destructive_range";
 
             // ========================================
             // SEQUENCER CONTROL BUTTONS (MIDI-mappable)
@@ -255,6 +257,8 @@ namespace Params
             inline const String PREF_PREVIEW_NOTES = "Preview Notes";
             inline const String PREF_FOLLOW_STEP = "Follow Step";
             inline const String PREF_NOTE_LENGTH = "Note Length";
+            inline const String PREF_DESTRUCTIVE_SCALE = "Destructive Scale";
+            inline const String PREF_DESTRUCTIVE_RANGE = "Destructive Range";
 
             // Scale Latch mode
             inline const String SCALE_LATCH = "Scale Latch";
@@ -399,6 +403,8 @@ namespace Params
         params.push_back(createBoolParam(Keys::ID::PREF_PREVIEW_NOTES, Keys::LABEL::PREF_PREVIEW_NOTES, true));
         params.push_back(createBoolParam(Keys::ID::PREF_FOLLOW_STEP, Keys::LABEL::PREF_FOLLOW_STEP, false));
         params.push_back(createFloatParam(Keys::ID::PREF_NOTE_LENGTH, Keys::LABEL::PREF_NOTE_LENGTH, 0.1f, 2.0f, 0.9f));
+        params.push_back(createBoolParam(Keys::ID::PREF_DESTRUCTIVE_SCALE, Keys::LABEL::PREF_DESTRUCTIVE_SCALE, false));
+        params.push_back(createBoolParam(Keys::ID::PREF_DESTRUCTIVE_RANGE, Keys::LABEL::PREF_DESTRUCTIVE_RANGE, false));
 
         // ========================================
         // SEQUENCER CONTROL BUTTONS (MIDI-mappable)
