@@ -49,6 +49,11 @@ namespace MainScreenLayout {
     constexpr int compactBottomGapAboveSequencer = 0;
     // Compact bottom row: extra top padding for logo to avoid clipping
     constexpr int compactBottomLogoExtraTopPadding = 4;
+
+    // Compact top row: reduce title row height (gap between navbar and content)
+    constexpr int compactTopTitleRowHeight = 10;
+    // Compact top row: reduce top content height (less bottom padding below piano roll)
+    constexpr int compactTopContentHeight = 210;
 }
 
 /**
@@ -144,11 +149,11 @@ public:
         if (compactMode_) {
             // Compact mode: show only one row directly below navbar
             if (showingTopRow_) {
-                // Title row
-                area.removeFromTop(titleRowHeight);
+                // Title row (reduced in compact mode)
+                area.removeFromTop(compactTopTitleRowHeight);
 
-                // Top content row
-                auto topRow = area.removeFromTop(topContentHeight);
+                // Top content row (reduced in compact mode)
+                auto topRow = area.removeFromTop(compactTopContentHeight);
                 topRow.removeFromLeft(marginLeft);
                 topRow.removeFromRight(marginRight);
 

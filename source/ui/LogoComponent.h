@@ -13,7 +13,7 @@ namespace LogoConstants {
     constexpr int topPadding = 5;
 
     // Scale factor for compact bottom row mode (logo shares space with step buttons)
-    constexpr float compactBottomScale = 0.75f;
+    constexpr float compactBottomScale = 0.6f;
 
     // Fine-tune offsets for positioning within the allocated bounds (applied after centering)
     constexpr float offsetX = 0.0f;
