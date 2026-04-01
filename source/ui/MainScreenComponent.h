@@ -46,7 +46,7 @@ namespace MainScreenLayout {
     constexpr int bottomPadding = 24;   // padding below sequencer row / bottom of window
 
     // Compact bottom row: extra gap between navbar/logo and sequencer rows
-    constexpr int compactBottomGapAboveSequencer = 22;
+    constexpr int compactBottomGapAboveSequencer = 0;
     // Compact bottom row: extra top padding for logo to avoid clipping
     constexpr int compactBottomLogoExtraTopPadding = 4;
 }
