@@ -141,6 +141,47 @@ TEST_CASE ("Visual - SubsequenceControlsComponent", "[visual]")
     snap (f.getMainScreen().getSubsequenceControls(), "subsequence_controls");
 }
 
+TEST_CASE ("Visual - Subsequence length 1 active", "[visual]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    auto& state = f.getState();
+
+    // Step 0: 1 substep with C4 (MIDI 60), currently playing
+    state.setSelectedStepForEditing(0);
+    state.setStepNote(0, 0, 60);           // C4
+    state.setStepNotesLength(0, 1);
+    state.setCurrentIndex(0);              // step 0 is playing
+    state.setStepNotesCurrentIndex(0, 0);  // substep 0 is active
+    f.processMessages();
+
+    snap (f.getMainScreen().getSubsequenceControls(), "subsequence_length1_active");
+}
+
+TEST_CASE ("Visual - Subsequence length 8 mixed", "[visual]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    auto& state = f.getState();
+
+    // Step 0: 8 substeps with mixed notes, rests, and one active
+    state.setSelectedStepForEditing(0);
+    state.setStepNote(0, 0, 60);   // C4
+    state.setStepNote(0, 1, 64);   // E4
+    state.setStepNote(0, 2, -1);   // rest
+    state.setStepNote(0, 3, 67);   // G4
+    state.setStepNote(0, 4, 72);   // C5
+    state.setStepNote(0, 5, -1);   // rest
+    state.setStepNote(0, 6, 69);   // A4
+    state.setStepNote(0, 7, 63);   // Eb4
+    state.setStepNotesLength(0, 8);
+    state.setCurrentIndex(0);              // step 0 is playing
+    state.setStepNotesCurrentIndex(0, 3);  // substep 3 (G4) is active
+    f.processMessages();
+
+    snap (f.getMainScreen().getSubsequenceControls(), "subsequence_length8_mixed");
+}
+
 TEST_CASE ("Visual - NoteRangeControlsComponent", "[visual]")
 {
     getJuceInit();

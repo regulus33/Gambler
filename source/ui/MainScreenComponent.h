@@ -298,37 +298,40 @@ public:
     }
 
     // Helper to update the subsequence bar UI from selected step's StepNotes
+    // Note: SubsequenceControlsComponent::onStateChanged() handles the same updates
+    // via APVTS listener. This method is kept for explicit refresh calls.
     void updateSubsequenceBar() {
         auto& state = processorRef.getState();
         int selectedStep = state.getSelectedStepForEditing();
-
         int length = state.getStepNotesLength(selectedStep);
         int currentSubstepIndex = state.getStepNotesCurrentIndex(selectedStep);
+        bool isCurrentStep = (selectedStep == state.getCurrentIndex());
 
         auto& bar = subsequenceControls.getSubsequenceBar();
 
-        // Update all 8 bars based on the current step's StepNotes
         for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
             if (i < length) {
-                // Active substep - color based on note value (quantized for display)
                 int midiNote = state.getQuantizedStepNote(selectedStep, i);
-                juce::Colour noteColor;
-                // Check if note is rest or quantized to rest
-                // This happens when: 1) stored note is a rest, or 2) no scale notes are selected
-                if (midiNote < 0) {
-                    // TODO centralize rest ui presentation
-                    noteColor = juce::Colour(SequenceGridConstants::defaultGreyHex);
-                } else {
-                    int chromaticNote = midiNote % 12;
-                    noteColor = state.getNoteColour(chromaticNote);
-                }
+                bool isCurrent = isCurrentStep && (i == currentSubstepIndex);
 
-                bool isCurrentSubstep = (i == currentSubstepIndex);
-                bar.setBarColor(i, noteColor);
-                bar.setBarBorder(i, isCurrentSubstep);
+                if (midiNote < 0) {
+                    bar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::restGreyHex));
+                    bar.setBarNoteLabel(i, "");
+                } else {
+                    if (isCurrent) {
+                        bar.setBarColor(i, UIConstants::activeStepColour);
+                    } else {
+                        int chromaticNote = midiNote % 12;
+                        bar.setBarColor(i, state.getNoteColour(chromaticNote));
+                    }
+                    bar.setBarNoteLabel(i, MusicConstants::midiNoteToNoteName(midiNote));
+                }
+                bar.setBarCurrent(i, isCurrent);
+                bar.setBarBorder(i, isCurrent);
             } else {
-                // Inactive substep - show as default grey (darker)
                 bar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::defaultGreyHex));
+                bar.setBarNoteLabel(i, "");
+                bar.setBarCurrent(i, false);
                 bar.setBarBorder(i, false);
             }
         }

@@ -3,6 +3,8 @@
 #include "BinaryData.h"
 #include "StateListenerComponent.h"
 #include "MidiLearnOverlayPainter.h"
+#include "MusicConstants.h"
+#include "UIConstants.h"
 #include "../backend/MidiLearnRegistry.h"
 #include "../backend/MidiMapping.h"
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -48,7 +50,12 @@ namespace SubsequenceControlsConstants {
 
     // Colors
     constexpr juce::uint32 defaultGreyHex = 0xff484848;  // Same as button background
+    constexpr juce::uint32 restGreyHex = 0xff505050;     // Lighter grey for rest substeps (matches StepButton)
     constexpr juce::uint32 buttonBgHex = 0xff484848;
+
+    // Note label
+    constexpr float fontSize = 10.0f;
+    constexpr float activeCircleDiameter = 14.0f;
 
     // Container
     constexpr int horizontalPadding = 10;  // Padding on each side
@@ -86,10 +93,39 @@ public:
         g.setColour (color);
         g.fillRoundedRectangle (bounds, barCornerRadius);
 
-        // Draw white border if enabled
+        // Draw white border if this is the current (playing) substep
         if (hasBorder) {
-            g.setColour (juce::Colours::white);
+            g.setColour (UIConstants::selectedStepOutlineColour);
             g.drawRoundedRectangle (bounds.reduced (0.5f), barCornerRadius, borderWidth);
+        }
+
+        // Draw note label if we have one
+        if (noteLabel_.isNotEmpty()) {
+            auto interFont = juce::Typeface::createSystemTypefaceFor(
+                BinaryData::InterVariableFont_ttf,
+                BinaryData::InterVariableFont_ttfSize);
+            juce::Font font(juce::FontOptions(interFont).withHeight(fontSize));
+            font.setBold(true);
+
+            if (isCurrent_) {
+                // Active substep: dark circle + white text (matches StepButton)
+                float circleDiam = activeCircleDiameter;
+                float circleX = bounds.getCentreX() - circleDiam * 0.5f;
+                float circleY = bounds.getCentreY() - circleDiam * 0.5f;
+                auto circleBounds = juce::Rectangle<float>(circleX, circleY, circleDiam, circleDiam);
+
+                g.setColour(juce::Colours::black);
+                g.fillEllipse(circleBounds);
+
+                g.setColour(juce::Colours::white);
+                g.setFont(font);
+                g.drawText(noteLabel_, circleBounds, juce::Justification::centred, false);
+            } else {
+                // Normal substep: black text on colored background
+                g.setColour(juce::Colours::black);
+                g.setFont(font);
+                g.drawText(noteLabel_, bounds, juce::Justification::centred, false);
+            }
         }
 
         // Draw MIDI learn overlay on top
@@ -126,11 +162,23 @@ public:
         return hasBorder;
     }
 
+    void setNoteLabel(const juce::String& label) {
+        noteLabel_ = label;
+        repaint();
+    }
+
+    void setCurrent(bool current) {
+        isCurrent_ = current;
+        repaint();
+    }
+
     std::function<void()> onClick;
 
 private:
     juce::Colour color;
     bool hasBorder;
+    juce::String noteLabel_;
+    bool isCurrent_ = false;
     MidiControlId midiControlId_ = MidiControlId::COUNT;
     MidiLearnRegistry* registry_ = nullptr;
 };
@@ -218,6 +266,28 @@ public:
             return bars[index]->getBorder();
         }
         return false;
+    }
+
+    /**
+     * Set the note label of a single bar
+     * @param index Bar index (0-7)
+     * @param label Note name (e.g., "C4") or empty for no label
+     */
+    void setBarNoteLabel(int index, const juce::String& label) {
+        if (index >= 0 && index < SubsequenceControlsConstants::numBars) {
+            bars[index]->setNoteLabel(label);
+        }
+    }
+
+    /**
+     * Set whether a bar is the current (playing) substep
+     * @param index Bar index (0-7)
+     * @param current Whether this is the active playing substep
+     */
+    void setBarCurrent(int index, bool current) {
+        if (index >= 0 && index < SubsequenceControlsConstants::numBars) {
+            bars[index]->setCurrent(current);
+        }
     }
 
     /**
@@ -419,8 +489,8 @@ public:
                 onPlusClicked();
         };
 
-        // Subscribe to selected step and all substep parameters
-        listenToParameter(Params::Keys::ID::SEQ_SELECTED_STEP);
+        // Subscribe to sequence metadata (selected step, current index, length)
+        listenToSequenceMetadata();
         listenToStepNotes(0, ParamConstants::MAX_STEPS - 1);
         listenToStepNotesLength(0, ParamConstants::MAX_STEPS - 1);
 
@@ -479,31 +549,38 @@ protected:
         auto& state = getState();
         int selectedStep = state.getSelectedStepForEditing();
         int substepLength = state.getStepNotesLength(selectedStep);
+        int currentSubstep = state.getStepNotesCurrentIndex(selectedStep);
+        bool isCurrentStep = (selectedStep == state.getCurrentIndex());
 
-        // Update bar colors and borders based on substep data
         for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
             if (i < substepLength) {
-                // Get the quantized note for this substep and determine its color
                 int noteNumber = state.getQuantizedStepNote(selectedStep, i);
+                bool isCurrent = isCurrentStep && (i == currentSubstep);
 
-                // Check for rest before calculating pitch class
-                // This happens when: 1) stored note is a rest, or 2) no scale notes are selected
                 if (noteNumber < 0) {
-                    // Rest or quantized to rest - use grey
-                    subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::defaultGreyHex));
+                    // Rest substep
+                    subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::restGreyHex));
+                    subsequenceBar.setBarNoteLabel(i, "");
                 } else {
-                    // Normal note - use chromatic color
-                    int pitchClass = noteNumber % 12;
-                    juce::Colour noteColor = getState().getNoteColour(pitchClass);
-                    subsequenceBar.setBarColor(i, noteColor);
+                    // Normal note substep
+                    if (isCurrent) {
+                        subsequenceBar.setBarColor(i, UIConstants::activeStepColour);
+                    } else {
+                        int pitchClass = noteNumber % 12;
+                        subsequenceBar.setBarColor(i, state.getNoteColour(pitchClass));
+                    }
+                    subsequenceBar.setBarNoteLabel(i, MusicConstants::midiNoteToNoteName(noteNumber));
                 }
-            } else {
-                // Inactive substep - grey
-                subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::defaultGreyHex));
-            }
 
-            // Clear all borders - the current substep border is handled by playback
-            subsequenceBar.setBarBorder(i, false);
+                subsequenceBar.setBarCurrent(i, isCurrent);
+                subsequenceBar.setBarBorder(i, isCurrent);
+            } else {
+                // Inactive substep
+                subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::defaultGreyHex));
+                subsequenceBar.setBarNoteLabel(i, "");
+                subsequenceBar.setBarCurrent(i, false);
+                subsequenceBar.setBarBorder(i, false);
+            }
         }
     }
 
