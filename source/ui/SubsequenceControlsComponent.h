@@ -49,7 +49,7 @@ namespace SubsequenceControlsConstants {
     constexpr float buttonFontSize = 12.0f * heightScaleFactor;
 
     // Colors
-    constexpr juce::uint32 defaultGreyHex = 0xff484848;  // Same as button background
+    constexpr juce::uint32 defaultGreyHex = 0xff2a2a2a;  // Dark grey for inactive/out-of-length substeps
     constexpr juce::uint32 restGreyHex = 0xff505050;     // Lighter grey for rest substeps (matches StepButton)
     constexpr juce::uint32 buttonBgHex = 0xff484848;
 

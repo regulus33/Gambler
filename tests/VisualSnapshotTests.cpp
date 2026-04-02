@@ -182,6 +182,23 @@ TEST_CASE ("Visual - Subsequence length 8 mixed", "[visual]")
     snap (f.getMainScreen().getSubsequenceControls(), "subsequence_length8_mixed");
 }
 
+TEST_CASE ("Visual - Subsequence length 2 note and rest", "[visual]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    auto& state = f.getState();
+
+    // Step 0: 2 substeps — one note, one rest — remaining 6 are inactive
+    state.setSelectedStepForEditing(0);
+    state.setStepNote(0, 0, 65);           // F4
+    state.setStepNote(0, 1, -1);           // rest
+    state.setStepNotesLength(0, 2);
+    state.setCurrentIndex(1);              // not playing this step
+    f.processMessages();
+
+    snap (f.getMainScreen().getSubsequenceControls(), "subsequence_length2_note_rest");
+}
+
 TEST_CASE ("Visual - NoteRangeControlsComponent", "[visual]")
 {
     getJuceInit();
