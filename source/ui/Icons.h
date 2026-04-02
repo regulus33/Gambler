@@ -1901,4 +1901,44 @@ public:
         return path;
     }
 
+    /**
+     * Creates a "bake scale" icon — musical note with a down arrow (stamp/apply).
+     * Represents destructively applying scale quantization to steps.
+     */
+    static juce::Path createBakeScaleIcon() {
+        juce::Path path;
+        // Musical note head (filled ellipse)
+        path.addEllipse(0.0f, 13.0f, 7.0f, 5.0f);
+        // Note stem
+        path.addRoundedRectangle(6.0f, 2.0f, 2.0f, 13.0f, 0.5f);
+        // Down arrow (stamp/bake)
+        path.startNewSubPath(13.0f, 10.0f);
+        path.lineTo(17.0f, 15.0f);
+        path.lineTo(21.0f, 10.0f);
+        // Arrow stem
+        path.addRoundedRectangle(16.0f, 3.0f, 2.0f, 12.0f, 0.5f);
+        return path;
+    }
+
+    /**
+     * Creates a "bake range" icon — vertical range bracket with a down arrow (stamp/apply).
+     * Represents destructively applying note range to steps.
+     */
+    static juce::Path createBakeRangeIcon() {
+        juce::Path path;
+        // Vertical bar (range indicator)
+        path.addRoundedRectangle(1.0f, 2.0f, 3.0f, 16.0f, 1.0f);
+        // Top cap
+        path.addRoundedRectangle(0.0f, 1.0f, 7.0f, 2.0f, 0.5f);
+        // Bottom cap
+        path.addRoundedRectangle(0.0f, 17.0f, 7.0f, 2.0f, 0.5f);
+        // Down arrow (stamp/bake)
+        path.startNewSubPath(13.0f, 10.0f);
+        path.lineTo(17.0f, 15.0f);
+        path.lineTo(21.0f, 10.0f);
+        // Arrow stem
+        path.addRoundedRectangle(16.0f, 3.0f, 2.0f, 12.0f, 0.5f);
+        return path;
+    }
+
 };

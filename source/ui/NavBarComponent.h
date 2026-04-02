@@ -4,6 +4,7 @@
 #include "PresetSelectorComponent.h"
 #include "ToggleIconButton.h"
 #include "ScaleLatchButton.h"
+#include "DestructiveToggleButton.h"
 #include "sliders/SubdivisionSlider.h"
 #include "../data/Params.h"
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -104,6 +105,8 @@ namespace NavBarConstants {
     constexpr float playPauseScale     = 0.8f;   // play / pause button
     constexpr float stopScale          = 0.8f;   // stop button
     constexpr float midiLearnScale     = 0.8f;   // MIDI learn button
+    constexpr float bakeScaleScale     = 0.8f;   // bake scale to steps button
+    constexpr float bakeRangeScale     = 0.8f;   // bake range to steps button
     constexpr float settingsScale      = 0.8f;   // settings gear button
 
     // Base sizes (before scaling)
@@ -145,6 +148,10 @@ public:
           playPauseButton(Icons::createPlayIcon, Icons::createPauseIcon, false, false),
           stopButton(Icons::createStopIcon, Icons::createStopIcon, false, false),
           scaleLatchButton(processor),
+          bakeScaleButton(processor, Params::Keys::ID::PREF_DESTRUCTIVE_SCALE,
+                          MidiControlId::DESTRUCTIVE_SCALE, Icons::createBakeScaleIcon),
+          bakeRangeButton(processor, Params::Keys::ID::PREF_DESTRUCTIVE_RANGE,
+                          MidiControlId::DESTRUCTIVE_RANGE, Icons::createBakeRangeIcon),
           compactTopButton(Icons::createCompactTopIcon, Icons::createCompactTopIcon, true, true),
           compactBottomButton(Icons::createCompactViewIcon, Icons::createCompactViewIcon, true, true)
     {
@@ -188,6 +195,10 @@ public:
         // Add scale latch button
         addAndMakeVisible(scaleLatchButton);
         // Note: No callback needed - syncs with APVTS parameter
+
+        // Add destructive toggle buttons (bake scale/range to steps)
+        addAndMakeVisible(bakeScaleButton);
+        addAndMakeVisible(bakeRangeButton);
 
         // Add export button (supports click-to-save and drag-to-DAW)
         addAndMakeVisible(exportButton);
@@ -294,6 +305,8 @@ public:
         addItem(fb, subdivisionSlider, ss, ss, bg);
         addItem(fb, exportButton, sz(exportScale), sz(exportScale), bg);
         addItem(fb, scaleLatchButton, sz(scaleLatchScale), sz(scaleLatchScale), bg);
+        addItem(fb, bakeScaleButton, sz(bakeScaleScale), sz(bakeScaleScale), bg);
+        addItem(fb, bakeRangeButton, sz(bakeRangeScale), sz(bakeRangeScale), bg);
         addItem(fb, playPauseButton, sz(playPauseScale), sz(playPauseScale), bg);
         addItem(fb, stopButton, sz(stopScale), sz(stopScale), bg);
         addItem(fb, midiLearnButton, sz(midiLearnScale), sz(midiLearnScale), bg);
@@ -387,6 +400,8 @@ public:
         playPauseButton.setRegistry(registry);
         stopButton.setRegistry(registry);
         scaleLatchButton.setRegistry(registry);
+        bakeScaleButton.setRegistry(registry);
+        bakeRangeButton.setRegistry(registry);
         presetSelector.setRegistry(registry);
     }
 
@@ -398,6 +413,8 @@ private:
     ToggleIconButton playPauseButton;
     ToggleIconButton stopButton;
     ScaleLatchButton scaleLatchButton;
+    DestructiveToggleButton bakeScaleButton;
+    DestructiveToggleButton bakeRangeButton;
     ToggleIconButton compactTopButton;
     ToggleIconButton compactBottomButton;
     ExportButton exportButton;

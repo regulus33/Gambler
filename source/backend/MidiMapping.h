@@ -100,6 +100,10 @@ enum class MidiControlId {
     // ========== SCALE CONTROLS ==========
     SCALE_LATCH, // Toggle scale latch mode
 
+    // ========== DESTRUCTIVE TOGGLES ==========
+    DESTRUCTIVE_SCALE, // Bake scale to steps
+    DESTRUCTIVE_RANGE, // Bake range to steps
+
     // ========== Total count ==========
     COUNT
 };
@@ -238,6 +242,9 @@ inline std::string getMidiControlName(MidiControlId id) {
         case MidiControlId::STOP: return "Stop";
 
         case MidiControlId::SCALE_LATCH: return "Scale Latch";
+
+        case MidiControlId::DESTRUCTIVE_SCALE: return "Bake Scale";
+        case MidiControlId::DESTRUCTIVE_RANGE: return "Bake Range";
 
         default: return "Unknown Control";
     }
