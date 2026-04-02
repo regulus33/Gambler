@@ -49,6 +49,11 @@ public:
             return juce::Identifier("step_" + juce::String(stepIndex) + "_notes_idx");
         }
 
+        // Selected substep index for editing: step_X_notes_sel
+        static juce::Identifier selectedSubstepIndex(int stepIndex) {
+            return juce::Identifier("step_" + juce::String(stepIndex) + "_notes_sel");
+        }
+
         // Step modulation: step_X_mod_Y_type, step_X_mod_Y_cc, step_X_mod_Y_value, step_X_mod_Y_selected
         static juce::Identifier stepModType(int stepIndex, int modIndex) {
             return juce::Identifier("step_" + juce::String(stepIndex) + "_mod_" + juce::String(modIndex) + "_type");
@@ -112,6 +117,9 @@ public:
 
     int getStepNotesCurrentIndex(int stepIndex) const;
     void setStepNotesCurrentIndex(int stepIndex, int index);
+
+    int getSelectedSubstepIndex(int stepIndex) const;
+    void setSelectedSubstepIndex(int stepIndex, int index);
 
     // ========================================
     // STEP MODULATIONS

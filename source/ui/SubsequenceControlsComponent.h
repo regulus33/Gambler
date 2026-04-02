@@ -66,14 +66,23 @@ namespace SubsequenceControlsConstants {
 }
 
 /**
+ * BorderStyle - Visual border states for substep bars
+ */
+enum class BarBorderStyle {
+    none,       // No border
+    selected,   // White solid border — user selected this substep for editing
+    next,       // Grey dotted border — this substep will play next when parent step triggers
+    current     // White solid border — this substep is currently playing
+};
+
+/**
  * SingleBar - Individual clickable rectangle component
  * Supports MIDI learn mode for mapping to SUBSEQ_BAR_0 through SUBSEQ_BAR_7
  */
 class SingleBar : public juce::Component {
 public:
     SingleBar()
-        : color (juce::Colour (SubsequenceControlsConstants::defaultGreyHex)),
-          hasBorder (false)
+        : color_ (juce::Colour (SubsequenceControlsConstants::defaultGreyHex))
     {
     }
 
@@ -90,13 +99,31 @@ public:
         auto bounds = getLocalBounds().toFloat();
 
         // Fill bar with color
-        g.setColour (color);
+        g.setColour (color_);
         g.fillRoundedRectangle (bounds, barCornerRadius);
 
-        // Draw white border if this is the current (playing) substep
-        if (hasBorder) {
-            g.setColour (UIConstants::selectedStepOutlineColour);
-            g.drawRoundedRectangle (bounds.reduced (0.5f), barCornerRadius, borderWidth);
+        // Draw border based on style
+        auto insetBounds = bounds.reduced(0.5f);
+        switch (borderStyle_) {
+            case BarBorderStyle::current:
+            case BarBorderStyle::selected:
+                g.setColour(UIConstants::selectedStepOutlineColour);
+                g.drawRoundedRectangle(insetBounds, barCornerRadius, borderWidth);
+                break;
+            case BarBorderStyle::next: {
+                // Grey dotted border
+                g.setColour(juce::Colour(0xff888888));
+                juce::Path roundedRect;
+                roundedRect.addRoundedRectangle(insetBounds, barCornerRadius);
+                const float dashLengths[] = { 3.0f, 3.0f };
+                juce::Path dashedPath;
+                juce::PathStrokeType(borderWidth).createDashedStroke(
+                    dashedPath, roundedRect, dashLengths, 2);
+                g.fillPath(dashedPath);
+                break;
+            }
+            case BarBorderStyle::none:
+                break;
         }
 
         // Draw note label if we have one
@@ -144,22 +171,27 @@ public:
             onClick();
     }
 
+    void mouseDoubleClick(const juce::MouseEvent& /*event*/) override {
+        if (onDoubleClick)
+            onDoubleClick();
+    }
+
     void setColor (juce::Colour newColor) {
-        color = newColor;
+        color_ = newColor;
         repaint();
     }
 
     juce::Colour getColor() const {
-        return color;
+        return color_;
     }
 
-    void setBorder (bool shouldHaveBorder) {
-        hasBorder = shouldHaveBorder;
+    void setBorderStyle(BarBorderStyle style) {
+        borderStyle_ = style;
         repaint();
     }
 
-    bool getBorder() const {
-        return hasBorder;
+    BarBorderStyle getBorderStyle() const {
+        return borderStyle_;
     }
 
     void setNoteLabel(const juce::String& label) {
@@ -173,10 +205,11 @@ public:
     }
 
     std::function<void()> onClick;
+    std::function<void()> onDoubleClick;
 
 private:
-    juce::Colour color;
-    bool hasBorder;
+    juce::Colour color_;
+    BarBorderStyle borderStyle_ = BarBorderStyle::none;
     juce::String noteLabel_;
     bool isCurrent_ = false;
     MidiControlId midiControlId_ = MidiControlId::COUNT;
@@ -198,10 +231,16 @@ public:
             bars[i]->setMidiControlId(static_cast<MidiControlId>(
                 static_cast<int>(MidiControlId::SUBSEQ_BAR_0) + i));
 
-            // Setup click callback for each bar
+            // Setup click callback for each bar (select for editing)
             bars[i]->onClick = [this, i]() {
                 if (onBarClicked)
                     onBarClicked (i);
+            };
+
+            // Setup double-click callback (set as active/current)
+            bars[i]->onDoubleClick = [this, i]() {
+                if (onBarDoubleClicked)
+                    onBarDoubleClicked(i);
             };
         }
     }
@@ -246,56 +285,28 @@ public:
         return juce::Colour (SubsequenceControlsConstants::defaultGreyHex);
     }
 
-    /**
-     * Set the border visibility of a single bar
-     * @param index Bar index (0-7)
-     * @param hasBorder Whether to show the border
-     */
-    void setBarBorder (int index, bool hasBorder) {
+    void setBarBorderStyle(int index, BarBorderStyle style) {
         if (index >= 0 && index < SubsequenceControlsConstants::numBars) {
-            bars[index]->setBorder (hasBorder);
+            bars[index]->setBorderStyle(style);
         }
     }
 
-    /**
-     * Get the border state of a single bar
-     * @param index Bar index (0-7)
-     */
-    bool getBarBorder (int index) const {
+    BarBorderStyle getBarBorderStyle(int index) const {
         if (index >= 0 && index < SubsequenceControlsConstants::numBars) {
-            return bars[index]->getBorder();
+            return bars[index]->getBorderStyle();
         }
-        return false;
+        return BarBorderStyle::none;
     }
 
-    /**
-     * Set the note label of a single bar
-     * @param index Bar index (0-7)
-     * @param label Note name (e.g., "C4") or empty for no label
-     */
     void setBarNoteLabel(int index, const juce::String& label) {
         if (index >= 0 && index < SubsequenceControlsConstants::numBars) {
             bars[index]->setNoteLabel(label);
         }
     }
 
-    /**
-     * Set whether a bar is the current (playing) substep
-     * @param index Bar index (0-7)
-     * @param current Whether this is the active playing substep
-     */
     void setBarCurrent(int index, bool current) {
         if (index >= 0 && index < SubsequenceControlsConstants::numBars) {
             bars[index]->setCurrent(current);
-        }
-    }
-
-    /**
-     * Clear all borders
-     */
-    void clearAllBorders() {
-        for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
-            bars[i]->setBorder (false);
         }
     }
 
@@ -310,8 +321,9 @@ public:
         return nullptr;
     }
 
-    // Callback for bar clicks
+    // Callback for bar clicks (single = select, double = set active)
     std::function<void(int)> onBarClicked;
+    std::function<void(int)> onBarDoubleClicked;
 
 private:
     std::array<std::unique_ptr<SingleBar>, SubsequenceControlsConstants::numBars> bars;
@@ -472,10 +484,16 @@ public:
         minusButton.setMidiControlId(MidiControlId::SUBSEQ_MINUS);
         plusButton.setMidiControlId(MidiControlId::SUBSEQ_PLUS);
 
-        // Setup bar click callback
+        // Setup bar click callback (select for editing)
         subsequenceBar.onBarClicked = [this] (int index) {
             if (onBarClicked)
                 onBarClicked (index);
+        };
+
+        // Setup bar double-click callback (set as active/current)
+        subsequenceBar.onBarDoubleClicked = [this] (int index) {
+            if (onBarDoubleClicked)
+                onBarDoubleClicked(index);
         };
 
         // Setup button callbacks
@@ -537,6 +555,7 @@ public:
 
     // Callbacks
     std::function<void(int)> onBarClicked;
+    std::function<void(int)> onBarDoubleClicked;
     std::function<void()> onMinusClicked;
     std::function<void()> onPlusClicked;
 
@@ -550,6 +569,7 @@ protected:
         int selectedStep = state.getSelectedStepForEditing();
         int substepLength = state.getStepNotesLength(selectedStep);
         int currentSubstep = state.getStepNotesCurrentIndex(selectedStep);
+        int selectedSubstep = state.getSelectedSubstepIndex(selectedStep);
         bool isCurrentStep = (selectedStep == state.getCurrentIndex());
 
         for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
@@ -558,11 +578,9 @@ protected:
                 bool isCurrent = isCurrentStep && (i == currentSubstep);
 
                 if (noteNumber < 0) {
-                    // Rest substep
                     subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::restGreyHex));
                     subsequenceBar.setBarNoteLabel(i, "");
                 } else {
-                    // Normal note substep
                     if (isCurrent) {
                         subsequenceBar.setBarColor(i, UIConstants::activeStepColour);
                     } else {
@@ -573,13 +591,23 @@ protected:
                 }
 
                 subsequenceBar.setBarCurrent(i, isCurrent);
-                subsequenceBar.setBarBorder(i, isCurrent);
+
+                // Border priority: current > selected > next
+                if (isCurrent) {
+                    subsequenceBar.setBarBorderStyle(i, BarBorderStyle::current);
+                } else if (i == selectedSubstep) {
+                    subsequenceBar.setBarBorderStyle(i, BarBorderStyle::selected);
+                } else if (i == currentSubstep) {
+                    // Not the currently playing step, but this is the next substep to play
+                    subsequenceBar.setBarBorderStyle(i, BarBorderStyle::next);
+                } else {
+                    subsequenceBar.setBarBorderStyle(i, BarBorderStyle::none);
+                }
             } else {
-                // Inactive substep
                 subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::defaultGreyHex));
                 subsequenceBar.setBarNoteLabel(i, "");
                 subsequenceBar.setBarCurrent(i, false);
-                subsequenceBar.setBarBorder(i, false);
+                subsequenceBar.setBarBorderStyle(i, BarBorderStyle::none);
             }
         }
     }

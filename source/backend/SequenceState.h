@@ -181,6 +181,14 @@ public:
         internalState.setStepNotesCurrentIndex(stepIndex, index);
     }
 
+    int getSelectedSubstepIndex(int stepIndex) const {
+        return internalState.getSelectedSubstepIndex(stepIndex);
+    }
+
+    void setSelectedSubstepIndex(int stepIndex, int index) {
+        internalState.setSelectedSubstepIndex(stepIndex, index);
+    }
+
     /**
      * Get the RAW stored note for a step (based on its current substep index)
      * This returns the unquantized value as stored in APVTS
@@ -227,6 +235,16 @@ public:
      */
     void updateCurrentNoteForStep(int stepIndex, int noteNumber) {
         int substepIdx = getStepNotesCurrentIndex(stepIndex);
+        if (substepIdx < 0) substepIdx = 0;
+        setStepNote(stepIndex, substepIdx, bakeNoteForStorage(noteNumber));
+    }
+
+    /**
+     * Update the selected substep's note for a step
+     * Used when the user edits a note via piano roll/note controls after selecting a substep.
+     */
+    void updateSelectedNoteForStep(int stepIndex, int noteNumber) {
+        int substepIdx = getSelectedSubstepIndex(stepIndex);
         if (substepIdx < 0) substepIdx = 0;
         setStepNote(stepIndex, substepIdx, bakeNoteForStorage(noteNumber));
     }

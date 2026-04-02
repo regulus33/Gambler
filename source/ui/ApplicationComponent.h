@@ -116,11 +116,12 @@ public:
         mainScreen.getMainControls().getNoteControls().onNoteChanged = [this](int pitchClass) {
             auto& state = processorRef.getState();
             int selectedStep = state.getSelectedStepForEditing();
-            int currentNote = state.getCurrentNoteForStep(selectedStep);
+            int selectedSubstep = state.getSelectedSubstepIndex(selectedStep);
+            int currentNote = state.getQuantizedStepNote(selectedStep, selectedSubstep);
             int currentOctave = currentNote / 12;
             int newNote = currentOctave * 12 + pitchClass;
 
-            state.updateCurrentNoteForStep(selectedStep, newNote);
+            state.updateSelectedNoteForStep(selectedStep, newNote);
             DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote);
 
             if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
@@ -135,11 +136,12 @@ public:
         mainScreen.getMainControls().getNoteControls().onOctaveChanged = [this](int octaveIndex) {
             auto& state = processorRef.getState();
             int selectedStep = state.getSelectedStepForEditing();
-            int currentNote = state.getCurrentNoteForStep(selectedStep);
+            int selectedSubstep = state.getSelectedSubstepIndex(selectedStep);
+            int currentNote = state.getQuantizedStepNote(selectedStep, selectedSubstep);
             int pitchClass = currentNote % 12;
             int newNote = octaveIndex * 12 + pitchClass;
 
-            state.updateCurrentNoteForStep(selectedStep, newNote);
+            state.updateSelectedNoteForStep(selectedStep, newNote);
             DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote);
 
             if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
@@ -192,7 +194,6 @@ public:
         // Sequencer step clicks
         mainScreen.getSequencerSteps().onStepClicked = [this](int stepIndex) {
             processorRef.triggerStepMidi(stepIndex);
-            mainScreen.updateSubsequenceBar();
             DBG("Step clicked: " + juce::String(stepIndex));
         };
 
@@ -304,10 +305,11 @@ private:
         processorRef.getState().applyPendingNoteWrites();
         mainScreen.updateFromSequence();
 
-        // Update note/octave slider options (moved from MainScreenComponent)
+        // Update note/octave slider options based on selected substep
         auto& state = processorRef.getState();
         int selectedStep = state.getSelectedStepForEditing();
-        int selectedNote = state.getCurrentNoteForStep(selectedStep);
+        int selectedSubstep = state.getSelectedSubstepIndex(selectedStep);
+        int selectedNote = state.getQuantizedStepNote(selectedStep, selectedSubstep);
         updateNoteControlOptions(selectedNote);
 
         updatePlayPauseButtonState();
@@ -450,15 +452,24 @@ private:
             int substepLength = state.getStepNotesLength(selectedStep);
 
             if (index < substepLength) {
-                state.setStepNotesCurrentIndex(selectedStep, index);
-                DBG("Substep " + juce::String(index) + " selected");
+                state.setSelectedSubstepIndex(selectedStep, index);
+                DBG("Substep " + juce::String(index) + " selected for editing");
 
-                mainScreen.updateSubsequenceBar();
-                int midiNote = state.getCurrentNoteForStep(selectedStep);
+                int midiNote = state.getQuantizedStepNote(selectedStep, index);
                 int chromaticNote = midiNote % 12;
                 mainScreen.getPianoRoll().setActiveNote(chromaticNote);
                 mainScreen.getMainControls().getNoteControls().setFromMidiNote(midiNote);
                 mainScreen.getMainControls().getNoteControls().setRestOverlay(midiNote < 0);
+            }
+        };
+        subControls.onBarDoubleClicked = [this](int index) {
+            auto& state = processorRef.getState();
+            int selectedStep = state.getSelectedStepForEditing();
+            int substepLength = state.getStepNotesLength(selectedStep);
+
+            if (index < substepLength) {
+                state.setStepNotesCurrentIndex(selectedStep, index);
+                DBG("Substep " + juce::String(index) + " set as active");
             }
         };
         subControls.onMinusClicked = [this]() {
@@ -468,7 +479,6 @@ private:
             if (currentLength > 1) {
                 state.setStepNotesLength(selectedStep, currentLength - 1);
                 DBG("Subsequence length decreased to: " + juce::String(currentLength - 1));
-                mainScreen.updateSubsequenceBar();
             }
         };
         subControls.onPlusClicked = [this]() {
@@ -478,7 +488,6 @@ private:
             if (currentLength < ParamConstants::MAX_SUBSTEPS) {
                 state.setStepNotesLength(selectedStep, currentLength + 1);
                 DBG("Subsequence length increased to: " + juce::String(currentLength + 1));
-                mainScreen.updateSubsequenceBar();
             }
         };
     }

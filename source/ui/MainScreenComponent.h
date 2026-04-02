@@ -297,46 +297,6 @@ public:
         }
     }
 
-    // Helper to update the subsequence bar UI from selected step's StepNotes
-    // Note: SubsequenceControlsComponent::onStateChanged() handles the same updates
-    // via APVTS listener. This method is kept for explicit refresh calls.
-    void updateSubsequenceBar() {
-        auto& state = processorRef.getState();
-        int selectedStep = state.getSelectedStepForEditing();
-        int length = state.getStepNotesLength(selectedStep);
-        int currentSubstepIndex = state.getStepNotesCurrentIndex(selectedStep);
-        bool isCurrentStep = (selectedStep == state.getCurrentIndex());
-
-        auto& bar = subsequenceControls.getSubsequenceBar();
-
-        for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
-            if (i < length) {
-                int midiNote = state.getQuantizedStepNote(selectedStep, i);
-                bool isCurrent = isCurrentStep && (i == currentSubstepIndex);
-
-                if (midiNote < 0) {
-                    bar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::restGreyHex));
-                    bar.setBarNoteLabel(i, "");
-                } else {
-                    if (isCurrent) {
-                        bar.setBarColor(i, UIConstants::activeStepColour);
-                    } else {
-                        int chromaticNote = midiNote % 12;
-                        bar.setBarColor(i, state.getNoteColour(chromaticNote));
-                    }
-                    bar.setBarNoteLabel(i, MusicConstants::midiNoteToNoteName(midiNote));
-                }
-                bar.setBarCurrent(i, isCurrent);
-                bar.setBarBorder(i, isCurrent);
-            } else {
-                bar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::defaultGreyHex));
-                bar.setBarNoteLabel(i, "");
-                bar.setBarCurrent(i, false);
-                bar.setBarBorder(i, false);
-            }
-        }
-    }
-
     // Update UI from sequence state (called from async update)
     void updateFromSequence() {
         auto& state = processorRef.getState();
@@ -380,9 +340,6 @@ public:
         // - White fill indicates current step (playback position)
         // - White border indicates selected step for editing
         sequenceOverview.getSequenceGrid().updateFromState(state, currentStep);
-
-        // Update the subsequence bar to reflect selected step's substep state
-        updateSubsequenceBar();
 
         // Update the probability gauge to highlight the randomly selected circle (if roll is engaged)
         int lastProbabilityIndex = state.getLastProbabilityIndex();

@@ -190,6 +190,72 @@ TEST_CASE("SequenceState step notes") {
         REQUIRE(state.getStepNote(0, 1) == 64);
         REQUIRE(state.getStepNote(0, 2) == 67);
     }
+
+    SECTION("Selected substep index defaults to 0") {
+        REQUIRE(state.getSelectedSubstepIndex(0) == 0);
+        REQUIRE(state.getSelectedSubstepIndex(5) == 0);
+    }
+
+    SECTION("setSelectedSubstepIndex() stores and retrieves correctly") {
+        state.setSelectedSubstepIndex(0, 3);
+        REQUIRE(state.getSelectedSubstepIndex(0) == 3);
+
+        state.setSelectedSubstepIndex(0, 7);
+        REQUIRE(state.getSelectedSubstepIndex(0) == 7);
+    }
+
+    SECTION("setSelectedSubstepIndex() clamps to valid range") {
+        state.setSelectedSubstepIndex(0, -1);
+        REQUIRE(state.getSelectedSubstepIndex(0) == 0);
+
+        state.setSelectedSubstepIndex(0, 100);
+        REQUIRE(state.getSelectedSubstepIndex(0) == 7);  // MAX_SUBSTEPS - 1
+    }
+
+    SECTION("Selected substep is independent per step") {
+        state.setSelectedSubstepIndex(0, 2);
+        state.setSelectedSubstepIndex(1, 5);
+        REQUIRE(state.getSelectedSubstepIndex(0) == 2);
+        REQUIRE(state.getSelectedSubstepIndex(1) == 5);
+    }
+
+    SECTION("Selected substep is independent from current index") {
+        state.setStepNotesLength(0, 4);
+        state.setStepNotesCurrentIndex(0, 3);
+        state.setSelectedSubstepIndex(0, 1);
+        REQUIRE(state.getStepNotesCurrentIndex(0) == 3);
+        REQUIRE(state.getSelectedSubstepIndex(0) == 1);
+    }
+
+    SECTION("updateSelectedNoteForStep() edits the selected substep") {
+        state.setStepNote(0, 0, 60);
+        state.setStepNote(0, 1, 64);
+        state.setStepNote(0, 2, 67);
+        state.setStepNotesLength(0, 3);
+        state.setStepNotesCurrentIndex(0, 0);
+
+        // Select substep 2 and edit it
+        state.setSelectedSubstepIndex(0, 2);
+        state.updateSelectedNoteForStep(0, 72);
+
+        // Only substep 2 should change
+        REQUIRE(state.getStepNote(0, 0) == 60);
+        REQUIRE(state.getStepNote(0, 1) == 64);
+        REQUIRE(state.getStepNote(0, 2) == 72);
+    }
+
+    SECTION("updateCurrentNoteForStep() edits the current substep, not selected") {
+        state.setStepNote(0, 0, 60);
+        state.setStepNote(0, 1, 64);
+        state.setStepNotesLength(0, 2);
+        state.setStepNotesCurrentIndex(0, 1);
+        state.setSelectedSubstepIndex(0, 0);
+
+        // Current index is 1, selected is 0 — updateCurrent should edit index 1
+        state.updateCurrentNoteForStep(0, 72);
+        REQUIRE(state.getStepNote(0, 0) == 60);  // selected, unchanged
+        REQUIRE(state.getStepNote(0, 1) == 72);  // current, changed
+    }
 }
 
 // ============================================================================
