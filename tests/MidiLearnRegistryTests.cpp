@@ -268,24 +268,7 @@ SCENARIO("MidiLearnRegistry MIDI learning", "[midilearnregistry]") {
         }
     }
 
-    GIVEN("A MidiLearnRegistry with a callback") {
-        MidiLearnRegistry registry;
-        bool callbackCalled = false;
-        registry.onMappingLearned = [&callbackCalled]() {
-            callbackCalled = true;
-        };
 
-        registry.enterLearnMode();
-        registry.setLearningControl(MidiControlId::NOTE_SLIDER);
-
-        WHEN("A mapping is learned") {
-            registry.learnMidiMessage(MidiMessageType::CC, 1, 10);
-
-            THEN("Callback is invoked") {
-                REQUIRE(callbackCalled == true);
-            }
-        }
-    }
 }
 
 // ============================================================================

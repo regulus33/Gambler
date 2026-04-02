@@ -3,7 +3,7 @@
 #include "MidiMapping.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <unordered_map>
-#include <functional>
+
 
 /**
  * MidiLearnRegistry
@@ -176,11 +176,6 @@ public:
         // Clear learning state (user can click another control to continue)
         currentLearningControlId = MidiControlId::COUNT;
 
-        // Trigger callback to update UI
-        if (onMappingLearned) {
-            onMappingLearned();
-        }
-
         return true;
     }
 
@@ -287,14 +282,6 @@ public:
 
         DBG("Loaded " << userMappings.size() << " user MIDI mappings from XML");
     }
-
-    // ========== Callbacks ==========
-
-    /**
-     * Called when a new mapping is learned (from audio thread)
-     * Use AsyncUpdater to safely update UI
-     */
-    std::function<void()> onMappingLearned;
 
 private:
     // MIDI learn state
