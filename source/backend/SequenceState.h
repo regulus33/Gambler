@@ -177,6 +177,13 @@ public:
         return internalState.getStepNotesCurrentIndex(stepIndex);
     }
 
+    /** The substep that will play on the next pass of this step. */
+    int getNextSubstepIndex(int stepIndex) const {
+        int length = getStepNotesLength(stepIndex);
+        if (length <= 0) return 0;
+        return (getStepNotesCurrentIndex(stepIndex) + 1) % length;
+    }
+
     void setStepNotesCurrentIndex(int stepIndex, int index) {
         internalState.setStepNotesCurrentIndex(stepIndex, index);
     }
@@ -190,14 +197,12 @@ public:
     }
 
     /**
-     * Get the RAW stored note for a step (based on its current substep index)
+     * Get the RAW stored note for the next-to-play substep
      * This returns the unquantized value as stored in APVTS
      * Use getQuantizedCurrentNoteForStep() for display/playback
      */
     int getRawCurrentNoteForStep(int stepIndex) const {
-        int substepIdx = getStepNotesCurrentIndex(stepIndex);
-        if (substepIdx < 0) substepIdx = 0;
-        return getStepNote(stepIndex, substepIdx);
+        return getStepNote(stepIndex, getNextSubstepIndex(stepIndex));
     }
 
     /**
@@ -211,13 +216,11 @@ public:
     }
 
     /**
-     * Get the quantized current note for a step (based on its current substep index)
-     * This is what should be displayed and played
+     * Get the quantized note for the next-to-play substep
+     * This is what should be displayed in step buttons and controls
      */
     int getQuantizedCurrentNoteForStep(int stepIndex) const {
-        int substepIdx = getStepNotesCurrentIndex(stepIndex);
-        if (substepIdx < 0) substepIdx = 0;
-        return getQuantizedStepNote(stepIndex, substepIdx);
+        return getQuantizedStepNote(stepIndex, getNextSubstepIndex(stepIndex));
     }
 
     /**
@@ -230,13 +233,11 @@ public:
     }
 
     /**
-     * Update the current note for a step (at its current substep index)
+     * Update the next-to-play substep's note for a step.
      * When destructive scale/range is enabled, the note is baked before storage.
      */
     void updateCurrentNoteForStep(int stepIndex, int noteNumber) {
-        int substepIdx = getStepNotesCurrentIndex(stepIndex);
-        if (substepIdx < 0) substepIdx = 0;
-        setStepNote(stepIndex, substepIdx, bakeNoteForStorage(noteNumber));
+        setStepNote(stepIndex, getNextSubstepIndex(stepIndex), bakeNoteForStorage(noteNumber));
     }
 
     /**
@@ -643,9 +644,9 @@ public:
 
         // If random mode (roll) is enabled, use the probability for play/rest decisions
         if (getIsRandom()) {
-            // Roll mode always writes to substep 0 — no reason to cycle through
-            // substeps when every tick generates a fresh random note anyway.
-            constexpr int substepIdx = 0;
+            // Advance this step's substep index (same as normal playback —
+            // substep advances once per sequence pass when currentIndex lands here)
+            int substepIdx = tickStepSubstepOnly(currentIndex);
 
             // Check play probability - if false, queue a rest and return -1
             if (!getPlayProbability(probabilityIndex)) {

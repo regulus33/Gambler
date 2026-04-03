@@ -568,20 +568,19 @@ protected:
         auto& state = getState();
         int selectedStep = state.getSelectedStepForEditing();
         int substepLength = state.getStepNotesLength(selectedStep);
-        int currentSubstep = state.getStepNotesCurrentIndex(selectedStep);
+        int nextSubstep = state.getNextSubstepIndex(selectedStep);
         int selectedSubstep = state.getSelectedSubstepIndex(selectedStep);
-        bool isCurrentStep = (selectedStep == state.getCurrentIndex());
 
         for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
             if (i < substepLength) {
                 int noteNumber = state.getQuantizedStepNote(selectedStep, i);
-                bool isCurrent = isCurrentStep && (i == currentSubstep);
+                bool isActive = (i == nextSubstep);
 
                 if (noteNumber < 0) {
                     subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::restGreyHex));
                     subsequenceBar.setBarNoteLabel(i, "");
                 } else {
-                    if (isCurrent) {
+                    if (isActive) {
                         subsequenceBar.setBarColor(i, UIConstants::activeStepColour);
                     } else {
                         int pitchClass = noteNumber % 12;
@@ -590,16 +589,13 @@ protected:
                     subsequenceBar.setBarNoteLabel(i, MusicConstants::midiNoteToNoteName(noteNumber));
                 }
 
-                subsequenceBar.setBarCurrent(i, isCurrent);
+                subsequenceBar.setBarCurrent(i, isActive);
 
-                // Border priority: current > selected > next
-                if (isCurrent) {
+                // Border priority: active > selected > next
+                if (isActive) {
                     subsequenceBar.setBarBorderStyle(i, BarBorderStyle::current);
                 } else if (i == selectedSubstep) {
                     subsequenceBar.setBarBorderStyle(i, BarBorderStyle::selected);
-                } else if (i == currentSubstep) {
-                    // Not the currently playing step, but this is the next substep to play
-                    subsequenceBar.setBarBorderStyle(i, BarBorderStyle::next);
                 } else {
                     subsequenceBar.setBarBorderStyle(i, BarBorderStyle::none);
                 }
