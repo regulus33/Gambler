@@ -68,9 +68,6 @@ PluginProcessor::PluginProcessor()
         }
     }
 
-#if GAMBLER_HAS_SYNTH
-    synthEngine = std::make_unique<SynthEngine> (apvts);
-#endif
 }
 
 // Generate the param layout for the audio processor value tree.
@@ -121,11 +118,7 @@ bool PluginProcessor::isMidiEffect() const {
 }
 
 double PluginProcessor::getTailLengthSeconds() const {
-#if GAMBLER_HAS_SYNTH
-    return 10.0; // Max release time for synth voices
-#else
     return 0.0;
-#endif
 }
 
 int PluginProcessor::getNumPrograms() {
@@ -152,13 +145,9 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 
 //==============================================================================
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock) {
+    juce::ignoreUnused (samplesPerBlock);
     // Set sample rate for internal clock timing
     clock.setSampleRate (sampleRate);
-
-#if GAMBLER_HAS_SYNTH
-    if (synthEngine)
-        synthEngine->prepare (sampleRate, samplesPerBlock);
-#endif
 }
 
 void PluginProcessor::releaseResources() {
@@ -473,11 +462,6 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         }
     }
 
-#if GAMBLER_HAS_SYNTH
-    // Synth engine consumes the MIDI the sequencer just generated
-    if (synthEngine)
-        synthEngine->processBlock (buffer, midiMessages);
-#endif
 }
 
 //==============================================================================
@@ -706,6 +690,20 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
             }
         }
         DBG ("SHUFFLE triggered");
+    }
+
+    // ========== DESTRUCTIVE MODE TRANSITIONS ==========
+    // When switching from OFF → ON, immediately bake all existing notes
+    // so the user doesn't hear out-of-scale/range notes that were stored raw.
+
+    if (parameterID == Params::Keys::ID::PREF_DESTRUCTIVE_SCALE && isOn) {
+        getState().bakeAllExistingNotes();
+        DBG ("DESTRUCTIVE_SCALE ON - baked all existing notes to current scale");
+    }
+
+    if (parameterID == Params::Keys::ID::PREF_DESTRUCTIVE_RANGE && isOn) {
+        getState().bakeAllExistingNotes();
+        DBG ("DESTRUCTIVE_RANGE ON - baked all existing notes to current range");
     }
 
     // ========== PRESET CYCLING ==========

@@ -718,6 +718,23 @@ public:
      * This allows changing scales without losing the underlying random data.
      * WARNING: Should only be called from message thread (modifies APVTS)
      */
+    /**
+     * Sweep all 64 steps × 8 substeps, applying bakeNoteForStorage() to each.
+     * Called when DESTRUCTIVE_SCALE or DESTRUCTIVE_RANGE transitions from OFF to ON,
+     * so that existing notes are immediately quantized/clamped to match the
+     * current scale and range, preventing jarring out-of-scale/range playback.
+     */
+    void bakeAllExistingNotes() {
+        for (int step = 0; step < ParamConstants::MAX_STEPS; ++step) {
+            for (int substep = 0; substep < ParamConstants::MAX_SUBSTEPS; ++substep) {
+                int note = getStepNote(step, substep);
+                int baked = bakeNoteForStorage(note);
+                if (baked != note)
+                    setStepNote(step, substep, baked);
+            }
+        }
+    }
+
     void randomizeStepNote(int stepIndex) {
         // Use thread_local to avoid data races between audio and UI threads
         thread_local std::random_device rd;
