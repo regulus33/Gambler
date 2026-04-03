@@ -643,8 +643,9 @@ public:
 
         // If random mode (roll) is enabled, use the probability for play/rest decisions
         if (getIsRandom()) {
-            // Tick the substep first to advance the substep index
-            int substepIdx = tickStepSubstepOnly(currentIndex);
+            // Roll mode always writes to substep 0 — no reason to cycle through
+            // substeps when every tick generates a fresh random note anyway.
+            constexpr int substepIdx = 0;
 
             // Check play probability - if false, queue a rest and return -1
             if (!getPlayProbability(probabilityIndex)) {
