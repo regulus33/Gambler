@@ -1,9 +1,9 @@
 # JUCE Assertion Report
 
-**Generated:** 2026-04-01 19:56:43
+**Generated:** 2026-04-02 23:14:11
 **Actionable assertion hits:** 0
 **Actionable unique locations:** 0
-**Suppressed (known-benign):** 96 hits across 1 locations
+**Suppressed (known-benign):** 103 hits across 1 locations
 
 ---
 
@@ -16,5 +16,5 @@ All captured assertions are known-benign JUCE internal lifecycle issues.
 These are JUCE-internal assertions caused by Timer/MessageManager lifecycle
 ordering in test environments. They do not affect test correctness.
 
-- `juce_Timer.cpp:376` — 96 hits
+- `juce_Timer.cpp:376` — 103 hits
 
