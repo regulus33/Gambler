@@ -11,6 +11,7 @@
 
 #include "helpers/TestApp.h"
 #include <catch2/catch_test_macros.hpp>
+#include <data/Params.h>
 
 // ============================================================================
 // TRANSPORT
@@ -63,6 +64,135 @@ SCENARIO("User pauses and resumes playback from the same step", "[user-story][tr
                     REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Stopped);
                     // Index is -1 (pre-start), meaning the next tick() will advance to step 0
                     REQUIRE(app.state().getCurrentIndex() == -1);
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// DEFAULT STATE
+// ============================================================================
+
+SCENARIO("Fresh app has correct defaults", "[user-story][defaults]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A freshly launched app") {
+        TestApp app;
+
+        THEN("Sequence length is 8") {
+            REQUIRE(app.state().getLength() == ParamConstants::DEFAULT_LENGTH);
+        }
+
+        AND_THEN("All 8 steps default to middle C (MIDI 60)") {
+            for (int i = 0; i < 8; ++i) {
+                REQUIRE(app.state().getStepNote(i, 0) == ParamConstants::DEFAULT_NOTE);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// ROLL (Random Mode)
+// ============================================================================
+
+SCENARIO("Roll button randomizes notes as the sequencer plays through them", "[user-story][roll]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A playing sequencer with 8 default middle-C steps") {
+        TestApp app;
+        REQUIRE(app.state().getLength() == 8);
+        app.state().setCurrentIndex(-1);
+
+        // Enable all play probabilities so roll always generates notes (not rests)
+        for (int i = 0; i < 64; ++i)
+            app.state().setPlayProbability(i, true);
+
+        WHEN("User presses Roll and the sequencer ticks through all 8 steps") {
+            app.sequencerControls().rollButton().press();
+            app.processMessages();
+            REQUIRE(app.state().getIsRandom() == true);
+
+            // Tick through all 8 steps, collecting the notes returned
+            std::array<int, 8> playedNotes {};
+            for (int i = 0; i < 8; ++i)
+                playedNotes[i] = app.state().tick();
+
+            // Flush the queued note writes to state
+            app.state().applyPendingNoteWrites();
+
+            THEN("At least one step has been changed from the default middle C") {
+                bool anyChanged = false;
+                for (int i = 0; i < 8; ++i) {
+                    if (app.state().getStepNote(i, 0) != ParamConstants::DEFAULT_NOTE) {
+                        anyChanged = true;
+                        break;
+                    }
+                }
+                REQUIRE(anyChanged);
+            }
+
+            AND_THEN("All played notes are within the scale range") {
+                int rangeMin = app.state().getScaleRangeMin();
+                int rangeMax = app.state().getScaleRangeMax();
+                for (int i = 0; i < 8; ++i) {
+                    if (playedNotes[i] >= 0) {
+                        REQUIRE(playedNotes[i] >= rangeMin);
+                        REQUIRE(playedNotes[i] <= rangeMax);
+                    }
+                }
+            }
+
+            AND_THEN("The stored notes match what was played") {
+                for (int i = 0; i < 8; ++i) {
+                    int stored = app.state().getStepNote(i, 0);
+                    if (playedNotes[i] >= 0) {
+                        // Stored note should be the unquantized version,
+                        // and played note is quantized — but with chromatic scale
+                        // (all notes enabled), they should be the same
+                        REQUIRE(stored == playedNotes[i]);
+                    }
+                }
+            }
+        }
+    }
+}
+
+SCENARIO("Roll button stops randomizing when released", "[user-story][roll]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A playing sequencer with roll engaged and notes randomized") {
+        TestApp app;
+        app.state().setCurrentIndex(-1);
+        for (int i = 0; i < 64; ++i)
+            app.state().setPlayProbability(i, true);
+
+        app.sequencerControls().rollButton().press();
+        app.processMessages();
+
+        // Tick through once to randomize
+        for (int i = 0; i < 8; ++i)
+            app.state().tick();
+        app.state().applyPendingNoteWrites();
+
+        // Capture the notes after roll
+        std::array<int, 8> notesAfterRoll {};
+        for (int i = 0; i < 8; ++i)
+            notesAfterRoll[i] = app.state().getStepNote(i, 0);
+
+        WHEN("User releases Roll and ticks through the sequence again") {
+            app.sequencerControls().rollButton().release();
+            app.processMessages();
+            REQUIRE(app.state().getIsRandom() == false);
+
+            // Tick through again — should play stored notes, not generate new ones
+            std::array<int, 8> playedNotes {};
+            for (int i = 0; i < 8; ++i)
+                playedNotes[i] = app.state().tick();
+
+            THEN("The played notes are the same as the stored notes from the roll") {
+                for (int i = 0; i < 8; ++i) {
+                    REQUIRE(playedNotes[i] == notesAfterRoll[i]);
                 }
             }
         }
