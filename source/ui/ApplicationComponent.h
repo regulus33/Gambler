@@ -468,7 +468,10 @@ private:
             int substepLength = state.getStepNotesLength(selectedStep);
 
             if (index < substepLength) {
-                state.setStepNotesCurrentIndex(selectedStep, index);
+                // Active highlight shows nextSubstep = (currentIndex + 1) % length,
+                // so set currentIndex to index-1 so the clicked substep becomes next-to-play.
+                int prev = (index - 1 + substepLength) % substepLength;
+                state.setStepNotesCurrentIndex(selectedStep, prev);
                 DBG("Substep " + juce::String(index) + " set as active");
             }
         };
