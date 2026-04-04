@@ -243,6 +243,63 @@ SCENARIO("Roll button stops randomizing when released", "[user-story][roll]") {
     }
 }
 
+// ============================================================================
+// SUBSEQUENCE
+// ============================================================================
+
+SCENARIO("User clicks a step and sees its substep in the subsequence controls", "[user-story][substep]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A fresh app with default middle-C notes") {
+        TestApp app;
+        const auto inactiveGrey = juce::Colour(SubsequenceControlsConstants::defaultGreyHex);
+
+        WHEN("User clicks step 0") {
+            app.sequencerSteps().clickStep(0);
+            app.processMessages();
+
+            THEN("Step 0 is selected for editing") {
+                REQUIRE(app.state().getSelectedStepForEditing() == 0);
+            }
+
+            AND_THEN("The first substep bar shows a note color (not inactive grey)") {
+                auto bar0Color = app.subsequenceControls().barColor(0);
+                REQUIRE(bar0Color != inactiveGrey);
+            }
+
+            AND_THEN("The remaining 7 substep bars are inactive grey") {
+                for (int i = 1; i < 8; ++i) {
+                    REQUIRE(app.subsequenceControls().barColor(i) == inactiveGrey);
+                }
+            }
+
+            AND_WHEN("User clicks the + button to add a second substep") {
+                app.subsequenceControls().clickPlus();
+                app.processMessages();
+
+                THEN("Step 0 now has 2 substeps") {
+                    REQUIRE(app.state().getStepNotesLength(0) == 2);
+                }
+
+                AND_THEN("The first two bars show note colors") {
+                    REQUIRE(app.subsequenceControls().barColor(0) != inactiveGrey);
+                    REQUIRE(app.subsequenceControls().barColor(1) != inactiveGrey);
+                }
+
+                AND_THEN("The remaining 6 bars are inactive grey") {
+                    for (int i = 2; i < 8; ++i) {
+                        REQUIRE(app.subsequenceControls().barColor(i) == inactiveGrey);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// ROLL (MIDI)
+// ============================================================================
+
 SCENARIO("MIDI-mapped Roll randomizes notes while held and stops when released", "[user-story][roll][midi]") {
     GamblerTestInitialiser juceInit;
 

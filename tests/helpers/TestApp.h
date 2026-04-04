@@ -203,6 +203,11 @@ public:
     void clickPlus();
     void clickMinus();
 
+    /// Get the fill color of a substep bar (0-7)
+    juce::Colour barColor(int index) const {
+        return comp_.getSubsequenceBar().getBarColor(index);
+    }
+
     SubsequenceControlsComponent& raw() { return comp_; }
 
 private:
