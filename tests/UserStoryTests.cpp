@@ -68,3 +68,49 @@ SCENARIO("User pauses and resumes playback from the same step", "[user-story][tr
         }
     }
 }
+
+SCENARIO("MIDI-mapped transport controls pause, resume, and stop", "[user-story][transport][midi]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Play/Pause mapped to MIDI note 60, Stop mapped to MIDI note 61") {
+        TestApp app;
+        app.mapMidiNote(MidiControlId::PLAY_PAUSE, 60);
+        app.mapMidiNote(MidiControlId::STOP, 61);
+
+        app.state().setCurrentIndex(5);
+        REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Playing);
+
+        WHEN("MIDI note 60 is pressed and released to pause") {
+            app.sendMidiNoteOn(60);
+            app.sendMidiNoteOff(60);
+            app.processMessages();
+
+            THEN("Sequencer is paused and stays on step 5") {
+                REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Paused);
+                REQUIRE(app.state().getCurrentIndex() == 5);
+            }
+
+            AND_WHEN("MIDI note 60 is pressed and released again to resume") {
+                app.sendMidiNoteOn(60);
+                app.sendMidiNoteOff(60);
+                app.processMessages();
+
+                THEN("Sequencer is playing again from the same step") {
+                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Playing);
+                    REQUIRE(app.state().getCurrentIndex() == 5);
+                }
+            }
+
+            AND_WHEN("MIDI note 61 is pressed and released to stop") {
+                app.sendMidiNoteOn(61);
+                app.sendMidiNoteOff(61);
+                app.processMessages();
+
+                THEN("Sequencer is stopped and index resets so next tick plays step 0") {
+                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Stopped);
+                    REQUIRE(app.state().getCurrentIndex() == -1);
+                }
+            }
+        }
+    }
+}

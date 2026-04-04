@@ -18,6 +18,8 @@
 #include "test_helpers.h"
 #include <PluginEditor.h>
 #include <PluginProcessor.h>
+#include <backend/MidiLearnRegistry.h>
+#include <backend/MidiMapping.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
 // Forward declarations for component types
@@ -272,6 +274,30 @@ public:
     PianoRollProxy pianoRoll();
     SubsequenceProxy subsequenceControls();
     SequenceOverviewProxy sequenceOverview();
+
+    // --- MIDI learn: programmatically map a control to a MIDI note ---
+    void mapMidiNote(MidiControlId controlId, int noteNumber, int channel = 1) {
+        auto& registry = processor_.getMidiLearnRegistry();
+        registry.enterLearnMode();
+        registry.setLearningControl(controlId);
+        registry.learnMidiMessage(MidiMessageType::NOTE, channel, noteNumber);
+        registry.exitLearnMode();
+    }
+
+    // --- Send a MIDI note through processBlock ---
+    void sendMidiNoteOn(int noteNumber, int channel = 1, juce::uint8 velocity = 127) {
+        juce::AudioBuffer<float> buffer(2, 512);
+        juce::MidiBuffer midi;
+        midi.addEvent(juce::MidiMessage::noteOn(channel, noteNumber, velocity), 0);
+        processor_.processBlock(buffer, midi);
+    }
+
+    void sendMidiNoteOff(int noteNumber, int channel = 1) {
+        juce::AudioBuffer<float> buffer(2, 512);
+        juce::MidiBuffer midi;
+        midi.addEvent(juce::MidiMessage::noteOff(channel, noteNumber), 0);
+        processor_.processBlock(buffer, midi);
+    }
 
     // Convenience: get MainScreenComponent
     MainScreenComponent& mainScreen() {
