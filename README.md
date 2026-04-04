@@ -663,4 +663,43 @@ Visual snapshot tests live in `tests/VisualSnapshotTests.cpp`. Golden images are
  `cd docs && pdflatex gambler-codebase-guide.tex && pdflatex gambler-codebase-guide.tex`
 (two passes needed for the table of contents and cross-references)
 
-                                                                       ```
+                                                         
+
+#### Tests API
+
+```
+The TestApp API looks like:                                                                                                             
+                                                   
+  TestApp app;                                                                                                                            
+                                                                                                                                          
+  // Transport                                 
+  app.navBar().clickPlayPause();                                                                                                          
+  app.navBar().clickStop();                        
+                                               
+  // Sequencer controls (buttons via mouse simulation)                                                                                    
+  app.sequencerControls().rollButton().press();   // hold
+  app.sequencerControls().rollButton().release();  // release                                                                             
+  app.sequencerControls().shiftButton().click();                                                                                          
+  app.sequencerControls().lengthPlusButton().click();
+  app.sequencerControls().pageRightButton().click();                                                                                      
+                                                   
+  // Piano roll                                                                                                                           
+  app.pianoRoll().toggleNote(1);  // toggle Db     
+                                                                                                                                          
+  // Subsequence                                   
+  app.subsequenceControls().clickPlus();                                                                                                  
+  app.subsequenceControls().clickBar(2);                                                                                                  
+                                               
+  // Grid navigation                                                                                                                      
+  app.sequenceOverview().clickStep(12);            
+  app.sequenceOverview().doubleClickStep(10);                                                                                             
+                                                   
+  // State & audio                                                                                                                        
+  app.state()            // SequenceState&
+  app.processor()        // PluginProcessor&                                                                                              
+  app.processMessages(); // pump JUCE message loop                                                                                        
+  app.simulateAudioBlock();                    
+                                                                                                                                          
+  ```
+
+
