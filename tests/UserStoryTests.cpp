@@ -14,6 +14,28 @@
 #include <data/Params.h>
 
 // ============================================================================
+// DEFAULT STATE
+// ============================================================================
+
+SCENARIO("Fresh app has correct defaults", "[user-story][defaults]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A freshly launched app") {
+        TestApp app;
+
+        THEN("Sequence length is 8") {
+            REQUIRE(app.state().getLength() == ParamConstants::DEFAULT_LENGTH);
+        }
+
+        AND_THEN("All 8 steps default to middle C (MIDI 60)") {
+            for (int i = 0; i < 8; ++i) {
+                REQUIRE(app.state().getStepNote(i, 0) == ParamConstants::DEFAULT_NOTE);
+            }
+        }
+    }
+}
+
+// ============================================================================
 // TRANSPORT
 // ============================================================================
 
@@ -70,23 +92,47 @@ SCENARIO("User pauses and resumes playback from the same step", "[user-story][tr
     }
 }
 
-// ============================================================================
-// DEFAULT STATE
-// ============================================================================
-
-SCENARIO("Fresh app has correct defaults", "[user-story][defaults]") {
+SCENARIO("MIDI-mapped transport controls pause, resume, and stop", "[user-story][transport][midi]") {
     GamblerTestInitialiser juceInit;
 
-    GIVEN("A freshly launched app") {
+    GIVEN("Play/Pause mapped to MIDI note 60, Stop mapped to MIDI note 61") {
         TestApp app;
+        app.mapMidiNote(MidiControlId::PLAY_PAUSE, 60);
+        app.mapMidiNote(MidiControlId::STOP, 61);
 
-        THEN("Sequence length is 8") {
-            REQUIRE(app.state().getLength() == ParamConstants::DEFAULT_LENGTH);
-        }
+        app.state().setCurrentIndex(5);
+        REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Playing);
 
-        AND_THEN("All 8 steps default to middle C (MIDI 60)") {
-            for (int i = 0; i < 8; ++i) {
-                REQUIRE(app.state().getStepNote(i, 0) == ParamConstants::DEFAULT_NOTE);
+        WHEN("MIDI note 60 is pressed and released to pause") {
+            app.sendMidiNoteOn(60);
+            app.sendMidiNoteOff(60);
+            app.processMessages();
+
+            THEN("Sequencer is paused and stays on step 5") {
+                REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Paused);
+                REQUIRE(app.state().getCurrentIndex() == 5);
+            }
+
+            AND_WHEN("MIDI note 60 is pressed and released again to resume") {
+                app.sendMidiNoteOn(60);
+                app.sendMidiNoteOff(60);
+                app.processMessages();
+
+                THEN("Sequencer is playing again from the same step") {
+                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Playing);
+                    REQUIRE(app.state().getCurrentIndex() == 5);
+                }
+            }
+
+            AND_WHEN("MIDI note 61 is pressed and released to stop") {
+                app.sendMidiNoteOn(61);
+                app.sendMidiNoteOff(61);
+                app.processMessages();
+
+                THEN("Sequencer is stopped and index resets so next tick plays step 0") {
+                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Stopped);
+                    REQUIRE(app.state().getCurrentIndex() == -1);
+                }
             }
         }
     }
@@ -105,8 +151,7 @@ SCENARIO("Roll button randomizes notes as the sequencer plays through them", "[u
         app.state().setCurrentIndex(-1);
 
         // Enable all play probabilities so roll always generates notes (not rests)
-        for (int i = 0; i < 64; ++i)
-            app.state().setPlayProbability(i, true);
+        app.setAllPlayProbabilities(true);
 
         WHEN("User presses Roll and the sequencer ticks through all 8 steps") {
             app.sequencerControls().rollButton().press();
@@ -164,8 +209,7 @@ SCENARIO("Roll button stops randomizing when released", "[user-story][roll]") {
     GIVEN("A playing sequencer with roll engaged and notes randomized") {
         TestApp app;
         app.state().setCurrentIndex(-1);
-        for (int i = 0; i < 64; ++i)
-            app.state().setPlayProbability(i, true);
+        app.setAllPlayProbabilities(true);
 
         app.sequencerControls().rollButton().press();
         app.processMessages();
@@ -199,46 +243,61 @@ SCENARIO("Roll button stops randomizing when released", "[user-story][roll]") {
     }
 }
 
-SCENARIO("MIDI-mapped transport controls pause, resume, and stop", "[user-story][transport][midi]") {
+SCENARIO("MIDI-mapped Roll randomizes notes while held and stops when released", "[user-story][roll][midi]") {
     GamblerTestInitialiser juceInit;
 
-    GIVEN("Play/Pause mapped to MIDI note 60, Stop mapped to MIDI note 61") {
+    GIVEN("Roll mapped to MIDI note 62, with 8 default middle-C steps") {
         TestApp app;
-        app.mapMidiNote(MidiControlId::PLAY_PAUSE, 60);
-        app.mapMidiNote(MidiControlId::STOP, 61);
+        app.mapMidiNote(MidiControlId::BUTTON_ROLL, 62);
+        app.state().setCurrentIndex(-1);
+        app.setAllPlayProbabilities(true);
 
-        app.state().setCurrentIndex(5);
-        REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Playing);
-
-        WHEN("MIDI note 60 is pressed and released to pause") {
-            app.sendMidiNoteOn(60);
-            app.sendMidiNoteOff(60);
+        WHEN("MIDI note 62 is held and the sequencer ticks through all 8 steps") {
+            app.sendMidiNoteOn(62);
             app.processMessages();
+            REQUIRE(app.state().getIsRandom() == true);
 
-            THEN("Sequencer is paused and stays on step 5") {
-                REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Paused);
-                REQUIRE(app.state().getCurrentIndex() == 5);
+            std::array<int, 8> playedNotes {};
+            for (int i = 0; i < 8; ++i)
+                playedNotes[i] = app.state().tick();
+            app.state().applyPendingNoteWrites();
+
+            THEN("At least one step has been changed from the default middle C") {
+                bool anyChanged = false;
+                for (int i = 0; i < 8; ++i) {
+                    if (app.state().getStepNote(i, 0) != ParamConstants::DEFAULT_NOTE) {
+                        anyChanged = true;
+                        break;
+                    }
+                }
+                REQUIRE(anyChanged);
             }
 
-            AND_WHEN("MIDI note 60 is pressed and released again to resume") {
-                app.sendMidiNoteOn(60);
-                app.sendMidiNoteOff(60);
-                app.processMessages();
-
-                THEN("Sequencer is playing again from the same step") {
-                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Playing);
-                    REQUIRE(app.state().getCurrentIndex() == 5);
+            AND_THEN("The stored notes match what was played") {
+                for (int i = 0; i < 8; ++i) {
+                    int stored = app.state().getStepNote(i, 0);
+                    if (playedNotes[i] >= 0)
+                        REQUIRE(stored == playedNotes[i]);
                 }
             }
 
-            AND_WHEN("MIDI note 61 is pressed and released to stop") {
-                app.sendMidiNoteOn(61);
-                app.sendMidiNoteOff(61);
-                app.processMessages();
+            AND_WHEN("MIDI note 62 is released and the sequencer ticks again") {
+                // Capture notes after roll
+                std::array<int, 8> notesAfterRoll {};
+                for (int i = 0; i < 8; ++i)
+                    notesAfterRoll[i] = app.state().getStepNote(i, 0);
 
-                THEN("Sequencer is stopped and index resets so next tick plays step 0") {
-                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Stopped);
-                    REQUIRE(app.state().getCurrentIndex() == -1);
+                app.sendMidiNoteOff(62);
+                app.processMessages();
+                REQUIRE(app.state().getIsRandom() == false);
+
+                std::array<int, 8> replayedNotes {};
+                for (int i = 0; i < 8; ++i)
+                    replayedNotes[i] = app.state().tick();
+
+                THEN("The played notes are the stored notes from the roll, not new random ones") {
+                    for (int i = 0; i < 8; ++i)
+                        REQUIRE(replayedNotes[i] == notesAfterRoll[i]);
                 }
             }
         }

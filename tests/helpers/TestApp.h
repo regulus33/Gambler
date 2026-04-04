@@ -275,6 +275,12 @@ public:
     SubsequenceProxy subsequenceControls();
     SequenceOverviewProxy sequenceOverview();
 
+    // --- Set all 64 play probabilities at once ---
+    void setAllPlayProbabilities(bool shouldPlay) {
+        for (int i = 0; i < 64; ++i)
+            state().setPlayProbability(i, shouldPlay);
+    }
+
     // --- MIDI learn: programmatically map a control to a MIDI note ---
     void mapMidiNote(MidiControlId controlId, int noteNumber, int channel = 1) {
         auto& registry = processor_.getMidiLearnRegistry();
