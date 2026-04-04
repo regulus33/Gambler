@@ -106,7 +106,7 @@ public:
             DBG("Piano roll scale changed - updated global scale");
 
             int selectedStep = state.getSelectedStepForEditing();
-            int selectedNote = state.getCurrentNoteForStep(selectedStep);
+            int selectedNote = state.getSelectedNoteForStep(selectedStep);
             updateNoteControlOptions(selectedNote);
 
             triggerAsyncUpdate();
@@ -523,7 +523,7 @@ private:
         noteRange.onRangeChanged = [this]() {
             auto& state = processorRef.getState();
             int selectedStep = state.getSelectedStepForEditing();
-            int selectedNote = state.getCurrentNoteForStep(selectedStep);
+            int selectedNote = state.getSelectedNoteForStep(selectedStep);
             updateNoteControlOptions(selectedNote);
             mainScreen.getMainControls().getNoteControls().setFromMidiNote(selectedNote);
         };

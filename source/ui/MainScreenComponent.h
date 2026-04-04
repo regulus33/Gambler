@@ -327,10 +327,10 @@ public:
         int currentNote = state.getCurrentNoteForStep(currentStep);
         noteRangeControls.setActiveNote(currentNote);
 
-        // Get the selected step's note for editing controls (may be different from playback position)
-        int selectedNote = state.getCurrentNoteForStep(selectedStep);
+        // Get the selected substep's note for editing controls
+        int selectedNote = state.getSelectedNoteForStep(selectedStep);
 
-        // Update the note/octave controls to reflect the selected step's note
+        // Update the note/octave controls to reflect the selected substep's note
         mainControls.getNoteControls().setFromMidiNote(selectedNote);
         mainControls.getNoteControls().setRestOverlay(selectedNote < 0);
 

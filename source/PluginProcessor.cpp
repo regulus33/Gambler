@@ -807,8 +807,8 @@ void PluginProcessor::triggerStepMidi (int stepIndex) {
     // Set the selected step for editing via APVTS (thread-safe)
     state.setSelectedStepForEditing (stepIndex);
 
-    // Get the note for this step from APVTS-backed state
-    int note = state.getCurrentNoteForStep (stepIndex);
+    // Get the selected substep's note for this step from APVTS-backed state
+    int note = state.getSelectedNoteForStep (stepIndex);
 
     // Get step modulations from APVTS-backed state
     std::vector<StepModulationData> selectedMods;
@@ -932,7 +932,7 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
         note = noteOverride;
         DBG ("  Using override note: " << note);
     } else {
-        note = state.getCurrentNoteForStep (selectedStep);
+        note = state.getSelectedNoteForStep (selectedStep);
         DBG ("  Selected step: " << selectedStep << ", Note from step: " << note);
     }
 
@@ -1264,10 +1264,10 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             int octaveIndex = MidiValueConverter::midiToDiscreteIndex (midiValue, 9); // 0-9
             // Update via APVTS-backed state (thread-safe)
             int selectedStep = state.getSelectedStepForEditing();
-            int currentNote = state.getCurrentNoteForStep (selectedStep);
+            int currentNote = state.getSelectedNoteForStep (selectedStep);
             int pitchClass = currentNote % 12;
             int newNote = octaveIndex * 12 + pitchClass;
-            state.updateCurrentNoteForStep (selectedStep, newNote);
+            state.updateSelectedNoteForStep (selectedStep, newNote);
             DBG ("  → Octave changed to " << octaveIndex << " (MIDI note " << newNote << ")");
             auto callback = onSequenceTick;
             if (callback)
@@ -1280,10 +1280,10 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             int pitchClass = MidiValueConverter::midiToDiscreteIndex (midiValue, 11); // 0-11
             // Update via APVTS-backed state (thread-safe)
             int selectedStep = state.getSelectedStepForEditing();
-            int currentNote = state.getCurrentNoteForStep (selectedStep);
+            int currentNote = state.getSelectedNoteForStep (selectedStep);
             int octave = currentNote / 12;
             int newNote = octave * 12 + pitchClass;
-            state.updateCurrentNoteForStep (selectedStep, newNote);
+            state.updateSelectedNoteForStep (selectedStep, newNote);
             DBG ("  → Note changed to pitch class " << pitchClass << " (MIDI note " << newNote << ")");
             auto callback = onSequenceTick;
             if (callback)

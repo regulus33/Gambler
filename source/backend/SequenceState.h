@@ -241,6 +241,16 @@ public:
     }
 
     /**
+     * Get the quantized note for the selected substep (the one the user clicked to inspect/edit).
+     * This is what the note/octave controls should display.
+     */
+    int getSelectedNoteForStep(int stepIndex) const {
+        int substepIdx = getSelectedSubstepIndex(stepIndex);
+        if (substepIdx < 0) substepIdx = 0;
+        return getQuantizedStepNote(stepIndex, substepIdx);
+    }
+
+    /**
      * Update the selected substep's note for a step
      * Used when the user edits a note via piano roll/note controls after selecting a substep.
      */
