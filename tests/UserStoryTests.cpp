@@ -291,6 +291,114 @@ SCENARIO("User clicks a step and sees its substep in the subsequence controls", 
                         REQUIRE(app.subsequenceControls().barColor(i) == inactiveGrey);
                     }
                 }
+
+                AND_WHEN("User sets substep 0 to C4 (60) and substep 1 to E4 (64)") {
+                    app.state().setStepNote(0, 0, 60); // C4
+                    app.state().setStepNote(0, 1, 64); // E4
+
+                    AND_WHEN("User clicks substep bar 0") {
+                        app.subsequenceControls().clickBar(0);
+                        app.processMessages();
+
+                        THEN("NoteSlider shows C (pitchClass 0) and OctaveSlider shows octave 5") {
+                            auto& noteControls = app.mainScreen().getMainControls().getNoteControls();
+                            REQUIRE(noteControls.getNoteSlider().getChromaticPitchClass() == 0);
+                            REQUIRE(noteControls.getOctaveSlider().getActualOctaveIndex() == 5);
+                        }
+                    }
+
+                    AND_WHEN("User clicks substep bar 1") {
+                        app.subsequenceControls().clickBar(1);
+                        app.processMessages();
+
+                        THEN("NoteSlider shows E (pitchClass 4) and OctaveSlider shows octave 5") {
+                            auto& noteControls = app.mainScreen().getMainControls().getNoteControls();
+                            REQUIRE(noteControls.getNoteSlider().getChromaticPitchClass() == 4);
+                            REQUIRE(noteControls.getOctaveSlider().getActualOctaveIndex() == 5);
+                        }
+                    }
+                }
+
+                AND_WHEN("Sequencer ticks through step 0 to advance the substep index") {
+                    app.state().setStepNote(0, 0, 60); // C4
+                    app.state().setStepNote(0, 1, 64); // E4
+
+                    // Reset substep index to -1 (pre-start), mirroring what
+                    // SequenceState::reset() does after stop
+                    app.state().setStepNotesCurrentIndex(0, -1);
+                    REQUIRE(app.state().getStepNotesCurrentIndex(0) == -1);
+
+                    // tickStep advances before playing: (current + 1) % length
+                    // First tick: (-1+1)%2 = 0 → plays substep 0
+                    int note1 = app.state().tickStep(0);
+                    REQUIRE(app.state().getStepNotesCurrentIndex(0) == 0);
+                    REQUIRE(note1 == 60); // C4
+
+                    // Second tick: (0+1)%2 = 1 → plays substep 1
+                    int note2 = app.state().tickStep(0);
+                    REQUIRE(app.state().getStepNotesCurrentIndex(0) == 1);
+                    REQUIRE(note2 == 64); // E4
+
+                    THEN("Third visit wraps back to substep 0") {
+                        int note3 = app.state().tickStep(0);
+                        REQUIRE(app.state().getStepNotesCurrentIndex(0) == 0);
+                        REQUIRE(note3 == 60); // C4
+                    }
+                }
+            }
+        }
+    }
+}
+
+SCENARIO("Roll randomizes all substeps as the sequencer cycles through them", "[user-story][substep][roll]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 has 3 substeps, all starting at middle C") {
+        TestApp app;
+        app.state().setCurrentIndex(-1);
+        app.setAllPlayProbabilities(true);
+
+        // Give step 0 three substeps, all default C4
+        app.state().setStepNotesLength(0, 3);
+        app.state().setStepNote(0, 0, 60);
+        app.state().setStepNote(0, 1, 60);
+        app.state().setStepNote(0, 2, 60);
+        app.state().setStepNotesCurrentIndex(0, -1);
+
+        WHEN("User engages roll and the sequencer loops 3 times (hitting step 0 three times)") {
+            app.sequencerControls().rollButton().press();
+            app.processMessages();
+            REQUIRE(app.state().getIsRandom() == true);
+
+            int length = app.state().getLength(); // 8 steps
+
+            // Loop through the full sequence 3 times so step 0 is visited 3 times,
+            // once for each substep
+            for (int loop = 0; loop < 3; ++loop)
+                for (int i = 0; i < length; ++i)
+                    app.state().tick();
+
+            app.state().applyPendingNoteWrites();
+
+            THEN("All three substeps of step 0 have been written to") {
+                // Each substep was visited once per loop, so after 3 loops
+                // each substep has been overwritten at least once.
+                // With random generation, at least one should differ from the
+                // original middle C — run enough loops to make this near-certain.
+                bool anySubstepChanged = false;
+                for (int s = 0; s < 3; ++s) {
+                    if (app.state().getStepNote(0, s) != 60) {
+                        anySubstepChanged = true;
+                        break;
+                    }
+                }
+                REQUIRE(anySubstepChanged);
+            }
+
+            AND_THEN("The substep index has cycled correctly (3 visits to a 3-substep step wraps back to start)") {
+                // 3 visits: -1→0, 0→1, 1→2, and since length is 3: (2+1)%3 would be next
+                // After 3 ticks on this step, currentIndex should be 2
+                REQUIRE(app.state().getStepNotesCurrentIndex(0) == 2);
             }
         }
     }

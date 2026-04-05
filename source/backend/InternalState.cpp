@@ -67,7 +67,7 @@ int InternalState::getStepNotesCurrentIndex(int stepIndex) const {
 void InternalState::setStepNotesCurrentIndex(int stepIndex, int index) {
     if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return;
     tree.setProperty(IDs::stepNotesCurrentIndex(stepIndex),
-                     juce::jlimit(0, ParamConstants::MAX_SUBSTEPS - 1, index), nullptr);
+                     juce::jlimit(-1, ParamConstants::MAX_SUBSTEPS - 1, index), nullptr);
 }
 
 int InternalState::getSelectedSubstepIndex(int stepIndex) const {
