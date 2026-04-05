@@ -2,76 +2,52 @@
 
 #include "../data/Params.h"
 #include "InternalState.h"
+#include "Step.h"
 #include "Scale.h"
-#include "ModulationType.h"
+#include "ScaleQuantizer.h"
+#include "Sequence.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <array>
-#include <atomic>
 #include <vector>
-#include <random>
-
-/**
- * StepModulationData - Lightweight struct for step modulation data
- * Used by SequenceState::getSelectedModulations()
- */
-struct StepModulationData {
-    ModulationType type = ModulationType::CC;
-    int ccNumber = 1;
-    int value = 64;
-    bool selected = false;
-
-    ModulationType getType() const { return type; }
-    int getCCNumber() const { return ccNumber; }
-    int getValue() const { return value; }
-    bool isSelected() const { return selected; }
-};
 
 /**
  * SequenceState - APVTS-backed sequencer state accessor
- * 
- * This class provides the same interface as the old Sequence class but reads/writes
- * directly to APVTS parameters. This makes all state access thread-safe and enables
- * automatic DAW automation support.
- * 
- * Key benefits:
- * - Thread-safe: APVTS parameters use atomics internally
- * - No command queue needed: UI can set parameters directly
- * - DAW automation: All parameters can be automated
- * - MIDI mapping: Parameters can be mapped to MIDI controllers
- * 
+ *
+ * Provides a domain API over APVTS (automatable params) and InternalState
+ * (per-step data). Step-level operations are delegated to Step view objects.
+ *
  * Usage:
- *   SequenceState state(apvts);
- *   int note = state.getStepNote(0, 0);  // Read note for step 0, substep 0
- *   state.setStepNote(0, 0, 72);         // Set note (thread-safe)
+ *   SequenceState state(apvts, internal);
+ *   Step s = state.step(0);          // get a Step view
+ *   int note = s.note(0);            // read substep 0
+ *   state.setStepNote(0, 0, 72);     // legacy API still works
  */
 class SequenceState {
 public:
     using APVTS = juce::AudioProcessorValueTreeState;
 
     SequenceState(APVTS& apvts, InternalState& internalState)
-        : apvts(apvts), internalState(internalState) {}
-    
-    // ========================================
-    // SEQUENCE METADATA
-    // ========================================
-    
-    int getLength() const {
-        return getIntParam(Params::Keys::ID::SEQ_LENGTH);
-    }
-    
-    void setLength(int length) {
-        setIntParam(Params::Keys::ID::SEQ_LENGTH, 
-            juce::jlimit(1, ParamConstants::MAX_STEPS, length));
-    }
-    
-    // Current playback index (delegated to InternalState)
-    int getCurrentIndex() const {
-        return internalState.getCurrentIndex();
-    }
+        : apvts(apvts), internalState(internalState), scaleQ(apvts), seq(apvts, internalState, scaleQ) {}
 
-    void setCurrentIndex(int index) {
-        internalState.setCurrentIndex(juce::jlimit(-1, getLength() - 1, index));
-    }
+    /** Access the domain objects directly. */
+    Sequence& sequence() { return seq; }
+    const Sequence& sequence() const { return seq; }
+    ScaleQuantizer& scaleQuantizer() { return scaleQ; }
+    const ScaleQuantizer& scaleQuantizer() const { return scaleQ; }
+
+    /** Get a Step view for the given index. Lightweight — no allocation. */
+    Step step(int stepIndex) { return seq.step(stepIndex); }
+    const Step step(int stepIndex) const { return seq.step(stepIndex); }
+
+    // ========================================
+    // SEQUENCE METADATA (delegated through Sequence)
+    // ========================================
+
+    int getLength() const { return seq.length(); }
+    void setLength(int length) { seq.setLength(length); }
+
+    int getCurrentIndex() const { return seq.currentIndex(); }
+    void setCurrentIndex(int index) { seq.setCurrentIndex(index); }
 
     int getSelectedStepForEditing() const {
         return getIntParam(Params::Keys::ID::SEQ_SELECTED_STEP);
@@ -98,441 +74,163 @@ public:
         setBoolParam(Params::Keys::ID::SEQ_IS_SHIFT, shift);
     }
 
-    // Last probability index (delegated to InternalState)
-    int getLastProbabilityIndex() const {
-        return internalState.getLastProbabilityIndex();
-    }
+    int getLastProbabilityIndex() const { return seq.lastProbabilityIndex(); }
+    void setLastProbabilityIndex(int index) { seq.setLastProbabilityIndex(index); }
 
-    void setLastProbabilityIndex(int index) {
-        internalState.setLastProbabilityIndex(index);
-    }
-
-    // View window start (delegated to InternalState)
-    int getViewWindowStart() const {
-        return internalState.getViewWindowStart();
-    }
-
-    void setViewWindowStart(int startIndex) {
-        internalState.setViewWindowStart(startIndex);
-    }
+    int getViewWindowStart() const { return internalState.getViewWindowStart(); }
+    void setViewWindowStart(int startIndex) { internalState.setViewWindowStart(startIndex); }
 
     // ========================================
-    // PLAY PROBABILITY (delegated to InternalState)
+    // PLAY PROBABILITY (delegated through Sequence)
     // ========================================
 
-    bool getPlayProbability(int index) const {
-        return internalState.getPlayProbability(index);
-    }
-
-    void setPlayProbability(int index, bool shouldPlay) {
-        internalState.setPlayProbability(index, shouldPlay);
-    }
-
-    void setProbabilityPercentage(int percentage) {
-        percentage = juce::jlimit(0, 100, percentage);
-        int numToPlay = (ParamConstants::MAX_STEPS * percentage) / 100;
-
-        // Reset all to false
-        for (int i = 0; i < ParamConstants::MAX_STEPS; i++) {
-            setPlayProbability(i, false);
-        }
-
-        // Randomly set numToPlay indices to true
-        // Use thread_local to avoid data races between audio and UI threads
-        thread_local std::random_device rd;
-        thread_local std::mt19937 gen(rd());
-
-        std::vector<int> indices;
-        for (int i = 0; i < ParamConstants::MAX_STEPS; i++) {
-            indices.push_back(i);
-        }
-        std::shuffle(indices.begin(), indices.end(), gen);
-
-        for (int i = 0; i < numToPlay && i < static_cast<int>(indices.size()); i++) {
-            setPlayProbability(indices[i], true);
-        }
-    }
+    bool getPlayProbability(int index) const { return seq.playProbability(index); }
+    void setPlayProbability(int index, bool shouldPlay) { seq.setPlayProbability(index, shouldPlay); }
+    void setProbabilityPercentage(int percentage) { seq.setProbabilityPercentage(percentage); }
     
     // ========================================
-    // STEP NOTES (delegated to InternalState)
+    // STEP NOTES (delegated through Step)
     // ========================================
 
     int getStepNote(int stepIndex, int substepIndex) const {
-        return internalState.getStepNote(stepIndex, substepIndex);
+        return step(stepIndex).note(substepIndex);
     }
 
     void setStepNote(int stepIndex, int substepIndex, int noteNumber) {
-        internalState.setStepNote(stepIndex, substepIndex, noteNumber);
+        step(stepIndex).setNote(substepIndex, noteNumber);
     }
 
     int getStepNotesLength(int stepIndex) const {
-        return internalState.getStepNotesLength(stepIndex);
+        return step(stepIndex).substepCount();
     }
 
     void setStepNotesLength(int stepIndex, int length) {
-        internalState.setStepNotesLength(stepIndex, length);
+        step(stepIndex).setSubstepCount(length);
     }
 
     int getStepNotesCurrentIndex(int stepIndex) const {
-        return internalState.getStepNotesCurrentIndex(stepIndex);
+        return step(stepIndex).currentSubstep();
     }
 
-    /** The substep that will play on the next pass of this step. */
     int getNextSubstepIndex(int stepIndex) const {
-        int length = getStepNotesLength(stepIndex);
-        if (length <= 0) return 0;
-        return (getStepNotesCurrentIndex(stepIndex) + 1) % length;
+        return step(stepIndex).nextSubstep();
     }
 
     void setStepNotesCurrentIndex(int stepIndex, int index) {
-        internalState.setStepNotesCurrentIndex(stepIndex, index);
+        step(stepIndex).setCurrentSubstep(index);
     }
 
     int getSelectedSubstepIndex(int stepIndex) const {
-        return internalState.getSelectedSubstepIndex(stepIndex);
+        return step(stepIndex).selectedSubstep();
     }
 
     void setSelectedSubstepIndex(int stepIndex, int index) {
-        internalState.setSelectedSubstepIndex(stepIndex, index);
+        step(stepIndex).setSelectedSubstep(index);
     }
 
-    /**
-     * Get the RAW stored note for the next-to-play substep
-     * This returns the unquantized value as stored in APVTS
-     * Use getQuantizedCurrentNoteForStep() for display/playback
-     */
     int getRawCurrentNoteForStep(int stepIndex) const {
-        return getStepNote(stepIndex, getNextSubstepIndex(stepIndex));
+        return step(stepIndex).rawCurrentNote();
     }
 
-    /**
-     * Get the quantized version of a step's note
-     * This applies the global scale quantization on-the-fly without modifying stored data
-     */
+    /** Quantize a step's note on-the-fly without modifying stored data. */
     int getQuantizedStepNote(int stepIndex, int substepIndex) const {
-        int note = getStepNote(stepIndex, substepIndex);
-        if (note < 0) return note;  // Don't quantize rests
+        int note = step(stepIndex).note(substepIndex);
+        if (note < 0) return note;
         return quantizeNoteToGlobalScale(note);
     }
 
-    /**
-     * Get the quantized note for the next-to-play substep
-     * This is what should be displayed in step buttons and controls
-     */
     int getQuantizedCurrentNoteForStep(int stepIndex) const {
-        return getQuantizedStepNote(stepIndex, getNextSubstepIndex(stepIndex));
+        return getQuantizedStepNote(stepIndex, step(stepIndex).nextSubstep());
     }
 
-    /**
-     * Get the current note for a step (based on its current substep index)
-     * Returns the QUANTIZED note for display/editing purposes
-     * This is the main accessor that UI components should use
-     */
+    /** Main accessor for UI — returns quantized note for the next-to-play substep. */
     int getCurrentNoteForStep(int stepIndex) const {
         return getQuantizedCurrentNoteForStep(stepIndex);
     }
 
-    /**
-     * Update the next-to-play substep's note for a step.
-     * When destructive scale/range is enabled, the note is baked before storage.
-     */
     void updateCurrentNoteForStep(int stepIndex, int noteNumber) {
-        setStepNote(stepIndex, getNextSubstepIndex(stepIndex), bakeNoteForStorage(noteNumber));
+        step(stepIndex).setNote(step(stepIndex).nextSubstep(), bakeNoteForStorage(noteNumber));
     }
 
-    /**
-     * Get the quantized note for the selected substep (the one the user clicked to inspect/edit).
-     * This is what the note/octave controls should display.
-     */
     int getSelectedNoteForStep(int stepIndex) const {
-        int substepIdx = getSelectedSubstepIndex(stepIndex);
+        int substepIdx = step(stepIndex).selectedSubstep();
         if (substepIdx < 0) substepIdx = 0;
         return getQuantizedStepNote(stepIndex, substepIdx);
     }
 
-    /**
-     * Update the selected substep's note for a step
-     * Used when the user edits a note via piano roll/note controls after selecting a substep.
-     */
     void updateSelectedNoteForStep(int stepIndex, int noteNumber) {
-        int substepIdx = getSelectedSubstepIndex(stepIndex);
+        int substepIdx = step(stepIndex).selectedSubstep();
         if (substepIdx < 0) substepIdx = 0;
-        setStepNote(stepIndex, substepIdx, bakeNoteForStorage(noteNumber));
+        step(stepIndex).setNote(substepIdx, bakeNoteForStorage(noteNumber));
     }
 
-    /**
-     * Check if a step's current note is a rest (-1)
-     * Checks the RAW stored value (before quantization)
-     */
     bool stepHasRest(int stepIndex) const {
-        return getRawCurrentNoteForStep(stepIndex) < 0;
+        return step(stepIndex).isRest();
     }
 
     // ========================================
-    // STEP MODULATIONS (delegated to InternalState)
+    // STEP MODULATIONS (delegated through Step)
     // ========================================
 
     ModulationType getStepModType(int stepIndex, int modIndex) const {
-        return static_cast<ModulationType>(internalState.getStepModType(stepIndex, modIndex));
+        return step(stepIndex).modType(modIndex);
     }
 
     void setStepModType(int stepIndex, int modIndex, ModulationType type) {
-        internalState.setStepModType(stepIndex, modIndex, static_cast<int>(type));
+        step(stepIndex).setModType(modIndex, type);
     }
 
     int getStepModCCNum(int stepIndex, int modIndex) const {
-        return internalState.getStepModCC(stepIndex, modIndex);
+        return step(stepIndex).modCCNumber(modIndex);
     }
 
     void setStepModCCNum(int stepIndex, int modIndex, int ccNum) {
-        internalState.setStepModCC(stepIndex, modIndex, ccNum);
+        step(stepIndex).setModCCNumber(modIndex, ccNum);
     }
 
     int getStepModValue(int stepIndex, int modIndex) const {
-        return internalState.getStepModValue(stepIndex, modIndex);
+        return step(stepIndex).modValue(modIndex);
     }
 
     void setStepModValue(int stepIndex, int modIndex, int value) {
-        internalState.setStepModValue(stepIndex, modIndex, value);
+        step(stepIndex).setModValue(modIndex, value);
     }
 
     bool getStepModSelected(int stepIndex, int modIndex) const {
-        return internalState.getStepModSelected(stepIndex, modIndex);
+        return step(stepIndex).modSelected(modIndex);
     }
 
     void setStepModSelected(int stepIndex, int modIndex, bool selected) {
-        internalState.setStepModSelected(stepIndex, modIndex, selected);
+        step(stepIndex).setModSelected(modIndex, selected);
     }
 
-    /**
-     * Get all selected modulations for a step
-     */
     std::vector<StepModulationData> getSelectedModulations(int stepIndex) const {
-        std::vector<StepModulationData> result;
-        for (int i = 0; i < ParamConstants::NUM_MODULATIONS; i++) {
-            if (getStepModSelected(stepIndex, i)) {
-                StepModulationData mod;
-                mod.type = getStepModType(stepIndex, i);
-                mod.ccNumber = getStepModCCNum(stepIndex, i);
-                mod.value = getStepModValue(stepIndex, i);
-                mod.selected = true;
-                result.push_back(mod);
-            }
-        }
-        return result;
+        return step(stepIndex).selectedModulations();
     }
 
     // ========================================
-    // SCALE WINDOW (Global - applies to all steps)
+    // SCALE / RANGE / QUANTIZATION (delegated through ScaleQuantizer)
     // ========================================
 
-    // Window-based parameters (stored in APVTS)
-    int getScaleWindowOffset() const {
-        return getIntParam(Params::Keys::ID::SCALE_WINDOW_OFFSET);
-    }
+    int getScaleWindowOffset() const { return scaleQ.windowOffset(); }
+    void setScaleWindowOffset(int offset) { scaleQ.setWindowOffset(offset); }
+    int getScaleWindowSize() const { return scaleQ.windowSize(); }
+    void setScaleWindowSize(int size) { scaleQ.setWindowSize(size); }
 
-    void setScaleWindowOffset(int offset) {
-        setIntParam(Params::Keys::ID::SCALE_WINDOW_OFFSET, juce::jlimit(0, 127, offset));
-    }
+    int getScaleRangeMin() const { return scaleQ.rangeMin(); }
+    int getScaleRangeMax() const { return scaleQ.rangeMax(); }
+    void setScaleRangeMin(int min) { scaleQ.setRangeMin(min); }
+    void setScaleRangeMax(int max) { scaleQ.setRangeMax(max); }
 
-    int getScaleWindowSize() const {
-        return getIntParam(Params::Keys::ID::SCALE_WINDOW_SIZE);
-    }
+    bool getGlobalScaleNote(int noteIndex) const { return scaleQ.scaleNote(noteIndex); }
+    void setGlobalScaleNote(int noteIndex, bool enabled) { scaleQ.setScaleNote(noteIndex, enabled); }
+    std::array<int, 12> getGlobalScaleNotes() const { return scaleQ.scaleNotes(); }
+    void setGlobalScaleNotes(const std::array<int, 12>& notes) { scaleQ.setScaleNotes(notes); }
+    Scale getGlobalScale() const { return scaleQ.asScale(); }
+    bool isNoteInGlobalScale(int noteNumber) const { return scaleQ.isInScale(noteNumber); }
 
-    void setScaleWindowSize(int size) {
-        setIntParam(Params::Keys::ID::SCALE_WINDOW_SIZE, juce::jlimit(1, 128, size));
-    }
-
-    // Computed range values (for backward compatibility and convenience)
-    // These compute min/max from the window offset and size
-    int getScaleRangeMin() const {
-        return Scale::computeMinFromWindow(getScaleWindowOffset(), getScaleWindowSize());
-    }
-
-    int getScaleRangeMax() const {
-        return Scale::computeMaxFromWindow(getScaleWindowOffset(), getScaleWindowSize());
-    }
-
-    // Set range by computing window offset and size
-    void setScaleRangeMin(int min) {
-        int currentMax = getScaleRangeMax();
-        int newOffset = Scale::computeOffsetFromRange(min, currentMax);
-        int newSize = Scale::computeSizeFromRange(min, currentMax);
-        setScaleWindowOffset(newOffset);
-        setScaleWindowSize(newSize);
-    }
-
-    void setScaleRangeMax(int max) {
-        int currentMin = getScaleRangeMin();
-        int newOffset = Scale::computeOffsetFromRange(currentMin, max);
-        int newSize = Scale::computeSizeFromRange(currentMin, max);
-        setScaleWindowOffset(newOffset);
-        setScaleWindowSize(newSize);
-    }
-
-    // ========================================
-    // GLOBAL SCALE
-    // ========================================
-
-    /**
-     * Get a specific note's enabled state in the global scale
-     */
-    bool getGlobalScaleNote(int noteIndex) const {
-        if (noteIndex < 0 || noteIndex >= ParamConstants::NUM_SCALE_NOTES) return true;
-        return getBoolParam(Params::Keys::ID::globalScaleNote(noteIndex));
-    }
-
-    /**
-     * Set a specific note's enabled state in the global scale
-     */
-    void setGlobalScaleNote(int noteIndex, bool enabled) {
-        if (noteIndex >= 0 && noteIndex < ParamConstants::NUM_SCALE_NOTES) {
-            setBoolParam(Params::Keys::ID::globalScaleNote(noteIndex), enabled);
-        }
-    }
-
-    /**
-     * Get all global scale notes
-     */
-    std::array<int, 12> getGlobalScaleNotes() const {
-        std::array<int, 12> notes;
-        for (int i = 0; i < 12; i++) {
-            notes[i] = getGlobalScaleNote(i) ? 1 : 0;
-        }
-        return notes;
-    }
-
-    /**
-     * Set all global scale notes
-     */
-    void setGlobalScaleNotes(const std::array<int, 12>& notes) {
-        for (int i = 0; i < 12; i++) {
-            setGlobalScaleNote(i, notes[i] != 0);
-        }
-    }
-
-    /**
-     * Get a Scale object for the global scale
-     */
-    Scale getGlobalScale() const {
-        Scale scale;
-        scale.setScaleNotes(getGlobalScaleNotes());
-        scale.setRangeMin(getScaleRangeMin());
-        scale.setRangeMax(getScaleRangeMax());
-        return scale;
-    }
-
-    /**
-     * Check if a note is in the global scale
-     */
-    bool isNoteInGlobalScale(int noteNumber) const {
-        if (noteNumber < 0 || noteNumber > 127) return false;
-        int pitchClass = noteNumber % 12;
-        return getGlobalScaleNote(pitchClass);
-    }
-
-    /**
-     * Quantize a note to the global scale and clamp to note range.
-     * When destructive mode is OFF (default), this applies both range clamping
-     * and scale quantization on-the-fly at playback time.
-     * When destructive mode is ON, the corresponding quantization is skipped
-     * here because it was already baked into the stored note at record time.
-     * Returns -1 (rest) if no scale notes are enabled.
-     */
-    int quantizeNoteToGlobalScale(int noteNumber) const {
-        bool skipRange = getDestructiveRange();
-        bool skipScale = getDestructiveScale();
-
-        int rangeMin = getScaleRangeMin();
-        int rangeMax = getScaleRangeMax();
-
-        // Clamp to note range (skip if already baked at record time)
-        if (!skipRange)
-            noteNumber = juce::jlimit(rangeMin, rangeMax, noteNumber);
-
-        // Skip scale quantization if already baked at record time
-        if (skipScale)
-            return noteNumber;
-
-        // Check if any notes are enabled in the global scale
-        bool anyEnabled = false;
-        for (int i = 0; i < 12; i++) {
-            if (getGlobalScaleNote(i)) {
-                anyEnabled = true;
-                break;
-            }
-        }
-        // If no notes are enabled, return -1 (rest) to indicate "no note should play"
-        if (!anyEnabled) return -1;
-
-        // If already in scale and in range, return it
-        if (isNoteInGlobalScale(noteNumber)) return noteNumber;
-
-        // Determine search bounds based on whether range is baked
-        int searchMin = skipRange ? 0 : rangeMin;
-        int searchMax = skipRange ? 127 : rangeMax;
-
-        // Find nearest note in scale within the range (prefer lower when equidistant)
-        for (int distance = 1; distance <= 127; distance++) {
-            int downNote = noteNumber - distance;
-            if (downNote >= searchMin && isNoteInGlobalScale(downNote)) return downNote;
-
-            int upNote = noteNumber + distance;
-            if (upNote <= searchMax && isNoteInGlobalScale(upNote)) return upNote;
-
-            // Stop searching if both directions are out of range
-            if (downNote < searchMin && upNote > searchMax) break;
-        }
-
-        // No scale note found in range — return as rest
-        return -1;
-    }
-
-    /**
-     * Apply destructive quantization to a note before storage.
-     * When destructive scale/range is enabled, the note is quantized/clamped
-     * NOW so the baked value is stored. This allows the scale or range to
-     * change later without affecting previously recorded notes.
-     */
-    int bakeNoteForStorage(int noteNumber) const {
-        if (noteNumber < 0) return noteNumber;  // Don't bake rests
-
-        bool bakeRange = getDestructiveRange();
-        bool bakeScale = getDestructiveScale();
-
-        if (!bakeRange && !bakeScale)
-            return noteNumber;  // Nothing to bake
-
-        if (bakeRange) {
-            int rangeMin = getScaleRangeMin();
-            int rangeMax = getScaleRangeMax();
-            noteNumber = juce::jlimit(rangeMin, rangeMax, noteNumber);
-        }
-
-        if (bakeScale) {
-            // Check if any notes are enabled
-            bool anyEnabled = false;
-            for (int i = 0; i < 12; i++) {
-                if (getGlobalScaleNote(i)) { anyEnabled = true; break; }
-            }
-            if (!anyEnabled) return -1;
-
-            if (!isNoteInGlobalScale(noteNumber)) {
-                int rangeMin = bakeRange ? getScaleRangeMin() : 0;
-                int rangeMax = bakeRange ? getScaleRangeMax() : 127;
-                for (int distance = 1; distance <= 127; distance++) {
-                    int downNote = noteNumber - distance;
-                    if (downNote >= rangeMin && isNoteInGlobalScale(downNote)) return downNote;
-                    int upNote = noteNumber + distance;
-                    if (upNote <= rangeMax && isNoteInGlobalScale(upNote)) return upNote;
-                    if (downNote < rangeMin && upNote > rangeMax) break;
-                }
-                return -1;
-            }
-        }
-
-        return noteNumber;
-    }
+    int quantizeNoteToGlobalScale(int noteNumber) const { return scaleQ.quantize(noteNumber); }
+    int bakeNoteForStorage(int noteNumber) const { return scaleQ.bake(noteNumber); }
 
     // ========================================
     // CLOCK
@@ -594,21 +292,10 @@ public:
         setFloatParam(Params::Keys::ID::PREF_NOTE_LENGTH, juce::jlimit(0.0f, 1.0f, length));
     }
 
-    bool getDestructiveScale() const {
-        return getBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE);
-    }
-
-    void setDestructiveScale(bool enabled) {
-        setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE, enabled);
-    }
-
-    bool getDestructiveRange() const {
-        return getBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_RANGE);
-    }
-
-    void setDestructiveRange(bool enabled) {
-        setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_RANGE, enabled);
-    }
+    bool getDestructiveScale() const { return scaleQ.destructiveScale(); }
+    void setDestructiveScale(bool enabled) { scaleQ.setDestructiveScale(enabled); }
+    bool getDestructiveRange() const { return scaleQ.destructiveRange(); }
+    void setDestructiveRange(bool enabled) { scaleQ.setDestructiveRange(enabled); }
 
     // ========================================
     // NOTE COLOURS (delegated to InternalState)
@@ -631,255 +318,21 @@ public:
     }
 
     // ========================================
-    // SEQUENCER OPERATIONS
+    // SEQUENCER OPERATIONS (delegated through Sequence)
     // ========================================
 
-    /**
-     * Advance the sequencer to the next step and return the note to play.
-     * This is the main tick function called from processBlock.
-     *
-     * @return MIDI note number to play (quantized), or -1 for rest
-     */
-    int tick() {
-        int length = getLength();
-        int currentIndex = getCurrentIndex();
-
-        // Advance index (wraps at length boundary)
-        currentIndex = (currentIndex + 1) % length;
-        setCurrentIndex(currentIndex);
-
-        // Advance probability index sequentially, wrapping at MAX_STEPS
-        int probabilityIndex = (getLastProbabilityIndex() + 1) % ParamConstants::MAX_STEPS;
-        setLastProbabilityIndex(probabilityIndex);
-
-        // If random mode (roll) is enabled, use the probability for play/rest decisions
-        if (getIsRandom()) {
-            // Advance this step's substep index (same as normal playback —
-            // substep advances once per sequence pass when currentIndex lands here)
-            int substepIdx = tickStepSubstepOnly(currentIndex);
-
-            // Check play probability - if false, queue a rest and return -1
-            if (!getPlayProbability(probabilityIndex)) {
-                // Queue the rest note write for the message thread to apply
-                queueNoteWrite(currentIndex, substepIdx, -1);
-                return -1;
-            }
-
-            // Probability check passed - generate a random note
-            // Bake if destructive mode is on, otherwise store raw
-            // Return the quantized version for immediate playback
-            int unquantizedNote = generateRandomNoteUnquantized();
-            queueNoteWrite(currentIndex, substepIdx, bakeNoteForStorage(unquantizedNote));
-            return quantizeNoteToGlobalScale(unquantizedNote);
-        }
-
-        // Not in random mode - just tick the current step normally
-        return tickStep(currentIndex);
-    }
-
-    /**
-     * Advance a step's substep index without returning the note
-     * Used internally by tick() when we need to advance first, then decide what to do
-     */
-    int tickStepSubstepOnly(int stepIndex) {
-        int substepLength = getStepNotesLength(stepIndex);
-        int substepIndex = getStepNotesCurrentIndex(stepIndex);
-
-        // Advance substep index
-        substepIndex = (substepIndex + 1) % substepLength;
-        setStepNotesCurrentIndex(stepIndex, substepIndex);
-
-        return substepIndex;
-    }
-
-    /**
-     * Tick a step's substep sequence and return the note (quantized)
-     */
-    int tickStep(int stepIndex) {
-        int substepLength = getStepNotesLength(stepIndex);
-        int substepIndex = getStepNotesCurrentIndex(stepIndex);
-
-        // Advance substep index
-        substepIndex = (substepIndex + 1) % substepLength;
-        setStepNotesCurrentIndex(stepIndex, substepIndex);
-
-        // Return quantized note for playback
-        return getQuantizedStepNote(stepIndex, substepIndex);
-    }
-
-    /**
-     * Generate a random unquantized note within the scale range.
-     * Used by roll mode - the unquantized value is queued for deferred storage,
-     * while quantization happens on-the-fly for playback.
-     */
-    int generateRandomNoteUnquantized() const {
-        // Use thread_local to avoid data races between audio and UI threads
-        thread_local std::random_device rd;
-        thread_local std::mt19937 gen(rd());
-
-        int rangeMin = getScaleRangeMin();
-        int rangeMax = getScaleRangeMax();
-        std::uniform_int_distribution<> dis(rangeMin, rangeMax);
-
-        return dis(gen);
-    }
-
-    /**
-     * Randomize a step's current note within scale and range
-     * NOTE: Stores UNQUANTIZED random value. Quantization happens on-the-fly during playback/display.
-     * This allows changing scales without losing the underlying random data.
-     * WARNING: Should only be called from message thread (modifies APVTS)
-     */
-    /**
-     * Sweep all 64 steps × 8 substeps, applying bakeNoteForStorage() to each.
-     * Called when DESTRUCTIVE_SCALE or DESTRUCTIVE_RANGE transitions from OFF to ON,
-     * so that existing notes are immediately quantized/clamped to match the
-     * current scale and range, preventing jarring out-of-scale/range playback.
-     */
-    void bakeAllExistingNotes() {
-        for (int step = 0; step < ParamConstants::MAX_STEPS; ++step) {
-            for (int substep = 0; substep < ParamConstants::MAX_SUBSTEPS; ++substep) {
-                int note = getStepNote(step, substep);
-                int baked = bakeNoteForStorage(note);
-                if (baked != note)
-                    setStepNote(step, substep, baked);
-            }
-        }
-    }
-
-    void randomizeStepNote(int stepIndex) {
-        // Use thread_local to avoid data races between audio and UI threads
-        thread_local std::random_device rd;
-        thread_local std::mt19937 gen(rd());
-
-        int rangeMin = getScaleRangeMin();
-        int rangeMax = getScaleRangeMax();
-        std::uniform_int_distribution<> dis(rangeMin, rangeMax);
-
-        int randomNote = dis(gen);
-        // Bake scale/range if destructive mode is on, otherwise store raw
-        randomNote = bakeNoteForStorage(randomNote);
-
-        int substepIdx = getStepNotesCurrentIndex(stepIndex);
-        if (substepIdx < 0) substepIdx = 0;
-        setStepNote(stepIndex, substepIdx, randomNote);
-    }
-
-
-
-    /**
-     * Increase sequence length by 1
-     */
-    void increaseLength() {
-        int length = getLength();
-        if (length < ParamConstants::MAX_STEPS) {
-            setLength(length + 1);
-        }
-    }
-
-    /**
-     * Decrease sequence length by 1
-     */
-    void decreaseLength() {
-        int length = getLength();
-        if (length > 1) {
-            setLength(length - 1);
-            // Wrap current index if needed
-            int currentIndex = getCurrentIndex();
-            if (currentIndex >= length - 1) {
-                setCurrentIndex(length - 2);
-            }
-        }
-    }
-
-    /**
-     * Nudge sequence left (rotate)
-     */
-    void nudgeLeft() {
-        int length = getLength();
-        if (length <= 1) return;
-
-        // Save first step's data
-        std::array<int, ParamConstants::MAX_SUBSTEPS> tempNotes;
-        for (int s = 0; s < ParamConstants::MAX_SUBSTEPS; s++) {
-            tempNotes[s] = getStepNote(0, s);
-        }
-        int tempLength = getStepNotesLength(0);
-
-        // Shift all steps left
-        for (int i = 0; i < length - 1; i++) {
-            for (int s = 0; s < ParamConstants::MAX_SUBSTEPS; s++) {
-                setStepNote(i, s, getStepNote(i + 1, s));
-            }
-            setStepNotesLength(i, getStepNotesLength(i + 1));
-        }
-
-        // Put first step at end
-        for (int s = 0; s < ParamConstants::MAX_SUBSTEPS; s++) {
-            setStepNote(length - 1, s, tempNotes[s]);
-        }
-        setStepNotesLength(length - 1, tempLength);
-    }
-
-    /**
-     * Nudge sequence right (rotate)
-     */
-    void nudgeRight() {
-        int length = getLength();
-        if (length <= 1) return;
-
-        // Save last step's data
-        std::array<int, ParamConstants::MAX_SUBSTEPS> tempNotes;
-        for (int s = 0; s < ParamConstants::MAX_SUBSTEPS; s++) {
-            tempNotes[s] = getStepNote(length - 1, s);
-        }
-        int tempLength = getStepNotesLength(length - 1);
-
-        // Shift all steps right
-        for (int i = length - 1; i > 0; i--) {
-            for (int s = 0; s < ParamConstants::MAX_SUBSTEPS; s++) {
-                setStepNote(i, s, getStepNote(i - 1, s));
-            }
-            setStepNotesLength(i, getStepNotesLength(i - 1));
-        }
-
-        // Put last step at beginning
-        for (int s = 0; s < ParamConstants::MAX_SUBSTEPS; s++) {
-            setStepNote(0, s, tempNotes[s]);
-        }
-        setStepNotesLength(0, tempLength);
-    }
-
-    /**
-     * Reset sequence to initial state
-     */
-    void reset() {
-        setCurrentIndex(-1);
-        for (int step = 0; step < ParamConstants::MAX_STEPS; step++) {
-            setStepNotesCurrentIndex(step, -1);
-        }
-    }
-
-    // ========================================
-    // PENDING NOTE WRITES (audio thread -> message thread)
-    // ========================================
-
-    /**
-     * Apply any pending note writes queued by the audio thread.
-     * Must be called from the message thread (e.g., in handleAsyncUpdate).
-     */
-    void applyPendingNoteWrites() {
-        int readIdx = pendingNoteReadIndex.load(std::memory_order_acquire);
-        int writeIdx = pendingNoteWriteIndex.load(std::memory_order_acquire);
-
-        while (readIdx != writeIdx) {
-            auto& entry = pendingNoteBuffer[readIdx % PENDING_NOTE_BUFFER_SIZE];
-            // Write to InternalState (step notes are now stored there, not in APVTS)
-            internalState.setStepNote(entry.stepIndex, entry.substepIndex, entry.noteValue);
-            readIdx++;
-            pendingNoteReadIndex.store(readIdx, std::memory_order_release);
-        }
-    }
+    int tick() { return seq.tick(); }
+    int tickStep(int stepIndex) { return seq.tickStep(stepIndex); }
+    int tickStepSubstepOnly(int stepIndex) { return step(stepIndex).advanceSubstep(); }
+    int generateRandomNoteUnquantized() const { return seq.generateRandomNoteUnquantized(); }
+    void bakeAllExistingNotes() { seq.bakeAllExistingNotes(); }
+    void randomizeStepNote(int stepIndex) { seq.randomizeStepNote(stepIndex); }
+    void increaseLength() { seq.increaseLength(); }
+    void decreaseLength() { seq.decreaseLength(); }
+    void nudgeLeft() { seq.nudgeLeft(); }
+    void nudgeRight() { seq.nudgeRight(); }
+    void reset() { seq.reset(); }
+    void applyPendingNoteWrites() { seq.applyPendingNoteWrites(); }
 
     // ========================================
     // PARAMETER ACCESS HELPERS
@@ -888,29 +341,8 @@ public:
 private:
     APVTS& apvts;
     InternalState& internalState;
-
-    // Lock-free SPSC ring buffer for deferring note writes from audio to message thread
-    struct PendingNoteWrite {
-        int stepIndex;
-        int substepIndex;
-        int noteValue;
-    };
-    static constexpr int PENDING_NOTE_BUFFER_SIZE = 64;
-    std::array<PendingNoteWrite, PENDING_NOTE_BUFFER_SIZE> pendingNoteBuffer {};
-    std::atomic<int> pendingNoteWriteIndex { 0 };
-    std::atomic<int> pendingNoteReadIndex { 0 };
-
-    void queueNoteWrite(int stepIndex, int substepIndex, int noteValue) {
-        int writeIdx = pendingNoteWriteIndex.load(std::memory_order_relaxed);
-        int readIdx = pendingNoteReadIndex.load(std::memory_order_acquire);
-        // Drop if buffer full (shouldn't happen at normal tick rates)
-        if (writeIdx - readIdx >= PENDING_NOTE_BUFFER_SIZE) return;
-        auto& entry = pendingNoteBuffer[writeIdx % PENDING_NOTE_BUFFER_SIZE];
-        entry.stepIndex = stepIndex;
-        entry.substepIndex = substepIndex;
-        entry.noteValue = noteValue;
-        pendingNoteWriteIndex.store(writeIdx + 1, std::memory_order_release);
-    }
+    ScaleQuantizer scaleQ;
+    Sequence seq;
 
     int getIntParam(const juce::String& paramId) const {
         if (auto* param = apvts.getRawParameterValue(paramId)) {
