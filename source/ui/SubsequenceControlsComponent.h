@@ -577,7 +577,10 @@ protected:
                 bool isActive = (i == nextSubstep);
 
                 if (noteNumber < 0) {
-                    subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::restGreyHex));
+                    if (isActive)
+                        subsequenceBar.setBarColor(i, UIConstants::activeStepColour);
+                    else
+                        subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::restGreyHex));
                     subsequenceBar.setBarNoteLabel(i, "");
                 } else {
                     if (isActive) {
@@ -592,8 +595,11 @@ protected:
                 subsequenceBar.setBarCurrent(i, isActive);
 
                 // Border priority: active > selected > next
-                if (isActive) {
+                // Active rests use white fill instead of white border
+                if (isActive && noteNumber >= 0) {
                     subsequenceBar.setBarBorderStyle(i, BarBorderStyle::current);
+                } else if (isActive && noteNumber < 0) {
+                    subsequenceBar.setBarBorderStyle(i, BarBorderStyle::none);
                 } else if (i == selectedSubstep) {
                     subsequenceBar.setBarBorderStyle(i, BarBorderStyle::selected);
                 } else {

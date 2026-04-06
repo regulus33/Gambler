@@ -404,6 +404,54 @@ SCENARIO("Roll randomizes all substeps as the sequencer cycles through them", "[
     }
 }
 
+SCENARIO("Active rest substep shows active fill, not a selected border", "[user-story][substep]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 has 2 substeps: a note and a rest") {
+        TestApp app;
+        app.state().setStepNotesLength(0, 2);
+        app.state().setStepNote(0, 0, 60);  // C4
+        app.state().setStepNote(0, 1, -1);  // rest
+
+        // Select step 0 for editing so subsequence controls show it
+        app.sequencerSteps().clickStep(0);
+        app.processMessages();
+
+        WHEN("The rest substep is next to play (nextSubstep points to it)") {
+            // nextSubstep = (currentSubstep + 1) % length
+            // For substep 1 to be next: currentSubstep must be 0
+            // One tick from -1 sets currentSubstep to 0, so nextSubstep = 1
+            app.state().setStepNotesCurrentIndex(0, -1);
+            app.state().tickStep(0); // currentIndex -> 0, nextSubstep -> 1
+            app.processMessages();
+
+            THEN("The rest bar has the active fill color, not rest grey") {
+                auto restBarColor = app.subsequenceControls().barColor(1);
+                REQUIRE(restBarColor == UIConstants::activeStepColour);
+            }
+
+            AND_THEN("The rest bar has no border (not the white 'selected' border)") {
+                REQUIRE(app.subsequenceControls().barBorderStyle(1) == BarBorderStyle::none);
+            }
+        }
+
+        WHEN("The rest substep is NOT next to play") {
+            // currentSubstep = 1, so nextSubstep = (1+1)%2 = 0 (not the rest)
+            app.state().setStepNotesCurrentIndex(0, 1);
+            app.processMessages();
+
+            THEN("The rest bar shows rest grey") {
+                auto restBarColor = app.subsequenceControls().barColor(1);
+                REQUIRE(restBarColor == juce::Colour(SubsequenceControlsConstants::restGreyHex));
+            }
+
+            AND_THEN("The rest bar has no border") {
+                REQUIRE(app.subsequenceControls().barBorderStyle(1) == BarBorderStyle::none);
+            }
+        }
+    }
+}
+
 // ============================================================================
 // ROLL (MIDI)
 // ============================================================================

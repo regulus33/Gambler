@@ -208,6 +208,11 @@ public:
         return comp_.getSubsequenceBar().getBarColor(index);
     }
 
+    /// Get the border style of a substep bar (0-7)
+    BarBorderStyle barBorderStyle(int index) const {
+        return comp_.getSubsequenceBar().getBarBorderStyle(index);
+    }
+
     SubsequenceControlsComponent& raw() { return comp_; }
 
 private:
