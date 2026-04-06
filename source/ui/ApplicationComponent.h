@@ -3,6 +3,7 @@
 #include "../PluginProcessor.h"
 #include "../backend/MidiExporter.h"
 #include "LogoComponent.h"
+#include "PresetSelectorComponent.h"
 #include "MainScreenComponent.h"
 #include "SettingsScreenComponent.h"
 #include "../backend/ClockMode.h"
@@ -33,8 +34,9 @@ public:
         // Add main screen first (visible by default)
         addAndMakeVisible(mainScreen);
 
-        // Add logo and navbar last so they paint on top of screen components
+        // Add logo, preset selector, and navbar last so they paint on top of screen components
         addAndMakeVisible(logo);
+        addAndMakeVisible(presetSelector);
         addAndMakeVisible(navBar);
 
         // ========================================
@@ -268,19 +270,33 @@ public:
     void resized() override {
         auto area = getLocalBounds();
 
-        // NavBar row
-        auto navRow = area.removeFromTop(NavBarConstants::height);
-
-        // Logo: left-aligned in the navbar row, over the piano roll area
+        // Top strip: Logo (left) | NavBar (center) | PresetSelector (right)
         int logoH = logo.getCalculatedHeight();
-        int logoY = navRow.getY() + LogoConstants::topPadding;
+        int stripH = juce::jmax(NavBarConstants::height, logoH + LogoConstants::topPadding);
+        auto strip = area.removeFromTop(stripH);
+        int navBarH = NavBarConstants::height;
+
+        // Logo: left-aligned, offset from top
+        int logoY = strip.getY() + LogoConstants::topPadding;
         if (mainScreen.isCompactMode() && !mainScreen.isShowingTopRow())
             logoY += MainScreenLayout::compactBottomLogoExtraTopPadding;
-        logo.setBounds(navRow.getX() + MainScreenLayout::marginLeft, logoY,
-                       MainScreenLayout::pianoRollWidth, logoH);
+        int logoW = logo.getCalculatedWidth() + MainScreenLayout::marginLeft * 2;
+        logo.setBounds(strip.getX() + MainScreenLayout::marginLeft, logoY,
+                       logoW, logoH);
 
-        // NavBar: right portion of the navbar row (after logo area)
-        navBar.setBounds(navRow.withTrimmedLeft(MainScreenLayout::marginLeft + MainScreenLayout::pianoRollWidth + MainScreenLayout::topRowGap));
+        // Preset selector: right-aligned with consistent margin matching content area
+        constexpr float psScale = 0.8f;
+        constexpr int topBarMargin = MainScreenLayout::marginRight + SubsequenceControlsConstants::horizontalPadding;
+        int psW = static_cast<int>(static_cast<float>(presetSelector.getCalculatedWidth()) * psScale);
+        int psH = static_cast<int>(static_cast<float>(presetSelector.getCalculatedHeight()) * psScale);
+        int psX = strip.getRight() - psW - topBarMargin;
+        int psY = strip.getY() + (navBarH - psH) / 2;
+        presetSelector.setBounds(psX, psY, psW, psH);
+
+        // NavBar: fills space between logo and preset selector
+        int navX = logo.getRight();
+        int navW = presetSelector.getX() - navX;
+        navBar.setBounds(navX, strip.getY(), navW, navBarH);
 
         // Screens take up the full area (they reserve the navbar height internally for layout alignment)
         auto fullArea = getLocalBounds();
@@ -293,6 +309,7 @@ public:
     // Public accessors
     MainScreenComponent& getMainScreen() { return mainScreen; }
     NavBarComponent& getNavBar() { return navBar; }
+    PresetSelectorComponent& getPresetSelector() { return presetSelector; }
 
     // Callback when the design height changes (compact mode toggle)
     std::function<void(int)> onDesignHeightChanged;
@@ -509,6 +526,7 @@ private:
         };
 
         navBar.setSettingsButtonRegistry(&registry);
+        presetSelector.setRegistry(&registry);
 
         mainScreen.getMainControls().setMidiLearnSelectedCallback([this]() {
             triggerAsyncUpdate();
@@ -635,8 +653,9 @@ private:
         mainScreen.setVisible(false);
         settingsScreen->setVisible(true);
 
-        // Ensure logo and navbar stay on top of the settings screen
+        // Ensure logo, preset selector, and navbar stay on top of the settings screen
         logo.toFront(false);
+        presetSelector.toFront(false);
         navBar.toFront(false);
 
         // Toggle settings button to show X icon
@@ -673,7 +692,7 @@ private:
     // ========================================
 
     void setupPresetSelector() {
-        auto& presetSelector = navBar.getPresetSelector();
+
 
         presetSelector.setDialogParent(this);
         refreshPresetList();
@@ -707,7 +726,7 @@ private:
         int nextIndex = (currentIndex + 1) % static_cast<int>(presets.size());
         loadPreset(nextIndex);
 
-        navBar.getPresetSelector().selectPresetByName(presets[static_cast<size_t>(nextIndex)].name, false);
+        presetSelector.selectPresetByName(presets[static_cast<size_t>(nextIndex)].name, false);
     }
 
     void cyclePresetDown() {
@@ -720,14 +739,14 @@ private:
         int prevIndex = (currentIndex - 1 + count) % count;
         loadPreset(prevIndex);
 
-        navBar.getPresetSelector().selectPresetByName(presets[static_cast<size_t>(prevIndex)].name, false);
+        presetSelector.selectPresetByName(presets[static_cast<size_t>(prevIndex)].name, false);
     }
 
     void refreshPresetList() {
         auto& presetManager = processorRef.getPresetManager();
         presetManager.refreshPresetList();
 
-        auto& presetSelector = navBar.getPresetSelector();
+
         presetSelector.setPresets(presetManager.getPresetNames());
 
         const auto& currentName = presetManager.getCurrentPresetName();
@@ -760,14 +779,14 @@ private:
         if (xml && presetManager.savePreset(name, *xml)) {
             presetManager.setCurrentPresetName(name);
             refreshPresetList();
-            navBar.getPresetSelector().selectPresetByName(name, false);
+            presetSelector.selectPresetByName(name, false);
             DBG("Saved preset: " + name);
         }
     }
 
     void deletePreset(int index) {
         auto& presetManager = processorRef.getPresetManager();
-        auto& presetSelector = navBar.getPresetSelector();
+
 
         const auto& presets = presetManager.getPresets();
         juce::String deletedName;
@@ -837,6 +856,7 @@ private:
     // ========================================
     PluginProcessor& processorRef;
     LogoComponent logo;
+    PresetSelectorComponent presetSelector;
     NavBarComponent navBar;
     MainScreenComponent mainScreen;
     std::unique_ptr<SettingsScreenComponent> settingsScreen;

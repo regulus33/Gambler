@@ -1,7 +1,6 @@
 #pragma once
 
 #include "BinaryData.h"
-#include "PresetSelectorComponent.h"
 #include "ToggleIconButton.h"
 #include "ScaleLatchButton.h"
 #include "DestructiveToggleButton.h"
@@ -96,7 +95,6 @@ namespace NavBarConstants {
     constexpr int marginRight = 35;
 
     // Per-component scale factors — tweak individually to resize each control
-    constexpr float presetScale        = 0.8f;   // preset selector (dropdown + arrows + save)
     constexpr float compactTopScale    = 0.8f;   // compact top row toggle button
     constexpr float compactBottomScale = 0.8f;   // compact bottom row toggle button
     constexpr float subdivisionScale   = 0.8f;   // subdivision slider
@@ -115,7 +113,6 @@ namespace NavBarConstants {
 
     // Spacing — tweak these to adjust gaps
     constexpr int buttonGap = 6;                   // gap between icon buttons
-    constexpr int presetSelectorGap = 10;           // gap after preset selector
 
     // Settings icon scale factor - tweak this to adjust the settings gear icon size
     constexpr float settingsIconScale = 1.0f;
@@ -155,8 +152,6 @@ public:
           compactTopButton(Icons::createCompactTopIcon, Icons::createCompactTopIcon, true, true),
           compactBottomButton(Icons::createCompactViewIcon, Icons::createCompactViewIcon, true, true)
     {
-        addAndMakeVisible(presetSelector);
-
         // Add MIDI learn button
         addAndMakeVisible(midiLearnButton);
         midiLearnButton.onClick = [this](bool toggled) {
@@ -276,7 +271,7 @@ public:
     void resized() override {
         using namespace NavBarConstants;
 
-        auto area = getLocalBounds().reduced(marginLeft, 0).withTrimmedRight(marginRight - marginLeft);
+        auto area = getLocalBounds();
 
         // Helper to add a fixed-size item centered vertically
         auto addItem = [&](juce::FlexBox& fb, juce::Component& comp, float w, float h, float gap = 0.0f) {
@@ -286,31 +281,22 @@ public:
         juce::FlexBox fb;
         fb.flexDirection = juce::FlexBox::Direction::row;
         fb.alignItems = juce::FlexBox::AlignItems::center;
+        fb.justifyContent = juce::FlexBox::JustifyContent::spaceAround;
 
-        // Left group: preset selector
-        addItem(fb, presetSelector,
-                static_cast<float>(presetSelector.getCalculatedWidth()) * presetScale,
-                static_cast<float>(presetSelector.getCalculatedHeight()) * presetScale);
-
-        // Flexible spacer pushes remaining items to the right
-        fb.items.add(juce::FlexItem().withFlex(1.0f));
-
-        // Right group: tool buttons, transport, settings (each with its own scale)
-        float bg = static_cast<float>(buttonGap);
         auto sz = [](float scale) { return baseButtonSize * scale; };
         float ss = baseSubdivSize * subdivisionScale;
 
         addItem(fb, compactTopButton, sz(compactTopScale), sz(compactTopScale));
-        addItem(fb, compactBottomButton, sz(compactBottomScale), sz(compactBottomScale), bg);
-        addItem(fb, subdivisionSlider, ss, ss, bg);
-        addItem(fb, exportButton, sz(exportScale), sz(exportScale), bg);
-        addItem(fb, scaleLatchButton, sz(scaleLatchScale), sz(scaleLatchScale), bg);
-        addItem(fb, bakeScaleButton, sz(bakeScaleScale), sz(bakeScaleScale), bg);
-        addItem(fb, bakeRangeButton, sz(bakeRangeScale), sz(bakeRangeScale), bg);
-        addItem(fb, playPauseButton, sz(playPauseScale), sz(playPauseScale), bg);
-        addItem(fb, stopButton, sz(stopScale), sz(stopScale), bg);
-        addItem(fb, midiLearnButton, sz(midiLearnScale), sz(midiLearnScale), bg);
-        addItem(fb, settingsButton, sz(settingsScale), sz(settingsScale), bg);
+        addItem(fb, compactBottomButton, sz(compactBottomScale), sz(compactBottomScale));
+        addItem(fb, subdivisionSlider, ss, ss);
+        addItem(fb, exportButton, sz(exportScale), sz(exportScale));
+        addItem(fb, scaleLatchButton, sz(scaleLatchScale), sz(scaleLatchScale));
+        addItem(fb, bakeScaleButton, sz(bakeScaleScale), sz(bakeScaleScale));
+        addItem(fb, bakeRangeButton, sz(bakeRangeScale), sz(bakeRangeScale));
+        addItem(fb, playPauseButton, sz(playPauseScale), sz(playPauseScale));
+        addItem(fb, stopButton, sz(stopScale), sz(stopScale));
+        addItem(fb, midiLearnButton, sz(midiLearnScale), sz(midiLearnScale));
+        addItem(fb, settingsButton, sz(settingsScale), sz(settingsScale));
 
         fb.performLayout(area.toFloat());
     }
@@ -388,9 +374,6 @@ public:
         }
     }
 
-    // Access to preset selector for wiring up callbacks
-    PresetSelectorComponent& getPresetSelector() { return presetSelector; }
-
     // Access to subdivision slider for MIDI learn wiring
     SubdivisionSlider& getSubdivisionSlider() { return subdivisionSlider; }
 
@@ -402,12 +385,10 @@ public:
         scaleLatchButton.setRegistry(registry);
         bakeScaleButton.setRegistry(registry);
         bakeRangeButton.setRegistry(registry);
-        presetSelector.setRegistry(registry);
     }
 
 private:
     PluginProcessor& processorRef;
-    PresetSelectorComponent presetSelector;
     ToggleIconButton midiLearnButton;
     ToggleIconButton settingsButton;
     ToggleIconButton playPauseButton;

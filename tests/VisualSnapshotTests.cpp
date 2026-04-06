@@ -210,7 +210,7 @@ TEST_CASE ("Visual - PresetSelectorComponent", "[visual]")
 {
     getJuceInit();
     PluginTestFixture f;
-    snap (f.getNavBar().getPresetSelector(), "preset_selector");
+    snap (f.getPresetSelector(), "preset_selector");
 }
 
 TEST_CASE ("Visual - SubdivisionSlider", "[visual]")

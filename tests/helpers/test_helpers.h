@@ -40,6 +40,9 @@ public:
     NavBarComponent& getNavBar() {
         return editor.getApplicationComponent().getNavBar();
     }
+    PresetSelectorComponent& getPresetSelector() {
+        return editor.getApplicationComponent().getPresetSelector();
+    }
     void processMessages (int timeoutMs = 50) {
         juce::MessageManager::getInstance()->runDispatchLoopUntil (timeoutMs);
     }
