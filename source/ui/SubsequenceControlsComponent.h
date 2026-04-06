@@ -54,7 +54,8 @@ namespace SubsequenceControlsConstants {
     constexpr juce::uint32 buttonBgHex = 0xff484848;
 
     // Note label
-    constexpr float fontSize = 10.0f;
+    constexpr float noteLabelScale = 0.9f;
+    constexpr float fontSize = 10.0f * noteLabelScale;
     constexpr float activeCircleDiameter = 14.0f;
 
     // Container
