@@ -20,6 +20,7 @@ namespace MainScreenLayout {
     // Margins
     constexpr int marginLeft = 22;
     constexpr int marginRight = 22;
+    constexpr int presetSelectorMarginRight = 32;  // gap between preset selector and window edge
 
     // Title row (between navbar and content)
     constexpr int titleRowHeight = 25;

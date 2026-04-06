@@ -286,10 +286,9 @@ public:
 
         // Preset selector: right-aligned with consistent margin matching content area
         constexpr float psScale = 0.8f;
-        constexpr int topBarMargin = MainScreenLayout::marginRight + SubsequenceControlsConstants::horizontalPadding;
         int psW = static_cast<int>(static_cast<float>(presetSelector.getCalculatedWidth()) * psScale);
         int psH = static_cast<int>(static_cast<float>(presetSelector.getCalculatedHeight()) * psScale);
-        int psX = strip.getRight() - psW - topBarMargin;
+        int psX = strip.getRight() - psW - MainScreenLayout::presetSelectorMarginRight;
         int psY = strip.getY() + (navBarH - psH) / 2;
         presetSelector.setBounds(psX, psY, psW, psH);
 
