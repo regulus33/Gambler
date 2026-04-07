@@ -8,7 +8,7 @@
 #include "SequencerControlsComponent.h"
 #include "MainControlsComponent.h"
 #include "SequenceOverviewComponent.h"
-#include "SubsequenceControlsComponent.h"
+#include "SubsequencerComponent/SubsequenceControlsComponent.h"
 #include "NoteRangeControlsComponent.h"
 #include "../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
