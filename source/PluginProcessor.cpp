@@ -1460,8 +1460,8 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
                 int selectedStep = state.getSelectedStepForEditing();
                 int substepLength = state.getStepNotesLength (selectedStep);
                 if (barIndex < substepLength) {
-                    state.setStepNotesCurrentIndex (selectedStep, barIndex);
-                    DBG ("  → Substep " << barIndex << " selected");
+                    state.setSelectedSubstepIndex (selectedStep, barIndex);
+                    DBG ("  → Substep " << barIndex << " selected for editing");
                 }
                 if (onSequenceTick)
                     onSequenceTick();

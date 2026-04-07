@@ -315,6 +315,23 @@ public:
         processor_.processBlock(buffer, midi);
     }
 
+    // --- MIDI learn: programmatically map a control to a MIDI CC ---
+    void mapMidiCC(MidiControlId controlId, int ccNumber, int channel = 1) {
+        auto& registry = processor_.getMidiLearnRegistry();
+        registry.enterLearnMode();
+        registry.setLearningControl(controlId);
+        registry.learnMidiMessage(MidiMessageType::CC, channel, ccNumber);
+        registry.exitLearnMode();
+    }
+
+    // --- Send a MIDI CC through processBlock ---
+    void sendMidiCC(int ccNumber, int value, int channel = 1) {
+        juce::AudioBuffer<float> buffer(2, 512);
+        juce::MidiBuffer midi;
+        midi.addEvent(juce::MidiMessage::controllerEvent(channel, ccNumber, value), 0);
+        processor_.processBlock(buffer, midi);
+    }
+
     // Convenience: get MainScreenComponent
     MainScreenComponent& mainScreen() {
         return editor_.getApplicationComponent().getMainScreen();

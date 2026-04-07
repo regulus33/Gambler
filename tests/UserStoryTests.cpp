@@ -516,3 +516,353 @@ SCENARIO("MIDI-mapped Roll randomizes notes while held and stops when released",
         }
     }
 }
+
+// ============================================================================
+// NOTE / OCTAVE SLIDER → SUBSTEP
+// ============================================================================
+
+SCENARIO("Changing the note slider updates the selected substep", "[user-story][substep][note-slider]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 has 2 substeps (C4=60 and E4=64), substep 1 is selected") {
+        TestApp app;
+        app.state().setStepNotesLength(0, 2);
+        app.state().setStepNote(0, 0, 60); // C4
+        app.state().setStepNote(0, 1, 64); // E4
+
+        app.sequencerSteps().clickStep(0);
+        app.processMessages();
+
+        // Select substep 1 for editing
+        app.subsequenceControls().clickBar(1);
+        app.processMessages();
+
+        REQUIRE(app.state().getSelectedSubstepIndex(0) == 1);
+
+        WHEN("User changes the note slider to G (pitch class 7)") {
+            app.mainScreen().getMainControls().getNoteControls().onNoteChanged(7);
+            app.processMessages();
+
+            THEN("Substep 1 is now G4 (octave preserved from E4=64, so 5*12+7=67)") {
+                REQUIRE(app.state().getStepNote(0, 1) == 67);
+            }
+
+            AND_THEN("Substep 0 is unchanged (still C4=60)") {
+                REQUIRE(app.state().getStepNote(0, 0) == 60);
+            }
+        }
+    }
+}
+
+SCENARIO("Changing the octave slider updates the selected substep", "[user-story][substep][octave-slider]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 has 2 substeps (C4=60 and E4=64), substep 0 is selected") {
+        TestApp app;
+        app.state().setStepNotesLength(0, 2);
+        app.state().setStepNote(0, 0, 60); // C4
+        app.state().setStepNote(0, 1, 64); // E4
+
+        app.sequencerSteps().clickStep(0);
+        app.processMessages();
+
+        // Select substep 0 for editing
+        app.subsequenceControls().clickBar(0);
+        app.processMessages();
+
+        REQUIRE(app.state().getSelectedSubstepIndex(0) == 0);
+
+        WHEN("User changes the octave slider to octave 6 (index 6)") {
+            app.mainScreen().getMainControls().getNoteControls().onOctaveChanged(6);
+            app.processMessages();
+
+            THEN("Substep 0 is now C6 (6*12+0=72, pitch class preserved)") {
+                REQUIRE(app.state().getStepNote(0, 0) == 72);
+            }
+
+            AND_THEN("Substep 1 is unchanged (still E4=64)") {
+                REQUIRE(app.state().getStepNote(0, 1) == 64);
+            }
+        }
+    }
+}
+
+SCENARIO("Switching selected substep and editing updates only that substep", "[user-story][substep][note-slider]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 has 3 substeps: C4=60, E4=64, G4=67") {
+        TestApp app;
+        app.state().setStepNotesLength(0, 3);
+        app.state().setStepNote(0, 0, 60);
+        app.state().setStepNote(0, 1, 64);
+        app.state().setStepNote(0, 2, 67);
+
+        app.sequencerSteps().clickStep(0);
+        app.processMessages();
+
+        WHEN("User selects substep 2 and changes note to A (pitch class 9)") {
+            app.subsequenceControls().clickBar(2);
+            app.processMessages();
+            REQUIRE(app.state().getSelectedSubstepIndex(0) == 2);
+
+            app.mainScreen().getMainControls().getNoteControls().onNoteChanged(9);
+            app.processMessages();
+
+            THEN("Substep 2 becomes A4 (5*12+9=69)") {
+                REQUIRE(app.state().getStepNote(0, 2) == 69);
+            }
+
+            AND_WHEN("User switches to substep 0 and changes octave to 3") {
+                app.subsequenceControls().clickBar(0);
+                app.processMessages();
+                REQUIRE(app.state().getSelectedSubstepIndex(0) == 0);
+
+                app.mainScreen().getMainControls().getNoteControls().onOctaveChanged(3);
+                app.processMessages();
+
+                THEN("Substep 0 becomes C3 (3*12+0=36)") {
+                    REQUIRE(app.state().getStepNote(0, 0) == 36);
+                }
+
+                AND_THEN("Substep 1 and 2 are unchanged") {
+                    REQUIRE(app.state().getStepNote(0, 1) == 64);
+                    REQUIRE(app.state().getStepNote(0, 2) == 69);
+                }
+            }
+        }
+    }
+}
+
+SCENARIO("Double-clicking a substep bar sets it as the next to play", "[user-story][substep][double-click]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 has 3 substeps: C4, E4, G4") {
+        TestApp app;
+        app.state().setStepNotesLength(0, 3);
+        app.state().setStepNote(0, 0, 60); // C4
+        app.state().setStepNote(0, 1, 64); // E4
+        app.state().setStepNote(0, 2, 67); // G4
+
+        app.sequencerSteps().clickStep(0);
+        app.processMessages();
+
+        // Start with substep index at -1 (pre-start)
+        app.state().setStepNotesCurrentIndex(0, -1);
+
+        WHEN("User double-clicks substep bar 2") {
+            app.subsequenceControls().doubleClickBar(2);
+            app.processMessages();
+
+            THEN("The next tick on step 0 plays substep 2 (G4)") {
+                int note = app.state().tickStep(0);
+                REQUIRE(note == 67);
+                REQUIRE(app.state().getStepNotesCurrentIndex(0) == 2);
+            }
+        }
+
+        WHEN("User double-clicks substep bar 1") {
+            app.subsequenceControls().doubleClickBar(1);
+            app.processMessages();
+
+            THEN("The next tick on step 0 plays substep 1 (E4)") {
+                int note = app.state().tickStep(0);
+                REQUIRE(note == 64);
+                REQUIRE(app.state().getStepNotesCurrentIndex(0) == 1);
+            }
+
+            AND_THEN("Subsequent ticks continue cycling from that point") {
+                app.state().tickStep(0); // plays substep 1
+                int note = app.state().tickStep(0); // plays substep 2
+                REQUIRE(note == 67);
+                REQUIRE(app.state().getStepNotesCurrentIndex(0) == 2);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// MIDI-MAPPED SUBSTEP EDITING (mirrors the UI-driven tests above)
+// ============================================================================
+
+SCENARIO("MIDI-mapped SUBSEQ_PLUS and SUBSEQ_MINUS change substep length",
+         "[user-story][substep][midi-mapped]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 is selected with 1 substep, plus/minus mapped to CC 20/21") {
+        TestApp app;
+        app.sequencerSteps().clickStep(0);
+        app.processMessages();
+
+        app.mapMidiCC(MidiControlId::SUBSEQ_PLUS, 20);
+        app.mapMidiCC(MidiControlId::SUBSEQ_MINUS, 21);
+
+        REQUIRE(app.state().getStepNotesLength(0) == 1);
+
+        WHEN("User sends CC 20 three times (SUBSEQ_PLUS)") {
+            app.sendMidiCC(20, 127);
+            app.sendMidiCC(20, 127);
+            app.sendMidiCC(20, 127);
+
+            THEN("Step 0 now has 4 substeps") {
+                REQUIRE(app.state().getStepNotesLength(0) == 4);
+            }
+
+            AND_WHEN("User sends CC 21 twice (SUBSEQ_MINUS)") {
+                app.sendMidiCC(21, 127);
+                app.sendMidiCC(21, 127);
+
+                THEN("Step 0 now has 2 substeps") {
+                    REQUIRE(app.state().getStepNotesLength(0) == 2);
+                }
+            }
+        }
+    }
+}
+
+SCENARIO("MIDI-mapped SUBSEQ_BAR selects a substep for editing",
+         "[user-story][substep][midi-mapped]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 has 3 substeps, SUBSEQ_BAR_0..2 mapped to CCs 30/31/32") {
+        TestApp app;
+        app.state().setStepNotesLength(0, 3);
+        app.state().setStepNote(0, 0, 60);
+        app.state().setStepNote(0, 1, 64);
+        app.state().setStepNote(0, 2, 67);
+
+        app.sequencerSteps().clickStep(0);
+        app.processMessages();
+
+        app.mapMidiCC(MidiControlId::SUBSEQ_BAR_0, 30);
+        app.mapMidiCC(MidiControlId::SUBSEQ_BAR_1, 31);
+        app.mapMidiCC(MidiControlId::SUBSEQ_BAR_2, 32);
+
+        WHEN("User sends CC 32 (bar 2)") {
+            app.sendMidiCC(32, 127);
+
+            THEN("Substep 2 is selected for editing") {
+                REQUIRE(app.state().getSelectedSubstepIndex(0) == 2);
+            }
+        }
+
+        WHEN("User sends CC 31 (bar 1)") {
+            app.sendMidiCC(31, 127);
+
+            THEN("Substep 1 is selected for editing") {
+                REQUIRE(app.state().getSelectedSubstepIndex(0) == 1);
+            }
+        }
+    }
+}
+
+SCENARIO("MIDI-mapped NOTE_SLIDER edits the MIDI-selected substep",
+         "[user-story][substep][midi-mapped]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 has 2 substeps (C4, E4), SUBSEQ_BAR_1 on CC 31, NOTE_SLIDER on CC 40") {
+        TestApp app;
+        app.state().setStepNotesLength(0, 2);
+        app.state().setStepNote(0, 0, 60); // C4
+        app.state().setStepNote(0, 1, 64); // E4
+
+        app.sequencerSteps().clickStep(0);
+        app.processMessages();
+
+        app.mapMidiCC(MidiControlId::SUBSEQ_BAR_1, 31);
+        app.mapMidiCC(MidiControlId::NOTE_SLIDER, 40);
+
+        WHEN("User sends CC 31 to select substep 1, then CC 40 with value 81 (pitch class 7 = G)") {
+            app.sendMidiCC(31, 127);
+            REQUIRE(app.state().getSelectedSubstepIndex(0) == 1);
+
+            app.sendMidiCC(40, 81);
+
+            THEN("Substep 1 is now G4 (octave 5 preserved from E4, 5*12+7=67)") {
+                REQUIRE(app.state().getStepNote(0, 1) == 67);
+            }
+
+            AND_THEN("Substep 0 is unchanged (still C4=60)") {
+                REQUIRE(app.state().getStepNote(0, 0) == 60);
+            }
+        }
+    }
+}
+
+SCENARIO("MIDI-mapped OCTAVE_SLIDER edits the MIDI-selected substep",
+         "[user-story][substep][midi-mapped]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 has 2 substeps (C4, E4), SUBSEQ_BAR_0 on CC 30, OCTAVE_SLIDER on CC 41") {
+        TestApp app;
+        app.state().setStepNotesLength(0, 2);
+        app.state().setStepNote(0, 0, 60);
+        app.state().setStepNote(0, 1, 64);
+
+        app.sequencerSteps().clickStep(0);
+        app.processMessages();
+
+        app.mapMidiCC(MidiControlId::SUBSEQ_BAR_0, 30);
+        app.mapMidiCC(MidiControlId::OCTAVE_SLIDER, 41);
+
+        WHEN("User sends CC 30 to select substep 0, then CC 41 with value 85 (octave 6)") {
+            app.sendMidiCC(30, 127);
+            REQUIRE(app.state().getSelectedSubstepIndex(0) == 0);
+
+            app.sendMidiCC(41, 85);
+
+            THEN("Substep 0 is now C6 (6*12+0=72)") {
+                REQUIRE(app.state().getStepNote(0, 0) == 72);
+            }
+
+            AND_THEN("Substep 1 is unchanged (still E4=64)") {
+                REQUIRE(app.state().getStepNote(0, 1) == 64);
+            }
+        }
+    }
+}
+
+SCENARIO("MIDI-mapped substep editing: full switch-and-edit workflow",
+         "[user-story][substep][midi-mapped]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 has 3 substeps (C4, E4, G4), full MIDI mapping") {
+        TestApp app;
+        app.state().setStepNotesLength(0, 3);
+        app.state().setStepNote(0, 0, 60);
+        app.state().setStepNote(0, 1, 64);
+        app.state().setStepNote(0, 2, 67);
+
+        app.sequencerSteps().clickStep(0);
+        app.processMessages();
+
+        app.mapMidiCC(MidiControlId::SUBSEQ_BAR_0, 30);
+        app.mapMidiCC(MidiControlId::SUBSEQ_BAR_2, 32);
+        app.mapMidiCC(MidiControlId::NOTE_SLIDER, 40);
+        app.mapMidiCC(MidiControlId::OCTAVE_SLIDER, 41);
+
+        WHEN("User selects substep 2 via MIDI and changes note to A (CC 40 value 104)") {
+            app.sendMidiCC(32, 127);
+            app.sendMidiCC(40, 104); // floor(104/127*11) = 9 = A
+
+            THEN("Substep 2 becomes A4 (5*12+9=69)") {
+                REQUIRE(app.state().getStepNote(0, 2) == 69);
+            }
+
+            AND_WHEN("User switches to substep 0 via MIDI and changes octave to 3 (CC 41 value 43)") {
+                app.sendMidiCC(30, 127);
+                REQUIRE(app.state().getSelectedSubstepIndex(0) == 0);
+
+                app.sendMidiCC(41, 43); // floor(43/127*9) = 3
+
+                THEN("Substep 0 becomes C3 (3*12+0=36)") {
+                    REQUIRE(app.state().getStepNote(0, 0) == 36);
+                }
+
+                AND_THEN("Substep 1 and 2 are unchanged") {
+                    REQUIRE(app.state().getStepNote(0, 1) == 64);
+                    REQUIRE(app.state().getStepNote(0, 2) == 69);
+                }
+            }
+        }
+    }
+}
