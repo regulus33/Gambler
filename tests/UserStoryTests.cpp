@@ -1034,3 +1034,83 @@ SCENARIO("Non-destructive scale quantization updates every display surface",
         }
     }
 }
+
+// ============================================================================
+// NON-DESTRUCTIVE SCALE QUANTIZATION (PLAYBACK)
+// ============================================================================
+//
+// Sister scenario to the display-surface test above. Here we verify that what
+// the sequencer actually *plays* (via state.tick() — the exact call
+// PluginProcessor::processBlock makes to get the next MIDI note) matches the
+// displayed quantized values, and that the PianoRollComponent "active note"
+// dot highlights the quantized pitch class of the currently-playing step.
+
+SCENARIO("Non-destructive scale quantization drives playback and active-note dot",
+         "[user-story][scale][quantization][playback]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A paused app with raw step notes covering quantization boundary cases") {
+        TestApp app;
+        auto& state = app.state();
+
+        // Pause so nothing ticks behind our back during message pumping.
+        app.navBar().clickPlayPause();
+        app.processMessages();
+
+        // Reset playhead to -1 so the first tick() lands on step 0.
+        state.setCurrentIndex(-1);
+
+        // Simple 1-substep-per-step fixture (same raw notes as the display test).
+        const int rawNotes[8]      = { 60, 61, 62, 63, 66, 68, 70, 71 };
+        const int expectedQuant[8] = { 60, 60, 60, 64, 67, 67, 72, 72 };
+
+        for (int i = 0; i < 8; ++i) {
+            state.setStepNotesLength(i, 1);
+            state.setStepNote(i, 0, rawNotes[i]);
+        }
+        app.processMessages();
+
+        WHEN("The scale is reduced to {C, E, G} via the piano roll") {
+            const int keysToDisable[] = { 1, 2, 3, 5, 6, 8, 9, 10, 11 };
+            for (int k : keysToDisable)
+                app.pianoRoll().toggleNote(k);
+            app.processMessages();
+
+            THEN("state.tick() — the note processBlock would emit — matches the displayed quantized value at every step") {
+                // tick() advances currentIndex by 1 (mod length) and returns
+                // the quantized note for the newly-current step. After reset
+                // to -1, eight ticks walk steps 0..7 in order.
+                for (int i = 0; i < 8; ++i) {
+                    int played = state.tick();
+                    INFO("step=" << i << " raw=" << rawNotes[i]
+                         << " played=" << played << " expected=" << expectedQuant[i]);
+                    REQUIRE(played == expectedQuant[i]);
+                    REQUIRE(state.getCurrentIndex() == i);
+                }
+            }
+
+            AND_THEN("The piano-roll active-note dot follows the quantized pitch class as the playhead moves") {
+                auto& pianoRoll = app.mainScreen().getPianoRoll();
+
+                for (int i = 0; i < 8; ++i) {
+                    state.setCurrentIndex(i);
+                    // Fire the same callback that PluginProcessor::processBlock
+                    // invokes after each sequencer tick — this is what pushes
+                    // the new playhead position into the UI in production.
+                    if (app.processor().onSequenceTick)
+                        app.processor().onSequenceTick();
+                    app.processMessages();
+
+                    int expectedChromatic = expectedQuant[i] % 12;
+                    int actualChromatic = pianoRoll.getActiveNote();
+                    INFO("step=" << i
+                         << " raw=" << rawNotes[i]
+                         << " expectedQuant=" << expectedQuant[i]
+                         << " expectedChromatic=" << expectedChromatic
+                         << " actualChromatic=" << actualChromatic);
+                    REQUIRE(actualChromatic == expectedChromatic);
+                }
+            }
+        }
+    }
+}
