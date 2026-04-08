@@ -990,14 +990,9 @@ SCENARIO("Non-destructive scale quantization updates every display surface",
             }
 
             AND_THEN("Subsequencer bars for step 0 show the quantized substep colours") {
-                // Force the subsequence bar listener to refresh. It subscribes
-                // to step-note params (not scale params), so a scale change
-                // alone won't trigger onStateChanged. Bouncing the selected
-                // step fires the metadata listener and rebuilds the bars.
-                app.sequencerSteps().clickStep(1);
-                app.processMessages();
-                app.sequencerSteps().clickStep(0);
-                app.processMessages();
+                // SubsequenceControlsComponent subscribes to scale params, so
+                // the piano-roll scale change above should already have
+                // refreshed the bar colours without any further nudging.
 
                 // Bar 0 is the "next to play" substep and paints with
                 // UIConstants::activeStepColour rather than its note colour —

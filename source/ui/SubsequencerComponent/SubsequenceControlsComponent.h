@@ -68,6 +68,11 @@ public:
         listenToStepNotes(0, ParamConstants::MAX_STEPS - 1);
         listenToStepNotesLength(0, ParamConstants::MAX_STEPS - 1);
 
+        // Subscribe to scale params — in non-destructive mode, substep display
+        // notes/colours are quantized on the fly, so scale edits must refresh us.
+        listenToGlobalScaleNotes();
+        listenToScaleRange();
+
         // Subscribe to note colour changes
         for (int i = 0; i < 12; ++i)
             listenToParameter(Params::Keys::ID::noteColour(i));
