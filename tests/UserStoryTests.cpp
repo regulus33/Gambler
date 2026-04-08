@@ -18,6 +18,10 @@
 #include <ui/SequenceOverviewComponent.h>
 #include <ui/MainControlsComponent.h>
 #include <ui/NoteControlsComponent.h>
+#include <ui/sliders/NoteSlider.h>
+#include <ui/sliders/OctaveSlider.h>
+#include <ui/sliders/NotchedSlider.h>
+#include <set>
 
 // ============================================================================
 // DEFAULT STATE
@@ -1109,6 +1113,184 @@ SCENARIO("Non-destructive scale quantization drives playback and active-note dot
                          << " expectedChromatic=" << expectedChromatic
                          << " actualChromatic=" << actualChromatic);
                     REQUIRE(actualChromatic == expectedChromatic);
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// NON-DESTRUCTIVE SCALE QUANTIZATION (MAIN CONTROLS SLIDERS)
+// ============================================================================
+//
+// Sister scenario to the display / playback tests above. This one targets the
+// MainControlsComponent sliders (NoteSlider + OctaveSlider) under a scale-only
+// change:
+//   - the slider option sets are filtered to the in-scale pitch classes and
+//     the reachable octaves,
+//   - selecting a step shows the displayed (quantized) note in the sliders,
+//   - moving the NoteSlider writes a new raw note through the non-destructive
+//     path preserving the octave,
+//   - moving the OctaveSlider writes a new raw note preserving the pitch
+//     class,
+//   - the value reported by NoteControls.getMidiNote() is consistent with the
+//     same step's displayed value on the other surfaces.
+
+SCENARIO("Non-destructive scale quantization drives MainControls sliders",
+         "[user-story][scale][quantization][main-controls]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A paused app with raw step notes covering quantization boundary cases") {
+        TestApp app;
+        auto& state = app.state();
+
+        // Pause so the playhead / next-substep don't drift under us.
+        app.navBar().clickPlayPause();
+        app.processMessages();
+
+        // Same fixture as the display / playback scenarios.
+        const int rawNotes[8]      = { 60, 61, 62, 63, 66, 68, 70, 71 };
+        const int expectedQuant[8] = { 60, 60, 60, 64, 67, 67, 72, 72 };
+
+        for (int i = 0; i < 8; ++i) {
+            state.setStepNotesLength(i, 1);
+            state.setStepNote(i, 0, rawNotes[i]);
+        }
+        app.processMessages();
+
+        WHEN("The scale is reduced to {C, E, G} via the piano roll") {
+            const int keysToDisable[] = { 1, 2, 3, 5, 6, 8, 9, 10, 11 };
+            for (int k : keysToDisable)
+                app.pianoRoll().toggleNote(k);
+            app.processMessages();
+
+            auto& noteControls = app.mainScreen().getMainControls().getNoteControls();
+            auto& noteSlider   = noteControls.getNoteSlider();
+            auto& octaveSlider = noteControls.getOctaveSlider();
+
+            THEN("NoteSlider options filter to exactly the 3 in-scale pitch classes") {
+                // Select a step so updateNoteControlOptions has run for a
+                // concrete current-note context.
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+
+                // NotchedSlider range is [0, numOptions-1], so max+1 == count.
+                int noteCount = (int) noteSlider.getSlider().getSlider().getMaximum() + 1;
+                REQUIRE(noteCount == 3);
+
+                // Walking the slider over each index should yield exactly
+                // {C=0, E=4, G=7} as chromatic pitch classes.
+                std::set<int> seenPcs;
+                for (int idx = 0; idx < noteCount; ++idx) {
+                    noteSlider.getSlider().getSlider().setValue(
+                        (double) idx, juce::dontSendNotification);
+                    seenPcs.insert(noteSlider.getChromaticPitchClass());
+                }
+                REQUIRE(seenPcs == std::set<int>{0, 4, 7});
+            }
+
+            AND_THEN("OctaveSlider options cover the full range (default scale range unchanged)") {
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+
+                int octaveCount = (int) octaveSlider.getSlider().getSlider().getMaximum() + 1;
+                REQUIRE(octaveCount == 10);
+            }
+
+            AND_THEN("Selecting step 3 (raw Eb4=63) shows the quantized E4 in the sliders") {
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+
+                REQUIRE(noteControls.getMidiNote() == expectedQuant[3]); // 64
+                REQUIRE(noteSlider.getChromaticPitchClass() == (expectedQuant[3] % 12));
+                REQUIRE(octaveSlider.getActualOctaveIndex() == (expectedQuant[3] / 12));
+            }
+
+            AND_THEN("Selecting step 6 (raw Bb4=70) shows the cross-octave quantized C5 in the sliders") {
+                app.sequencerSteps().clickStep(6);
+                app.processMessages();
+
+                REQUIRE(noteControls.getMidiNote() == expectedQuant[6]); // 72
+                REQUIRE(noteSlider.getChromaticPitchClass() == (expectedQuant[6] % 12));
+                REQUIRE(octaveSlider.getActualOctaveIndex() == (expectedQuant[6] / 12));
+            }
+
+            AND_THEN("Moving the NoteSlider on step 3 writes a new raw note preserving the displayed octave") {
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+
+                // Displayed value is E5? No — raw 63 quantizes to 64 (E4),
+                // so octave = 64/12 = 5 in MIDI octave terms. The handler
+                // rebuilds newNote = currentOctave * 12 + pitchClass using
+                // that displayed octave.
+                int displayedOct = expectedQuant[3] / 12; // 5
+
+                // User drags NoteSlider to G. In the filtered 3-option scale
+                // {C=0, E=4, G=7}, G is slider index 2. Drive the underlying
+                // juce::Slider with notification so the full callback chain
+                // (NoteSlider -> NoteControls -> ApplicationComponent handler)
+                // fires exactly like a real drag.
+                noteSlider.getSlider().getSlider().setValue(2.0, juce::sendNotificationSync);
+                app.processMessages();
+
+                int expectedNewNote = displayedOct * 12 + 7; // 67
+
+                // Raw storage updated (G is in scale, so quantize is a no-op).
+                REQUIRE(state.getStepNote(3, 0) == expectedNewNote);
+                // Displayed note for step 3 matches.
+                REQUIRE(state.getSelectedNoteForStep(3) == expectedNewNote);
+                // Slider state reflects the new note.
+                REQUIRE(noteControls.getMidiNote() == expectedNewNote);
+                REQUIRE(noteSlider.getChromaticPitchClass() == 7);
+                REQUIRE(octaveSlider.getActualOctaveIndex() == displayedOct);
+
+                // Other steps' raw storage untouched.
+                for (int i = 0; i < 8; ++i) {
+                    if (i == 3) continue;
+                    REQUIRE(state.getStepNote(i, 0) == rawNotes[i]);
+                }
+            }
+
+            AND_THEN("Moving the OctaveSlider on step 6 writes a new raw note preserving the displayed pitch class") {
+                app.sequencerSteps().clickStep(6);
+                app.processMessages();
+
+                // Displayed: raw 70 quantizes to 72 (C5), so pc=0.
+                int displayedPc = expectedQuant[6] % 12; // 0
+
+                // User drags OctaveSlider to octave 7. All 10 octaves are
+                // present so the slider index matches the actual octave.
+                octaveSlider.getSlider().getSlider().setValue(7.0, juce::sendNotificationSync);
+                app.processMessages();
+
+                int expectedNewNote = 7 * 12 + displayedPc; // 84
+
+                REQUIRE(state.getStepNote(6, 0) == expectedNewNote);
+                REQUIRE(state.getSelectedNoteForStep(6) == expectedNewNote);
+                REQUIRE(noteControls.getMidiNote() == expectedNewNote);
+                REQUIRE(noteSlider.getChromaticPitchClass() == displayedPc);
+                REQUIRE(octaveSlider.getActualOctaveIndex() == 7);
+
+                for (int i = 0; i < 8; ++i) {
+                    if (i == 6) continue;
+                    REQUIRE(state.getStepNote(i, 0) == rawNotes[i]);
+                }
+            }
+
+            AND_THEN("NoteControls.getMidiNote matches the SequenceGrid-displayed note for the same step") {
+                auto& grid = app.mainScreen().getSequenceOverview().getSequenceGrid();
+
+                for (int stepIdx : { 3, 4, 6, 7 }) {
+                    app.sequencerSteps().clickStep(stepIdx);
+                    app.processMessages();
+
+                    int shown = noteControls.getMidiNote();
+                    REQUIRE(shown == expectedQuant[stepIdx]);
+
+                    // Cross-check against the sequence grid's painted colour.
+                    auto gridColour = grid.getSquareState(0, stepIdx).color;
+                    auto expectedColour = state.getNoteColour(expectedQuant[stepIdx] % 12);
+                    REQUIRE(gridColour == expectedColour);
                 }
             }
         }
