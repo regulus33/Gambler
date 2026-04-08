@@ -12,6 +12,12 @@
 #include "helpers/TestApp.h"
 #include <catch2/catch_test_macros.hpp>
 #include <data/Params.h>
+#include <backend/Scale.h>
+#include <ui/MainScreenComponent.h>
+#include <ui/SequenceGrid.h>
+#include <ui/SequenceOverviewComponent.h>
+#include <ui/MainControlsComponent.h>
+#include <ui/NoteControlsComponent.h>
 
 // ============================================================================
 // DEFAULT STATE
@@ -862,6 +868,173 @@ SCENARIO("MIDI-mapped substep editing: full switch-and-edit workflow",
                     REQUIRE(app.state().getStepNote(0, 1) == 64);
                     REQUIRE(app.state().getStepNote(0, 2) == 69);
                 }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// NON-DESTRUCTIVE SCALE QUANTIZATION (DISPLAY)
+// ============================================================================
+//
+// With PREF_DESTRUCTIVE_SCALE / PREF_DESTRUCTIVE_RANGE OFF (default), the raw
+// step notes stored in state are never rewritten when the user edits the
+// scale via the PianoRollComponent. Instead, every UI surface that shows a
+// step note reads through a "quantized" getter on SequenceState, so the
+// *display* reflects the current scale while storage stays intact.
+//
+// This scenario injects a fixture of 8 raw notes covering the boundary cases
+// of ScaleQuantizer (in-scale, snap-down, tie-goes-down, snap-up, cross-octave
+// snap), reduces the scale to {C, E, G} by toggling piano-roll keys, and
+// then verifies every display surface shows the quantized values while the
+// raw storage is untouched.
+
+SCENARIO("Non-destructive scale quantization updates every display surface",
+         "[user-story][scale][quantization]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A fresh app (destructive scale/range OFF by default) with a known fixture") {
+        TestApp app;
+        auto& state = app.state();
+
+        // Pause the sequencer so next-substep / active-step don't drift while
+        // we pump the message loop during this test.
+        app.navBar().clickPlayPause();
+        app.processMessages();
+
+        // Sanity: destructive modes are off by default
+        REQUIRE_FALSE(app.processor().getAPVTS()
+                          .getRawParameterValue(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE)
+                          ->load() >= 0.5f);
+        REQUIRE_FALSE(app.processor().getAPVTS()
+                          .getRawParameterValue(Params::Keys::ID::PREF_DESTRUCTIVE_RANGE)
+                          ->load() >= 0.5f);
+
+        // Fixture: 8 raw notes, one per step, covering quantization boundary cases.
+        // Expected quantization under scale {C, E, G} (pitch classes {0, 4, 7}):
+        //   60 C4  -> 60 C4  (in scale)
+        //   61 Db4 -> 60 C4  (d=1 down=60 in scale)
+        //   62 D4  -> 60 C4  (d=1 no hit; d=2 down=60 in scale)
+        //   63 Eb4 -> 64 E4  (d=1 down=62 no; up=64 in scale)
+        //   66 Gb4 -> 67 G4  (d=1 down=65 no; up=67 in scale)
+        //   68 Ab4 -> 67 G4  (d=1 down=67 in scale)
+        //   70 Bb4 -> 72 C5  (d=1 no; d=2 down=68 no; up=72 in scale)
+        //   71 B4  -> 72 C5  (d=1 down=70 no; up=72 in scale)
+        const int rawNotes[8]      = { 60, 61, 62, 63, 66, 68, 70, 71 };
+        const int expectedQuant[8] = { 60, 60, 60, 64, 67, 67, 72, 72 };
+
+        // Write raw fixture directly, bypassing any baking path.
+        for (int i = 0; i < 8; ++i)
+            state.setStepNote(i, 0, rawNotes[i]);
+
+        // Step 0 also gets 4 substeps exercising the same quantization rules
+        // so we can verify the subsequencer bar surface.
+        state.setStepNotesLength(0, 4);
+        const int step0RawSubs[4]      = { 60, 61, 63, 66 };
+        const int step0ExpectedSubs[4] = { 60, 60, 64, 67 };
+        for (int s = 0; s < 4; ++s)
+            state.setStepNote(0, s, step0RawSubs[s]);
+
+        app.processMessages();
+
+        WHEN("User reduces the scale to {C, E, G} by toggling piano-roll keys") {
+            // Default scale is chromatic — toggle off everything except C, E, G.
+            // Chromatic indices: C=0, Db=1, D=2, Eb=3, E=4, F=5, Gb=6, G=7,
+            //                    Ab=8, A=9, Bb=10, B=11
+            const int keysToDisable[] = { 1, 2, 3, 5, 6, 8, 9, 10, 11 };
+            for (int k : keysToDisable) {
+                app.pianoRoll().toggleNote(k);
+            }
+            app.processMessages();
+
+            THEN("The global scale has exactly C, E, G enabled") {
+                REQUIRE(state.getGlobalScaleNote(0));        // C
+                REQUIRE_FALSE(state.getGlobalScaleNote(1));  // Db
+                REQUIRE_FALSE(state.getGlobalScaleNote(2));  // D
+                REQUIRE_FALSE(state.getGlobalScaleNote(3));  // Eb
+                REQUIRE(state.getGlobalScaleNote(4));        // E
+                REQUIRE_FALSE(state.getGlobalScaleNote(5));  // F
+                REQUIRE_FALSE(state.getGlobalScaleNote(6));  // Gb
+                REQUIRE(state.getGlobalScaleNote(7));        // G
+                REQUIRE_FALSE(state.getGlobalScaleNote(8));  // Ab
+                REQUIRE_FALSE(state.getGlobalScaleNote(9));  // A
+                REQUIRE_FALSE(state.getGlobalScaleNote(10)); // Bb
+                REQUIRE_FALSE(state.getGlobalScaleNote(11)); // B
+            }
+
+            AND_THEN("Raw step-note storage is UNCHANGED (non-destructive)") {
+                for (int i = 1; i < 8; ++i)
+                    REQUIRE(state.getStepNote(i, 0) == rawNotes[i]);
+                for (int s = 0; s < 4; ++s)
+                    REQUIRE(state.getStepNote(0, s) == step0RawSubs[s]);
+            }
+
+            AND_THEN("SequenceState quantized getters return the expected values") {
+                // step 0's "current" note is the next-to-play substep (default 0).
+                REQUIRE(state.getCurrentNoteForStep(0) == step0ExpectedSubs[0]);
+                for (int i = 1; i < 8; ++i)
+                    REQUIRE(state.getCurrentNoteForStep(i) == expectedQuant[i]);
+
+                for (int s = 0; s < 4; ++s)
+                    REQUIRE(state.getQuantizedStepNote(0, s) == step0ExpectedSubs[s]);
+            }
+
+            AND_THEN("SequenceOverview grid squares show the quantized note colours") {
+                auto& grid = app.mainScreen().getSequenceOverview().getSequenceGrid();
+                for (int i = 0; i < 8; ++i) {
+                    int expected = (i == 0) ? step0ExpectedSubs[0] : expectedQuant[i];
+                    auto actualColour = grid.getSquareState(0, i).color;
+                    auto expectedColour = state.getNoteColour(expected % 12);
+                    REQUIRE(actualColour == expectedColour);
+                }
+            }
+
+            AND_THEN("Subsequencer bars for step 0 show the quantized substep colours") {
+                // Force the subsequence bar listener to refresh. It subscribes
+                // to step-note params (not scale params), so a scale change
+                // alone won't trigger onStateChanged. Bouncing the selected
+                // step fires the metadata listener and rebuilds the bars.
+                app.sequencerSteps().clickStep(1);
+                app.processMessages();
+                app.sequencerSteps().clickStep(0);
+                app.processMessages();
+
+                // Bar 0 is the "next to play" substep and paints with
+                // UIConstants::activeStepColour rather than its note colour —
+                // verify substeps 1..3 where the note colour is the displayed value.
+                // The "next to play" substep paints with activeStepColour
+                // regardless of its note, so exclude it from the colour check.
+                int activeSubstep = state.getNextSubstepIndex(0);
+                int checked = 0;
+                auto subs = app.subsequenceControls();
+                for (int s = 0; s < 4; ++s) {
+                    if (s == activeSubstep) continue;
+                    auto actualColour = subs.barColor(s);
+                    auto expectedColour = state.getNoteColour(step0ExpectedSubs[s] % 12);
+                    INFO("substep=" << s
+                         << " expectedQuant=" << step0ExpectedSubs[s]
+                         << " actualARGB=" << juce::String::toHexString((int)actualColour.getARGB())
+                         << " expectedARGB=" << juce::String::toHexString((int)expectedColour.getARGB()));
+                    REQUIRE(actualColour == expectedColour);
+                    ++checked;
+                }
+                REQUIRE(checked >= 3);
+            }
+
+            AND_THEN("NoteControls (MainControls) displays the quantized value of the selected step") {
+                // Step 3: raw Eb4=63 -> quantized E4=64 (snap up).
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+
+                int shown = app.mainScreen().getMainControls().getNoteControls().getMidiNote();
+                REQUIRE(shown == expectedQuant[3]);
+
+                // Step 6: raw Bb4=70 -> quantized C5=72 (cross-octave snap).
+                app.sequencerSteps().clickStep(6);
+                app.processMessages();
+
+                shown = app.mainScreen().getMainControls().getNoteControls().getMidiNote();
+                REQUIRE(shown == expectedQuant[6]);
             }
         }
     }
