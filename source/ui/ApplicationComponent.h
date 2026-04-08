@@ -319,14 +319,19 @@ private:
     // ========================================
     void handleAsyncUpdate() override {
         processorRef.getState().applyPendingNoteWrites();
-        mainScreen.updateFromSequence();
 
-        // Update note/octave slider options based on selected substep
+        // Rebuild note/octave slider option sets BEFORE updateFromSequence,
+        // because updateFromSequence calls NoteControls::setFromMidiNote which
+        // resolves the octave through OctaveSlider's octaveIndices_ mapping —
+        // that mapping must already reflect the current scale + range or the
+        // slider lands on the wrong actual octave.
         auto& state = processorRef.getState();
         int selectedStep = state.getSelectedStepForEditing();
         int selectedSubstep = state.getSelectedSubstepIndex(selectedStep);
         int selectedNote = state.getQuantizedStepNote(selectedStep, selectedSubstep);
         updateNoteControlOptions(selectedNote);
+
+        mainScreen.updateFromSequence();
 
         updatePlayPauseButtonState();
         repaintMidiLearnComponents();
