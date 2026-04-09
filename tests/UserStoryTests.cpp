@@ -1380,6 +1380,9 @@ inline void setRange(TestApp& app, int lo, int hi, bool midi) {
 }
 
 inline void enableDestructive(TestApp& app, bool scale, bool range) {
+    // Same code path as DestructiveToggleButton::mouseDown → setParamOn.
+    // The APVTS parameterChanged callback in PluginProcessor triggers
+    // bakeAllExistingNotes() on the OFF→ON transition.
     auto& apvts = app.processor().getAPVTS();
     if (scale)
         if (auto* p = apvts.getParameter(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE))
@@ -1902,6 +1905,607 @@ SCENARIO("MIDI-driven scale + range quantization across all surfaces and shifts"
                     if (i == 3) continue;
                     REQUIRE(state.getStepNote(i, 0) == RAW[i]);
                 }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// DESTRUCTIVE SCALE QUANTIZATION (UI-driven)
+// ============================================================================
+//
+// Same fixture and scale as the non-destructive tests, but destructive-scale
+// mode is enabled AFTER setting the scale. This causes bakeAllExistingNotes()
+// to rewrite raw storage, so raw == quantized. After that, changing the scale
+// does NOT retroactively update existing notes — only new writes go through
+// bakeNoteForStorage().
+
+SCENARIO("Destructive scale quantization bakes notes and freezes on scale shift",
+         "[user-story][scale][quantization][destructive]") {
+    GamblerTestInitialiser juceInit;
+    using namespace SRT;
+
+    GIVEN("A paused app with raw fixture, range [50,109], scale {C, E, G}") {
+        TestApp app;
+        auto& state = app.state();
+
+        app.navBar().clickPlayPause();
+        app.processMessages();
+
+        writeFixture(state);
+        setRange(app, 50, 109, false);
+        setScaleCEG(app, false);
+        app.processMessages();
+
+        REQUIRE(state.getScaleRangeMin() == 50);
+        REQUIRE(state.getScaleRangeMax() == 109);
+        checkScaleCEG(state);
+
+        WHEN("User enables destructive scale mode") {
+            enableDestructive(app, true, false);
+            app.processMessages();
+
+            THEN("Raw storage is now BAKED to the CEG-quantized values") {
+                checkRaw(state, CEG, 8);
+            }
+            AND_THEN("Quantized getters match (same values, now from baked raw)") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("SequenceGrid shows quantized colours") {
+                checkGrid(app, CEG, 8);
+            }
+            AND_THEN("NoteSlider lists {C, E, G}") {
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+                checkNoteSliderPcs(app, {0, 4, 7});
+            }
+            AND_THEN("OctaveSlider shows 5 octaves for pc=E under [50,109]") {
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+                checkOctaveCount(app, 5);
+            }
+            AND_THEN("NoteControls.getMidiNote matches") {
+                for (int s : { 3, 6 }) {
+                    app.sequencerSteps().clickStep(s);
+                    app.processMessages();
+                    checkSlider(app, CEG[s]);
+                }
+            }
+            AND_THEN("state.tick() plays the baked values") {
+                checkPlayback(state, CEG, 8);
+            }
+            AND_THEN("Active-note dot follows baked values") {
+                checkActiveDot(app, CEG, 8);
+            }
+        }
+
+        WHEN("User enables destructive scale, then shifts scale to {C, F}") {
+            enableDestructive(app, true, false);
+            app.processMessages();
+
+            // Notes are now baked to CEG: { 60, 60, 60, 64, 67, 67, 72, 72 }
+            // Now shift scale to {C, F} — existing notes should NOT change.
+            shiftScaleToCF(app, false);
+            app.processMessages();
+
+            checkScaleCF(state);
+
+            // In destructive-scale mode, quantize() skips scale, so the
+            // baked-to-CEG values display as-is even though E and G are no
+            // longer in the active scale.
+            THEN("Raw storage still holds the CEG-baked values (NOT re-baked to CF)") {
+                checkRaw(state, CEG, 8);
+            }
+            AND_THEN("Quantized getters return the CEG-baked values unchanged") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("SequenceGrid shows the CEG-baked colours") {
+                checkGrid(app, CEG, 8);
+            }
+            AND_THEN("state.tick() plays the CEG-baked values") {
+                checkPlayback(state, CEG, 8);
+            }
+            AND_THEN("Dragging NoteSlider writes a baked note through the new scale") {
+                app.sequencerSteps().clickStep(0);
+                app.processMessages();
+
+                auto& noteSlider = app.mainScreen().getMainControls().getNoteControls().getNoteSlider();
+
+                // Drag to F (index 1 in {C, F}).
+                noteSlider.getSlider().getSlider().setValue(1.0, juce::sendNotificationSync);
+                app.processMessages();
+
+                // bakeNoteForStorage with destructiveScale ON bakes to the
+                // current scale {C, F}. newNote = 5*12+5 = 65 (F5), which is
+                // in scale, so bake returns 65.
+                REQUIRE(state.getStepNote(0, 0) == 65);
+                REQUIRE(state.getSelectedNoteForStep(0) == 65);
+                checkSlider(app, 65);
+
+                // Other steps still hold CEG-baked values.
+                for (int i = 1; i < 8; ++i)
+                    REQUIRE(state.getStepNote(i, 0) == CEG[i]);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// DESTRUCTIVE SCALE QUANTIZATION (MIDI-driven)
+// ============================================================================
+
+SCENARIO("MIDI-driven destructive scale quantization bakes notes and freezes on scale shift",
+         "[user-story][scale][quantization][destructive][midi-mapped]") {
+    GamblerTestInitialiser juceInit;
+    using namespace SRT;
+
+    GIVEN("A paused app with raw fixture, MIDI mappings, range [50,109], scale {C, E, G}") {
+        TestApp app;
+        auto& state = app.state();
+
+        app.navBar().clickPlayPause();
+        app.processMessages();
+
+        writeFixture(state);
+        setupMidiMappings(app);
+        setRange(app, 50, 109, true);
+        setScaleCEG(app, true);
+        app.processMessages();
+
+        REQUIRE(state.getScaleRangeMin() == 50);
+        REQUIRE(state.getScaleRangeMax() == 109);
+        checkScaleCEG(state);
+
+        WHEN("User enables destructive scale mode") {
+            enableDestructive(app, true, false);
+            app.processMessages();
+
+            THEN("Raw storage is BAKED to CEG-quantized values") {
+                checkRaw(state, CEG, 8);
+            }
+            AND_THEN("Quantized getters match") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("SequenceGrid shows quantized colours") {
+                checkGrid(app, CEG, 8);
+            }
+            AND_THEN("state.tick() plays baked values") {
+                checkPlayback(state, CEG, 8);
+            }
+            AND_THEN("Active-note dot follows baked values") {
+                checkActiveDot(app, CEG, 8);
+            }
+        }
+
+        WHEN("User enables destructive scale, then shifts scale to {C, F} via MIDI") {
+            enableDestructive(app, true, false);
+            app.processMessages();
+
+            shiftScaleToCF(app, true);
+            app.processMessages();
+            checkScaleCF(state);
+
+            THEN("Raw storage still holds CEG-baked values") {
+                checkRaw(state, CEG, 8);
+            }
+            AND_THEN("Quantized getters return CEG-baked values unchanged") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("SequenceGrid shows CEG-baked colours") {
+                checkGrid(app, CEG, 8);
+            }
+            AND_THEN("state.tick() plays CEG-baked values") {
+                checkPlayback(state, CEG, 8);
+            }
+            AND_THEN("MIDI CC on NOTE_SLIDER writes a baked note through the new scale") {
+                app.sequencerSteps().clickStep(0);
+                app.processMessages();
+
+                // Step 0 = C5=60. CC 40 value 58 -> pc=5 (F).
+                // newNote = 5*12+5 = 65. bake with {C,F} -> 65 (in scale).
+                app.sendMidiCC(40, 58);
+                app.processMessages();
+
+                REQUIRE(state.getStepNote(0, 0) == 65);
+                REQUIRE(state.getSelectedNoteForStep(0) == 65);
+                for (int i = 1; i < 8; ++i)
+                    REQUIRE(state.getStepNote(i, 0) == CEG[i]);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// DESTRUCTIVE RANGE QUANTIZATION (UI-driven)
+// ============================================================================
+//
+// Tests destructive-range mode with scale {C, E, G}. When range-destructive is
+// enabled, bakeAllExistingNotes() clamps raw notes to the range (but does NOT
+// apply scale since bakeS is false). After that, changing the range does NOT
+// retroactively update existing notes.
+
+SCENARIO("Destructive range quantization bakes notes and freezes on range shift",
+         "[user-story][range][quantization][destructive]") {
+    GamblerTestInitialiser juceInit;
+    using namespace SRT;
+
+    GIVEN("A paused app with raw fixture, range [50,109], scale {C, E, G}") {
+        TestApp app;
+        auto& state = app.state();
+
+        app.navBar().clickPlayPause();
+        app.processMessages();
+
+        writeFixture(state);
+        setRange(app, 50, 109, false);
+        setScaleCEG(app, false);
+        app.processMessages();
+
+        REQUIRE(state.getScaleRangeMin() == 50);
+        REQUIRE(state.getScaleRangeMax() == 109);
+        checkScaleCEG(state);
+
+        WHEN("User enables destructive range mode") {
+            enableDestructive(app, false, true);
+            app.processMessages();
+
+            // bake() with destructiveRange ON clamps to [50,109] — all raws
+            // are already inside, so clamping is a no-op. bake() does NOT
+            // apply scale when only destructiveRange is ON (bakeS is false).
+            THEN("Raw storage is unchanged (all raws already inside [50,109])") {
+                checkRaw(state, RAW, 8);
+            }
+            // quantize() skips range (destructiveRange=true), but still
+            // applies scale (destructiveScale=false).
+            AND_THEN("Quantized getters match CEG (scale still applied by display)") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("SequenceGrid shows quantized colours") {
+                checkGrid(app, CEG, 8);
+            }
+            AND_THEN("state.tick() plays scale-quantized values") {
+                checkPlayback(state, CEG, 8);
+            }
+        }
+
+        WHEN("User enables destructive range, then tightens range to [50, 71]") {
+            enableDestructive(app, false, true);
+            app.processMessages();
+
+            checkRaw(state, RAW, 8);
+
+            setRange(app, 50, 71, false);
+            app.processMessages();
+
+            REQUIRE(state.getScaleRangeMin() == 50);
+            REQUIRE(state.getScaleRangeMax() == 71);
+
+            // bakeAllExistingNotes only ran on the OFF->ON transition (with
+            // old range [50,109]). Changing the range afterward does NOT
+            // re-bake.
+            THEN("Raw storage is still unchanged (bake only ran once on transition)") {
+                checkRaw(state, RAW, 8);
+            }
+            // quantize() skips range (destructiveRange=true) but still
+            // applies scale. Without range clamping, all raws map to
+            // CEG-quantized values (same as full-range scale-only scenario).
+            AND_THEN("Quantized getters match CEG (range skipped, scale applied)") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("SequenceGrid shows CEG-quantized colours") {
+                checkGrid(app, CEG, 8);
+            }
+            AND_THEN("state.tick() plays CEG-quantized values") {
+                checkPlayback(state, CEG, 8);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// DESTRUCTIVE RANGE QUANTIZATION (MIDI-driven)
+// ============================================================================
+
+SCENARIO("MIDI-driven destructive range quantization bakes notes and freezes on range shift",
+         "[user-story][range][quantization][destructive][midi-mapped]") {
+    GamblerTestInitialiser juceInit;
+    using namespace SRT;
+
+    GIVEN("A paused app with raw fixture, MIDI mappings, range [50,109], scale {C, E, G}") {
+        TestApp app;
+        auto& state = app.state();
+
+        app.navBar().clickPlayPause();
+        app.processMessages();
+
+        writeFixture(state);
+        setupMidiMappings(app);
+        setRange(app, 50, 109, true);
+        setScaleCEG(app, true);
+        app.processMessages();
+
+        REQUIRE(state.getScaleRangeMin() == 50);
+        REQUIRE(state.getScaleRangeMax() == 109);
+        checkScaleCEG(state);
+
+        WHEN("User enables destructive range mode") {
+            enableDestructive(app, false, true);
+            app.processMessages();
+
+            THEN("Raw storage unchanged (all raws inside [50,109])") {
+                checkRaw(state, RAW, 8);
+            }
+            AND_THEN("Quantized getters match CEG") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("state.tick() plays scale-quantized values") {
+                checkPlayback(state, CEG, 8);
+            }
+        }
+
+        WHEN("User enables destructive range, then tightens range to [50, 71] via MIDI") {
+            enableDestructive(app, false, true);
+            app.processMessages();
+            checkRaw(state, RAW, 8);
+
+            setRange(app, 50, 71, true);
+            app.processMessages();
+
+            REQUIRE(state.getScaleRangeMin() == 50);
+            REQUIRE(state.getScaleRangeMax() == 71);
+
+            THEN("Raw storage is still unchanged") {
+                checkRaw(state, RAW, 8);
+            }
+            AND_THEN("Quantized getters match CEG (range skipped, scale applied)") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("state.tick() plays CEG-quantized values") {
+                checkPlayback(state, CEG, 8);
+            }
+            AND_THEN("Active-note dot follows CEG-quantized values") {
+                checkActiveDot(app, CEG, 8);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// DESTRUCTIVE SCALE + RANGE COMBINED (UI-driven)
+// ============================================================================
+//
+// Both destructive flags ON. bake() applies range clamp AND scale snap on
+// writes, quantize() is a full passthrough. After enabling, changing scale
+// and/or range does NOT retroactively update existing notes. New writes go
+// through bake() which applies both current scale AND range.
+
+SCENARIO("Destructive scale+range combined bakes notes and freezes on shift",
+         "[user-story][scale][range][quantization][destructive]") {
+    GamblerTestInitialiser juceInit;
+    using namespace SRT;
+
+    GIVEN("A paused app with raw fixture, range [50,109], scale {C, E, G}") {
+        TestApp app;
+        auto& state = app.state();
+
+        app.navBar().clickPlayPause();
+        app.processMessages();
+
+        writeFixture(state);
+        setRange(app, 50, 109, false);
+        setScaleCEG(app, false);
+        app.processMessages();
+
+        REQUIRE(state.getScaleRangeMin() == 50);
+        REQUIRE(state.getScaleRangeMax() == 109);
+        checkScaleCEG(state);
+
+        WHEN("User enables both destructive scale and range") {
+            enableDestructive(app, true, true);
+            app.processMessages();
+
+            // bake() clamps to [50,109] (no-op, all inside) then snaps to
+            // scale {C,E,G}. Result is the same as CEG.
+            THEN("Raw storage is BAKED to CEG-quantized values") {
+                checkRaw(state, CEG, 8);
+            }
+            // quantize() skips both scale and range -> full passthrough.
+            AND_THEN("Quantized getters match (passthrough from baked raw)") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("SequenceGrid shows quantized colours") {
+                checkGrid(app, CEG, 8);
+            }
+            AND_THEN("NoteControls.getMidiNote matches") {
+                for (int s : { 3, 6 }) {
+                    app.sequencerSteps().clickStep(s);
+                    app.processMessages();
+                    checkSlider(app, CEG[s]);
+                }
+            }
+            AND_THEN("state.tick() plays the baked values") {
+                checkPlayback(state, CEG, 8);
+            }
+            AND_THEN("Active-note dot follows baked values") {
+                checkActiveDot(app, CEG, 8);
+            }
+        }
+
+        WHEN("User enables both destructive modes, then shifts to {C,F} + [50,71]") {
+            enableDestructive(app, true, true);
+            app.processMessages();
+
+            // Notes baked to CEG under [50,109].
+            checkRaw(state, CEG, 8);
+
+            shiftScaleToCF(app, false);
+            setRange(app, 50, 71, false);
+            app.processMessages();
+
+            checkScaleCF(state);
+            REQUIRE(state.getScaleRangeMin() == 50);
+            REQUIRE(state.getScaleRangeMax() == 71);
+
+            // quantize() is full passthrough, so existing baked notes display
+            // as-is regardless of the new scale/range.
+            THEN("Raw storage still holds CEG-baked values") {
+                checkRaw(state, CEG, 8);
+            }
+            AND_THEN("Quantized getters return CEG-baked values (full passthrough)") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("SequenceGrid shows CEG-baked colours") {
+                checkGrid(app, CEG, 8);
+            }
+            AND_THEN("state.tick() plays CEG-baked values") {
+                checkPlayback(state, CEG, 8);
+            }
+            AND_THEN("Dragging NoteSlider writes a note baked through BOTH new scale and range") {
+                app.sequencerSteps().clickStep(0);
+                app.processMessages();
+
+                auto& noteSlider = app.mainScreen().getMainControls().getNoteControls().getNoteSlider();
+
+                // Step 0 = C5=60. Drag to F (index 1 in {C,F}).
+                // newNote = 5*12+5 = 65. bake clamps to [50,71] (65 inside),
+                // then scale {C,F}: 65 is F, in scale. Result = 65.
+                noteSlider.getSlider().getSlider().setValue(1.0, juce::sendNotificationSync);
+                app.processMessages();
+
+                REQUIRE(state.getStepNote(0, 0) == 65);
+                REQUIRE(state.getSelectedNoteForStep(0) == 65);
+                checkSlider(app, 65);
+
+                for (int i = 1; i < 8; ++i)
+                    REQUIRE(state.getStepNote(i, 0) == CEG[i]);
+            }
+            AND_THEN("Dragging OctaveSlider out of range gets clamped+snapped by bake") {
+                // Use step 0 (C5=60, pc=0) — its baked pc is in the new
+                // scale {C,F}, so the NoteSlider can display it cleanly.
+                app.sequencerSteps().clickStep(0);
+                app.processMessages();
+
+                auto& octaveSlider = app.mainScreen().getMainControls().getNoteControls().getOctaveSlider();
+
+                // Drive to highest available octave index.
+                int maxIdx = (int) octaveSlider.getSlider().getSlider().getMaximum();
+                octaveSlider.getSlider().getSlider().setValue((double) maxIdx, juce::sendNotificationSync);
+                app.processMessages();
+
+                // The written note must be inside [50,71] and in {C,F}.
+                int written = state.getStepNote(0, 0);
+                REQUIRE(written >= 50);
+                REQUIRE(written <= 71);
+                int pc = written % 12;
+                REQUIRE((pc == 0 || pc == 5)); // C or F
+            }
+        }
+    }
+}
+
+// ============================================================================
+// DESTRUCTIVE SCALE + RANGE COMBINED (MIDI-driven)
+// ============================================================================
+
+SCENARIO("MIDI-driven destructive scale+range combined bakes notes and freezes on shift",
+         "[user-story][scale][range][quantization][destructive][midi-mapped]") {
+    GamblerTestInitialiser juceInit;
+    using namespace SRT;
+
+    GIVEN("A paused app with raw fixture, MIDI mappings, range [50,109], scale {C, E, G}") {
+        TestApp app;
+        auto& state = app.state();
+
+        app.navBar().clickPlayPause();
+        app.processMessages();
+
+        writeFixture(state);
+        setupMidiMappings(app);
+        setRange(app, 50, 109, true);
+        setScaleCEG(app, true);
+        app.processMessages();
+
+        REQUIRE(state.getScaleRangeMin() == 50);
+        REQUIRE(state.getScaleRangeMax() == 109);
+        checkScaleCEG(state);
+
+        WHEN("User enables both destructive modes") {
+            enableDestructive(app, true, true);
+            app.processMessages();
+
+            THEN("Raw storage is BAKED to CEG") {
+                checkRaw(state, CEG, 8);
+            }
+            AND_THEN("Quantized getters match (full passthrough)") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("SequenceGrid shows quantized colours") {
+                checkGrid(app, CEG, 8);
+            }
+            AND_THEN("state.tick() plays baked values") {
+                checkPlayback(state, CEG, 8);
+            }
+            AND_THEN("Active-note dot follows baked values") {
+                checkActiveDot(app, CEG, 8);
+            }
+        }
+
+        WHEN("User enables both destructive modes, then shifts to {C,F} + [50,71] via MIDI") {
+            enableDestructive(app, true, true);
+            app.processMessages();
+            checkRaw(state, CEG, 8);
+
+            shiftScaleToCF(app, true);
+            setRange(app, 50, 71, true);
+            app.processMessages();
+
+            checkScaleCF(state);
+            REQUIRE(state.getScaleRangeMin() == 50);
+            REQUIRE(state.getScaleRangeMax() == 71);
+
+            THEN("Raw storage still holds CEG-baked values") {
+                checkRaw(state, CEG, 8);
+            }
+            AND_THEN("Quantized getters return CEG-baked values (full passthrough)") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("SequenceGrid shows CEG-baked colours") {
+                checkGrid(app, CEG, 8);
+            }
+            AND_THEN("state.tick() plays CEG-baked values") {
+                checkPlayback(state, CEG, 8);
+            }
+            AND_THEN("Active-note dot follows CEG-baked values") {
+                checkActiveDot(app, CEG, 8);
+            }
+            AND_THEN("MIDI CC on NOTE_SLIDER writes a note baked through both scale and range") {
+                app.sequencerSteps().clickStep(0);
+                app.processMessages();
+
+                // Step 0 = C5=60. CC 40 value 58 -> pc=5 (F).
+                // newNote = 5*12+5 = 65. bake: clamp [50,71] ok, {C,F} ok.
+                app.sendMidiCC(40, 58);
+                app.processMessages();
+
+                REQUIRE(state.getStepNote(0, 0) == 65);
+                REQUIRE(state.getSelectedNoteForStep(0) == 65);
+                for (int i = 1; i < 8; ++i)
+                    REQUIRE(state.getStepNote(i, 0) == CEG[i]);
+            }
+            AND_THEN("MIDI CC on OCTAVE_SLIDER out of range gets clamped+snapped") {
+                app.sequencerSteps().clickStep(0);
+                app.processMessages();
+
+                // Step 0 = C5=60. CC 41 value 99 -> oct=7.
+                // MIDI path: currentNote=60 (passthrough), pc=0.
+                // newNote = 7*12+0 = 84. bake: clamp to [50,71] -> 71.
+                // 71=B not in {C,F}. Search: 70 Bb no, 69 A no, 68 Ab no,
+                // 67 G no, 66 Gb no, 65 F yes -> 65.
+                app.sendMidiCC(41, 99);
+                app.processMessages();
+
+                REQUIRE(state.getStepNote(0, 0) == 65);
+                REQUIRE(state.getSelectedNoteForStep(0) == 65);
             }
         }
     }

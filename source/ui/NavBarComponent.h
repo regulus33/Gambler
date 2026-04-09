@@ -377,6 +377,10 @@ public:
     // Access to subdivision slider for MIDI learn wiring
     SubdivisionSlider& getSubdivisionSlider() { return subdivisionSlider; }
 
+    // Access to destructive toggle buttons for testing
+    DestructiveToggleButton& getBakeScaleButton() { return bakeScaleButton; }
+    DestructiveToggleButton& getBakeRangeButton() { return bakeRangeButton; }
+
     // Set the MIDI learn registry for navbar buttons
     void setSettingsButtonRegistry(MidiLearnRegistry* registry) {
         settingsButton.setRegistry(registry);
