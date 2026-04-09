@@ -28,6 +28,9 @@ namespace PianoRollConstants {
     const juce::Colour unselectedBlackKeyColor = juce::Colour (186, 186, 186);
     // Colour fade animation
     constexpr float colourFadeSpeed = 10.0f;  // Lerp speed (higher = faster fade)
+    // Active note circle fade (seconds)
+    constexpr float activeCircleFadeInDuration = 0.06f;   // Fast fade in
+    constexpr float activeCircleFadeOutDuration = 0.15f;  // Slightly slower fade out
 }
 
 /**
@@ -292,6 +295,25 @@ public:
                     lastVBlankTimestamp_ = timestampSec;
                     frameDeltaSec_ = static_cast<float>(juce::jlimit(0.001, 0.1, delta));
 
+                    // Animate active-note circle alphas
+                    bool circleAnimating = false;
+                    for (int i = 0; i < 12; i++) {
+                        float& alpha = activeCircleAlpha_[i];
+                        float target = activeCircleTargetAlpha_[i];
+                        if (std::abs(alpha - target) > 0.001f) {
+                            float duration = (target > alpha)
+                                ? PianoRollConstants::activeCircleFadeInDuration
+                                : PianoRollConstants::activeCircleFadeOutDuration;
+                            float step = frameDeltaSec_ / duration;
+                            alpha = (target > alpha)
+                                ? juce::jmin(alpha + step, target)
+                                : juce::jmax(alpha - step, target);
+                            circleAnimating = true;
+                        }
+                    }
+                    if (circleAnimating)
+                        needsAnimationRepaint_ = true;
+
                     if (needsAnimationRepaint_) {
                         needsAnimationRepaint_ = false;
                         repaint();
@@ -332,6 +354,10 @@ public:
     void setActiveNote (int noteIndex) {
         if (activeNoteIndex != noteIndex) {
             activeNoteIndex = noteIndex;
+            // Target alphas drive the fade animation per key
+            for (int i = 0; i < 12; i++)
+                activeCircleTargetAlpha_[i] = (i == activeNoteIndex) ? 1.0f : 0.0f;
+            needsAnimationRepaint_ = true;
             repaint();
         }
     }
@@ -525,30 +551,27 @@ private:
         // Determine text area based on key type
         auto textArea = pathBounds.withTrimmedTop (pathBounds.getHeight() * 0.7f);
 
-        // Check if this is the active note
-        bool isActive = (keyIndex == activeNoteIndex);
-
         float scaledFontSize = baseFontSize * derivedScale_ * noteTextScale;
         float scaledCircleRadius = baseActiveCircleRadius * derivedScale_ * noteTextScale;
 
-        if (isActive) {
-            // Draw black circle behind the text
+        float circleAlpha = activeCircleAlpha_[keyIndex];
+
+        if (circleAlpha > 0.0f) {
+            // Draw black circle behind the text, faded by animated alpha
             auto circleCentre = textArea.getCentre();
-            g.setColour (juce::Colours::black);
+            g.setColour (juce::Colours::black.withAlpha(circleAlpha));
             g.fillEllipse (circleCentre.x - scaledCircleRadius, circleCentre.y - scaledCircleRadius,
                           scaledCircleRadius * 2.0f, scaledCircleRadius * 2.0f);
+        }
 
-            // Draw note name in white, bold Inter font
-            g.setColour (juce::Colours::white);
+        {
+            // Blend text colour from black (inactive) to white (active) based on circle alpha
+            auto textColour = juce::Colours::black.interpolatedWith(juce::Colours::white, circleAlpha);
+            g.setColour (textColour);
             juce::Font font (interFont);
             font.setHeight (scaledFontSize);
-            font.setBold (true);
-            g.setFont (font);
-        } else {
-            // Draw note name in black, regular Inter font
-            g.setColour (juce::Colours::black);
-            juce::Font font (interFont);
-            font.setHeight (scaledFontSize);
+            if (circleAlpha > 0.5f)
+                font.setBold (true);
             g.setFont (font);
         }
 
@@ -761,6 +784,10 @@ private:
 
     // Last key hit during the current drag gesture (prevents duplicate triggers on same key)
     int lastDragKey_ = -1;
+
+    // Active note circle fade animation state
+    std::array<float, 12> activeCircleAlpha_ = {};       // Current animated alpha per key
+    std::array<float, 12> activeCircleTargetAlpha_ = {};  // Target alpha per key (1 = active, 0 = inactive)
 
     // Colour fade animation state
     std::array<juce::Colour, 12> displayColours_;
