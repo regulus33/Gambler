@@ -402,4 +402,3 @@ private:
     SubdivisionSlider subdivisionSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> subdivisionAttachment;
 };
-

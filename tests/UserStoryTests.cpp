@@ -1297,224 +1297,447 @@ SCENARIO("Non-destructive scale quantization drives MainControls sliders",
 }
 
 // ============================================================================
+// SCALE + RANGE QUANTIZATION TEST HELPERS
+// ============================================================================
+//
+// Shared setup and verification functions used by the parameterised
+// scale/range integration scenarios below. Keeps the individual SCANARIOs
+// concise while the helpers encode the fixture, expected values, and
+// assertion logic in one place.
+
+namespace SRT { // Scale-Range Test helpers
+
+// ---- Fixture data ----
+constexpr int RAW[8]  = { 60, 61, 62, 63, 66, 68, 70, 71 };
+constexpr int SUBS[4] = { 60, 61, 63, 66 };
+
+// Expected under scale {C, E, G} — works for default range or [50, 109]
+// (all raws land inside the window, so clamping is a no-op).
+constexpr int CEG[8]      = { 60, 60, 60, 64, 67, 67, 72, 72 };
+constexpr int CEG_SUBS[4] = { 60, 60, 64, 67 };
+
+// Expected under scale {C, F} with range [50, 71]
+// (clamp-then-snap path in ScaleQuantizer).
+constexpr int CF_50_71[8] = { 60, 60, 60, 65, 65, 65, 65, 65 };
+
+// ---- Setup helpers ----
+
+inline void writeFixture(SequenceState& state) {
+    for (int i = 0; i < 8; ++i) {
+        state.setStepNotesLength(i, 1);
+        state.setStepNote(i, 0, RAW[i]);
+    }
+}
+
+inline void writeFixtureWithSubsteps(SequenceState& state) {
+    writeFixture(state);
+    state.setStepNotesLength(0, 4);
+    for (int s = 0; s < 4; ++s)
+        state.setStepNote(0, s, SUBS[s]);
+}
+
+inline void setupMidiMappings(TestApp& app) {
+    for (int i = 0; i < 12; ++i)
+        app.mapMidiNote(static_cast<MidiControlId>(
+            static_cast<int>(MidiControlId::SCALE_NOTE_C) + i), 48 + i);
+    app.mapMidiCC(MidiControlId::NOTE_RANGE_MIN, 50);
+    app.mapMidiCC(MidiControlId::NOTE_RANGE_MAX, 51);
+    app.mapMidiCC(MidiControlId::NOTE_SLIDER, 40);
+    app.mapMidiCC(MidiControlId::OCTAVE_SLIDER, 41);
+}
+
+inline void setScaleCEG(TestApp& app, bool midi) {
+    const int off[] = { 1, 2, 3, 5, 6, 8, 9, 10, 11 };
+    for (int k : off) {
+        if (midi) app.sendMidiNoteOn(48 + k);
+        else      app.pianoRoll().toggleNote(k);
+    }
+}
+
+inline void shiftScaleToCF(TestApp& app, bool midi) {
+    auto toggle = [&](int k) {
+        if (midi) app.sendMidiNoteOn(48 + k);
+        else      app.pianoRoll().toggleNote(k);
+    };
+    toggle(5); // enable F
+    toggle(4); // disable E
+    toggle(7); // disable G
+}
+
+inline void setRange(TestApp& app, int lo, int hi, bool midi) {
+    int size   = Scale::computeSizeFromRange(lo, hi);
+    int offset = Scale::computeOffsetFromRange(lo, hi);
+    if (midi) {
+        app.sendMidiCC(50, offset);      // NOTE_RANGE_MIN -> offset
+        app.sendMidiCC(51, size - 1);    // NOTE_RANGE_MAX -> value+1 = size
+    } else {
+        auto& apvts = app.processor().getAPVTS();
+        if (auto* p = apvts.getParameter(Params::Keys::ID::SCALE_WINDOW_SIZE))
+            p->setValueNotifyingHost(p->convertTo0to1((float)size));
+        if (auto* p = apvts.getParameter(Params::Keys::ID::SCALE_WINDOW_OFFSET))
+            p->setValueNotifyingHost(p->convertTo0to1((float)offset));
+    }
+}
+
+inline void enableDestructive(TestApp& app, bool scale, bool range) {
+    auto& apvts = app.processor().getAPVTS();
+    if (scale)
+        if (auto* p = apvts.getParameter(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE))
+            p->setValueNotifyingHost(1.0f);
+    if (range)
+        if (auto* p = apvts.getParameter(Params::Keys::ID::PREF_DESTRUCTIVE_RANGE))
+            p->setValueNotifyingHost(1.0f);
+}
+
+// ---- Verification helpers ----
+
+inline void checkScaleCEG(SequenceState& state) {
+    REQUIRE(state.getGlobalScaleNote(0));        // C
+    REQUIRE_FALSE(state.getGlobalScaleNote(1));  // Db
+    REQUIRE_FALSE(state.getGlobalScaleNote(2));  // D
+    REQUIRE_FALSE(state.getGlobalScaleNote(3));  // Eb
+    REQUIRE(state.getGlobalScaleNote(4));        // E
+    REQUIRE_FALSE(state.getGlobalScaleNote(5));  // F
+    REQUIRE_FALSE(state.getGlobalScaleNote(6));  // Gb
+    REQUIRE(state.getGlobalScaleNote(7));        // G
+    REQUIRE_FALSE(state.getGlobalScaleNote(8));  // Ab
+    REQUIRE_FALSE(state.getGlobalScaleNote(9));  // A
+    REQUIRE_FALSE(state.getGlobalScaleNote(10)); // Bb
+    REQUIRE_FALSE(state.getGlobalScaleNote(11)); // B
+}
+
+inline void checkScaleCF(SequenceState& state) {
+    REQUIRE(state.getGlobalScaleNote(0));         // C
+    REQUIRE(state.getGlobalScaleNote(5));         // F
+    REQUIRE_FALSE(state.getGlobalScaleNote(4));   // E
+    REQUIRE_FALSE(state.getGlobalScaleNote(7));   // G
+}
+
+inline void checkRaw(SequenceState& state, const int expected[], int count) {
+    for (int i = 0; i < count; ++i) {
+        INFO("step=" << i);
+        REQUIRE(state.getStepNote(i, 0) == expected[i]);
+    }
+}
+
+inline void checkQuantized(SequenceState& state, const int expected[], int count) {
+    for (int i = 0; i < count; ++i) {
+        INFO("step=" << i);
+        REQUIRE(state.getCurrentNoteForStep(i) == expected[i]);
+    }
+}
+
+inline void checkGrid(TestApp& app, const int expected[], int count) {
+    auto& state = app.state();
+    auto& grid  = app.mainScreen().getSequenceOverview().getSequenceGrid();
+    for (int i = 0; i < count; ++i) {
+        auto actual   = grid.getSquareState(0, i).color;
+        auto expected_ = state.getNoteColour(expected[i] % 12);
+        INFO("step=" << i);
+        REQUIRE(actual == expected_);
+    }
+}
+
+inline void checkNoteSliderPcs(TestApp& app, const std::set<int>& expectedPcs) {
+    auto& ns = app.mainScreen().getMainControls().getNoteControls().getNoteSlider();
+    int count = (int)ns.getSlider().getSlider().getMaximum() + 1;
+    REQUIRE(count == (int)expectedPcs.size());
+    std::set<int> pcs;
+    for (int idx = 0; idx < count; ++idx) {
+        ns.getSlider().getSlider().setValue((double)idx, juce::dontSendNotification);
+        pcs.insert(ns.getChromaticPitchClass());
+    }
+    REQUIRE(pcs == expectedPcs);
+}
+
+inline void checkOctaveCount(TestApp& app, int expectedCount) {
+    auto& os = app.mainScreen().getMainControls().getNoteControls().getOctaveSlider();
+    REQUIRE((int)os.getSlider().getSlider().getMaximum() + 1 == expectedCount);
+}
+
+inline void checkSlider(TestApp& app, int expectedNote) {
+    auto& nc = app.mainScreen().getMainControls().getNoteControls();
+    REQUIRE(nc.getMidiNote() == expectedNote);
+}
+
+inline void checkPlayback(SequenceState& state, const int expected[], int count) {
+    state.setCurrentIndex(-1);
+    for (int i = 0; i < count; ++i) {
+        int played = state.tick();
+        INFO("step=" << i);
+        REQUIRE(played == expected[i]);
+    }
+}
+
+inline void checkActiveDot(TestApp& app, const int expected[], int count) {
+    auto& state = app.state();
+    auto& pr    = app.mainScreen().getPianoRoll();
+    for (int i = 0; i < count; ++i) {
+        state.setCurrentIndex(i);
+        if (app.processor().onSequenceTick)
+            app.processor().onSequenceTick();
+        app.processMessages();
+        INFO("step=" << i);
+        REQUIRE(pr.getActiveNote() == (expected[i] % 12));
+    }
+}
+
+} // namespace SRT
+
+// ============================================================================
 // NON-DESTRUCTIVE SCALE + RANGE QUANTIZATION (INTEGRATION)
 // ============================================================================
 //
-// The capstone scenario for the scale-quantization cluster. Exercises scale
-// AND range together, verifies every display surface (SequenceGrid,
-// SequencerSteps via state.getCurrentNoteForStep — the exact call StepButton
-// makes — subsequencer bar, MainControls sliders), plus playback via
-// state.tick() and the piano-roll active-note dot. Then it SHIFTS both the
-// scale and the range to a narrower window, forcing the clamp-then-snap path
-// in ScaleQuantizer, and re-verifies the same surfaces.
+// Capstone scenario for the scale-quantization cluster. Exercises scale AND
+// range together, verifies every display surface, playback, active-note dot,
+// and slider behaviour. Then SHIFTS both scale and range to a narrower
+// window, forcing the clamp-then-snap path, and re-verifies.
 
 SCENARIO("Non-destructive scale + range quantization across all surfaces and shifts",
          "[user-story][scale][range][quantization][integration]") {
     GamblerTestInitialiser juceInit;
+    using namespace SRT;
 
-    GIVEN("A paused app with raw fixture, medium range window, and scale {C, E, G}") {
+    GIVEN("A paused app with raw fixture, range [50,109], scale {C, E, G}") {
         TestApp app;
         auto& state = app.state();
-        auto& apvts = app.processor().getAPVTS();
 
         app.navBar().clickPlayPause();
         app.processMessages();
 
-        // Same 8-step fixture as the earlier scale scenarios — all raw notes
-        // land inside the initial [50, 109] window so Part A exercises
-        // scale-only snapping, and Part B narrows the window so clamp-then-snap
-        // kicks in.
-        const int rawNotes[8] = { 60, 61, 62, 63, 66, 68, 70, 71 };
+        writeFixture(state);
+        setRange(app, 50, 109, false);
+        setScaleCEG(app, false);
+        app.processMessages();
+
+        REQUIRE(state.getScaleRangeMin() == 50);
+        REQUIRE(state.getScaleRangeMax() == 109);
+        checkScaleCEG(state);
+
+        WHEN("No shift — initial range + scale quantization") {
+            THEN("Quantized getters match") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("SequenceGrid shows quantized colours") {
+                checkGrid(app, CEG, 8);
+            }
+            AND_THEN("NoteSlider lists {C, E, G}") {
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+                checkNoteSliderPcs(app, {0, 4, 7});
+            }
+            AND_THEN("OctaveSlider shows 5 octaves for pc=E under [50,109]") {
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+                checkOctaveCount(app, 5);
+            }
+            AND_THEN("NoteControls.getMidiNote matches") {
+                for (int s : { 3, 6 }) {
+                    app.sequencerSteps().clickStep(s);
+                    app.processMessages();
+                    checkSlider(app, CEG[s]);
+                }
+            }
+            AND_THEN("state.tick() plays expected") {
+                checkPlayback(state, CEG, 8);
+            }
+        }
+
+        WHEN("User shifts scale to {C, F} and range to [50, 71]") {
+            shiftScaleToCF(app, false);
+            setRange(app, 50, 71, false);
+            app.processMessages();
+
+            REQUIRE(state.getScaleRangeMin() == 50);
+            REQUIRE(state.getScaleRangeMax() == 71);
+            checkScaleCF(state);
+
+            THEN("Raw storage is UNCHANGED") {
+                checkRaw(state, RAW, 8);
+            }
+            AND_THEN("Quantized getters match shifted expected") {
+                checkQuantized(state, CF_50_71, 8);
+            }
+            AND_THEN("SequenceGrid refreshes") {
+                checkGrid(app, CF_50_71, 8);
+            }
+            AND_THEN("NoteSlider lists {C, F}") {
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+                checkNoteSliderPcs(app, {0, 5});
+            }
+            AND_THEN("OctaveSlider constrained to 2 octaves") {
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+                checkSlider(app, CF_50_71[3]);
+                checkOctaveCount(app, 2);
+            }
+            AND_THEN("state.tick() plays shifted expected") {
+                checkPlayback(state, CF_50_71, 8);
+            }
+            AND_THEN("Active-note dot follows shifted expected") {
+                checkActiveDot(app, CF_50_71, 8);
+            }
+            AND_THEN("Dragging NoteSlider writes correct raw note") {
+                app.sequencerSteps().clickStep(0);
+                app.processMessages();
+
+                auto& noteSlider = app.mainScreen().getMainControls().getNoteControls().getNoteSlider();
+                noteSlider.getSlider().getSlider().setValue(1.0, juce::sendNotificationSync);
+                app.processMessages();
+
+                REQUIRE(state.getStepNote(0, 0) == 65);
+                REQUIRE(state.getSelectedNoteForStep(0) == 65);
+                checkSlider(app, 65);
+                for (int i = 1; i < 8; ++i)
+                    REQUIRE(state.getStepNote(i, 0) == RAW[i]);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// MIDI-DRIVEN SCALE QUANTIZATION (mirrors the UI-driven scale stories above)
+// ============================================================================
+//
+// Same fixture and expected outputs as the UI-driven display / playback /
+// main-controls stories, but every MIDI-mappable interaction is driven through
+// mapped MIDI messages processed via processBlock instead of direct UI calls.
+//
+// MIDI-mappable controls exercised here:
+//   SCALE_NOTE_C..B  — MIDI note-on toggles the scale note (12 mappings)
+//   NOTE_SLIDER      — CC value -> chromatic pitch class 0-11
+//   OCTAVE_SLIDER    — CC value -> octave 0-9
+//
+// Non-MIDI controls (step clicking, message pumping) still use the UI helpers.
+
+SCENARIO("MIDI-driven scale quantization updates display surfaces and drives sliders",
+         "[user-story][scale][quantization][midi-mapped]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A paused app with the standard 8-step fixture, scale notes mapped to MIDI notes 48-59") {
+        TestApp app;
+        auto& state = app.state();
+
+        app.navBar().clickPlayPause();
+        app.processMessages();
+
+        // Same fixture as the UI-driven scenarios.
+        const int rawNotes[8]      = { 60, 61, 62, 63, 66, 68, 70, 71 };
+        const int expectedQuant[8] = { 60, 60, 60, 64, 67, 67, 72, 72 };
+
         for (int i = 0; i < 8; ++i) {
             state.setStepNotesLength(i, 1);
             state.setStepNote(i, 0, rawNotes[i]);
         }
 
-        // --- Range: offset=50, size=60 -> [50, 109] ---
-        // Write the APVTS params directly, same path NoteRangeControlsComponent
-        // takes via its slider attachments.
-        auto setRangeWindow = [&](int desiredMin, int desiredMax) {
-            int size   = Scale::computeSizeFromRange(desiredMin, desiredMax);
-            int offset = Scale::computeOffsetFromRange(desiredMin, desiredMax);
-            if (auto* p = apvts.getParameter(Params::Keys::ID::SCALE_WINDOW_SIZE))
-                p->setValueNotifyingHost(p->convertTo0to1((float) size));
-            if (auto* p = apvts.getParameter(Params::Keys::ID::SCALE_WINDOW_OFFSET))
-                p->setValueNotifyingHost(p->convertTo0to1((float) offset));
-        };
-        setRangeWindow(50, 109);
+        // Step 0 gets 4 substeps for subsequencer bar verification.
+        state.setStepNotesLength(0, 4);
+        const int step0RawSubs[4]      = { 60, 61, 63, 66 };
+        const int step0ExpectedSubs[4] = { 60, 60, 64, 67 };
+        for (int s = 0; s < 4; ++s)
+            state.setStepNote(0, s, step0RawSubs[s]);
 
-        // --- Scale: real piano-roll integration, disable everything except C/E/G ---
-        const int keysToDisable[] = { 1, 2, 3, 5, 6, 8, 9, 10, 11 };
-        for (int k : keysToDisable)
-            app.pianoRoll().toggleNote(k);
+        // Map all 12 scale notes to MIDI notes 48..59.
+        for (int i = 0; i < 12; ++i)
+            app.mapMidiNote(static_cast<MidiControlId>(
+                static_cast<int>(MidiControlId::SCALE_NOTE_C) + i), 48 + i);
+
+        // Map sliders to CCs for the driving portion.
+        app.mapMidiCC(MidiControlId::NOTE_SLIDER, 40);
+        app.mapMidiCC(MidiControlId::OCTAVE_SLIDER, 41);
+
         app.processMessages();
 
-        // Sanity: range and scale land where we expect.
-        REQUIRE(state.getScaleRangeMin() == 50);
-        REQUIRE(state.getScaleRangeMax() == 109);
-        REQUIRE(state.getGlobalScaleNote(0));
-        REQUIRE(state.getGlobalScaleNote(4));
-        REQUIRE(state.getGlobalScaleNote(7));
-        REQUIRE_FALSE(state.getGlobalScaleNote(5));
-
-        // Hand-computed under scale {0,4,7} + range [50,109]:
-        // all raws are inside the window, so clamping is a no-op and this
-        // matches the scale-only expected values from the earlier scenarios.
-        const int expectedA[8] = { 60, 60, 60, 64, 67, 67, 72, 72 };
-
-        auto& noteControls = app.mainScreen().getMainControls().getNoteControls();
-        auto& noteSlider   = noteControls.getNoteSlider();
-        auto& octaveSlider = noteControls.getOctaveSlider();
-
-        WHEN("No shift has happened yet — initial range + scale quantization") {
-            THEN("SequenceState quantized getters match expectedA for every step") {
-                for (int i = 0; i < 8; ++i) {
-                    INFO("step=" << i);
-                    REQUIRE(state.getCurrentNoteForStep(i) == expectedA[i]);
-                }
-            }
-
-            AND_THEN("SequenceGrid shows the quantized colours") {
-                auto& grid = app.mainScreen().getSequenceOverview().getSequenceGrid();
-                for (int i = 0; i < 8; ++i) {
-                    auto actualColour = grid.getSquareState(0, i).color;
-                    auto expectedColour = state.getNoteColour(expectedA[i] % 12);
-                    INFO("step=" << i);
-                    REQUIRE(actualColour == expectedColour);
-                }
-            }
-
-            AND_THEN("NoteSlider lists exactly the 3 in-scale pitch classes {C, E, G}") {
-                app.sequencerSteps().clickStep(3);
-                app.processMessages();
-
-                int count = (int) noteSlider.getSlider().getSlider().getMaximum() + 1;
-                REQUIRE(count == 3);
-
-                std::set<int> pcs;
-                for (int idx = 0; idx < count; ++idx) {
-                    noteSlider.getSlider().getSlider().setValue(
-                        (double) idx, juce::dontSendNotification);
-                    pcs.insert(noteSlider.getChromaticPitchClass());
-                }
-                REQUIRE(pcs == std::set<int>{0, 4, 7});
-            }
-
-            AND_THEN("OctaveSlider lists the octaves reachable for the selected-step pitch class under [50,109]") {
-                // Step 3 displays E4 = pc=4. Reachable octaves for pc=4 under
-                // [50,109]: oct*12+4 in [50,109] -> oct in {4(52), 5(64), 6(76), 7(88), 8(100)} = 5 octaves.
-                app.sequencerSteps().clickStep(3);
-                app.processMessages();
-
-                int count = (int) octaveSlider.getSlider().getSlider().getMaximum() + 1;
-                REQUIRE(count == 5);
-            }
-
-            AND_THEN("NoteControls.getMidiNote matches expectedA for the selected step") {
-                for (int stepIdx : { 3, 6 }) {
-                    app.sequencerSteps().clickStep(stepIdx);
-                    app.processMessages();
-                    REQUIRE(noteControls.getMidiNote() == expectedA[stepIdx]);
-                }
-            }
-
-            AND_THEN("state.tick() plays expectedA in order") {
-                state.setCurrentIndex(-1);
-                for (int i = 0; i < 8; ++i) {
-                    int played = state.tick();
-                    INFO("step=" << i);
-                    REQUIRE(played == expectedA[i]);
-                }
-            }
-        }
-
-        WHEN("User shifts scale to {C, F} and range to [50, 71]") {
-            // Enable F (pc 5), disable E and G (pcs 4 and 7).
-            app.pianoRoll().toggleNote(5); // enable F
-            app.pianoRoll().toggleNote(4); // disable E
-            app.pianoRoll().toggleNote(7); // disable G
-            setRangeWindow(50, 71);
+        WHEN("User toggles off 9 scale notes via MIDI note-ons, leaving {C, E, G}") {
+            // Default scale is chromatic (all on). Sending MIDI note-on toggles
+            // each note off: Db=1, D=2, Eb=3, F=5, Gb=6, Ab=8, A=9, Bb=10, B=11.
+            const int keysToDisable[] = { 1, 2, 3, 5, 6, 8, 9, 10, 11 };
+            for (int k : keysToDisable)
+                app.sendMidiNoteOn(48 + k);
             app.processMessages();
 
-            // Sanity
-            REQUIRE(state.getScaleRangeMin() == 50);
-            REQUIRE(state.getScaleRangeMax() == 71);
-            REQUIRE(state.getGlobalScaleNote(0));
-            REQUIRE(state.getGlobalScaleNote(5));
-            REQUIRE_FALSE(state.getGlobalScaleNote(4));
-            REQUIRE_FALSE(state.getGlobalScaleNote(7));
+            THEN("The global scale has exactly C, E, G enabled") {
+                REQUIRE(state.getGlobalScaleNote(0));        // C
+                REQUIRE_FALSE(state.getGlobalScaleNote(1));  // Db
+                REQUIRE_FALSE(state.getGlobalScaleNote(2));  // D
+                REQUIRE_FALSE(state.getGlobalScaleNote(3));  // Eb
+                REQUIRE(state.getGlobalScaleNote(4));        // E
+                REQUIRE_FALSE(state.getGlobalScaleNote(5));  // F
+                REQUIRE_FALSE(state.getGlobalScaleNote(6));  // Gb
+                REQUIRE(state.getGlobalScaleNote(7));        // G
+                REQUIRE_FALSE(state.getGlobalScaleNote(8));  // Ab
+                REQUIRE_FALSE(state.getGlobalScaleNote(9));  // A
+                REQUIRE_FALSE(state.getGlobalScaleNote(10)); // Bb
+                REQUIRE_FALSE(state.getGlobalScaleNote(11)); // B
+            }
 
-            // Hand-computed under scale {0,5} + range [50,71]:
-            //   60 C   -> 60 (in scale, in range)
-            //   61 Db  -> d=1 down=60 -> 60
-            //   62 D   -> d=2 down=60 -> 60
-            //   63 Eb  -> d=2 up=65 (F) -> 65
-            //   66 Gb  -> d=1 down=65 -> 65
-            //   68 Ab  -> d=3 down=65 -> 65
-            //   70 Bb  -> search caps at 71; d=5 down=65 -> 65
-            //   71 B   -> search caps at 71; d=6 down=65 -> 65
-            const int expectedB[8] = { 60, 60, 60, 65, 65, 65, 65, 65 };
-
-            THEN("Raw storage is still UNCHANGED (non-destructive scale AND range)") {
-                for (int i = 0; i < 8; ++i)
+            AND_THEN("Raw step-note storage is UNCHANGED (non-destructive)") {
+                for (int i = 1; i < 8; ++i)
                     REQUIRE(state.getStepNote(i, 0) == rawNotes[i]);
+                for (int s = 0; s < 4; ++s)
+                    REQUIRE(state.getStepNote(0, s) == step0RawSubs[s]);
             }
 
-            AND_THEN("SequenceState quantized getters match expectedB for every step") {
-                for (int i = 0; i < 8; ++i) {
-                    INFO("step=" << i << " raw=" << rawNotes[i]);
-                    REQUIRE(state.getCurrentNoteForStep(i) == expectedB[i]);
-                }
+            AND_THEN("SequenceState quantized getters return the expected values") {
+                REQUIRE(state.getCurrentNoteForStep(0) == step0ExpectedSubs[0]);
+                for (int i = 1; i < 8; ++i)
+                    REQUIRE(state.getCurrentNoteForStep(i) == expectedQuant[i]);
+                for (int s = 0; s < 4; ++s)
+                    REQUIRE(state.getQuantizedStepNote(0, s) == step0ExpectedSubs[s]);
             }
 
-            AND_THEN("SequenceGrid refreshes to the new quantized colours") {
+            AND_THEN("SequenceGrid shows quantized colours") {
                 auto& grid = app.mainScreen().getSequenceOverview().getSequenceGrid();
                 for (int i = 0; i < 8; ++i) {
+                    int expected = (i == 0) ? step0ExpectedSubs[0] : expectedQuant[i];
                     auto actualColour = grid.getSquareState(0, i).color;
-                    auto expectedColour = state.getNoteColour(expectedB[i] % 12);
-                    INFO("step=" << i);
+                    auto expectedColour = state.getNoteColour(expected % 12);
                     REQUIRE(actualColour == expectedColour);
                 }
             }
 
-            AND_THEN("NoteSlider now lists exactly {C, F} (2 options)") {
-                app.sequencerSteps().clickStep(3);
-                app.processMessages();
-
-                int count = (int) noteSlider.getSlider().getSlider().getMaximum() + 1;
-                REQUIRE(count == 2);
-
-                std::set<int> pcs;
-                for (int idx = 0; idx < count; ++idx) {
-                    noteSlider.getSlider().getSlider().setValue(
-                        (double) idx, juce::dontSendNotification);
-                    pcs.insert(noteSlider.getChromaticPitchClass());
+            AND_THEN("Subsequencer bars for step 0 show quantized colours") {
+                int activeSubstep = state.getNextSubstepIndex(0);
+                int checked = 0;
+                auto subs = app.subsequenceControls();
+                for (int s = 0; s < 4; ++s) {
+                    if (s == activeSubstep) continue;
+                    auto actualColour = subs.barColor(s);
+                    auto expectedColour = state.getNoteColour(step0ExpectedSubs[s] % 12);
+                    REQUIRE(actualColour == expectedColour);
+                    ++checked;
                 }
-                REQUIRE(pcs == std::set<int>{0, 5});
+                REQUIRE(checked >= 3);
             }
 
-            AND_THEN("OctaveSlider is constrained by the tighter [50,71] window") {
-                // Step 3 displays F4 = 65 under the new quant (pc=5).
-                // Reachable octaves for pc=5 under [50,71]:
-                //   oct*12+5 in [50,71] -> oct in {4(53), 5(65)} = 2 octaves.
+            AND_THEN("NoteSlider filters to 3 options and sliders show correct quantized values") {
                 app.sequencerSteps().clickStep(3);
                 app.processMessages();
 
-                REQUIRE(noteControls.getMidiNote() == expectedB[3]); // 65
-                int count = (int) octaveSlider.getSlider().getSlider().getMaximum() + 1;
-                REQUIRE(count == 2);
+                auto& noteControls = app.mainScreen().getMainControls().getNoteControls();
+                auto& noteSlider   = noteControls.getNoteSlider();
+                auto& octaveSlider = noteControls.getOctaveSlider();
+
+                int noteCount = (int) noteSlider.getSlider().getSlider().getMaximum() + 1;
+                REQUIRE(noteCount == 3);
+
+                // Step 3: raw Eb4=63 -> quantized E4=64.
+                REQUIRE(noteControls.getMidiNote() == expectedQuant[3]);
+                REQUIRE(noteSlider.getChromaticPitchClass() == (expectedQuant[3] % 12));
+                REQUIRE(octaveSlider.getActualOctaveIndex() == (expectedQuant[3] / 12));
             }
 
-            AND_THEN("state.tick() plays expectedB in order") {
+            AND_THEN("state.tick() plays the quantized values") {
                 state.setCurrentIndex(-1);
                 for (int i = 0; i < 8; ++i) {
                     int played = state.tick();
-                    INFO("step=" << i << " raw=" << rawNotes[i]);
-                    REQUIRE(played == expectedB[i]);
+                    INFO("step=" << i);
+                    REQUIRE(played == expectedQuant[i]);
                 }
             }
 
-            AND_THEN("The piano-roll active-note dot follows the new quantized pitch class") {
+            AND_THEN("The piano-roll active-note dot follows quantized pitch class") {
                 auto& pianoRoll = app.mainScreen().getPianoRoll();
                 for (int i = 0; i < 8; ++i) {
                     state.setCurrentIndex(i);
@@ -1522,29 +1745,163 @@ SCENARIO("Non-destructive scale + range quantization across all surfaces and shi
                         app.processor().onSequenceTick();
                     app.processMessages();
 
-                    int expectedChromatic = expectedB[i] % 12;
-                    INFO("step=" << i << " expectedChromatic=" << expectedChromatic);
-                    REQUIRE(pianoRoll.getActiveNote() == expectedChromatic);
+                    REQUIRE(pianoRoll.getActiveNote() == (expectedQuant[i] % 12));
                 }
             }
 
-            AND_THEN("Dragging NoteSlider to F on step 0 writes a new raw note through the non-destructive path") {
+            AND_THEN("MIDI CC on NOTE_SLIDER changes pitch class, preserving displayed octave") {
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+
+                // Step 3 displays E4=64 (quantized). Octave = 64/12 = 5.
+                // Send CC 40 with value 81 -> floor(81/127*11) = floor(7.02) = 7 (G).
+                // Expected: 5*12 + 7 = 67.
+                app.sendMidiCC(40, 81);
+                app.processMessages();
+
+                REQUIRE(state.getStepNote(3, 0) == 67);
+                REQUIRE(state.getSelectedNoteForStep(3) == 67);
+
+                // Other steps untouched.
+                for (int i = 0; i < 8; ++i) {
+                    if (i == 3) continue;
+                    REQUIRE(state.getStepNote(i, 0) == rawNotes[i]);
+                }
+            }
+
+            AND_THEN("MIDI CC on OCTAVE_SLIDER changes octave, preserving displayed pitch class") {
+                app.sequencerSteps().clickStep(6);
+                app.processMessages();
+
+                // Step 6 displays C5=72 (quantized). pc = 0.
+                // Send CC 41 with value 99 -> floor(99/127*9) = floor(7.02) = 7.
+                // Expected: 7*12 + 0 = 84.
+                app.sendMidiCC(41, 99);
+                app.processMessages();
+
+                REQUIRE(state.getStepNote(6, 0) == 84);
+                REQUIRE(state.getSelectedNoteForStep(6) == 84);
+
+                for (int i = 0; i < 8; ++i) {
+                    if (i == 6) continue;
+                    REQUIRE(state.getStepNote(i, 0) == rawNotes[i]);
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// MIDI-DRIVEN SCALE + RANGE QUANTIZATION (mirrors the UI-driven integration)
+// ============================================================================
+
+SCENARIO("MIDI-driven scale + range quantization across all surfaces and shifts",
+         "[user-story][scale][range][quantization][midi-mapped]") {
+    GamblerTestInitialiser juceInit;
+    using namespace SRT;
+
+    GIVEN("A paused app with raw fixture, MIDI mappings for scale/range/sliders") {
+        TestApp app;
+        auto& state = app.state();
+
+        app.navBar().clickPlayPause();
+        app.processMessages();
+
+        writeFixture(state);
+        setupMidiMappings(app);
+        setRange(app, 50, 109, true);
+        setScaleCEG(app, true);
+        app.processMessages();
+
+        REQUIRE(state.getScaleRangeMin() == 50);
+        REQUIRE(state.getScaleRangeMax() == 109);
+        checkScaleCEG(state);
+
+        WHEN("No shift — initial MIDI-set range + scale quantization") {
+            THEN("Quantized getters match") {
+                checkQuantized(state, CEG, 8);
+            }
+            AND_THEN("SequenceGrid shows quantized colours") {
+                checkGrid(app, CEG, 8);
+            }
+            AND_THEN("NoteSlider lists {C, E, G} and OctaveSlider shows 5 octaves") {
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+                checkNoteSliderPcs(app, {0, 4, 7});
+                checkOctaveCount(app, 5);
+            }
+            AND_THEN("NoteControls.getMidiNote matches") {
+                for (int s : { 3, 6 }) {
+                    app.sequencerSteps().clickStep(s);
+                    app.processMessages();
+                    checkSlider(app, CEG[s]);
+                }
+            }
+            AND_THEN("state.tick() plays expected") {
+                checkPlayback(state, CEG, 8);
+            }
+        }
+
+        WHEN("User shifts scale to {C, F} and range to [50, 71] via MIDI") {
+            shiftScaleToCF(app, true);
+            setRange(app, 50, 71, true);
+            app.processMessages();
+
+            REQUIRE(state.getScaleRangeMin() == 50);
+            REQUIRE(state.getScaleRangeMax() == 71);
+            checkScaleCF(state);
+
+            THEN("Raw storage is UNCHANGED") {
+                checkRaw(state, RAW, 8);
+            }
+            AND_THEN("Quantized getters match shifted expected") {
+                checkQuantized(state, CF_50_71, 8);
+            }
+            AND_THEN("SequenceGrid refreshes") {
+                checkGrid(app, CF_50_71, 8);
+            }
+            AND_THEN("NoteSlider lists {C, F} and OctaveSlider constrained to 2") {
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+                checkNoteSliderPcs(app, {0, 5});
+                checkSlider(app, CF_50_71[3]);
+                checkOctaveCount(app, 2);
+            }
+            AND_THEN("state.tick() plays shifted expected") {
+                checkPlayback(state, CF_50_71, 8);
+            }
+            AND_THEN("Active-note dot follows shifted expected") {
+                checkActiveDot(app, CF_50_71, 8);
+            }
+            AND_THEN("MIDI CC on NOTE_SLIDER changes pitch class to F on step 0") {
                 app.sequencerSteps().clickStep(0);
                 app.processMessages();
 
-                // Displayed: 60 = C5, pc=0. In the 2-option scale {C=0, F=5},
-                // F is slider index 1. After the drag, the handler rebuilds
-                // newNote = currentOctave(5) * 12 + 5 = 65.
-                noteSlider.getSlider().getSlider().setValue(1.0, juce::sendNotificationSync);
+                // Step 0 displays C5=60. Octave = 5.
+                // CC 40 value 58 -> floor(58/127*11) = 5 (F). newNote = 5*12+5 = 65.
+                app.sendMidiCC(40, 58);
                 app.processMessages();
 
-                REQUIRE(state.getStepNote(0, 0) == 65);            // raw updated
-                REQUIRE(state.getSelectedNoteForStep(0) == 65);    // display getter agrees
-                REQUIRE(noteControls.getMidiNote() == 65);         // slider reflects it
-
-                // Other steps' raw storage untouched.
+                REQUIRE(state.getStepNote(0, 0) == 65);
+                REQUIRE(state.getSelectedNoteForStep(0) == 65);
                 for (int i = 1; i < 8; ++i)
-                    REQUIRE(state.getStepNote(i, 0) == rawNotes[i]);
+                    REQUIRE(state.getStepNote(i, 0) == RAW[i]);
+            }
+            AND_THEN("MIDI CC on OCTAVE_SLIDER changes octave on step 3") {
+                app.sequencerSteps().clickStep(3);
+                app.processMessages();
+
+                // Step 3 displays F4=65. pc=5.
+                // CC 41 value 57 -> floor(57/127*9) = 4. newNote = 4*12+5 = 53.
+                app.sendMidiCC(41, 57);
+                app.processMessages();
+
+                REQUIRE(state.getStepNote(3, 0) == 53);
+                REQUIRE(state.getSelectedNoteForStep(3) == 53);
+                for (int i = 0; i < 8; ++i) {
+                    if (i == 3) continue;
+                    REQUIRE(state.getStepNote(i, 0) == RAW[i]);
+                }
             }
         }
     }
