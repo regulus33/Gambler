@@ -197,45 +197,16 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     // more info in PreviewMidiFifo file for why we use this.
     previewMidiFifo.drainInto (midiMessages, getMidiOutputChannel());
 
-    // Check if scheduled note-off should be sent, this is necessary to allow length adjustments.
-    // Since this is mono and always will be we can just save the next note off number every time we just do a note on for that note.
-    // Sample-accurate implementation: calculate exact offset within buffer
-    if (scheduledNoteOffSample >= 0) {
-        juce::int64 bufferEndSample = currentSamplePosition + buffer.getNumSamples();
-
-        // Check if note-off should occur within this buffer
-        if (scheduledNoteOffSample >= currentSamplePosition && scheduledNoteOffSample < bufferEndSample) {
-            // Calculate sample-accurate offset within the buffer
-            int sampleOffset = static_cast<int>(scheduledNoteOffSample - currentSamplePosition);
-
-            // Clamp to buffer bounds for safety
-            sampleOffset = juce::jlimit(0, buffer.getNumSamples() - 1, sampleOffset);
-
-            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), lastMidiNoteNeedsNoteOff, scheduledNoteOffVelocity);
-            // add the event at the precise sample offset
-            midiMessages.addEvent (noteOff, sampleOffset);
-
-            // Send directly to MIDI output device (for standalone mode)
-            if (midiOutput) {
-                // Because there is no host we simply move over USB midi.
-                // TODO: we will eventually allow the user to select multiple ways to send midi, from network midi to ble midi and possibly even OSC instead of midi.
-                midiOutput->sendMessageNow (noteOff);
-            }
-            DBG ("Scheduled MIDI Note OFF: " << lastMidiNoteNeedsNoteOff << " at sample " << scheduledNoteOffSample
-                 << " (offset " << sampleOffset << " in buffer)");
-
-            // Clear scheduled note-off
-            scheduledNoteOffSample = -1;
-            lastMidiNoteNeedsNoteOff = -1;
-
-            // Notify UI that note-off occurred (thread-safe via AsyncUpdater)
-            auto noteOffCallback = onNoteOff;
-            if (noteOffCallback) {
-                noteOffCallback();
-            }
-        }
+    // Check if scheduled note-off should be sent (sample-accurate within this buffer)
+    if (noteOffScheduler.processScheduledNoteOff (midiMessages, getMidiOutputChannel(),
+                                                   midiOutput.get(), currentSamplePosition,
+                                                   buffer.getNumSamples()))
+    {
+        // Notify UI that note-off occurred (thread-safe via AsyncUpdater)
+        auto noteOffCallback = onNoteOff;
+        if (noteOffCallback)
+            noteOffCallback();
     }
-    // ========================================================
 
     // Update current sample position for the midi note off scheduling
     currentSamplePosition += buffer.getNumSamples();
@@ -303,23 +274,8 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
             clock.accumulateMidiClockPulse();
         }
 
-        // Cancel any scheduled note-off (we're starting a new step)
-        scheduledNoteOffSample = -1;
-        lastMidiNoteNeedsNoteOff = -1;
-
-        // TODO: we are relying on this now to stop stray notes from not being turned
-        // off after we stop the sequence...
-        // Send note off for previous note immediately (if any)
-        if (lastPlayedNote >= 0) {
-            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), lastPlayedNote, (juce::uint8) 0);
-            midiMessages.addEvent (noteOff, 0);
-
-            // Send directly to MIDI output device (for standalone mode)
-            if (midiOutput) {
-                midiOutput->sendMessageNow (noteOff);
-            }
-            DBG ("MIDI Note OFF: " << lastPlayedNote);
-        }
+        // Send immediate note-off for previous note and cancel any scheduled one
+        noteOffScheduler.sendImmediateNoteOff (midiMessages, getMidiOutputChannel(), midiOutput.get());
 
         // Tick the sequence to get the next note (using APVTS-backed state)
         auto& state = getState(); // get the avpts wrapper
@@ -370,11 +326,9 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
                 midiOutput->sendMessageNow (noteOn);
             }
             DBG ("MIDI Note ON: " << note << " (velocity " << (int) velocity << ", channel 1)");
-            // set the last played note so we can send the note off
-            lastPlayedNote = note;
+            noteOffScheduler.setLastPlayedNote (note);
 
             // Calculate samples per step based on current clock settings
-            // Get DAW BPM if in DAW_SYNC mode
             double dawBpm = 0.0;
             if (clock.getMode() == ClockMode::DAW_SYNC) {
                 if (auto* playHead = getPlayHead()) {
@@ -385,26 +339,18 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
                 }
             }
 
-            // Use unified calculation method from Clock
             double samplesPerStep = clock.calculateSamplesPerStep(dawBpm, getSampleRate());
 
             if (samplesPerStep > 0.0) {
-                // Calculate note-off time based on note length percentage (using APVTS-backed state)
                 double noteLengthPercent = state.getNoteLength();
-                // delay amount
                 juce::int64 noteOffDelay = static_cast<juce::int64> (samplesPerStep * noteLengthPercent);
-                // which sample we will send not off on for last note.
-                scheduledNoteOffSample = currentSamplePosition + noteOffDelay;
-                // the actual note to send off for
-                lastMidiNoteNeedsNoteOff = note;
-                // TODO: this probably should match the set velocity if available.
-                scheduledNoteOffVelocity = 0; // Standard note-off velocity
-                DBG ("Scheduled note-off for note " << note << " at sample " << scheduledNoteOffSample
-                                                    << " (delay: " << noteOffDelay << " samples, " << (noteLengthPercent * 100.0) << "% of step)");
+                noteOffScheduler.scheduleNoteOff (note, currentSamplePosition + noteOffDelay);
+                DBG ("Scheduled note-off for note " << note
+                     << " (delay: " << noteOffDelay << " samples, " << (noteLengthPercent * 100.0) << "% of step)");
             }
         } else {
             // Rest - no note to play
-            lastPlayedNote = -1;
+            noteOffScheduler.setLastPlayedNote (-1);
             // Note: Rest recording is now handled inside state.tick() when roll is engaged
             if (state.getIsRandom()) {
                 DBG ("Rest recorded at step: " << currentStepIndex);
@@ -778,23 +724,11 @@ void PluginProcessor::triggerStepMidi (int stepIndex) {
     }
 
     // Send note off for previous note (if any)
-    if (lastPlayedNote >= 0) {
-        if (midiOutput) {
-            // Standalone mode: send directly to MIDI device
-            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), lastPlayedNote, (juce::uint8) 0);
-            midiOutput->sendMessageNow (noteOff);
-            DBG ("Preview MIDI Note OFF (standalone): " << lastPlayedNote);
-        } else {
-            // DAW mode: queue for audio thread
-            previewMidiFifo.push ({ lastPlayedNote, false, 0 });
-            DBG ("Preview MIDI Note OFF queued (DAW): " << lastPlayedNote);
-        }
-    }
+    noteOffScheduler.sendPreviewNoteOff (getMidiOutputChannel(), midiOutput.get(), previewMidiFifo);
 
     // Send note on for the new note
     if (note >= 0) {
         // Send CC messages first (only in standalone mode for now)
-        // In DAW mode, CC messages would need to be queued via the audio thread
         if (midiOutput) {
             for (const auto& mod : selectedMods) {
                 if (mod.getType() == ModulationType::CC) {
@@ -806,18 +740,16 @@ void PluginProcessor::triggerStepMidi (int stepIndex) {
         }
 
         if (midiOutput) {
-            // Standalone mode: send directly to MIDI device
             auto noteOn = juce::MidiMessage::noteOn (getMidiOutputChannel(), note, velocity);
             midiOutput->sendMessageNow (noteOn);
             DBG ("Preview MIDI Note ON (standalone): " << note << " (velocity " << (int) velocity << ", step " << stepIndex << ")");
         } else {
-            // DAW mode: queue for audio thread
             previewMidiFifo.push ({ note, true, velocity });
             DBG ("Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int) velocity << ", step " << stepIndex << ")");
         }
-        lastPlayedNote = note;
+        noteOffScheduler.setLastPlayedNote (note);
     } else {
-        lastPlayedNote = -1;
+        noteOffScheduler.setLastPlayedNote (-1);
     }
 
     // Notify UI that state changed
@@ -873,25 +805,12 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
     }
 
     // Send note off for previous note (if any)
-    if (lastPlayedNote >= 0) {
-        if (midiOutput) {
-            // Standalone mode: send directly to MIDI device
-            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), lastPlayedNote, (juce::uint8) 0);
-            midiOutput->sendMessageNow (noteOff);
-            DBG ("  Preview MIDI Note OFF sent (standalone): " << lastPlayedNote);
-        } else {
-            // DAW mode: queue for audio thread
-            previewMidiFifo.push ({ lastPlayedNote, false, 0 });
-            DBG ("  Preview MIDI Note OFF queued (DAW): " << lastPlayedNote);
-        }
-    }
+    noteOffScheduler.sendPreviewNoteOff (getMidiOutputChannel(), midiOutput.get(), previewMidiFifo);
 
     // Send note on for the new note
     if (note >= 0) {
         // Send CC messages first (only in standalone mode for now)
-        // In DAW mode, CC messages would need to be queued via the audio thread
         if (midiOutput) {
-            // For each
             for (const auto& mod : selectedMods) {
                 if (mod.getType() == ModulationType::CC) {
                     auto ccMsg = juce::MidiMessage::controllerEvent (getMidiOutputChannel(), mod.getCCNumber(), mod.getValue());
@@ -902,18 +821,16 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
         }
 
         if (midiOutput) {
-            // Standalone mode: send directly to MIDI device
             auto noteOn = juce::MidiMessage::noteOn (getMidiOutputChannel(), note, velocity);
             midiOutput->sendMessageNow (noteOn);
             DBG ("  Preview MIDI Note ON sent (standalone): " << note << " (velocity " << (int) velocity << ")");
         } else {
-            // DAW mode: queue for audio thread
             previewMidiFifo.push ({ note, true, velocity });
             DBG ("  Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int) velocity << ")");
         }
-        lastPlayedNote = note;
+        noteOffScheduler.setLastPlayedNote (note);
     } else {
-        lastPlayedNote = -1;
+        noteOffScheduler.setLastPlayedNote (-1);
         DBG ("  No note to play (note < 0)");
     }
     DBG ("=== triggerCurrentStepMidi() complete ===");
@@ -966,21 +883,8 @@ void PluginProcessor::stopSequencer() {
         clock.stop();
     }
 
-    // Send note off for any playing note
-    if (lastPlayedNote >= 0) {
-        auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), lastPlayedNote, (juce::uint8) 0);
-
-        // Send to MIDI output if available (standalone mode)
-        if (midiOutput) {
-            midiOutput->sendMessageNow (noteOff);
-        }
-
-        lastPlayedNote = -1;
-    }
-
-    // Clear any scheduled note-offs
-    scheduledNoteOffSample = -1;
-    lastMidiNoteNeedsNoteOff = -1;
+    // Send note off for any playing note and clear all scheduling state
+    noteOffScheduler.stopAndClear (getMidiOutputChannel(), midiOutput.get());
 
     DBG ("Sequencer stopped and reset to step 0");
 }

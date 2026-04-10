@@ -4,6 +4,7 @@
 #include "backend/DawSync.h"
 #include "backend/InternalState.h"
 #include "backend/MidiLearnRegistry.h"
+#include "backend/NoteOffScheduler.h"
 #include "backend/PresetManager.h"
 #include "backend/PreviewMidiFifo.h"
 #include "backend/SequenceState.h"
@@ -207,14 +208,9 @@ private:
     // Track DAW transport state for auto-resume in external clock mode
     bool previousDawIsPlaying = false;
 
-    // MIDI state
-    int lastPlayedNote = -1;  // Track last note for note-off
-
-    // Note-off scheduling (for timed note length)
-    juce::int64 currentSamplePosition = 0;  // Current sample position in audio stream
-    juce::int64 scheduledNoteOffSample = -1;  // Sample position when note-off should be sent (-1 = no note-off scheduled)
-    int lastMidiNoteNeedsNoteOff = -1;  // Note number to send note-off for (-1 = none),
-    juce::uint8 scheduledNoteOffVelocity = 0;  // Velocity for note-off
+    // Note-off scheduling and MIDI state (last-played note, timed note-offs)
+    NoteOffScheduler noteOffScheduler;
+    juce::int64 currentSamplePosition = 0;  // Running sample counter for note-off timing
 
     // Direct MIDI output for standalone mode
     std::unique_ptr<juce::MidiOutput> midiOutput;
