@@ -7,6 +7,7 @@
 #include "../MidiLearnOverlayPainter.h"
 #include "../UIConstants.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_animation/juce_animation.h>
 #include <functional>
 
 /**
@@ -46,16 +47,33 @@ public:
         g.setColour (color_);
         g.fillRoundedRectangle (bounds, barCornerRadius);
 
-        // Draw border based on style
-        auto insetBounds = bounds.reduced(0.5f);
-        switch (borderStyle_) {
-            case BarBorderStyle::current:
-            case BarBorderStyle::selected:
+        // Animate solid border width toward target
+        {
+            bool wantsSolid = (borderStyle_ == BarBorderStyle::selected ||
+                               borderStyle_ == BarBorderStyle::current);
+            float borderTarget = wantsSolid ? borderWidth : 0.0f;
+            if (std::abs(borderDisplayWidth_ - borderTarget) > 0.01f) {
+                float duration = (borderTarget > borderDisplayWidth_)
+                    ? UIConstants::borderFadeInDuration
+                    : UIConstants::borderFadeOutDuration;
+                float step = frameDeltaSec_ / duration;
+                borderDisplayWidth_ = (borderTarget > borderDisplayWidth_)
+                    ? juce::jmin(borderDisplayWidth_ + step * borderWidth, borderTarget)
+                    : juce::jmax(borderDisplayWidth_ - step * borderWidth, borderTarget);
+                needsAnimationRepaint_ = true;
+            } else {
+                borderDisplayWidth_ = borderTarget;
+            }
+
+            auto insetBounds = bounds.reduced(0.5f);
+
+            if (borderDisplayWidth_ > 0.01f) {
                 g.setColour(UIConstants::selectedStepOutlineColour);
-                g.drawRoundedRectangle(insetBounds, barCornerRadius, borderWidth);
-                break;
-            case BarBorderStyle::next: {
-                // Grey dotted border
+                g.drawRoundedRectangle(insetBounds, barCornerRadius, borderDisplayWidth_);
+            }
+
+            // Dashed border for "next" style (no fade — it's a different visual)
+            if (borderStyle_ == BarBorderStyle::next) {
                 g.setColour(juce::Colour(0xff888888));
                 juce::Path roundedRect;
                 roundedRect.addRoundedRectangle(insetBounds, barCornerRadius);
@@ -64,10 +82,7 @@ public:
                 juce::PathStrokeType(borderWidth).createDashedStroke(
                     dashedPath, roundedRect, dashLengths, 2);
                 g.fillPath(dashedPath);
-                break;
             }
-            case BarBorderStyle::none:
-                break;
         }
 
         // Draw note label if we have one
@@ -151,6 +166,24 @@ public:
     std::function<void()> onClick;
     std::function<void()> onDoubleClick;
 
+    void parentHierarchyChanged() override {
+        if (getTopLevelComponent() != nullptr && vBlankAttachment_ == nullptr) {
+            vBlankAttachment_ = std::make_unique<juce::VBlankAttachment>(
+                this, [this](double timestampSec) {
+                    double delta = (lastVBlankTimestamp_ > 0.0)
+                        ? (timestampSec - lastVBlankTimestamp_)
+                        : (1.0 / 60.0);
+                    lastVBlankTimestamp_ = timestampSec;
+                    frameDeltaSec_ = static_cast<float>(juce::jlimit(0.001, 0.1, delta));
+
+                    if (needsAnimationRepaint_) {
+                        needsAnimationRepaint_ = false;
+                        repaint();
+                    }
+                });
+        }
+    }
+
 private:
     juce::Colour color_;
     BarBorderStyle borderStyle_ = BarBorderStyle::none;
@@ -158,4 +191,11 @@ private:
     bool isCurrent_ = false;
     MidiControlId midiControlId_ = MidiControlId::COUNT;
     MidiLearnRegistry* registry_ = nullptr;
+
+    // Border fade animation state
+    float borderDisplayWidth_ = 0.0f;
+    bool needsAnimationRepaint_ = false;
+    float frameDeltaSec_ = 1.0f / 60.0f;
+    double lastVBlankTimestamp_ = 0.0;
+    std::unique_ptr<juce::VBlankAttachment> vBlankAttachment_;
 };

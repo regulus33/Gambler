@@ -115,10 +115,27 @@ public:
                 g.setColour (dc);
                 g.fillRoundedRectangle (squareBounds, squareCornerRadius);
 
-                // Draw white border if enabled (selected step for editing)
-                if (state.hasBorder) {
-                    g.setColour (UIConstants::selectedStepOutlineColour);
-                    g.drawRoundedRectangle (squareBounds.reduced (0.5f), squareCornerRadius, borderWidth);
+                // Animate border width toward target
+                {
+                    float borderTarget = state.hasBorder ? borderWidth : 0.0f;
+                    float& bw = borderDisplayWidths_[row][col];
+                    if (std::abs(bw - borderTarget) > 0.01f) {
+                        float duration = (borderTarget > bw)
+                            ? UIConstants::borderFadeInDuration
+                            : UIConstants::borderFadeOutDuration;
+                        float step = frameDeltaSec_ / duration;
+                        bw = (borderTarget > bw)
+                            ? juce::jmin(bw + step * borderWidth, borderTarget)
+                            : juce::jmax(bw - step * borderWidth, borderTarget);
+                        stillAnimating = true;
+                    } else {
+                        bw = borderTarget;
+                    }
+
+                    if (bw > 0.01f) {
+                        g.setColour (UIConstants::selectedStepOutlineColour);
+                        g.drawRoundedRectangle (squareBounds.reduced (0.5f), squareCornerRadius, bw);
+                    }
                 }
 
                 // During drag: highlight the target square (last step in new length)
@@ -491,6 +508,10 @@ private:
     }
 
     SequenceState* stateRef = nullptr;
+
+    // Border fade animation state
+    std::array<std::array<float, SequenceGridConstants::gridCols>,
+               SequenceGridConstants::gridRows> borderDisplayWidths_ = {};
 
     // Colour fade animation state
     std::array<std::array<juce::Colour, SequenceGridConstants::gridCols>,

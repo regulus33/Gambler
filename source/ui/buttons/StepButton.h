@@ -156,13 +156,28 @@ public:
         g.fillRoundedRectangle(bounds, cornerRadius);
 
         if (isWithinSequence) {
-            // Draw white border on selected step (for editing)
-            if (isSelected) {
+            // Animate border width toward target
+            float borderTarget = isSelected ? borderWidthSelected : 0.0f;
+            if (std::abs(borderDisplayWidth_ - borderTarget) > 0.01f) {
+                float duration = (borderTarget > borderDisplayWidth_)
+                    ? UIConstants::borderFadeInDuration
+                    : UIConstants::borderFadeOutDuration;
+                float step = frameDeltaSec_ / duration;
+                borderDisplayWidth_ = (borderTarget > borderDisplayWidth_)
+                    ? juce::jmin(borderDisplayWidth_ + step * borderWidthSelected, borderTarget)
+                    : juce::jmax(borderDisplayWidth_ - step * borderWidthSelected, borderTarget);
+                needsAnimationRepaint_ = true;
+            } else {
+                borderDisplayWidth_ = borderTarget;
+            }
+
+            // Draw animated border
+            if (borderDisplayWidth_ > 0.01f) {
                 g.setColour(UIConstants::selectedStepOutlineColour);
-                float inset = borderWidthSelected * 0.5f;
+                float inset = borderDisplayWidth_ * 0.5f;
                 juce::Rectangle<float> borderBounds = bounds.reduced(inset);
                 float borderRadiusInner = juce::jmax(0.0f, cornerRadius - inset);
-                g.drawRoundedRectangle(borderBounds, borderRadiusInner, borderWidthSelected);
+                g.drawRoundedRectangle(borderBounds, borderRadiusInner, borderDisplayWidth_);
             }
 
             // Draw note text (only for non-rest steps)
@@ -295,6 +310,9 @@ private:
     int localIndex_;  // 0-7 (fixed, never changes)
     MidiControlId midiControlId_ = MidiControlId::COUNT;
     MidiLearnRegistry* registry_ = nullptr;
+
+    // Border fade animation state
+    float borderDisplayWidth_ = 0.0f;
 
     // Colour fade animation state
     juce::Colour displayColour_ { StepButtonConstants::emptyStepColor };
