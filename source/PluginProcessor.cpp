@@ -192,53 +192,8 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     // Clear incoming MIDI (we're generating, not processing MIDI through)
     midiMessages.clear();
 
-    // STANDALONE MODE ==== previewing midi notes when touching UI ========================================================
-    // Process any queued preview MIDI messages (from UI thread)
-    // create 2 pairs of start and size
-    int start1, block_size1, start2, block_size2;
-    // Ok so we create a Queue - first in, first out. In order of the time in which they were added.
-    previewMidiFifo.prepareToRead (previewMidiFifo.getNumReady(), start1, block_size1, start2, block_size2);
-    // we just fed those variables to prepareToRead so now we know the size and start for both data structures
-
-    // previewMidiFifo (AbstractFifo) - Manages indices only (read/write positions)
-    // previewMidiBuffer (array) - Stores the actual message data
-
-    // first part of buffer
-    for (int i = 0; i < block_size1; ++i) {
-        // get next message
-        const auto& msg = previewMidiBuffer[start1 + i];
-        // If it is note on, then send to the midi buffer
-        if (msg.isNoteOn) {
-            auto noteOn = juce::MidiMessage::noteOn (getMidiOutputChannel(), msg.noteNumber, msg.velocity);
-            // send to midi buffer
-            midiMessages.addEvent (noteOn, 0);
-            DBG ("Preview MIDI Note ON added to buffer: " << msg.noteNumber);
-        } else {
-            // note off
-            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), msg.noteNumber, msg.velocity);
-            midiMessages.addEvent (noteOff, 0);
-            DBG ("Preview MIDI Note OFF added to buffer: " << msg.noteNumber);
-        }
-    }
-
-    // second part of buffer same idea as first...
-    for (int i = 0; i < block_size2; ++i) {
-        const auto& msg = previewMidiBuffer[start2 + i];
-        if (msg.isNoteOn) {
-            auto noteOn = juce::MidiMessage::noteOn (getMidiOutputChannel(), msg.noteNumber, msg.velocity);
-            midiMessages.addEvent (noteOn, 0);
-            DBG ("Preview MIDI Note ON added to buffer: " << msg.noteNumber);
-        } else {
-            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), msg.noteNumber, msg.velocity);
-            midiMessages.addEvent (noteOff, 0);
-            DBG ("Preview MIDI Note OFF added to buffer: " << msg.noteNumber);
-        }
-    }
-
-    // tell the queue you are done reading it.
-    if (block_size1 + block_size2 > 0) {
-        previewMidiFifo.finishedRead (block_size1 + block_size2);
-    }
+    // Process any queued preview MIDI messages (from UI thread → audio thread)
+    previewMidiFifo.drainInto (midiMessages, getMidiOutputChannel());
 
     // Check if scheduled note-off should be sent, this is necessary to allow length adjustments.
     // Since this is mono and always will be we can just save the next note off number every time we just do a note on for that note.
@@ -829,13 +784,8 @@ void PluginProcessor::triggerStepMidi (int stepIndex) {
             DBG ("Preview MIDI Note OFF (standalone): " << lastPlayedNote);
         } else {
             // DAW mode: queue for audio thread
-            int start1, size1, start2, size2;
-            previewMidiFifo.prepareToWrite (1, start1, size1, start2, size2);
-            if (size1 > 0) {
-                previewMidiBuffer[start1] = { lastPlayedNote, false, 0 };
-                previewMidiFifo.finishedWrite (1);
-                DBG ("Preview MIDI Note OFF queued (DAW): " << lastPlayedNote);
-            }
+            previewMidiFifo.push ({ lastPlayedNote, false, 0 });
+            DBG ("Preview MIDI Note OFF queued (DAW): " << lastPlayedNote);
         }
     }
 
@@ -860,13 +810,8 @@ void PluginProcessor::triggerStepMidi (int stepIndex) {
             DBG ("Preview MIDI Note ON (standalone): " << note << " (velocity " << (int) velocity << ", step " << stepIndex << ")");
         } else {
             // DAW mode: queue for audio thread
-            int start1, size1, start2, size2;
-            previewMidiFifo.prepareToWrite (1, start1, size1, start2, size2);
-            if (size1 > 0) {
-                previewMidiBuffer[start1] = { note, true, velocity };
-                previewMidiFifo.finishedWrite (1);
-                DBG ("Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int) velocity << ", step " << stepIndex << ")");
-            }
+            previewMidiFifo.push ({ note, true, velocity });
+            DBG ("Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int) velocity << ", step " << stepIndex << ")");
         }
         lastPlayedNote = note;
     } else {
@@ -934,15 +879,8 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
             DBG ("  Preview MIDI Note OFF sent (standalone): " << lastPlayedNote);
         } else {
             // DAW mode: queue for audio thread
-            int start1, size1, start2, size2;
-            previewMidiFifo.prepareToWrite (1, start1, size1, start2, size2);
-            if (size1 > 0) {
-                previewMidiBuffer[start1] = { lastPlayedNote, false, 0 };
-                previewMidiFifo.finishedWrite (1);
-                DBG ("  Preview MIDI Note OFF queued (DAW): " << lastPlayedNote);
-            } else {
-                DBG ("  Preview MIDI queue full, Note OFF dropped: " << lastPlayedNote);
-            }
+            previewMidiFifo.push ({ lastPlayedNote, false, 0 });
+            DBG ("  Preview MIDI Note OFF queued (DAW): " << lastPlayedNote);
         }
     }
 
@@ -968,15 +906,8 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
             DBG ("  Preview MIDI Note ON sent (standalone): " << note << " (velocity " << (int) velocity << ")");
         } else {
             // DAW mode: queue for audio thread
-            int start1, size1, start2, size2;
-            previewMidiFifo.prepareToWrite (1, start1, size1, start2, size2);
-            if (size1 > 0) {
-                previewMidiBuffer[start1] = { note, true, velocity };
-                previewMidiFifo.finishedWrite (1);
-                DBG ("  Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int) velocity << ")");
-            } else {
-                DBG ("  Preview MIDI queue full, Note ON dropped: " << note);
-            }
+            previewMidiFifo.push ({ note, true, velocity });
+            DBG ("  Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int) velocity << ")");
         }
         lastPlayedNote = note;
     } else {

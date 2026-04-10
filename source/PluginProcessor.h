@@ -5,6 +5,7 @@
 #include "backend/InternalState.h"
 #include "backend/MidiLearnRegistry.h"
 #include "backend/PresetManager.h"
+#include "backend/PreviewMidiFifo.h"
 #include "backend/SequenceState.h"
 #include "data/Params.h"
 #include <juce_audio_devices/juce_audio_devices.h>
@@ -227,13 +228,7 @@ private:
 
     // Preview MIDI queue (for UI-triggered notes in DAW mode)
     // Thread-safe queue to pass MIDI from UI thread to audio thread
-    struct PreviewMidiMessage {
-        int noteNumber;
-        bool isNoteOn;
-        juce::uint8 velocity;
-    };
-    juce::AbstractFifo previewMidiFifo { 32 };  // Ring buffer for up to 32 messages
-    std::array<PreviewMidiMessage, 32> previewMidiBuffer;
+    PreviewMidiFifo previewMidiFifo;
 
     // MIDI learn registry for user-configurable mappings
     MidiLearnRegistry midiLearnRegistry;
