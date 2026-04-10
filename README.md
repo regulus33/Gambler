@@ -16,6 +16,19 @@ UPDATE_SNAPSHOTS=1 ./build/Tests "[visual]"                    # update visual g
 
 Requires C++23, JUCE 8.0.x, ninja.
 
+### pluginval (plugin validation)
+
+[pluginval](https://github.com/Tracktion/pluginval) runs automated tests against the built VST3 to check for crashes, parameter handling issues, state save/restore correctness, and more.
+
+```bash
+# Build the plugin first, then run pluginval (downloads automatically on first run)
+cmake -B build && cmake --build build
+./scripts/pluginval.sh                        # default strictness level 5
+./scripts/pluginval.sh --strictness-level 10  # maximum strictness
+```
+
+Strictness levels range from 1 (basic scan) to 10 (exhaustive stress tests). Level 5 is a good default for development; level 10 is recommended before release.
+
 ---
 
 ## UI Component Inventory
