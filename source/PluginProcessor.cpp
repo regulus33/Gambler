@@ -187,9 +187,10 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     }
 
     // Process incoming MIDI for control mapping (before clearing)
+    // we just do it all here so we don't muddy up this method too much more.
     processMidiInput (midiMessages);
 
-    // Clear incoming MIDI (we're generating, not processing MIDI through)
+    // Clear incoming MIDI (we're generating, not processing MIDI through and this is good practice with buffers)
     midiMessages.clear();
 
     // Process any queued preview MIDI messages (from UI thread → audio thread)
@@ -1042,7 +1043,10 @@ void PluginProcessor::loadStateFromXml (const juce::XmlElement& xml) {
 //==============================================================================
 // MIDI Input Processing
 //==============================================================================
-
+// In here we do 3 things:
+// 1. listen to external midi clock and forward it to clock
+// 2. Listen to midi, check our midiLearnRegistry (basically a map of messages to control ids) and if a match, trigger that control
+// 3. Saving new midi mappings if in midi learn mode.
 void PluginProcessor::processMidiInput (const juce::MidiBuffer& midiMessages) {
     // Iterate through all incoming MIDI messages
     for (const auto& metadata : midiMessages) {
