@@ -193,7 +193,8 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     // Clear incoming MIDI (we're generating, not processing MIDI through and this is good practice with buffers)
     midiMessages.clear();
 
-    // Process any queued preview MIDI messages (from UI thread → audio thread)
+    // This kinda has nothing to do with midi, its just sending preview notes...
+    // more info in PreviewMidiFifo file for why we use this.
     previewMidiFifo.drainInto (midiMessages, getMidiOutputChannel());
 
     // Check if scheduled note-off should be sent, this is necessary to allow length adjustments.
@@ -210,7 +211,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
             // Clamp to buffer bounds for safety
             sampleOffset = juce::jlimit(0, buffer.getNumSamples() - 1, sampleOffset);
 
-            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), scheduledNoteOffNote, scheduledNoteOffVelocity);
+            auto noteOff = juce::MidiMessage::noteOff (getMidiOutputChannel(), lastMidiNoteNeedsNoteOff, scheduledNoteOffVelocity);
             // add the event at the precise sample offset
             midiMessages.addEvent (noteOff, sampleOffset);
 
@@ -220,12 +221,12 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
                 // TODO: we will eventually allow the user to select multiple ways to send midi, from network midi to ble midi and possibly even OSC instead of midi.
                 midiOutput->sendMessageNow (noteOff);
             }
-            DBG ("Scheduled MIDI Note OFF: " << scheduledNoteOffNote << " at sample " << scheduledNoteOffSample
+            DBG ("Scheduled MIDI Note OFF: " << lastMidiNoteNeedsNoteOff << " at sample " << scheduledNoteOffSample
                  << " (offset " << sampleOffset << " in buffer)");
 
             // Clear scheduled note-off
             scheduledNoteOffSample = -1;
-            scheduledNoteOffNote = -1;
+            lastMidiNoteNeedsNoteOff = -1;
 
             // Notify UI that note-off occurred (thread-safe via AsyncUpdater)
             auto noteOffCallback = onNoteOff;
@@ -304,7 +305,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
 
         // Cancel any scheduled note-off (we're starting a new step)
         scheduledNoteOffSample = -1;
-        scheduledNoteOffNote = -1;
+        lastMidiNoteNeedsNoteOff = -1;
 
         // TODO: we are relying on this now to stop stray notes from not being turned
         // off after we stop the sequence...
@@ -395,7 +396,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
                 // which sample we will send not off on for last note.
                 scheduledNoteOffSample = currentSamplePosition + noteOffDelay;
                 // the actual note to send off for
-                scheduledNoteOffNote = note;
+                lastMidiNoteNeedsNoteOff = note;
                 // TODO: this probably should match the set velocity if available.
                 scheduledNoteOffVelocity = 0; // Standard note-off velocity
                 DBG ("Scheduled note-off for note " << note << " at sample " << scheduledNoteOffSample
@@ -979,7 +980,7 @@ void PluginProcessor::stopSequencer() {
 
     // Clear any scheduled note-offs
     scheduledNoteOffSample = -1;
-    scheduledNoteOffNote = -1;
+    lastMidiNoteNeedsNoteOff = -1;
 
     DBG ("Sequencer stopped and reset to step 0");
 }

@@ -213,7 +213,7 @@ private:
     // Note-off scheduling (for timed note length)
     juce::int64 currentSamplePosition = 0;  // Current sample position in audio stream
     juce::int64 scheduledNoteOffSample = -1;  // Sample position when note-off should be sent (-1 = no note-off scheduled)
-    int scheduledNoteOffNote = -1;  // Note number to send note-off for (-1 = none)
+    int lastMidiNoteNeedsNoteOff = -1;  // Note number to send note-off for (-1 = none),
     juce::uint8 scheduledNoteOffVelocity = 0;  // Velocity for note-off
 
     // Direct MIDI output for standalone mode
