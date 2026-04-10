@@ -84,7 +84,6 @@ ApplicationComponent
 | PresetSelectorComponent | `source/ui/PresetSelectorComponent.h` | ![](tests/snapshots/preset_selector.png) | StyledDropdown + cycle buttons for preset navigation |
 | SavePresetDialogComponent | `source/ui/SavePresetDialogComponent.h` | ![](tests/snapshots/save_preset_dialog.png) | Modal dialog for saving presets |
 | ExportButton | `source/ui/NavBarComponent.h` | — | Click-to-save or drag-to-DAW MIDI export |
-| ExportNameDialogComponent | `source/ui/ExportNameDialogComponent.h` | — | Modal dialog for naming MIDI export files |
 | ScaleLatchButton | `source/ui/ScaleLatchButton.h` | ![](tests/snapshots/scale_latch_button.png) | Toggle momentary/latched scale editing |
 | SubdivisionSlider | `source/ui/sliders/SubdivisionSlider.h` | ![](tests/snapshots/subdivision_slider.png) | Clock division selector (1/4, 1/8, 1/16, 1/32) |
 | ToggleIconButton | `source/ui/ToggleIconButton.h` | ![](tests/snapshots/toggle_icon_button.png) | Generic two-state icon button (used for Settings, Play, Stop, etc.) |
@@ -632,19 +631,6 @@ classDiagram
 
 ---
 
-## Possible Dead Code
-
-| Item | File(s) | Status | Notes |
-|------|---------|--------|-------|
-| `ScaleClearButton` class | `source/ui/ScaleClearButton.h` | **Orphaned** | Removed from NavBarComponent but file still exists. Not included anywhere |
-| `CLEAR_SCALE` APVTS param | `source/data/Params.h:150`, `PluginProcessor.cpp:787` | **Orphaned** | Handler in PluginProcessor still active but no UI to trigger it |
-| `createBarChartIcon()` | `source/ui/Icons.h` | **Unused** | Never called anywhere |
-| `createKeyboardIcon()` | `source/ui/Icons.h` | **Unused** | Never called anywhere |
-| `createRecordIcon()` | `source/ui/Icons.h` | **Unused** | Never called anywhere |
-| `preset_dropdown.png` | `tests/snapshots/` | **Stale** | No corresponding test case or component (replaced by StyledDropdown) |
-| `scale_clear_button.png` | `tests/snapshots/` | **Stale** | No corresponding test case in VisualSnapshotTests.cpp |
-| `settings_window.png` | `tests/snapshots/` | **Stale** | No corresponding test case (SettingsWindowComponent test was removed) |
-| `length_plus_sequence_overview.png` + ACTUAL/DIFF | `tests/snapshots/` | **Stale** | No corresponding test case in VisualSnapshotTests.cpp |
 
 ---
 

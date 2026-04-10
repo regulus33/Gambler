@@ -91,62 +91,6 @@ public:
     // ============================================================================
 
     /**
-     * Creates bar chart icon for MIDI data view
-     * Original SVG viewBox: 0 0 23 21
-     * Represents CC/modulation data visualization
-     */
-    static juce::Path createBarChartIcon() {
-        juce::Path path;
-        path.startNewSubPath (21.9f, 18.4f);
-        path.lineTo (21.0f, 18.4f);
-        path.lineTo (21.0f, 0.9f);
-        path.cubicTo (21.0f, 0.6f, 20.9f, 0.4f, 20.7f, 0.3f);
-        path.cubicTo (20.6f, 0.1f, 20.4f, 0.0f, 20.1f, 0.0f);
-        path.lineTo (14.0f, 0.0f);
-        path.cubicTo (13.8f, 0.0f, 13.5f, 0.1f, 13.4f, 0.3f);
-        path.cubicTo (13.2f, 0.4f, 13.1f, 0.6f, 13.1f, 0.9f);
-        path.lineTo (13.1f, 5.2f);
-        path.lineTo (7.9f, 5.2f);
-        path.cubicTo (7.6f, 5.2f, 7.4f, 5.3f, 7.3f, 5.5f);
-        path.cubicTo (7.1f, 5.7f, 7.0f, 5.9f, 7.0f, 6.1f);
-        path.lineTo (7.0f, 10.5f);
-        path.lineTo (2.6f, 10.5f);
-        path.cubicTo (2.4f, 10.5f, 2.2f, 10.6f, 2.0f, 10.8f);
-        path.cubicTo (1.8f, 10.9f, 1.8f, 11.1f, 1.8f, 11.4f);
-        path.lineTo (1.8f, 18.4f);
-        path.lineTo (0.9f, 18.4f);
-        path.cubicTo (0.6f, 18.4f, 0.4f, 18.5f, 0.3f, 18.6f);
-        path.cubicTo (0.1f, 18.8f, 0.0f, 19.0f, 0.0f, 19.2f);
-        path.cubicTo (0.0f, 19.5f, 0.1f, 19.7f, 0.3f, 19.9f);
-        path.cubicTo (0.4f, 20.0f, 0.6f, 20.1f, 0.9f, 20.1f);
-        path.lineTo (21.9f, 20.1f);
-        path.cubicTo (22.1f, 20.1f, 22.3f, 20.0f, 22.5f, 19.9f);
-        path.cubicTo (22.7f, 19.7f, 22.8f, 19.5f, 22.8f, 19.2f);
-        path.cubicTo (22.8f, 19.0f, 22.7f, 18.8f, 22.5f, 18.6f);
-        path.cubicTo (22.3f, 18.5f, 22.1f, 18.4f, 21.9f, 18.4f);
-        path.closeSubPath();
-        path.startNewSubPath (14.9f, 1.8f);
-        path.lineTo (19.2f, 1.8f);
-        path.lineTo (19.2f, 18.4f);
-        path.lineTo (14.9f, 18.4f);
-        path.lineTo (14.9f, 1.8f);
-        path.closeSubPath();
-        path.startNewSubPath (8.8f, 7.0f);
-        path.lineTo (13.1f, 7.0f);
-        path.lineTo (13.1f, 18.4f);
-        path.lineTo (8.8f, 18.4f);
-        path.lineTo (8.8f, 7.0f);
-        path.closeSubPath();
-        path.startNewSubPath (3.5f, 12.2f);
-        path.lineTo (7.0f, 12.2f);
-        path.lineTo (7.0f, 18.4f);
-        path.lineTo (3.5f, 18.4f);
-        path.lineTo (3.5f, 12.2f);
-        path.closeSubPath();
-        return path;
-    }
-
-    /**
      * Creates the dice/roll icon path
      * Original SVG viewBox: 0 0 22.3 22.8
      */
@@ -645,76 +589,6 @@ public:
     }
 
     /**
-     * Creates the keyboard icon path
-     * Original SVG viewBox: 0 0 21 21
-     * Represents a piano keyboard with white and black keys
-     */
-    static juce::Path createKeyboardIcon() {
-        Path path;
-        path.startNewSubPath (19.2f, 0.0f);
-        path.lineTo (1.8f, 0.0f);
-        path.cubicTo (1.3f, 0.0f, 0.8f, 0.2f, 0.5f, 0.5f);
-        path.cubicTo (0.2f, 0.8f, 0.0f, 1.3f, 0.0f, 1.8f);
-        path.lineTo (0.0f, 19.2f);
-        path.cubicTo (0.0f, 19.7f, 0.2f, 20.2f, 0.5f, 20.5f);
-        path.cubicTo (0.8f, 20.8f, 1.3f, 21.0f, 1.8f, 21.0f);
-        path.lineTo (19.2f, 21.0f);
-        path.cubicTo (19.7f, 21.0f, 20.2f, 20.8f, 20.5f, 20.5f);
-        path.cubicTo (20.8f, 20.2f, 21.0f, 19.7f, 21.0f, 19.2f);
-        path.lineTo (21.0f, 1.8f);
-        path.cubicTo (21.0f, 1.3f, 20.8f, 0.8f, 20.5f, 0.5f);
-        path.cubicTo (20.2f, 0.2f, 19.7f, 0.0f, 19.2f, 0.0f);
-        path.closeSubPath();
-        path.startNewSubPath (5.2f, 1.8f);
-        path.lineTo (7.9f, 1.8f);
-        path.lineTo (7.9f, 11.4f);
-        path.lineTo (5.2f, 11.4f);
-        path.lineTo (5.2f, 1.8f);
-        path.closeSubPath();
-        path.startNewSubPath (8.8f, 13.1f);
-        path.cubicTo (9.0f, 13.1f, 9.2f, 13.0f, 9.4f, 12.9f);
-        path.cubicTo (9.5f, 12.7f, 9.6f, 12.5f, 9.6f, 12.2f);
-        path.lineTo (9.6f, 1.8f);
-        path.lineTo (11.4f, 1.8f);
-        path.lineTo (11.4f, 12.2f);
-        path.cubicTo (11.4f, 12.5f, 11.5f, 12.7f, 11.6f, 12.9f);
-        path.cubicTo (11.8f, 13.0f, 12.0f, 13.1f, 12.2f, 13.1f);
-        path.lineTo (13.1f, 13.1f);
-        path.lineTo (13.1f, 19.2f);
-        path.lineTo (7.9f, 19.2f);
-        path.lineTo (7.9f, 13.1f);
-        path.lineTo (8.8f, 13.1f);
-        path.closeSubPath();
-        path.startNewSubPath (13.1f, 11.4f);
-        path.lineTo (13.1f, 1.8f);
-        path.lineTo (15.8f, 1.8f);
-        path.lineTo (15.8f, 11.4f);
-        path.lineTo (13.1f, 11.4f);
-        path.closeSubPath();
-        path.startNewSubPath (1.8f, 1.8f);
-        path.lineTo (3.5f, 1.8f);
-        path.lineTo (3.5f, 12.2f);
-        path.cubicTo (3.5f, 12.5f, 3.6f, 12.7f, 3.8f, 12.9f);
-        path.cubicTo (3.9f, 13.0f, 4.1f, 13.1f, 4.4f, 13.1f);
-        path.lineTo (6.1f, 13.1f);
-        path.lineTo (6.1f, 19.2f);
-        path.lineTo (1.8f, 19.2f);
-        path.lineTo (1.8f, 1.8f);
-        path.closeSubPath();
-        path.startNewSubPath (19.2f, 19.2f);
-        path.lineTo (14.9f, 19.2f);
-        path.lineTo (14.9f, 13.1f);
-        path.lineTo (16.6f, 13.1f);
-        path.cubicTo (16.9f, 13.1f, 17.1f, 13.0f, 17.2f, 12.9f);
-        path.cubicTo (17.4f, 12.7f, 17.5f, 12.5f, 17.5f, 12.2f);
-        path.lineTo (17.5f, 1.8f);
-        path.lineTo (19.2f, 1.8f);
-        path.lineTo (19.2f, 19.2f);
-        path.closeSubPath();
-        return path;
-    }
-
-    /**
      * Creates the save (floppy disk) icon path
      * Original SVG viewBox: 0 0 13 13
      * Classic floppy disk save icon
@@ -844,17 +718,6 @@ public:
         path.startNewSubPath (1.0f, 5.0f);
         path.lineTo (4.5f, 8.5f);
         path.lineTo (11.0f, 1.5f);
-        return path;
-    }
-
-    /**
-     * Creates a record icon (filled circle)
-     * ViewBox: 0 0 20 20
-     * Simple circle that can be filled or stroked
-     */
-    static juce::Path createRecordIcon() {
-        juce::Path path;
-        path.addEllipse(2.0f, 2.0f, 16.0f, 16.0f);
         return path;
     }
 

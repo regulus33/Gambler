@@ -42,8 +42,6 @@ namespace Params
             inline const String SEQ_SELECTED_STEP = "seq_selected_step";
             inline const String SEQ_IS_RANDOM = "seq_is_random";
             inline const String SEQ_IS_SHIFT = "seq_is_shift";
-            inline const String SEQ_LAST_PROB_INDEX = "seq_last_prob_index";
-            inline const String SEQ_VIEW_WINDOW_START = "seq_view_window_start";
 
             // Play probability array (64 bools)
             inline String playProbability(int index) {
@@ -148,8 +146,6 @@ namespace Params
             // Scale Latch mode (false = momentary, true = latched)
             inline const String SCALE_LATCH = "scale_latch";
 
-            // Clear Scale trigger
-            inline const String CLEAR_SCALE = "clear_scale";
 
             // Preset cycling triggers (MIDI-mappable)
             inline const String PRESET_CYCLE_UP = "preset_cycle_up";
@@ -175,7 +171,6 @@ namespace Params
             inline const String SEQ_SELECTED_STEP = "Selected Step";
             inline const String SEQ_IS_RANDOM = "Random Mode";
             inline const String SEQ_IS_SHIFT = "Shift Mode";
-            inline const String SEQ_VIEW_WINDOW_START = "View Window Start";
 
             inline String playProbability(int index) {
                 return "Probability " + String(index);
@@ -232,8 +227,6 @@ namespace Params
             // Scale Latch mode
             inline const String SCALE_LATCH = "Scale Latch";
 
-            // Clear Scale trigger
-            inline const String CLEAR_SCALE = "Clear Scale";
 
             // Preset cycling triggers
             inline const String PRESET_CYCLE_UP = "Preset Cycle Up";
@@ -374,8 +367,6 @@ namespace Params
         // Scale Latch mode (false = momentary, true = latched)
         params.push_back(createBoolParam(Keys::ID::SCALE_LATCH, Keys::LABEL::SCALE_LATCH, false));
 
-        // Clear Scale trigger
-        params.push_back(createBoolParam(Keys::ID::CLEAR_SCALE, Keys::LABEL::CLEAR_SCALE, false));
 
         // Preset cycling triggers (MIDI-mappable)
         params.push_back(createBoolParam(Keys::ID::PRESET_CYCLE_UP, Keys::LABEL::PRESET_CYCLE_UP, false));

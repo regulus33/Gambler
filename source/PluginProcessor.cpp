@@ -781,17 +781,6 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
         DBG("Clock subdivision set to " + juce::String(static_cast<int>(newValue)));
     }
 
-    // ========== SCALE CLEAR BUTTON ==========
-    if (parameterID == Params::Keys::ID::CLEAR_SCALE && isOn) {
-        auto& state = getState();
-
-        // Clear the global scale by disabling all notes (empty scale)
-        for (int note = 0; note < ParamConstants::NUM_SCALE_NOTES; note++) {
-            state.setGlobalScaleNote(note, false);
-        }
-
-        DBG("CLEAR_SCALE triggered - cleared global scale");
-    }
 }
 
 //==============================================================================

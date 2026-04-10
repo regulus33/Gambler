@@ -8,7 +8,6 @@
 #include "SettingsScreenComponent.h"
 #include "../backend/ClockMode.h"
 #include "../util/PlatformUtils.h"
-#include "ExportNameDialogComponent.h"
 #include "../native/iOSNativeDialogs.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 

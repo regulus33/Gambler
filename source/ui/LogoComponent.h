@@ -3,7 +3,6 @@
 #include "BinaryData.h"
 #include "Icons.h"
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "../utility/ComponentSnapshotUtility.h"
 
 namespace LogoConstants {
     // Overall component scale factor (applies to everything)

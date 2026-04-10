@@ -323,7 +323,6 @@ public:
 
     int tick() { return seq.tick(); }
     int tickStep(int stepIndex) { return seq.tickStep(stepIndex); }
-    int tickStepSubstepOnly(int stepIndex) { return step(stepIndex).advanceSubstep(); }
     int generateRandomNoteUnquantized() const { return seq.generateRandomNoteUnquantized(); }
     void bakeAllExistingNotes() { seq.bakeAllExistingNotes(); }
     void randomizeStepNote(int stepIndex) { seq.randomizeStepNote(stepIndex); }

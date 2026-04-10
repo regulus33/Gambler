@@ -2,7 +2,6 @@
 
 #include <array>
 #include <string>
-#include <vector>
 #include <juce_core/juce_core.h>
 
 /**
@@ -132,25 +131,6 @@ public:
     void setScaleNote(int index, int enabled) {
         if (index >= 0 && index < NUM_CHROMATIC_NOTES) {
             scaleNotes[index] = (enabled != 0) ? 1 : 0;
-        }
-    }
-    
-    /**
-     * Set scale from note names
-     * @param noteNames Vector of note names like {"C", "D", "E", "F", "G", "A", "B"}
-     */
-    void setScaleFromNames(const std::vector<std::string>& noteNames) {
-        // Reset all to 0
-        scaleNotes.fill(0);
-        
-        // Enable specified notes
-        for (const auto& name : noteNames) {
-            for (int i = 0; i < NUM_CHROMATIC_NOTES; i++) {
-                if (NOTE_NAMES[i] == name) {
-                    scaleNotes[i] = 1;
-                    break;
-                }
-            }
         }
     }
     
