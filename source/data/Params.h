@@ -273,17 +273,23 @@ namespace Params
     {
         vector<unique_ptr<RangedAudioParameter>> params;
 
+        // Version hint for all parameters. Bump this whenever the parameter
+        // layout changes after the first public release so that AU/AUv3 hosts
+        // (Logic, GarageBand) can preserve automation across plugin versions.
+        // Pre-release: everything is on version 1.
+        constexpr int kParamVersionHint = 1;
+
         // Helper lambdas
-        auto createBoolParam = [](const String& id, const String& label, bool defaultValue = false) {
-            return make_unique<AudioParameterBool>(id, label, defaultValue);
+        auto createBoolParam = [v = kParamVersionHint](const String& id, const String& label, bool defaultValue = false) {
+            return make_unique<AudioParameterBool>(ParameterID{id, v}, label, defaultValue);
         };
 
-        auto createIntParam = [](const String& id, const String& label, int min, int max, int defaultValue) {
-            return make_unique<AudioParameterInt>(id, label, min, max, defaultValue);
+        auto createIntParam = [v = kParamVersionHint](const String& id, const String& label, int min, int max, int defaultValue) {
+            return make_unique<AudioParameterInt>(ParameterID{id, v}, label, min, max, defaultValue);
         };
 
-        auto createFloatParam = [](const String& id, const String& label, float min, float max, float defaultValue) {
-            return make_unique<AudioParameterFloat>(id, label, NormalisableRange<float>(min, max), defaultValue);
+        auto createFloatParam = [v = kParamVersionHint](const String& id, const String& label, float min, float max, float defaultValue) {
+            return make_unique<AudioParameterFloat>(ParameterID{id, v}, label, NormalisableRange<float>(min, max), defaultValue);
         };
 
         // ========================================
