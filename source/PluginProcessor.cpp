@@ -953,126 +953,116 @@ void PluginProcessor::loadStateFromXml (const juce::XmlElement& xml) {
 // 2. Listen to midi, check our midiLearnRegistry (basically a map of messages to control ids) and if a match, trigger that control
 // 3. Saving new midi mappings if in midi learn mode.
 void PluginProcessor::processMidiInput (const juce::MidiBuffer& midiMessages) {
-    // Iterate through all incoming MIDI messages
     for (const auto& metadata : midiMessages) {
         auto msg = metadata.getMessage();
 
-        // Process external MIDI clock messages (system real-time)
-        if (clock.getMode() == ClockMode::EXTERNAL_MIDI_CLOCK) {
-            if (msg.isMidiClock()) {  // 0xF8 timing clock
-                clock.processExternalMidiClockPulse();
-                continue;
-            }
-            if (msg.isMidiStart()) {  // 0xFA
-                clock.handleExternalMidiStart();
-                sequencerState.store(PlaybackState::Playing);
-                DBG("External MIDI Start received - sequencer playing");
-                continue;
-            }
-            if (msg.isMidiContinue()) {  // 0xFB
-                clock.handleExternalMidiContinue();
-                sequencerState.store(PlaybackState::Playing);
-                DBG("External MIDI Continue received - sequencer resumed");
-                continue;
-            }
-            if (msg.isMidiStop()) {  // 0xFC
-                clock.handleExternalMidiStop();
-                DBG("External MIDI Stop received");
-                continue;
-            }
+        if (handleTransportMessage (msg))
+            continue;
+
+        if (msg.isController())
+            handleControlChange (msg);
+        else if (msg.isNoteOn() || msg.isNoteOff())
+            handleNoteMessage (msg);
+    }
+}
+
+bool PluginProcessor::handleTransportMessage (const juce::MidiMessage& msg) {
+    if (clock.getMode() != ClockMode::EXTERNAL_MIDI_CLOCK)
+        return false;
+
+    if (msg.isMidiClock()) {  // 0xF8 timing clock
+        clock.processExternalMidiClockPulse();
+        return true;
+    }
+    if (msg.isMidiStart()) {  // 0xFA
+        clock.handleExternalMidiStart();
+        sequencerState.store (SequencerState::Playing);
+        DBG ("External MIDI Start received - sequencer playing");
+        return true;
+    }
+    if (msg.isMidiContinue()) {  // 0xFB
+        clock.handleExternalMidiContinue();
+        sequencerState.store (SequencerState::Playing);
+        DBG ("External MIDI Continue received - sequencer resumed");
+        return true;
+    }
+    if (msg.isMidiStop()) {  // 0xFC
+        clock.handleExternalMidiStop();
+        DBG ("External MIDI Stop received");
+        return true;
+    }
+    return false;
+}
+
+void PluginProcessor::handleControlChange (const juce::MidiMessage& msg) {
+    const int ccNumber = msg.getControllerNumber();
+    const int ccValue  = msg.getControllerValue();
+    const int channel  = msg.getChannel();
+
+    routeLearnableMessage (MidiMessageType::CC, channel, ccNumber, ccValue, ccValue >= 64);
+}
+
+void PluginProcessor::handleNoteMessage (const juce::MidiMessage& msg) {
+    const int noteNumber = msg.getNoteNumber();
+    const int channel    = msg.getChannel();
+    const bool isNoteOn  = msg.isNoteOn();
+    const int value      = isNoteOn ? 127 : 0;
+
+    // Note Off shouldn't count as a "learn event" - only learn on Note On.
+    if (! isNoteOn && midiLearnRegistry.isLearning()) {
+        // Still allow a mapped Note Off to fire; just skip the learn branch.
+        MidiControlId controlId = midiLearnRegistry.findUserMapping (
+            MidiMessageType::NOTE, channel, noteNumber);
+        if (controlId != MidiControlId::COUNT) {
+            MidiMapping mapping { MidiMessageType::NOTE, noteNumber, controlId };
+            DBG ("MIDI Note " << noteNumber << " OFF → " << getMidiControlName (controlId));
+            handleMidiMapping (mapping, value, false);
         }
+        return;
+    }
 
-        // Process CC messages
-        if (msg.isController()) {
-            // get the control number
-            int ccNumber = msg.getControllerNumber();
-            // get the control value
-            int ccValue = msg.getControllerValue();
-            // get the channel
-            int channel = msg.getChannel();
+    routeLearnableMessage (MidiMessageType::NOTE, channel, noteNumber, value, isNoteOn);
+}
 
-            // Check if we're in MIDI learn mode first
-            if (midiLearnRegistry.isLearning()) {
-                // if we are learning then we need to assign this message to a "command"
-                bool learned = midiLearnRegistry.learnMidiMessage (
-                    MidiMessageType::CC, channel, ccNumber);
-                if (learned) {
-                    DBG ("Learned: CH" << channel << "-CC" << ccNumber);
-                    // Trigger UI update callback
-                    // Make a local copy to avoid race condition with UI thread clearing the callback
-                    auto callback = onMidiLearned;
-                    if (callback) {
-                        DBG ("  Calling onMidiLearned callback");
-                        callback();
-                    } else {
-                        DBG ("  WARNING: onMidiLearned callback is null!");
-                    }
-                    continue; // Don't process as regular mapping
-                }
-            }
-
-            // Look up user mapping
-            MidiControlId controlId = midiLearnRegistry.findUserMapping (
-                MidiMessageType::CC, channel, ccNumber);
-
-            if (controlId != MidiControlId::COUNT) {
-                // User mapping found - create temporary mapping struct
-                MidiMapping mapping;
-                mapping.type = MidiMessageType::CC;
-                mapping.midiNumber = ccNumber;
-                mapping.controlId = controlId;
-                mapping.minValue = 0.0f;
-                mapping.maxValue = 1.0f;
-                mapping.invert = false;
-
-                DBG ("MIDI CC " << ccNumber << " = " << ccValue << " → " << getMidiControlName (controlId));
-                handleMidiMapping (mapping, ccValue, ccValue >= 64);
-            }
+void PluginProcessor::routeLearnableMessage (MidiMessageType type,
+                                              int channel,
+                                              int midiNumber,
+                                              int value,
+                                              bool isOnOrPositive) {
+    if (midiLearnRegistry.isLearning()) {
+        if (midiLearnRegistry.learnMidiMessage (type, channel, midiNumber)) {
+            DBG ("Learned: CH" << channel
+                 << (type == MidiMessageType::CC ? "-CC" : "-N") << midiNumber);
+            notifyMidiLearned();
+            return;
         }
-        // Process Note On/Off messages
-        else if (msg.isNoteOn() || msg.isNoteOff()) {
-            int noteNumber = msg.getNoteNumber();
-            bool isNoteOn = msg.isNoteOn();
-            int channel = msg.getChannel();
+    }
 
-            // Check if we're in MIDI learn mode first
-            if (midiLearnRegistry.isLearning() && isNoteOn) {
-                bool learned = midiLearnRegistry.learnMidiMessage (
-                    MidiMessageType::NOTE, channel, noteNumber);
-                if (learned) {
-                    DBG ("Learned: CH" << channel << "-N" << noteNumber);
-                    // Trigger UI update callback
-                    // Make a local copy to avoid race condition with UI thread clearing the callback
-                    auto callback = onMidiLearned;
-                    if (callback) {
-                        DBG ("  Calling onMidiLearned callback");
-                        callback();
-                    } else {
-                        DBG ("  WARNING: onMidiLearned callback is null!");
-                    }
-                    continue; // Don't process as regular mapping
-                }
-            }
+    MidiControlId controlId = midiLearnRegistry.findUserMapping (type, channel, midiNumber);
+    if (controlId == MidiControlId::COUNT)
+        return;
 
-            // Look up user mapping
-            MidiControlId controlId = midiLearnRegistry.findUserMapping (
-                MidiMessageType::NOTE, channel, noteNumber);
+    MidiMapping mapping { type, midiNumber, controlId };
 
-            if (controlId != MidiControlId::COUNT) {
-                // User mapping found
-                MidiMapping mapping;
-                mapping.type = MidiMessageType::NOTE;
-                mapping.midiNumber = noteNumber;
-                mapping.controlId = controlId;
-                mapping.minValue = 0.0f;
-                mapping.maxValue = 1.0f;
-                mapping.invert = false;
+    if (type == MidiMessageType::CC) {
+        DBG ("MIDI CC " << midiNumber << " = " << value
+             << " → " << getMidiControlName (controlId));
+    } else {
+        DBG ("MIDI Note " << midiNumber << " " << (isOnOrPositive ? "ON" : "OFF")
+             << " → " << getMidiControlName (controlId));
+    }
 
-                DBG ("MIDI Note " << noteNumber << " " << (isNoteOn ? "ON" : "OFF") << " → " << getMidiControlName (controlId));
-                int value = isNoteOn ? 127 : 0;
-                handleMidiMapping (mapping, value, isNoteOn);
-            }
-        }
+    handleMidiMapping (mapping, value, isOnOrPositive);
+}
+
+void PluginProcessor::notifyMidiLearned() {
+    // Make a local copy to avoid a race with the UI thread clearing the callback.
+    auto callback = onMidiLearned;
+    if (callback) {
+        DBG ("  Calling onMidiLearned callback");
+        callback();
+    } else {
+        DBG ("  WARNING: onMidiLearned callback is null!");
     }
 }
 

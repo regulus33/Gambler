@@ -243,6 +243,26 @@ private:
      */
     void processMidiInput(const juce::MidiBuffer& midiMessages);
 
+    /** Forward real-time transport messages to the clock when slaved to
+     *  external MIDI clock. Returns true if the message was consumed. */
+    bool handleTransportMessage(const juce::MidiMessage& msg);
+
+    /** Dispatch a Control Change message to learn-mode or user mapping. */
+    void handleControlChange(const juce::MidiMessage& msg);
+
+    /** Dispatch a Note On/Off message to learn-mode or user mapping. */
+    void handleNoteMessage(const juce::MidiMessage& msg);
+
+    /** Shared learn-or-map routing for any learnable (CC / Note) message. */
+    void routeLearnableMessage(MidiMessageType type,
+                               int channel,
+                               int midiNumber,
+                               int value,
+                               bool isOnOrPositive);
+
+    /** Fire the onMidiLearned UI callback race-safely. */
+    void notifyMidiLearned();
+
     /**
      * Handle a single MIDI mapping by queuing the appropriate command
      * @param mapping The MIDI mapping configuration
