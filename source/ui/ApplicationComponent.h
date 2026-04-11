@@ -384,8 +384,8 @@ private:
 
     void updatePlayPauseButtonState() {
         auto state = processorRef.getSequencerState();
-        bool isPlaying = (state == PluginProcessor::SequencerState::Playing);
-        bool isStopped = (state == PluginProcessor::SequencerState::Stopped);
+        bool isPlaying = (state == PluginProcessor::PlaybackState::Playing);
+        bool isStopped = (state == PluginProcessor::PlaybackState::Stopped);
 
         navBar.setPlayPauseState(isPlaying);
         navBar.setStopButtonActive(isStopped);

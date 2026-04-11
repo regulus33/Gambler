@@ -108,7 +108,7 @@ public:
     /**
      * Sequencer playback states
      */
-    enum class SequencerState {
+    enum class PlaybackState {
         Stopped,  // Not playing, index at 0
         Playing,  // Advancing through sequence
         Paused    // Holding at current index
@@ -134,7 +134,7 @@ public:
      * Get the current sequencer state
      * @return Current state (Stopped, Playing, or Paused)
      */
-    SequencerState getSequencerState() const { return sequencerState.load(); }
+    PlaybackState getSequencerState() const { return sequencerState.load(); }
 
     // Preset manager
     PresetManager& getPresetManager() noexcept { return presetManager; }
@@ -203,7 +203,7 @@ private:
     PresetManager presetManager;
 
     // Sequencer playback state
-    std::atomic<SequencerState> sequencerState { SequencerState::Playing };  // Start playing by default
+    std::atomic<PlaybackState> sequencerState { PlaybackState::Playing };  // Start playing by default
 
     // Track DAW transport state for auto-resume in external clock mode
     bool previousDawIsPlaying = false;

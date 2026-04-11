@@ -56,7 +56,7 @@ SCENARIO("Sequencer is playing on startup", "[user-story][transport]") {
         TestApp app;
 
         THEN("The sequencer is already playing") {
-            REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Playing);
+            REQUIRE(app.processor().getSequencerState() == PluginProcessor::PlaybackState::Playing);
         }
     }
 }
@@ -67,14 +67,14 @@ SCENARIO("User pauses and resumes playback from the same step", "[user-story][tr
     GIVEN("A playing sequencer that has advanced to step 5") {
         TestApp app;
         app.state().setCurrentIndex(5);
-        REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Playing);
+        REQUIRE(app.processor().getSequencerState() == PluginProcessor::PlaybackState::Playing);
 
         WHEN("User clicks Play/Pause to pause") {
             app.navBar().clickPlayPause();
             app.processMessages();
 
             THEN("Sequencer is paused and stays on step 5") {
-                REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Paused);
+                REQUIRE(app.processor().getSequencerState() == PluginProcessor::PlaybackState::Paused);
                 REQUIRE(app.state().getCurrentIndex() == 5);
             }
 
@@ -83,7 +83,7 @@ SCENARIO("User pauses and resumes playback from the same step", "[user-story][tr
                 app.processMessages();
 
                 THEN("Sequencer is playing again from the same step") {
-                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Playing);
+                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::PlaybackState::Playing);
                     REQUIRE(app.state().getCurrentIndex() == 5);
                 }
             }
@@ -93,7 +93,7 @@ SCENARIO("User pauses and resumes playback from the same step", "[user-story][tr
                 app.processMessages();
 
                 THEN("Sequencer is stopped and index resets so next tick plays step 0") {
-                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Stopped);
+                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::PlaybackState::Stopped);
                     // Index is -1 (pre-start), meaning the next tick() will advance to step 0
                     REQUIRE(app.state().getCurrentIndex() == -1);
                 }
@@ -111,7 +111,7 @@ SCENARIO("MIDI-mapped transport controls pause, resume, and stop", "[user-story]
         app.mapMidiNote(MidiControlId::STOP, 61);
 
         app.state().setCurrentIndex(5);
-        REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Playing);
+        REQUIRE(app.processor().getSequencerState() == PluginProcessor::PlaybackState::Playing);
 
         WHEN("MIDI note 60 is pressed and released to pause") {
             app.sendMidiNoteOn(60);
@@ -119,7 +119,7 @@ SCENARIO("MIDI-mapped transport controls pause, resume, and stop", "[user-story]
             app.processMessages();
 
             THEN("Sequencer is paused and stays on step 5") {
-                REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Paused);
+                REQUIRE(app.processor().getSequencerState() == PluginProcessor::PlaybackState::Paused);
                 REQUIRE(app.state().getCurrentIndex() == 5);
             }
 
@@ -129,7 +129,7 @@ SCENARIO("MIDI-mapped transport controls pause, resume, and stop", "[user-story]
                 app.processMessages();
 
                 THEN("Sequencer is playing again from the same step") {
-                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Playing);
+                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::PlaybackState::Playing);
                     REQUIRE(app.state().getCurrentIndex() == 5);
                 }
             }
@@ -140,7 +140,7 @@ SCENARIO("MIDI-mapped transport controls pause, resume, and stop", "[user-story]
                 app.processMessages();
 
                 THEN("Sequencer is stopped and index resets so next tick plays step 0") {
-                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::SequencerState::Stopped);
+                    REQUIRE(app.processor().getSequencerState() == PluginProcessor::PlaybackState::Stopped);
                     REQUIRE(app.state().getCurrentIndex() == -1);
                 }
             }
