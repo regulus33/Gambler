@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../native/HapticFeedback.h"
 #include "BinaryData.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -71,7 +72,14 @@ public:
 
         addAndMakeVisible (slider);
 
-        slider.onValueChange = [this] { repaint(); };
+        slider.onValueChange = [this] {
+            int newIndex = getSelectedIndex();
+            if (newIndex != lastNotchIndex_) {
+                lastNotchIndex_ = newIndex;
+                HapticFeedback::tick();
+            }
+            repaint();
+        };
     }
 
     ~NotchedSlider() override {
@@ -279,4 +287,5 @@ private:
     juce::Rectangle<int> labelBounds;
     juce::Rectangle<int> gaugeBounds;
     bool locked_ = false;
+    int lastNotchIndex_ = 0;
 };
