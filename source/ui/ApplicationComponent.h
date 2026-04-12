@@ -131,6 +131,10 @@ public:
                     processorRef.triggerCurrentStepMidi(newNote);
                 }
             }
+
+            // Refilter octave options for the new pitch class and reposition slider
+            updateNoteControlOptions(newNote);
+            mainScreen.getMainControls().getNoteControls().setOctave(currentOctave);
         };
 
         // Note controls: octave changes
@@ -151,6 +155,10 @@ public:
                     processorRef.triggerCurrentStepMidi(newNote);
                 }
             }
+
+            // Refilter note options for the new octave and reposition slider
+            updateNoteControlOptions(newNote);
+            mainScreen.getMainControls().getNoteControls().setNote(pitchClass);
         };
 
         // Sequence grid: click to navigate

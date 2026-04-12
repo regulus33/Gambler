@@ -594,6 +594,45 @@ SCENARIO("Changing the octave slider updates the selected substep", "[user-story
     }
 }
 
+// ============================================================================
+// SLIDER CROSS-FILTERING (regression: changing one slider must refilter the other)
+// ============================================================================
+
+SCENARIO("Changing note slider refilters octave options for new pitch class", "[user-story][slider-refilter]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Range [36,84] with C-major scale, step 0 = E5 (MIDI 64)") {
+        TestApp app;
+        // C-major: C D E F G A B
+        std::array<int, 12> cMajor = {1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1};
+        app.state().setGlobalScaleNotes(cMajor);
+        app.state().setScaleRangeMin(36);
+        app.state().setScaleRangeMax(84);
+
+        app.state().setStepNote(0, 0, 64); // E5 (oct 5)
+        app.sequencerSteps().clickStep(0);
+        app.processMessages();
+
+        auto& noteControls = app.mainScreen().getMainControls().getNoteControls();
+        auto& octaveSlider = noteControls.getOctaveSlider();
+
+        // Initial: octave slider filtered for pitch class E (4):
+        // E3=40, E4=52, E5=64, E6=76 all in [36,84] -> 4 octaves
+        int initialOctaveCount = static_cast<int>(octaveSlider.getSlider().getSlider().getMaximum()) + 1;
+        REQUIRE(initialOctaveCount == 4);
+
+        WHEN("User changes note to C (pitch class 0)") {
+            noteControls.onNoteChanged(0);
+            app.processMessages();
+
+            THEN("Octave slider refilters for C: C3=36, C4=48, C5=60, C6=72, C7=84 -> 5 octaves") {
+                int newOctaveCount = static_cast<int>(octaveSlider.getSlider().getSlider().getMaximum()) + 1;
+                REQUIRE(newOctaveCount == 5);
+            }
+        }
+    }
+}
+
 SCENARIO("Switching selected substep and editing updates only that substep", "[user-story][substep][note-slider]") {
     GamblerTestInitialiser juceInit;
 
