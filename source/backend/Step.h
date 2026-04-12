@@ -29,7 +29,7 @@ struct StepModulationData {
  *   Step s(internalState, 3);
  *   int note = s.note(0);        // substep 0's raw note
  *   s.setNote(0, 72);            // set substep 0 to C5
- *   int next = s.nextSubstep();  // which substep plays next
+ *   int cur = s.effectiveCurrentSubstep(); // which substep is active
  *   int played = s.tick();       // advance substep index, return raw note
  */
 class Step {
@@ -75,19 +75,18 @@ public:
         state.setSelectedSubstepIndex(index, idx);
     }
 
-    /** The substep that will play on the next pass of this step. */
-    int nextSubstep() const {
-        int len = substepCount();
-        if (len <= 0) return 0;
-        return (currentSubstep() + 1) % len;
+    /** The substep that is currently active (clamped so pre-start -1 maps to 0). */
+    int effectiveCurrentSubstep() const {
+        int cs = currentSubstep();
+        return (cs < 0) ? 0 : cs;
     }
 
-    /** Raw (unquantized) note for the next-to-play substep. */
+    /** Raw (unquantized) note for the currently-active substep. */
     int rawCurrentNote() const {
-        return note(nextSubstep());
+        return note(effectiveCurrentSubstep());
     }
 
-    /** True if the next-to-play substep is a rest (-1). */
+    /** True if the currently-active substep is a rest (-1). */
     bool isRest() const {
         return rawCurrentNote() < 0;
     }

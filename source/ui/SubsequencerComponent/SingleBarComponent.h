@@ -16,7 +16,6 @@
 enum class BarBorderStyle {
     none,       // No border
     selected,   // White solid border — user selected this substep for editing
-    next,       // Grey dotted border — this substep will play next when parent step triggers
     current     // White solid border — this substep is currently playing
 };
 
@@ -70,18 +69,6 @@ public:
             if (borderDisplayWidth_ > 0.01f) {
                 g.setColour(UIConstants::selectedStepOutlineColour);
                 g.drawRoundedRectangle(insetBounds, barCornerRadius, borderDisplayWidth_);
-            }
-
-            // Dashed border for "next" style (no fade — it's a different visual)
-            if (borderStyle_ == BarBorderStyle::next) {
-                g.setColour(juce::Colour(0xff888888));
-                juce::Path roundedRect;
-                roundedRect.addRoundedRectangle(insetBounds, barCornerRadius);
-                const float dashLengths[] = { 3.0f, 3.0f };
-                juce::Path dashedPath;
-                juce::PathStrokeType(borderWidth).createDashedStroke(
-                    dashedPath, roundedRect, dashLengths, 2);
-                g.fillPath(dashedPath);
             }
         }
 

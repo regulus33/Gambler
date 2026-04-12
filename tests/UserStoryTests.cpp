@@ -427,12 +427,9 @@ SCENARIO("Active rest substep shows active fill, not a selected border", "[user-
         app.sequencerSteps().clickStep(0);
         app.processMessages();
 
-        WHEN("The rest substep is next to play (nextSubstep points to it)") {
-            // nextSubstep = (currentSubstep + 1) % length
-            // For substep 1 to be next: currentSubstep must be 0
-            // One tick from -1 sets currentSubstep to 0, so nextSubstep = 1
-            app.state().setStepNotesCurrentIndex(0, -1);
-            app.state().tickStep(0); // currentIndex -> 0, nextSubstep -> 1
+        WHEN("The rest substep is the current substep") {
+            // Set currentSubstep directly to 1 (the rest)
+            app.state().setStepNotesCurrentIndex(0, 1);
             app.processMessages();
 
             THEN("The rest bar has the active fill color, not rest grey") {
@@ -445,9 +442,9 @@ SCENARIO("Active rest substep shows active fill, not a selected border", "[user-
             }
         }
 
-        WHEN("The rest substep is NOT next to play") {
-            // currentSubstep = 1, so nextSubstep = (1+1)%2 = 0 (not the rest)
-            app.state().setStepNotesCurrentIndex(0, 1);
+        WHEN("The rest substep is NOT the current substep") {
+            // currentSubstep = 0, so the rest at index 1 is not active
+            app.state().setStepNotesCurrentIndex(0, 0);
             app.processMessages();
 
             THEN("The rest bar shows rest grey") {
@@ -643,7 +640,7 @@ SCENARIO("Switching selected substep and editing updates only that substep", "[u
     }
 }
 
-SCENARIO("Double-clicking a substep bar sets it as the next to play", "[user-story][substep][double-click]") {
+SCENARIO("Double-clicking a substep bar sets it as the current substep", "[user-story][substep][double-click]") {
     GamblerTestInitialiser juceInit;
 
     GIVEN("Step 0 has 3 substeps: C4, E4, G4") {
@@ -663,10 +660,15 @@ SCENARIO("Double-clicking a substep bar sets it as the next to play", "[user-sto
             app.subsequenceControls().doubleClickBar(2);
             app.processMessages();
 
-            THEN("The next tick on step 0 plays substep 2 (G4)") {
-                int note = app.state().tickStep(0);
-                REQUIRE(note == 67);
+            THEN("Substep 2 (G4) is now the current substep") {
                 REQUIRE(app.state().getStepNotesCurrentIndex(0) == 2);
+                REQUIRE(app.state().getCurrentNoteForStep(0) == 67);
+            }
+
+            AND_THEN("The next tick advances to substep 0 (C4)") {
+                int note = app.state().tickStep(0);
+                REQUIRE(note == 60);
+                REQUIRE(app.state().getStepNotesCurrentIndex(0) == 0);
             }
         }
 
@@ -674,15 +676,13 @@ SCENARIO("Double-clicking a substep bar sets it as the next to play", "[user-sto
             app.subsequenceControls().doubleClickBar(1);
             app.processMessages();
 
-            THEN("The next tick on step 0 plays substep 1 (E4)") {
-                int note = app.state().tickStep(0);
-                REQUIRE(note == 64);
+            THEN("Substep 1 (E4) is now the current substep") {
                 REQUIRE(app.state().getStepNotesCurrentIndex(0) == 1);
+                REQUIRE(app.state().getCurrentNoteForStep(0) == 64);
             }
 
             AND_THEN("Subsequent ticks continue cycling from that point") {
-                app.state().tickStep(0); // plays substep 1
-                int note = app.state().tickStep(0); // plays substep 2
+                int note = app.state().tickStep(0); // advances to substep 2
                 REQUIRE(note == 67);
                 REQUIRE(app.state().getStepNotesCurrentIndex(0) == 2);
             }
@@ -901,7 +901,7 @@ SCENARIO("Non-destructive scale quantization updates every display surface",
         TestApp app;
         auto& state = app.state();
 
-        // Pause the sequencer so next-substep / active-step don't drift while
+        // Pause the sequencer so active-step doesn't drift while
         // we pump the message loop during this test.
         app.navBar().clickPlayPause();
         app.processMessages();
@@ -974,7 +974,7 @@ SCENARIO("Non-destructive scale quantization updates every display surface",
             }
 
             AND_THEN("SequenceState quantized getters return the expected values") {
-                // step 0's "current" note is the next-to-play substep (default 0).
+                // step 0's "current" note is the active substep (default 0).
                 REQUIRE(state.getCurrentNoteForStep(0) == step0ExpectedSubs[0]);
                 for (int i = 1; i < 8; ++i)
                     REQUIRE(state.getCurrentNoteForStep(i) == expectedQuant[i]);
@@ -998,12 +998,10 @@ SCENARIO("Non-destructive scale quantization updates every display surface",
                 // the piano-roll scale change above should already have
                 // refreshed the bar colours without any further nudging.
 
-                // Bar 0 is the "next to play" substep and paints with
-                // UIConstants::activeStepColour rather than its note colour —
-                // verify substeps 1..3 where the note colour is the displayed value.
-                // The "next to play" substep paints with activeStepColour
-                // regardless of its note, so exclude it from the colour check.
-                int activeSubstep = state.getNextSubstepIndex(0);
+                // The current substep paints with activeStepColour rather than
+                // its note colour — exclude it from the colour check.
+                int activeSubstep = state.getStepNotesCurrentIndex(0);
+                if (activeSubstep < 0) activeSubstep = 0;
                 int checked = 0;
                 auto subs = app.subsequenceControls();
                 for (int s = 0; s < 4; ++s) {
@@ -1144,7 +1142,7 @@ SCENARIO("Non-destructive scale quantization drives MainControls sliders",
         TestApp app;
         auto& state = app.state();
 
-        // Pause so the playhead / next-substep don't drift under us.
+        // Pause so the playhead doesn't drift under us.
         app.navBar().clickPlayPause();
         app.processMessages();
 
@@ -1337,6 +1335,11 @@ inline void writeFixtureWithSubsteps(SequenceState& state) {
 }
 
 inline void setupMidiMappings(TestApp& app) {
+    // Enable latched scale mode so MIDI note-on toggles scale notes
+    // (momentary mode uses note-on = enable, note-off = disable).
+    if (auto* p = app.processor().getAPVTS().getParameter(Params::Keys::ID::SCALE_LATCH))
+        p->setValueNotifyingHost(1.0f);
+
     for (int i = 0; i < 12; ++i)
         app.mapMidiNote(static_cast<MidiControlId>(
             static_cast<int>(MidiControlId::SCALE_NOTE_C) + i), 48 + i);
@@ -1641,6 +1644,10 @@ SCENARIO("MIDI-driven scale quantization updates display surfaces and drives sli
         for (int s = 0; s < 4; ++s)
             state.setStepNote(0, s, step0RawSubs[s]);
 
+        // Enable latched scale mode so MIDI note-on toggles scale notes.
+        if (auto* p = app.processor().getAPVTS().getParameter(Params::Keys::ID::SCALE_LATCH))
+            p->setValueNotifyingHost(1.0f);
+
         // Map all 12 scale notes to MIDI notes 48..59.
         for (int i = 0; i < 12; ++i)
             app.mapMidiNote(static_cast<MidiControlId>(
@@ -1653,8 +1660,7 @@ SCENARIO("MIDI-driven scale quantization updates display surfaces and drives sli
         app.processMessages();
 
         WHEN("User toggles off 9 scale notes via MIDI note-ons, leaving {C, E, G}") {
-            // Default scale is chromatic (all on). Sending MIDI note-on toggles
-            // each note off: Db=1, D=2, Eb=3, F=5, Gb=6, Ab=8, A=9, Bb=10, B=11.
+            // Latched mode: MIDI note-on toggles scale notes off.
             const int keysToDisable[] = { 1, 2, 3, 5, 6, 8, 9, 10, 11 };
             for (int k : keysToDisable)
                 app.sendMidiNoteOn(48 + k);
@@ -1701,7 +1707,8 @@ SCENARIO("MIDI-driven scale quantization updates display surfaces and drives sli
             }
 
             AND_THEN("Subsequencer bars for step 0 show quantized colours") {
-                int activeSubstep = state.getNextSubstepIndex(0);
+                int activeSubstep = state.getStepNotesCurrentIndex(0);
+                if (activeSubstep < 0) activeSubstep = 0;
                 int checked = 0;
                 auto subs = app.subsequenceControls();
                 for (int s = 0; s < 4; ++s) {

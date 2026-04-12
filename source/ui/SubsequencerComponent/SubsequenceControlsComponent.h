@@ -129,13 +129,14 @@ protected:
         auto& state = getState();
         int selectedStep = state.getSelectedStepForEditing();
         int substepLength = state.getStepNotesLength(selectedStep);
-        int nextSubstep = state.getNextSubstepIndex(selectedStep);
+        int currentSubstep = state.getStepNotesCurrentIndex(selectedStep);
+        if (currentSubstep < 0) currentSubstep = 0;
         int selectedSubstep = state.getSelectedSubstepIndex(selectedStep);
 
         for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
             if (i < substepLength) {
                 int noteNumber = state.getQuantizedStepNote(selectedStep, i);
-                bool isActive = (i == nextSubstep);
+                bool isActive = (i == currentSubstep);
 
                 if (noteNumber < 0) {
                     if (isActive)

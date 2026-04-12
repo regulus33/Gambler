@@ -112,10 +112,6 @@ public:
         return step(stepIndex).currentSubstep();
     }
 
-    int getNextSubstepIndex(int stepIndex) const {
-        return step(stepIndex).nextSubstep();
-    }
-
     void setStepNotesCurrentIndex(int stepIndex, int index) {
         step(stepIndex).setCurrentSubstep(index);
     }
@@ -140,16 +136,16 @@ public:
     }
 
     int getQuantizedCurrentNoteForStep(int stepIndex) const {
-        return getQuantizedStepNote(stepIndex, step(stepIndex).nextSubstep());
+        return getQuantizedStepNote(stepIndex, step(stepIndex).effectiveCurrentSubstep());
     }
 
-    /** Main accessor for UI — returns quantized note for the next-to-play substep. */
+    /** Main accessor for UI — returns quantized note for the currently-active substep. */
     int getCurrentNoteForStep(int stepIndex) const {
         return getQuantizedCurrentNoteForStep(stepIndex);
     }
 
     void updateCurrentNoteForStep(int stepIndex, int noteNumber) {
-        step(stepIndex).setNote(step(stepIndex).nextSubstep(), bakeNoteForStorage(noteNumber));
+        step(stepIndex).setNote(step(stepIndex).effectiveCurrentSubstep(), bakeNoteForStorage(noteNumber));
     }
 
     int getSelectedNoteForStep(int stepIndex) const {
