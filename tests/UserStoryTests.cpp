@@ -1795,6 +1795,101 @@ SCENARIO("MIDI-driven scale quantization updates display surfaces and drives sli
 }
 
 // ============================================================================
+// MIDI-DRIVEN SCALE LATCH / MOMENTARY MODE
+// ============================================================================
+//
+// Verifies that MIDI-mapped scale note messages honour the SCALE_LATCH param:
+//   - Latched (lock ON):   note-on toggles, note-off is ignored
+//   - Momentary (lock OFF): note-on turns scale note ON, note-off turns it OFF
+
+SCENARIO("MIDI-mapped scale notes honour scale latch vs momentary mode",
+         "[user-story][scale][midi-mapped][latch]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("An app with scale notes mapped to MIDI notes 48-59") {
+        TestApp app;
+        auto& state = app.state();
+        auto& apvts = app.processor().getAPVTS();
+
+        // Map all 12 scale notes to MIDI notes 48..59.
+        for (int i = 0; i < 12; ++i)
+            app.mapMidiNote(static_cast<MidiControlId>(
+                static_cast<int>(MidiControlId::SCALE_NOTE_C) + i), 48 + i);
+        app.processMessages();
+
+        // Confirm all 12 notes start enabled (chromatic).
+        for (int i = 0; i < 12; ++i)
+            REQUIRE(state.getGlobalScaleNote(i));
+
+        WHEN("Scale latch is ON (latched/toggle mode)") {
+            apvts.getParameter(Params::Keys::ID::SCALE_LATCH)
+                ->setValueNotifyingHost(1.0f);
+            app.processMessages();
+
+            THEN("Note-on toggles a scale note OFF, note-off is ignored") {
+                // Toggle D (index 2) off with note-on
+                app.sendMidiNoteOn(50);  // MIDI note 50 = D
+                app.processMessages();
+                REQUIRE_FALSE(state.getGlobalScaleNote(2));
+
+                // Note-off should NOT toggle it back on
+                app.sendMidiNoteOff(50);
+                app.processMessages();
+                REQUIRE_FALSE(state.getGlobalScaleNote(2));
+
+                // Another note-on toggles it back ON
+                app.sendMidiNoteOn(50);
+                app.processMessages();
+                REQUIRE(state.getGlobalScaleNote(2));
+            }
+        }
+
+        WHEN("Scale latch is OFF (momentary mode)") {
+            apvts.getParameter(Params::Keys::ID::SCALE_LATCH)
+                ->setValueNotifyingHost(0.0f);
+            app.processMessages();
+
+            THEN("Note-on keeps scale note ON, note-off turns it OFF") {
+                // All notes start ON. Send note-on for D — should stay ON (already on).
+                app.sendMidiNoteOn(50);
+                app.processMessages();
+                REQUIRE(state.getGlobalScaleNote(2));
+
+                // Note-off turns D OFF (momentary release)
+                app.sendMidiNoteOff(50);
+                app.processMessages();
+                REQUIRE_FALSE(state.getGlobalScaleNote(2));
+
+                // Note-on turns it back ON
+                app.sendMidiNoteOn(50);
+                app.processMessages();
+                REQUIRE(state.getGlobalScaleNote(2));
+            }
+
+            AND_THEN("Multiple keys held then released independently") {
+                // Hold D and F via note-on — both stay ON
+                app.sendMidiNoteOn(50);  // D
+                app.sendMidiNoteOn(53);  // F
+                app.processMessages();
+                REQUIRE(state.getGlobalScaleNote(2));  // D
+                REQUIRE(state.getGlobalScaleNote(5));  // F
+
+                // Release D — D goes OFF, F stays ON
+                app.sendMidiNoteOff(50);
+                app.processMessages();
+                REQUIRE_FALSE(state.getGlobalScaleNote(2));  // D off
+                REQUIRE(state.getGlobalScaleNote(5));         // F still on
+
+                // Release F — F goes OFF
+                app.sendMidiNoteOff(53);
+                app.processMessages();
+                REQUIRE_FALSE(state.getGlobalScaleNote(5));  // F off
+            }
+        }
+    }
+}
+
+// ============================================================================
 // MIDI-DRIVEN SCALE + RANGE QUANTIZATION (mirrors the UI-driven integration)
 // ============================================================================
 

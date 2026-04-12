@@ -976,13 +976,13 @@ bool PluginProcessor::handleTransportMessage (const juce::MidiMessage& msg) {
     }
     if (msg.isMidiStart()) {  // 0xFA
         clock.handleExternalMidiStart();
-        sequencerState.store (SequencerState::Playing);
+        sequencerState.store (PlaybackState::Playing);
         DBG ("External MIDI Start received - sequencer playing");
         return true;
     }
     if (msg.isMidiContinue()) {  // 0xFB
         clock.handleExternalMidiContinue();
-        sequencerState.store (SequencerState::Playing);
+        sequencerState.store (PlaybackState::Playing);
         DBG ("External MIDI Continue received - sequencer resumed");
         return true;
     }
@@ -1334,12 +1334,29 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             int noteIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::SCALE_NOTE_C);
             bool currentState = state.getGlobalScaleNote(noteIndex);
 
-            // Toggle mode: Note ON toggles, Note OFF does nothing
-            if (isNoteOnOrCCPositive) {
-                state.setGlobalScaleNote(noteIndex, !currentState);
-                DBG ("  → Global scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
-                if (onSequenceTick)
-                    onSequenceTick();
+            // Honor SCALE_LATCH parameter: latched = toggle on press,
+            // momentary = ON on press / OFF on release
+            bool isLatched = false;
+            if (auto* latchParam = apvts.getParameter (Params::Keys::ID::SCALE_LATCH))
+                isLatched = latchParam->getValue() > 0.5f;
+
+            if (isLatched) {
+                // Latched mode: Note ON toggles, Note OFF does nothing
+                if (isNoteOnOrCCPositive) {
+                    state.setGlobalScaleNote(noteIndex, !currentState);
+                    DBG ("  → Global scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
+                    if (onSequenceTick)
+                        onSequenceTick();
+                }
+            } else {
+                // Momentary mode: Note ON turns on, Note OFF turns off
+                bool newState = isNoteOnOrCCPositive;
+                if (newState != currentState) {
+                    state.setGlobalScaleNote(noteIndex, newState);
+                    DBG ("  → Global scale note " << noteIndex << " momentary set to " << (newState ? "ON" : "OFF"));
+                    if (onSequenceTick)
+                        onSequenceTick();
+                }
             }
             break;
         }
