@@ -46,7 +46,8 @@ namespace NotchedSliderConstants {
     constexpr float gaugeFontSize = 12.0f;
 }
 
-class NotchedSlider : public juce::Component {
+class NotchedSlider : public juce::Component,
+                      private juce::Slider::Listener {
 public:
     /**
      * Constructor
@@ -71,15 +72,9 @@ public:
         slider.setValue (0.0);
 
         addAndMakeVisible (slider);
+        slider.addListener (this);
 
-        slider.onValueChange = [this] {
-            int newIndex = getSelectedIndex();
-            if (newIndex != lastNotchIndex_) {
-                lastNotchIndex_ = newIndex;
-                HapticFeedback::tick();
-            }
-            repaint();
-        };
+        slider.onValueChange = [this] { repaint(); };
     }
 
     ~NotchedSlider() override {
@@ -222,6 +217,14 @@ public:
     }
 
 private:
+    void sliderValueChanged (juce::Slider*) override {
+        int newIndex = getSelectedIndex();
+        if (newIndex != lastNotchIndex_) {
+            lastNotchIndex_ = newIndex;
+            HapticFeedback::tick();
+        }
+    }
+
     class LookAndFeel : public juce::LookAndFeel_V4 {
     public:
         LookAndFeel (NotchedSlider* parent) : parent (parent) {}
