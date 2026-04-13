@@ -9,6 +9,7 @@
 #include "backend/PreviewMidiFifo.h"
 #include "backend/SequenceState.h"
 #include "data/Params.h"
+#include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -144,6 +145,9 @@ public:
     MidiLearnRegistry& getMidiLearnRegistry() noexcept { return midiLearnRegistry; }
     const MidiLearnRegistry& getMidiLearnRegistry() const noexcept { return midiLearnRegistry; }
 
+    // Virtual keyboard state (for standalone computer-keyboard-as-MIDI)
+    juce::MidiKeyboardState& getKeyboardState() noexcept { return keyboardState; }
+
     /**
      * Get the current plugin state as XML (for preset saving)
      * This creates a complete snapshot of all state that should be saved.
@@ -228,6 +232,10 @@ private:
 
     // MIDI learn registry for user-configurable mappings
     MidiLearnRegistry midiLearnRegistry;
+
+    // Virtual keyboard state — MidiKeyboardComponent writes note-on/off here from the UI thread,
+    // processNextMidiBuffer() drains them into the audio MIDI buffer.
+    juce::MidiKeyboardState keyboardState;
 
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();

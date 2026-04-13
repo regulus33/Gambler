@@ -34,6 +34,19 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     // Add application component
     addAndMakeVisible (applicationComponent);
 
+    // In standalone mode, create a virtual MIDI keyboard that captures computer
+    // keyboard input but is not visible. It still needs to be a child component
+    // with focus so that keyPressed() events reach it.
+    if (processorRef.wrapperType == juce::AudioProcessor::wrapperType_Standalone) {
+        midiKeyboard = std::make_unique<juce::MidiKeyboardComponent>(
+            processorRef.getKeyboardState(),
+            juce::MidiKeyboardComponent::horizontalKeyboard);
+        midiKeyboard->setKeyPressBaseOctave (4);
+        midiKeyboard->setWantsKeyboardFocus (true);
+        midiKeyboard->setSize (0, 0);
+        addChildComponent (*midiKeyboard);  // child but not visible
+    }
+
 #if SHOW_INSPECTOR
     // Add inspector button (only when SHOW_INSPECTOR=1)
     addAndMakeVisible (inspectButton);
@@ -167,6 +180,20 @@ bool PluginEditor::keyPressed (const juce::KeyPress& key, juce::Component* origi
         return true;
     }
 
+    // Forward to the hidden MIDI keyboard so computer keys trigger notes
+    if (midiKeyboard && midiKeyboard->keyPressed (key))
+        return true;
+
+    return false;
+}
+
+bool PluginEditor::keyStateChanged (bool isKeyDown, juce::Component* originatingComponent) {
+    juce::ignoreUnused (originatingComponent);
+
+    // Forward to the hidden MIDI keyboard so it can detect key-up for note-off
+    if (midiKeyboard)
+        return midiKeyboard->keyStateChanged (isKeyDown);
+
     return false;
 }
 
@@ -199,7 +226,6 @@ void PluginEditor::componentMovedOrResized (juce::Component& component, bool was
     // Get current size
     int currentWidth = getWidth();
     int currentHeight = getHeight();
-
     // Calculate what the height should be for the current width
     int targetHeight = juce::roundToInt (static_cast<float>(currentWidth) / aspectRatio);
 

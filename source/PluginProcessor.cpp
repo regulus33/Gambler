@@ -197,6 +197,11 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     // more info in PreviewMidiFifo file for why we use this.
     previewMidiFifo.drainInto (midiMessages, getMidiOutputChannel());
 
+    // Drain virtual-keyboard note-on/off events into the MIDI buffer (standalone mode).
+    // MidiKeyboardComponent writes into keyboardState from the UI thread;
+    // processNextMidiBuffer() is the thread-safe handoff to the audio thread.
+    keyboardState.processNextMidiBuffer (midiMessages, 0, buffer.getNumSamples(), true);
+
     // Check if scheduled note-off should be sent (sample-accurate within this buffer)
     if (noteOffScheduler.processScheduledNoteOff (midiMessages, getMidiOutputChannel(),
                                                    midiOutput.get(), currentSamplePosition,

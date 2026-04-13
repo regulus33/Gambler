@@ -4,6 +4,7 @@
 #include "BinaryData.h"
 #include "melatonin_inspector/melatonin_inspector.h"
 #include "ui/ApplicationComponent.h"
+#include <juce_audio_utils/juce_audio_utils.h>
 
 //==============================================================================
 class PluginEditor : public juce::AudioProcessorEditor,
@@ -18,8 +19,9 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
-    // KeyListener override
+    // KeyListener overrides
     bool keyPressed (const juce::KeyPress& key, juce::Component* originatingComponent) override;
+    bool keyStateChanged (bool isKeyDown, juce::Component* originatingComponent) override;
 
     // ComponentListener override - for constraining aspect ratio
     void componentMovedOrResized (juce::Component& component, bool wasMoved, bool wasResized) override;
@@ -37,6 +39,10 @@ private:
 
     // UI Components
     ApplicationComponent applicationComponent;
+
+    // Virtual MIDI keyboard (standalone only) — uses computer keyboard as MIDI input.
+    // Hidden (zero-size, not visible) but still captures computer key presses.
+    std::unique_ptr<juce::MidiKeyboardComponent> midiKeyboard;
 
 #if SHOW_INSPECTOR
     // Inspector (only included when SHOW_INSPECTOR=1)
