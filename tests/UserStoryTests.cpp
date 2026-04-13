@@ -2826,3 +2826,92 @@ SCENARIO("MidiNoteRouter resolves default scale keys and user overrides correctl
     }
 }
 
+// ============================================================================
+// MIDI LEARN MODE: controls are frozen while mapping
+// ============================================================================
+//
+// While MIDI learn mode is active, incoming MIDI messages should only be used
+// for assigning mappings — they must never fire the underlying controls.
+// Otherwise the user could accidentally toggle scale notes, trigger Roll,
+// change sliders, etc. while simply auditioning which MIDI messages to map.
+
+SCENARIO("MIDI learn mode blocks all control triggers",
+         "[user-story][midi-routing][midi-learn]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A fresh app with latched scale and Roll mapped to note 60") {
+        TestApp app;
+        auto& state = app.state();
+
+        // Enable scale latch so note-on would normally toggle scale keys
+        if (auto* p = app.processor().getAPVTS().getParameter(Params::Keys::ID::SCALE_LATCH))
+            p->setValueNotifyingHost(1.0f);
+
+        // Pre-map note 60 to Roll so we can verify it doesn't fire in learn mode
+        app.mapMidiNote(MidiControlId::BUTTON_ROLL, 60);
+
+        // Snapshot the initial state
+        REQUIRE(state.getIsRandom() == false);
+        for (int i = 0; i < 12; ++i)
+            REQUIRE(state.getGlobalScaleNote(i) == true);
+
+        WHEN("User enters MIDI learn mode and sends various MIDI messages") {
+            app.processor().getMidiLearnRegistry().enterLearnMode();
+
+            // Send note 60 (mapped to Roll) — should NOT activate Roll
+            app.sendMidiNoteOn(60);
+
+            // Send note 62 (unmapped, would default to SCALE_NOTE_D) — should NOT toggle D
+            app.sendMidiNoteOn(62);
+
+            // Send note-off for 60 — should NOT fire Roll off
+            app.sendMidiNoteOff(60);
+
+            // Send a CC that is not mapped — should be harmless regardless,
+            // but verify it doesn't crash or leak through
+            app.sendMidiCC(99, 127);
+
+            THEN("Roll was NOT activated") {
+                REQUIRE(state.getIsRandom() == false);
+            }
+
+            AND_THEN("No scale notes were toggled") {
+                for (int i = 0; i < 12; ++i)
+                    REQUIRE(state.getGlobalScaleNote(i) == true);
+            }
+
+            AND_WHEN("User selects a control for learning and sends note 72") {
+                app.processor().getMidiLearnRegistry().setLearningControl(
+                    MidiControlId::BUTTON_PAGE_LEFT);
+                app.sendMidiNoteOn(72);
+
+                THEN("The mapping is created (note 72 → PAGE_LEFT)") {
+                    auto learned = app.processor().getMidiLearnRegistry().findUserMapping(
+                        MidiMessageType::NOTE, 1, 72);
+                    REQUIRE(learned == MidiControlId::BUTTON_PAGE_LEFT);
+                }
+
+                AND_THEN("Scale note C is still NOT toggled (learn consumed the message)") {
+                    REQUIRE(state.getGlobalScaleNote(0) == true);
+                }
+            }
+
+            AND_WHEN("User exits learn mode and sends the same messages") {
+                app.processor().getMidiLearnRegistry().exitLearnMode();
+
+                // Now note 60 should fire Roll
+                app.sendMidiNoteOn(60);
+                REQUIRE(state.getIsRandom() == true);
+
+                // And note 62 should toggle scale D
+                app.sendMidiNoteOn(62);
+                REQUIRE(state.getGlobalScaleNote(2) == false);
+
+                // Note-off for 60 should deactivate Roll
+                app.sendMidiNoteOff(60);
+                REQUIRE(state.getIsRandom() == false);
+            }
+        }
+    }
+}
+

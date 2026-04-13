@@ -1012,16 +1012,13 @@ void PluginProcessor::handleNoteMessage (const juce::MidiMessage& msg) {
     const bool isNoteOn  = msg.isNoteOn();
     const int value      = isNoteOn ? 127 : 0;
 
-    // Note Off shouldn't count as a "learn event" - only learn on Note On.
-    if (! isNoteOn && midiLearnRegistry.isLearning()) {
-        // Still allow a mapped Note Off to fire; just skip the learn branch.
-        // Uses MidiNoteRouter so unmapped notes still reach their default scale key.
-        MidiControlId controlId = MidiNoteRouter::resolve(
-            midiLearnRegistry, channel, noteNumber);
-        MidiMapping mapping { MidiMessageType::NOTE, noteNumber, controlId };
-        DBG ("MIDI Note " << noteNumber << " OFF → " << getMidiControlName (controlId));
-        handleMidiMapping (mapping, value, false);
-        return;
+    // While in learn mode, never fire controls — just consume the message.
+    // Note Off doesn't count as a "learn event" (only Note On teaches a mapping).
+    if (midiLearnRegistry.isLearning()) {
+        if (! isNoteOn)
+            return;
+        // Note On in learn mode falls through to routeLearnableMessage,
+        // which will call learnMidiMessage and return without firing controls.
     }
 
     routeLearnableMessage (MidiMessageType::NOTE, channel, noteNumber, value, isNoteOn);
@@ -1037,8 +1034,9 @@ void PluginProcessor::routeLearnableMessage (MidiMessageType type,
             DBG ("Learned: CH" << channel
                  << (type == MidiMessageType::CC ? "-CC" : "-N") << midiNumber);
             notifyMidiLearned();
-            return;
         }
+        // Always return in learn mode — never fire controls while mapping.
+        return;
     }
 
     MidiControlId controlId;
