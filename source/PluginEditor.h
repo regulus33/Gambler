@@ -41,8 +41,9 @@ private:
     ApplicationComponent applicationComponent;
 
     // Virtual MIDI keyboard (standalone only) — uses computer keyboard as MIDI input.
-    // Hidden (zero-size, not visible) but still captures computer key presses.
+    // Hidden by default; set SHOW_MIDI_KEYBOARD=1 in CMakeLists to show the keyboard strip.
     std::unique_ptr<juce::MidiKeyboardComponent> midiKeyboard;
+    static constexpr int keyboardHeight = 64;
 
 #if SHOW_INSPECTOR
     // Inspector (only included when SHOW_INSPECTOR=1)
@@ -58,6 +59,15 @@ private:
 
     // Whether auto-compact has already been applied (so we only do it once on first layout)
     bool autoCompactApplied = false;
+
+    // Height reserved for the visible MIDI keyboard strip (0 when hidden)
+    int getKeyboardStripHeight() const {
+#if SHOW_MIDI_KEYBOARD
+        return midiKeyboard ? keyboardHeight : 0;
+#else
+        return 0;
+#endif
+    }
 
     // Check aspect ratio and auto-enter compact mode if needed
     void checkAutoCompact();

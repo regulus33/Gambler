@@ -35,16 +35,19 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     addAndMakeVisible (applicationComponent);
 
     // In standalone mode, create a virtual MIDI keyboard that captures computer
-    // keyboard input but is not visible. It still needs to be a child component
-    // with focus so that keyPressed() events reach it.
+    // keyboard input. Set SHOW_MIDI_KEYBOARD=1 in CMakeLists to display the piano strip.
     if (processorRef.wrapperType == juce::AudioProcessor::wrapperType_Standalone) {
         midiKeyboard = std::make_unique<juce::MidiKeyboardComponent>(
             processorRef.getKeyboardState(),
             juce::MidiKeyboardComponent::horizontalKeyboard);
         midiKeyboard->setKeyPressBaseOctave (4);
         midiKeyboard->setWantsKeyboardFocus (true);
+#if SHOW_MIDI_KEYBOARD
+        addAndMakeVisible (*midiKeyboard);
+#else
         midiKeyboard->setSize (0, 0);
-        addChildComponent (*midiKeyboard);  // child but not visible
+        addChildComponent (*midiKeyboard);
+#endif
     }
 
 #if SHOW_INSPECTOR
@@ -88,12 +91,12 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         currentDesignHeight = newDesignHeight;
         isAdjustingSize = true;
         float scale = static_cast<float>(getWidth()) / static_cast<float>(PluginEditorLayout::editorWidth);
-        int newWindowHeight = juce::roundToInt(static_cast<float>(newDesignHeight) * scale);
+        int newWindowHeight = juce::roundToInt(static_cast<float>(newDesignHeight) * scale) + getKeyboardStripHeight();
         setSize(getWidth(), newWindowHeight);
         isAdjustingSize = false;
     };
 
-    setSize (PluginEditorLayout::editorWidth, PluginEditorLayout::editorHeight);
+    setSize (PluginEditorLayout::editorWidth, PluginEditorLayout::editorHeight + getKeyboardStripHeight());
 }
 
 PluginEditor::~PluginEditor() {
@@ -137,6 +140,14 @@ void PluginEditor::resized() {
     applicationComponent.setTransform (juce::AffineTransform::scale (scale)
                                                           .translated (static_cast<float>(offsetX),
                                                                       static_cast<float>(offsetY)));
+
+#if SHOW_MIDI_KEYBOARD
+    // Keyboard strip at the bottom of the window (no transform, raw pixels)
+    if (midiKeyboard) {
+        midiKeyboard->setBounds (0, getHeight() - keyboardHeight, getWidth(), keyboardHeight);
+        midiKeyboard->toFront (false);
+    }
+#endif
 
 #if SHOW_INSPECTOR
     // Inspector button in bottom right corner (uses scaled coordinates)
@@ -200,9 +211,11 @@ bool PluginEditor::keyStateChanged (bool isKeyDown, juce::Component* originating
 float PluginEditor::getScaleFactor() const {
     using namespace PluginEditorLayout;
 
+    int availableHeight = getHeight() - getKeyboardStripHeight();
+
     // Calculate scale based on width (height will be constrained by aspect ratio)
     float scaleX = static_cast<float>(getWidth()) / static_cast<float>(editorWidth);
-    float scaleY = static_cast<float>(getHeight()) / static_cast<float>(currentDesignHeight);
+    float scaleY = static_cast<float>(availableHeight) / static_cast<float>(currentDesignHeight);
 
     // Use the smaller scale to ensure everything fits
     return juce::jmin (scaleX, scaleY);
@@ -226,8 +239,8 @@ void PluginEditor::componentMovedOrResized (juce::Component& component, bool was
     // Get current size
     int currentWidth = getWidth();
     int currentHeight = getHeight();
-    // Calculate what the height should be for the current width
-    int targetHeight = juce::roundToInt (static_cast<float>(currentWidth) / aspectRatio);
+    // Calculate what the height should be for the current width (plus keyboard strip if visible)
+    int targetHeight = juce::roundToInt (static_cast<float>(currentWidth) / aspectRatio) + getKeyboardStripHeight();
 
     // If height doesn't match aspect ratio, adjust it
     if (currentHeight != targetHeight) {
