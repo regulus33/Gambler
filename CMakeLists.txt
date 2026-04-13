@@ -154,7 +154,7 @@ include(XcodePrettify)
 target_compile_definitions(SharedCode
     INTERFACE
     SHOW_INSPECTOR=1  # Set to 1 to enable the Melatonin Inspector button for UI debugging
-    SHOW_MIDI_KEYBOARD=1  # Set to 1 to show the virtual MIDI keyboard strip in standalone
+    SHOW_MIDI_KEYBOARD=0  # Set to 1 to show the virtual MIDI keyboard strip in standalone
     TAKE_SNAPSHOTS_OF_COMPONENTS=0  # Set to 1 enable hitting s snapshots every component in tree...
     SNAPSHOT_DESTINATION="${CMAKE_SOURCE_DIR}/component_snapshots"
     # JUCE_WEB_BROWSER and JUCE_USE_CURL off by default
