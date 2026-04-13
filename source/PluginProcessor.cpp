@@ -1015,13 +1015,12 @@ void PluginProcessor::handleNoteMessage (const juce::MidiMessage& msg) {
     // Note Off shouldn't count as a "learn event" - only learn on Note On.
     if (! isNoteOn && midiLearnRegistry.isLearning()) {
         // Still allow a mapped Note Off to fire; just skip the learn branch.
-        MidiControlId controlId = midiLearnRegistry.findUserMapping (
-            MidiMessageType::NOTE, channel, noteNumber);
-        if (controlId != MidiControlId::COUNT) {
-            MidiMapping mapping { MidiMessageType::NOTE, noteNumber, controlId };
-            DBG ("MIDI Note " << noteNumber << " OFF → " << getMidiControlName (controlId));
-            handleMidiMapping (mapping, value, false);
-        }
+        // Uses MidiNoteRouter so unmapped notes still reach their default scale key.
+        MidiControlId controlId = MidiNoteRouter::resolve(
+            midiLearnRegistry, channel, noteNumber);
+        MidiMapping mapping { MidiMessageType::NOTE, noteNumber, controlId };
+        DBG ("MIDI Note " << noteNumber << " OFF → " << getMidiControlName (controlId));
+        handleMidiMapping (mapping, value, false);
         return;
     }
 
@@ -1042,9 +1041,15 @@ void PluginProcessor::routeLearnableMessage (MidiMessageType type,
         }
     }
 
-    MidiControlId controlId = midiLearnRegistry.findUserMapping (type, channel, midiNumber);
-    if (controlId == MidiControlId::COUNT)
-        return;
+    MidiControlId controlId;
+    if (type == MidiMessageType::NOTE) {
+        // Notes always route somewhere: user mapping first, else default scale key
+        controlId = MidiNoteRouter::resolve(midiLearnRegistry, channel, midiNumber);
+    } else {
+        controlId = midiLearnRegistry.findUserMapping(type, channel, midiNumber);
+        if (controlId == MidiControlId::COUNT)
+            return;
+    }
 
     MidiMapping mapping { type, midiNumber, controlId };
 
