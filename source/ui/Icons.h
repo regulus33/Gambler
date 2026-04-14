@@ -1771,7 +1771,7 @@ public:
     static juce::Path createBakeScaleIcon() {
         juce::Path path;
         // Musical note head (filled ellipse)
-        path.addEllipse(0.25f, 13.0f, 7.0f, 5.0f);
+        path.addEllipse(1.0f, 13.0f, 7.0f, 5.0f);
         // Note stem
         path.addRoundedRectangle(6.0f, 2.0f, 2.0f, 13.0f, 0.5f);
         // Down arrow (stamp/bake)
