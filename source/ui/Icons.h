@@ -1779,8 +1779,8 @@ public:
         path.lineTo(17.0f, 15.0f);
         path.lineTo(21.0f, 10.0f);
         path.closeSubPath();
-        // Arrow stem (stops before triangle to avoid even-odd overlap)
-        path.addRoundedRectangle(16.0f, 3.0f, 2.0f, 8.0f, 0.5f);
+        // Arrow stem (stops at triangle top edge to avoid even-odd overlap)
+        path.addRoundedRectangle(16.0f, 3.0f, 2.0f, 7.0f, 0.5f);
         return path;
     }
 
@@ -1801,8 +1801,8 @@ public:
         path.lineTo(17.0f, 15.0f);
         path.lineTo(21.0f, 10.0f);
         path.closeSubPath();
-        // Arrow stem (stops before triangle to avoid even-odd overlap)
-        path.addRoundedRectangle(16.0f, 3.0f, 2.0f, 8.0f, 0.5f);
+        // Arrow stem (stops at triangle top edge to avoid even-odd overlap)
+        path.addRoundedRectangle(16.0f, 3.0f, 2.0f, 7.0f, 0.5f);
         return path;
     }
 
