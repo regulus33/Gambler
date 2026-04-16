@@ -55,6 +55,11 @@ namespace MainScreenLayout {
     constexpr int compactTopTitleRowHeight = 10;
     // Compact top row: reduce top content height (less bottom padding below piano roll)
     constexpr int compactTopContentHeight = 210;
+
+    // Compact mode: when the host window is taller than ideal, absorb up to this
+    // many pixels of extra height into the gap between navbar/logo and the row
+    // below. Beyond this, extra height stays below the content (flex-grow capped).
+    constexpr int compactMaxExtraTopGap = 200;
 }
 
 /**
@@ -148,6 +153,13 @@ public:
         area.removeFromTop(NavBarConstants::height);
 
         if (compactMode_) {
+            // Compact mode: when the host gives us more height than we need,
+            // absorb extra vertical space (capped at compactMaxExtraTopGap) into
+            // the gap between navbar/logo and the visible row below.
+            const int extraHeight  = juce::jmax(0, getHeight() - getIdealHeight());
+            const int extraTopGap  = juce::jmin(extraHeight, compactMaxExtraTopGap);
+            area.removeFromTop(extraTopGap);
+
             // Compact mode: show only one row directly below navbar
             if (showingTopRow_) {
                 // Title row (reduced in compact mode)

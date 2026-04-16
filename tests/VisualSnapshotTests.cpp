@@ -342,3 +342,31 @@ TEST_CASE ("Visual - Compact Bottom Row", "[visual]")
     f.processMessages(20);
     snap (mainScreen, "compact_bottom_row");
 }
+
+TEST_CASE ("Visual - Compact Top Row (tall window)", "[visual]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    auto& mainScreen = f.getMainScreen();
+    mainScreen.setCompactMode(true);
+    mainScreen.setShowingTopRow(true);
+    // Host gives us 300px more than ideal → 200px absorbed as top gap,
+    // remaining 100px sits below content.
+    int h = mainScreen.getIdealHeight() + 300;
+    mainScreen.setSize(1012, h);
+    f.processMessages(20);
+    snap (mainScreen, "compact_top_row_tall");
+}
+
+TEST_CASE ("Visual - Compact Bottom Row (tall window)", "[visual]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    auto& mainScreen = f.getMainScreen();
+    mainScreen.setCompactMode(true);
+    mainScreen.setShowingTopRow(false);
+    int h = mainScreen.getIdealHeight() + 300;
+    mainScreen.setSize(1012, h);
+    f.processMessages(20);
+    snap (mainScreen, "compact_bottom_row_tall");
+}
