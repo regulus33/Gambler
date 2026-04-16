@@ -55,11 +55,6 @@ namespace MainScreenLayout {
     constexpr int compactTopTitleRowHeight = 10;
     // Compact top row: reduce top content height (less bottom padding below piano roll)
     constexpr int compactTopContentHeight = 210;
-
-    // Compact mode: when the host window is taller than ideal, absorb up to this
-    // many pixels of extra height into the gap between navbar/logo and the row
-    // below. Beyond this, extra height stays below the content (flex-grow capped).
-    constexpr int compactMaxExtraTopGap = 200;
 }
 
 /**
@@ -153,20 +148,13 @@ public:
         area.removeFromTop(NavBarConstants::height);
 
         if (compactMode_) {
-            // Compact mode: when the host gives us more height than we need,
-            // absorb extra vertical space (capped at compactMaxExtraTopGap) into
-            // the gap between navbar/logo and the visible row below.
-            const int extraHeight  = juce::jmax(0, getHeight() - getIdealHeight());
-            const int extraTopGap  = juce::jmin(extraHeight, compactMaxExtraTopGap);
-            area.removeFromTop(extraTopGap);
+            // Compact mode: content block is bottom-anchored to the window, while
+            // navbar/logo stay top-anchored (owned by ApplicationComponent). Any
+            // extra window height simply opens up the empty gap in between.
+            area.removeFromBottom(bottomPadding);
 
-            // Compact mode: show only one row directly below navbar
             if (showingTopRow_) {
-                // Title row (reduced in compact mode)
-                area.removeFromTop(compactTopTitleRowHeight);
-
-                // Top content row (reduced in compact mode)
-                auto topRow = area.removeFromTop(compactTopContentHeight);
+                auto topRow = area.removeFromBottom(compactTopContentHeight);
                 topRow.removeFromLeft(marginLeft);
                 topRow.removeFromRight(marginRight);
 
@@ -178,10 +166,7 @@ public:
                 topRow.removeFromLeft(subsequenceExtraGap);
                 subsequenceControls.setBounds(topRow.removeFromLeft(subsequenceControlsWidth));
             } else {
-                // Bottom row directly below navbar
-                area.removeFromTop(compactBottomGapAboveSequencer);
-
-                auto bottomArea = area;
+                auto bottomArea = area.removeFromBottom(stepHeight * 2 + gapBetweenStepRows);
                 bottomArea.removeFromLeft(marginLeft);
                 bottomArea.removeFromRight(marginRight);
 
