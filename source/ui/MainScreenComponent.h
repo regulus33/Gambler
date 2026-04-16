@@ -46,15 +46,21 @@ namespace MainScreenLayout {
     constexpr int noteRangeGap = 18;
     constexpr int bottomPadding = 24;   // padding below sequencer row / bottom of window
 
-    // Compact bottom row: extra gap between navbar/logo and sequencer rows
-    constexpr int compactBottomGapAboveSequencer = 0;
     // Compact bottom row: extra top padding for logo to avoid clipping
     constexpr int compactBottomLogoExtraTopPadding = 4;
 
-    // Compact top row: reduce title row height (gap between navbar and content)
-    constexpr int compactTopTitleRowHeight = 10;
     // Compact top row: reduce top content height (less bottom padding below piano roll)
     constexpr int compactTopContentHeight = 210;
+
+    // Compact mode shared layout — both compact rows target the same ideal
+    // window height so swapping modes doesn't resize the host. Driven by the
+    // compact-top row's minimum needs.
+    constexpr int compactBottomPadding     = 32;  // breathing room below content
+    constexpr int compactTopGapAboveTitles = 15;  // navbar → title-row gap (top mode)
+    // = 45 (navbar) + 15 (gap) + 25 (titles) + 210 (content) + 32 (bottom) = 327
+    constexpr int compactIdealHeight =
+        NavBarConstants::height + compactTopGapAboveTitles + titleRowHeight
+        + compactTopContentHeight + compactBottomPadding;
 }
 
 /**
@@ -151,7 +157,7 @@ public:
             // Compact mode: content block is bottom-anchored to the window, while
             // navbar/logo stay top-anchored (owned by ApplicationComponent). Any
             // extra window height simply opens up the empty gap in between.
-            area.removeFromBottom(bottomPadding);
+            area.removeFromBottom(compactBottomPadding);
 
             if (showingTopRow_) {
                 auto topRow = area.removeFromBottom(compactTopContentHeight);
@@ -259,10 +265,9 @@ public:
         if (!compactMode_)
             return fullDesignHeight;
 
-        if (showingTopRow_)
-            return NavBarConstants::height + titleRowHeight + topContentHeight + bottomPadding;
-        else
-            return NavBarConstants::height + compactBottomGapAboveSequencer + stepHeight + gapBetweenStepRows + stepHeight + bottomPadding;
+        // Both compact modes share the same ideal height so toggling rows
+        // never resizes the host window.
+        return compactIdealHeight;
     }
 
     bool isCompactMode() const { return compactMode_; }
