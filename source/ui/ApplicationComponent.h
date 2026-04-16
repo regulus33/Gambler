@@ -81,12 +81,10 @@ public:
 
         navBar.onCompactViewToggled = [this](bool compact) {
             mainScreen.setCompactMode(compact);
-            updateLogoScale();
         };
 
         navBar.onSwapRowClicked = [this](bool showingTop) {
             mainScreen.setShowingTopRow(showingTop);
-            updateLogoScale();
         };
 
         // ========================================
@@ -285,8 +283,6 @@ public:
 
         // Logo: left-aligned, offset from top
         int logoY = strip.getY() + LogoConstants::topPadding;
-        if (mainScreen.isCompactMode() && !mainScreen.isShowingTopRow())
-            logoY += MainScreenLayout::compactBottomLogoExtraTopPadding;
         int logoW = logo.getCalculatedWidth() + MainScreenLayout::marginLeft * 2;
         logo.setBounds(strip.getX() + MainScreenLayout::marginLeft, logoY,
                        logoW, logoH);
@@ -851,12 +847,6 @@ private:
 
                 iOSNativeDialogs::shareFile(this, exportedFile, []() {});
             });
-    }
-
-    void updateLogoScale() {
-        bool isCompactBottom = mainScreen.isCompactMode() && !mainScreen.isShowingTopRow();
-        logo.setModeScale(isCompactBottom ? LogoConstants::compactBottomScale : 1.0f);
-        resized();
     }
 
     // ========================================

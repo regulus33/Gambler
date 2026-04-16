@@ -11,9 +11,6 @@ namespace LogoConstants {
     // Vertical padding from the top of the parent component
     constexpr int topPadding = 5;
 
-    // Scale factor for compact bottom row mode (logo shares space with step buttons)
-    constexpr float compactBottomScale = 0.6f;
-
     // Fine-tune offsets for positioning within the allocated bounds (applied after centering)
     constexpr float offsetX = 0.0f;
     constexpr float offsetY = 0.0f;
@@ -103,21 +100,9 @@ public:
     // Returns the calculated height of the component
     int getCalculatedHeight() const { return static_cast<int>(totalHeight); }
 
-    /**
-     * Set an extra scale multiplier (e.g. for compact bottom row mode).
-     * Defaults to 1.0 (no extra scaling).
-     */
-    void setModeScale(float scale) {
-        if (modeScale_ != scale) {
-            modeScale_ = scale;
-            calculateSize();
-            repaint();
-        }
-    }
-
 private:
-    float effectiveScale() const {
-        return LogoConstants::componentScale * modeScale_;
+    static float effectiveScale() {
+        return LogoConstants::componentScale;
     }
 
     void calculateSize() {
@@ -134,7 +119,6 @@ private:
         totalHeight = juce::jmax(textH, scaledDiceSize);
     }
 
-    float modeScale_ = 1.0f;
     juce::Path logoTextIcon;
     juce::Path diceIcon;
     float totalWidth = 0.0f;

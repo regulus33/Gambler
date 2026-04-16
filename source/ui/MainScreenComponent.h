@@ -46,20 +46,17 @@ namespace MainScreenLayout {
     constexpr int noteRangeGap = 18;
     constexpr int bottomPadding = 24;   // padding below sequencer row / bottom of window
 
-    // Compact bottom row: extra top padding for logo to avoid clipping
-    constexpr int compactBottomLogoExtraTopPadding = 4;
-
     // Compact top row: reduce top content height (less bottom padding below piano roll)
     constexpr int compactTopContentHeight = 210;
 
     // Compact mode shared layout — both compact rows target the same ideal
     // window height so swapping modes doesn't resize the host. Driven by the
     // compact-top row's minimum needs.
-    constexpr int compactBottomPadding     = 32;  // breathing room below content
-    constexpr int compactTopGapAboveTitles = 15;  // navbar → title-row gap (top mode)
+    constexpr int compactContentGap    = 15;  // gap between navbar and the row (both modes)
+    constexpr int compactBottomPadding = 32;  // breathing room below content (compact top)
     // = 45 (navbar) + 15 (gap) + 25 (titles) + 210 (content) + 32 (bottom) = 327
     constexpr int compactIdealHeight =
-        NavBarConstants::height + compactTopGapAboveTitles + titleRowHeight
+        NavBarConstants::height + compactContentGap + titleRowHeight
         + compactTopContentHeight + compactBottomPadding;
 }
 
@@ -154,13 +151,16 @@ public:
         area.removeFromTop(NavBarConstants::height);
 
         if (compactMode_) {
-            // Compact mode: content block is bottom-anchored to the window, while
-            // navbar/logo stay top-anchored (owned by ApplicationComponent). Any
-            // extra window height simply opens up the empty gap in between.
-            area.removeFromBottom(compactBottomPadding);
+            // Compact mode: both rows use the same gap below the navbar so the
+            // row sits at the same vertical distance from the logo/navbar
+            // regardless of which mode is active.
+            area.removeFromTop(compactContentGap);
 
             if (showingTopRow_) {
-                auto topRow = area.removeFromBottom(compactTopContentHeight);
+                // Title row reserves its own height above the content block.
+                area.removeFromTop(titleRowHeight);
+
+                auto topRow = area.removeFromTop(compactTopContentHeight);
                 topRow.removeFromLeft(marginLeft);
                 topRow.removeFromRight(marginRight);
 
@@ -172,7 +172,7 @@ public:
                 topRow.removeFromLeft(subsequenceExtraGap);
                 subsequenceControls.setBounds(topRow.removeFromLeft(subsequenceControlsWidth));
             } else {
-                auto bottomArea = area.removeFromBottom(stepHeight * 2 + gapBetweenStepRows);
+                auto bottomArea = area.removeFromTop(stepHeight * 2 + gapBetweenStepRows);
                 bottomArea.removeFromLeft(marginLeft);
                 bottomArea.removeFromRight(marginRight);
 
