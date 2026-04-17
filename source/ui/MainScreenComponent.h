@@ -52,8 +52,8 @@ namespace MainScreenLayout {
     // Compact mode shared layout — both compact rows target the same ideal
     // window height so swapping modes doesn't resize the host. Driven by the
     // compact-top row's minimum needs.
-    constexpr int compactTopContentGap    = 15;  // gap between navbar and content (compact top row)
-    constexpr int compactBottomContentGap = 15;  // gap between navbar and content (compact bottom row)
+    constexpr int compactTopContentGap    = 0;  // gap between navbar and content (compact top row)
+    constexpr int compactBottomContentGap = 25;  // gap between navbar and content (compact bottom row)
     constexpr int compactBottomPadding    = 32;  // breathing room below content (compact top)
     // = 45 (navbar) + 15 (gap) + 25 (titles) + 210 (content) + 32 (bottom) = 327
     constexpr int compactIdealHeight =
