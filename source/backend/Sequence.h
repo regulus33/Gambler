@@ -185,8 +185,9 @@ public:
         int idx = (currentIndex() + 1) % len;
         setCurrentIndex(idx);
 
-        int probIdx = (lastProbabilityIndex() + 1) % ParamConstants::MAX_STEPS;
-        setLastProbabilityIndex(probIdx);
+        int tickN = (lastProbabilityIndex() + 1) % ParamConstants::MAX_STEPS;
+        setLastProbabilityIndex(tickN);
+        const int probIdx = tickToUnderlyingIndex(tickN);
 
         if (isRandom()) {
             int substepIdx = step(idx).advanceSubstep();
@@ -336,6 +337,23 @@ private:
 
     static int roundToNearest(int percent, int totalCells) noexcept {
         return (percent * totalCells + 50) / 100;
+    }
+
+    // Map a 0..63 tick counter to an underlying step index in display-block-major
+    // order: B*B consecutive ticks fall within one display block before advancing
+    // to the next block in row-major display order. Keeps the highlight visually
+    // tied to the audio-sampled probability after dividing.
+    int tickToUnderlyingIndex(int tickN) const {
+        const int D = probabilityPattern.gridDim();
+        const int B = 8 / D;
+        const int blockArea = B * B;
+        const int blockIdx = tickN / blockArea;
+        const int within = tickN % blockArea;
+        const int dRow = blockIdx / D;
+        const int dCol = blockIdx % D;
+        const int wRow = within / B;
+        const int wCol = within % B;
+        return (dRow * B + wRow) * 8 + (dCol * B + wCol);
     }
 
     // Tile the pattern's DxD output across the 64-step probability array so

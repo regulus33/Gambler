@@ -61,14 +61,13 @@ public:
 
         const int blockSize = gridSize / currentGridDim;
 
-        // Map the underlying step highlight (0..63) into the current display grid
-        // so highlighting still works after dividing.
+        // The walker stores a 0..63 linear tick counter. blockSize*blockSize
+        // consecutive ticks fall within the same display block, so the active
+        // display block is just (tick / blockArea).
+        const int blockArea = blockSize * blockSize;
         int highlightedDisplayIndex = -1;
-        if (highlightedCircleIndex >= 0 && highlightedCircleIndex < gridSize * gridSize) {
-            const int hRow = highlightedCircleIndex / gridSize;
-            const int hCol = highlightedCircleIndex % gridSize;
-            highlightedDisplayIndex = (hRow / blockSize) * currentGridDim + (hCol / blockSize);
-        }
+        if (highlightedCircleIndex >= 0 && highlightedCircleIndex < gridSize * gridSize)
+            highlightedDisplayIndex = highlightedCircleIndex / blockArea;
 
         for (int row = 0; row < currentGridDim; ++row) {
             for (int col = 0; col < currentGridDim; ++col) {
