@@ -13,7 +13,7 @@ namespace {
 ProbabilityControlsComponent::ProbabilityControlsComponent(PluginProcessor& processor)
     : StateListenerComponent(processor)
     , probabilitySlider("Probability")
-    , randomizeButton(&Icons::createDiceIcon, &Icons::createDiceIcon, true, false)
+    , randomizeButton(&Icons::createDiceIcon, &Icons::createDiceIcon, false, false)
     , divideButton(&Icons::createDivideIcon, &Icons::createDivideIcon, false, false)
 {
     setPaintingIsUnclipped(true);
