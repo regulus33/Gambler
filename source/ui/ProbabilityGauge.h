@@ -61,13 +61,12 @@ public:
 
         const int blockSize = gridSize / currentGridDim;
 
-        // The walker stores a 0..63 linear tick counter. blockSize*blockSize
-        // consecutive ticks fall within the same display block, so the active
-        // display block is just (tick / blockArea).
-        const int blockArea = blockSize * blockSize;
+        // The walker stores a 0..(D*D - 1) display-cell index — one tick per
+        // visible cell — so the highlight is a direct lookup.
+        const int displayCells = currentGridDim * currentGridDim;
         int highlightedDisplayIndex = -1;
-        if (highlightedCircleIndex >= 0 && highlightedCircleIndex < gridSize * gridSize)
-            highlightedDisplayIndex = highlightedCircleIndex / blockArea;
+        if (highlightedCircleIndex >= 0 && highlightedCircleIndex < displayCells)
+            highlightedDisplayIndex = highlightedCircleIndex;
 
         for (int row = 0; row < currentGridDim; ++row) {
             for (int col = 0; col < currentGridDim; ++col) {
