@@ -1806,4 +1806,24 @@ public:
         return path;
     }
 
+    /**
+     * Creates the divide/subdivide icon path.
+     * 2x2 of small rounded squares with a gap between them, evoking "split
+     * into quarters". Drawn into a 22x22 viewBox to match the other icons.
+     */
+    static juce::Path createDivideIcon() {
+        juce::Path path;
+        constexpr float size = 9.0f;
+        constexpr float gap  = 2.0f;
+        constexpr float origin = 1.0f;           // leaves a 1px margin inside 22px
+        constexpr float radius = 1.5f;
+        const float second = origin + size + gap;
+
+        path.addRoundedRectangle (origin, origin, size, size, radius);
+        path.addRoundedRectangle (second, origin, size, size, radius);
+        path.addRoundedRectangle (origin, second, size, size, radius);
+        path.addRoundedRectangle (second, second, size, size, radius);
+        return path;
+    }
+
 };

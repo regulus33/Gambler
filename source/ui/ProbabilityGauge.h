@@ -45,41 +45,41 @@ public:
     void paint (juce::Graphics& g) override {
         using namespace ProbabilityGaugeConstants;
 
-        // Scale circles to fill available bounds
         const auto bounds = getLocalBounds();
         const float boundsW = static_cast<float>(bounds.getWidth());
         const float boundsH = static_cast<float>(bounds.getHeight());
-        const float cellW = boundsW / static_cast<float>(gridSize);
-        const float cellH = boundsH / static_cast<float>(gridSize);
+        const float cellW = boundsW / static_cast<float>(currentGridDim);
+        const float cellH = boundsH / static_cast<float>(currentGridDim);
         const float cellSize = std::min(cellW, cellH);
-        const float diameter = cellSize * 0.6f;
-        const float padding = (cellSize - diameter) * 0.5f;
+        const float side = cellSize * 0.6f;
+        const float padding = (cellSize - side) * 0.5f;
 
-        // Centre the grid within bounds
-        const float totalGridSize = cellSize * static_cast<float>(gridSize);
+        const float totalGridSize = cellSize * static_cast<float>(currentGridDim);
         const float offsetX = (boundsW - totalGridSize) * 0.5f;
         const float offsetY = (boundsH - totalGridSize) * 0.5f;
 
-        for (int i = 0; i < maxCircles; ++i)
-        {
-            const bool isVisible = (i < totalCircles);
-            if (!isVisible) continue;
+        const int blockSize = gridSize / currentGridDim;
 
-            const int col = i % gridSize;
-            const int row = i / gridSize;
+        for (int row = 0; row < currentGridDim; ++row) {
+            for (int col = 0; col < currentGridDim; ++col) {
+                const int displayIndex = row * currentGridDim + col;
+                // Map display cell to top-left underlying step in its block.
+                const int underlyingIndex =
+                    (row * blockSize) * gridSize + (col * blockSize);
 
-            const float x = offsetX + static_cast<float>(col) * cellSize + padding;
-            const float y = offsetY + static_cast<float>(row) * cellSize + padding;
+                const float x = offsetX + static_cast<float>(col) * cellSize + padding;
+                const float y = offsetY + static_cast<float>(row) * cellSize + padding;
 
-            const bool isHighlighted = (i == highlightedCircleIndex);
-            const bool isActive = circleStates[static_cast<size_t>(i)];
+                const bool isHighlighted = (displayIndex == highlightedCircleIndex);
+                const bool isActive = circleStates[static_cast<std::size_t>(underlyingIndex)];
 
-            if (isHighlighted)
-                g.setColour(isActive ? highlightPlayColour : highlightRestColour);
-            else
-                g.setColour(isActive ? activeColour : inactiveColour);
+                if (isHighlighted)
+                    g.setColour(isActive ? highlightPlayColour : highlightRestColour);
+                else
+                    g.setColour(isActive ? activeColour : inactiveColour);
 
-            g.fillEllipse(x, y, diameter, diameter);
+                g.fillRect(x, y, side, side);
+            }
         }
     }
 
@@ -120,6 +120,18 @@ public:
     int getStepCount() const { return totalCircles; }
 
     /**
+     * Set the display grid dimension (2, 4, or 8). The component size stays
+     * the same — each visual cell grows as the dimension shrinks.
+     */
+    void setGridDim (int dim) {
+        if (dim != 2 && dim != 4 && dim != 8) return;
+        currentGridDim = dim;
+        repaint();
+    }
+
+    int getGridDim() const { return currentGridDim; }
+
+    /**
      * Highlight a specific circle to show it was randomly selected.
      * The circle will be shown in yellow if it's active (playing) or white if inactive (resting).
      * Call with index = -1 to clear the highlight.
@@ -148,6 +160,9 @@ private:
 
     // Total visible circles - can be changed for variable step count
     int totalCircles = ProbabilityGaugeConstants::maxCircles;
+
+    // Display grid dimension (edge length in cells). 8 = full 8x8, 4 = 4x4, 2 = 2x2.
+    int currentGridDim = ProbabilityGaugeConstants::gridSize;
 
     // Tracks which circles are currently active (true = active/red)
     // This is updated from the backend via updateFromProbabilityArray()

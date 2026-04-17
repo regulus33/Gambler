@@ -2,6 +2,7 @@
 
 #include "ProbabilityGauge.h"
 #include "StateListenerComponent.h"
+#include "ToggleIconButton.h"
 #include "sliders/ProbabilitySlider.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -69,8 +70,11 @@ private:
     void updateUIFromState();
     std::array<bool, 64> readProbabilityArray() const;
     void pushStateToGauge();
+    void syncGaugeGridDim();
 
     AnalogueSlider probabilitySlider;
+    ToggleIconButton randomizeButton;
+    ToggleIconButton divideButton;
     ProbabilityGauge probabilityGauge;
     bool isUpdatingFromState = false;  // Prevent feedback loop
 };

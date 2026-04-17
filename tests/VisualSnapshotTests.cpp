@@ -35,7 +35,8 @@ static void snap (juce::Component& comp, const char* name)
 {
     SnapshotTester s (name);
     s.capture (comp);
-    s.matches();
+    if (! s.matches())
+        s.saveFailureArtifacts();
 }
 
 // ============================================================================

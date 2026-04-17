@@ -87,6 +87,11 @@ public:
     bool getPlayProbability(int index) const { return seq.playProbability(index); }
     void setPlayProbability(int index, bool shouldPlay) { seq.setPlayProbability(index, shouldPlay); }
     void setProbabilityPercentage(int percentage) { seq.setProbabilityPercentage(percentage); }
+    void reseedProbabilityPattern() { seq.reseedProbabilityPattern(); }
+    void randomizeProbabilityUniform() { seq.randomizeProbabilityUniform(); }
+    void setProbabilityDivisionLevel(int level) { seq.setProbabilityDivisionLevel(level); }
+    int getProbabilityDivisionLevel() const { return seq.probabilityDivisionLevel(); }
+    int getProbabilityGridDim() const { return seq.probabilityGridDim(); }
     
     // ========================================
     // STEP NOTES (delegated through Step)

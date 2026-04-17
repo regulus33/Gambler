@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Grid8x8.h"
+#include "Grid.h"
 
 #include <array>
 #include <cstdint>
@@ -10,7 +10,7 @@
 
 namespace algorithms::probability {
 
-// Stateful Eden growth model on Grid8x8.
+// Stateful Eden growth model on a square Grid of runtime dimension.
 //
 // Eden growth: plant a random seed cell, then repeatedly activate a random
 // inactive cell that is adjacent to the existing cluster. Produces organic
@@ -21,9 +21,12 @@ namespace algorithms::probability {
 // shape shrinks back along the path it grew.
 class EdenGrowthPattern {
 public:
-    using Cells = std::array<bool, Grid8x8::cellCount>;
+    using Cells = std::array<bool, Grid::maxCellCount>;
 
-    explicit EdenGrowthPattern (std::uint32_t seed = std::random_device{}()) {
+    explicit EdenGrowthPattern (int gridDim = Grid::maxDim,
+                                std::uint32_t seed = std::random_device{}())
+        : grid_ (gridDim)
+    {
         rng_.seed (seed);
         cells_.fill (false);
     }
@@ -34,6 +37,17 @@ public:
         clear();
     }
 
+    // Change the underlying grid dimension. Clears the cluster (cells that
+    // made sense on the old grid wouldn't on the new one).
+    void setGridDim (int newDim) {
+        if (newDim == grid_.dim()) return;
+        grid_ = Grid (newDim);
+        clear();
+    }
+
+    int gridDim() const noexcept { return grid_.dim(); }
+    int gridCellCount() const noexcept { return grid_.cellCount(); }
+
     // Forget the current cluster. Next grow() will pick a fresh seed cell.
     void clear() {
         cells_.fill (false);
@@ -41,8 +55,9 @@ public:
         boundary_.clear();
     }
 
-    // Resize the cluster to exactly `count` active cells (clamped to [0, 64]).
-    // Grows or shrinks as needed; preserves existing cells when possible.
+    // Resize the cluster to exactly `count` active cells (clamped to
+    // [0, gridCellCount()]). Grows or shrinks as needed; preserves existing
+    // cells when possible.
     void setActiveCount (int count) {
         const int target = clamp (count);
 
@@ -62,9 +77,9 @@ public:
     const Cells& cells() const noexcept { return cells_; }
 
 private:
-    static int clamp (int n) noexcept {
+    int clamp (int n) const noexcept {
         if (n < 0) return 0;
-        if (n > Grid8x8::cellCount) return Grid8x8::cellCount;
+        if (n > grid_.cellCount()) return grid_.cellCount();
         return n;
     }
 
@@ -78,7 +93,7 @@ private:
         boundary_.erase (next);
 
         std::array<int, 4> nbrs{};
-        const auto count = Grid8x8::neighbours (next, nbrs);
+        const auto count = grid_.neighbours (next, nbrs);
         for (std::size_t i = 0; i < count; ++i) {
             const int idx = nbrs[i];
             if (! cells_[static_cast<std::size_t> (idx)])
@@ -91,14 +106,11 @@ private:
         growthOrder_.pop_back();
         cells_[static_cast<std::size_t> (last)] = false;
 
-        // The removed cell rejoins the boundary if it still touches the cluster.
         if (hasActiveNeighbour (last))
             boundary_.insert (last);
 
-        // Each neighbour that was only in the boundary because of the removed
-        // cell must be re-evaluated.
         std::array<int, 4> nbrs{};
-        const auto count = Grid8x8::neighbours (last, nbrs);
+        const auto count = grid_.neighbours (last, nbrs);
         for (std::size_t i = 0; i < count; ++i) {
             const int idx = nbrs[i];
             if (cells_[static_cast<std::size_t> (idx)]) continue;
@@ -108,14 +120,11 @@ private:
     }
 
     int pickSeed() {
-        std::uniform_int_distribution<int> dist (0, Grid8x8::cellCount - 1);
+        std::uniform_int_distribution<int> dist (0, grid_.cellCount() - 1);
         return dist (rng_);
     }
 
     int pickFromBoundary() {
-        // Defensive: if the cluster has somehow eaten its own boundary
-        // (shouldn't happen on a connected grid below full capacity), fall
-        // back to picking any inactive cell at random.
         if (boundary_.empty())
             return pickAnyInactive();
 
@@ -127,8 +136,9 @@ private:
 
     int pickAnyInactive() {
         std::vector<int> inactive;
-        inactive.reserve (Grid8x8::cellCount);
-        for (int i = 0; i < Grid8x8::cellCount; ++i)
+        const int n = grid_.cellCount();
+        inactive.reserve (static_cast<std::size_t> (n));
+        for (int i = 0; i < n; ++i)
             if (! cells_[static_cast<std::size_t> (i)])
                 inactive.push_back (i);
 
@@ -138,13 +148,14 @@ private:
 
     bool hasActiveNeighbour (int index) const {
         std::array<int, 4> nbrs{};
-        const auto count = Grid8x8::neighbours (index, nbrs);
+        const auto count = grid_.neighbours (index, nbrs);
         for (std::size_t i = 0; i < count; ++i)
             if (cells_[static_cast<std::size_t> (nbrs[i])])
                 return true;
         return false;
     }
 
+    Grid grid_;
     Cells cells_{};
     std::vector<int> growthOrder_;
     std::set<int> boundary_;

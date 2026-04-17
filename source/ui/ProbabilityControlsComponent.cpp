@@ -1,5 +1,6 @@
 #include "ProbabilityControlsComponent.h"
 #include "../PluginProcessor.h"
+#include "Icons.h"
 
 namespace {
     int countActiveSteps(const std::array<bool, 64>& cells) {
@@ -12,12 +13,17 @@ namespace {
 ProbabilityControlsComponent::ProbabilityControlsComponent(PluginProcessor& processor)
     : StateListenerComponent(processor)
     , probabilitySlider("Probability")
+    , randomizeButton(&Icons::createDiceIcon, &Icons::createDiceIcon, true, false)
+    , divideButton(&Icons::createDivideIcon, &Icons::createDivideIcon, false, false)
 {
     setPaintingIsUnclipped(true);
     addAndMakeVisible(probabilitySlider);
+    addAndMakeVisible(randomizeButton);
+    addAndMakeVisible(divideButton);
     addAndMakeVisible(probabilityGauge);
 
     listenToPlayProbability();
+    syncGaugeGridDim();
     updateUIFromState();
 
     probabilitySlider.onValueChange = [this](float newValue) {
@@ -27,6 +33,18 @@ ProbabilityControlsComponent::ProbabilityControlsComponent(PluginProcessor& proc
         getState().setProbabilityPercentage(percentage);
         DBG("Probability randomized: " << percentage << "%");
 
+        pushStateToGauge();
+    };
+
+    randomizeButton.onClick = [this](bool) {
+        getState().randomizeProbabilityUniform();
+        pushStateToGauge();
+    };
+
+    divideButton.onClick = [this](bool) {
+        const int next = (getState().getProbabilityDivisionLevel() + 1) % 3;
+        getState().setProbabilityDivisionLevel(next);
+        syncGaugeGridDim();
         pushStateToGauge();
     };
 }
@@ -44,18 +62,30 @@ void ProbabilityControlsComponent::resized() {
     using namespace ProbabilityControlsConstants;
 
     auto bounds = getLocalBounds();
-    const int halfWidth = bounds.getWidth() / 2;
+    const int totalW = bounds.getWidth();
 
-    auto leftHalf = bounds.removeFromLeft(halfWidth);
-    auto rightHalf = bounds;
+    // 3-column layout: slider | buttons | gauge. Buttons column is narrow
+    // (two stacked square buttons), slider and gauge split the rest evenly.
+    const int buttonColWidth = juce::jmin(totalW / 5, 44);
+    const int sideWidth = (totalW - buttonColWidth) / 2;
 
-    auto sliderArea = leftHalf.withSizeKeepingCentre(leftHalf.getWidth(), leftHalf.getHeight());
-    probabilitySlider.setBounds(sliderArea);
+    auto sliderArea = bounds.removeFromLeft(sideWidth);
+    auto buttonCol  = bounds.removeFromLeft(buttonColWidth);
+    auto gaugeArea  = bounds;
+
+    probabilitySlider.setBounds(sliderArea.withSizeKeepingCentre(sliderArea.getWidth(), sliderArea.getHeight()));
+
+    const int half = buttonCol.getHeight() / 2;
+    auto topButton = buttonCol.removeFromTop(half);
+    auto bottomButton = buttonCol;
+    const int buttonSide = juce::jmin(topButton.getWidth(), topButton.getHeight()) - 6;
+    randomizeButton.setBounds(topButton.withSizeKeepingCentre(buttonSide, buttonSide));
+    divideButton.setBounds(bottomButton.withSizeKeepingCentre(buttonSide, buttonSide));
 
     constexpr int gaugePadding = 5;
-    auto gaugeArea = rightHalf.reduced(gaugePadding);
-    int side = static_cast<int>(std::min(gaugeArea.getWidth(), gaugeArea.getHeight()) * gaugeScale);
-    probabilityGauge.setBounds(gaugeArea.withSizeKeepingCentre(side, side));
+    auto paddedGauge = gaugeArea.reduced(gaugePadding);
+    int side = static_cast<int>(std::min(paddedGauge.getWidth(), paddedGauge.getHeight()) * gaugeScale);
+    probabilityGauge.setBounds(paddedGauge.withSizeKeepingCentre(side, side));
 }
 
 void ProbabilityControlsComponent::onStateChanged() {
@@ -72,6 +102,10 @@ std::array<bool, 64> ProbabilityControlsComponent::readProbabilityArray() const 
 
 void ProbabilityControlsComponent::pushStateToGauge() {
     probabilityGauge.updateFromProbabilityArray(readProbabilityArray());
+}
+
+void ProbabilityControlsComponent::syncGaugeGridDim() {
+    probabilityGauge.setGridDim(getState().getProbabilityGridDim());
 }
 
 void ProbabilityControlsComponent::updateUIFromState() {

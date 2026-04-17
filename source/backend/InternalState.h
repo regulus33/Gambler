@@ -72,6 +72,7 @@ public:
         static inline const juce::Identifier SEQ_CURRENT_INDEX {"seq_current_index"};
         static inline const juce::Identifier SEQ_LAST_PROB_INDEX {"seq_last_prob_index"};
         static inline const juce::Identifier SEQ_VIEW_WINDOW_START {"seq_view_window_start"};
+        static inline const juce::Identifier PROB_DIVISION_LEVEL {"prob_division_level"};
 
         // Play probability: prob_X
         static juce::Identifier playProbability(int index) {
@@ -153,6 +154,9 @@ public:
     // ========================================
     bool getPlayProbability(int index) const;
     void setPlayProbability(int index, bool enabled);
+
+    int getProbabilityDivisionLevel() const;
+    void setProbabilityDivisionLevel(int level);
 
     // ========================================
     // NOTE COLOURS

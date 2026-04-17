@@ -175,6 +175,14 @@ void InternalState::setPlayProbability(int index, bool enabled) {
     tree.setProperty(IDs::playProbability(index), enabled, nullptr);
 }
 
+int InternalState::getProbabilityDivisionLevel() const {
+    return tree.getProperty(IDs::PROB_DIVISION_LEVEL, 0);
+}
+
+void InternalState::setProbabilityDivisionLevel(int level) {
+    tree.setProperty(IDs::PROB_DIVISION_LEVEL, juce::jlimit(0, 2, level), nullptr);
+}
+
 // ========================================
 // NOTE COLOURS
 // ========================================
@@ -239,6 +247,7 @@ void InternalState::initializeDefaults() {
     for (int i = 0; i < ParamConstants::MAX_STEPS; ++i) {
         tree.setProperty(IDs::playProbability(i), true, nullptr);
     }
+    tree.setProperty(IDs::PROB_DIVISION_LEVEL, 0, nullptr);
 
     // Initialize note colours
     for (int i = 0; i < 12; ++i) {

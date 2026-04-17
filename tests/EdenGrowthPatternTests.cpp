@@ -1,5 +1,5 @@
 #include "algorithms/probability/EdenGrowthPattern.h"
-#include "algorithms/probability/Grid8x8.h"
+#include "algorithms/probability/Grid.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -9,23 +9,25 @@
 #include <unordered_set>
 
 using algorithms::probability::EdenGrowthPattern;
-using algorithms::probability::Grid8x8;
+using algorithms::probability::Grid;
 
 namespace {
 
-int countActive(const EdenGrowthPattern::Cells& cells) {
+constexpr int defaultDim = Grid::maxDim;
+
+int countActive(const EdenGrowthPattern::Cells& cells, int upTo) {
     int n = 0;
-    for (bool on : cells) if (on) ++n;
+    for (int i = 0; i < upTo; ++i)
+        if (cells[static_cast<std::size_t>(i)]) ++n;
     return n;
 }
 
-// Verify the active cells form a single connected region (4-neighbour).
-bool isConnected(const EdenGrowthPattern::Cells& cells) {
+bool isConnected(const EdenGrowthPattern::Cells& cells, const Grid& grid) {
     int seed = -1;
-    for (int i = 0; i < Grid8x8::cellCount; ++i) {
+    for (int i = 0; i < grid.cellCount(); ++i) {
         if (cells[static_cast<std::size_t>(i)]) { seed = i; break; }
     }
-    if (seed < 0) return true; // empty cluster is trivially connected
+    if (seed < 0) return true;
 
     std::unordered_set<int> visited;
     std::queue<int> q;
@@ -35,7 +37,7 @@ bool isConnected(const EdenGrowthPattern::Cells& cells) {
     while (! q.empty()) {
         const int idx = q.front(); q.pop();
         std::array<int, 4> nbrs{};
-        const auto count = Grid8x8::neighbours(idx, nbrs);
+        const auto count = grid.neighbours(idx, nbrs);
         for (std::size_t i = 0; i < count; ++i) {
             const int n = nbrs[i];
             if (cells[static_cast<std::size_t>(n)] && ! visited.count(n)) {
@@ -45,51 +47,51 @@ bool isConnected(const EdenGrowthPattern::Cells& cells) {
         }
     }
 
-    return static_cast<int>(visited.size()) == countActive(cells);
+    return static_cast<int>(visited.size()) == countActive(cells, grid.cellCount());
 }
 
 } // namespace
 
 TEST_CASE("EdenGrowthPattern starts empty", "[algorithms][eden]") {
-    EdenGrowthPattern pattern(42);
+    EdenGrowthPattern pattern(defaultDim, 42);
     REQUIRE(pattern.activeCount() == 0);
-    REQUIRE(countActive(pattern.cells()) == 0);
+    REQUIRE(countActive(pattern.cells(), pattern.gridCellCount()) == 0);
 }
 
 TEST_CASE("EdenGrowthPattern reaches exact requested count", "[algorithms][eden]") {
-    EdenGrowthPattern pattern(42);
+    EdenGrowthPattern pattern(defaultDim, 42);
 
     for (int target : {1, 7, 32, 63, 64}) {
         pattern.setActiveCount(target);
         REQUIRE(pattern.activeCount() == target);
-        REQUIRE(countActive(pattern.cells()) == target);
+        REQUIRE(countActive(pattern.cells(), pattern.gridCellCount()) == target);
     }
 }
 
 TEST_CASE("EdenGrowthPattern clamps out-of-range counts", "[algorithms][eden]") {
-    EdenGrowthPattern pattern(1);
+    EdenGrowthPattern pattern(defaultDim, 1);
 
     pattern.setActiveCount(-5);
     REQUIRE(pattern.activeCount() == 0);
 
     pattern.setActiveCount(9999);
-    REQUIRE(pattern.activeCount() == Grid8x8::cellCount);
+    REQUIRE(pattern.activeCount() == pattern.gridCellCount());
 }
 
 TEST_CASE("EdenGrowthPattern produces a connected cluster", "[algorithms][eden]") {
-    EdenGrowthPattern pattern(123);
+    EdenGrowthPattern pattern(defaultDim, 123);
+    Grid grid(defaultDim);
 
-    // Try a range of sizes — all should be one connected blob.
     for (int target : {1, 5, 12, 25, 40, 55}) {
         pattern.clear();
         pattern.setActiveCount(target);
         INFO("target = " << target);
-        REQUIRE(isConnected(pattern.cells()));
+        REQUIRE(isConnected(pattern.cells(), grid));
     }
 }
 
 TEST_CASE("EdenGrowthPattern grows monotonically", "[algorithms][eden]") {
-    EdenGrowthPattern pattern(7);
+    EdenGrowthPattern pattern(defaultDim, 7);
 
     pattern.setActiveCount(10);
     const auto snapshot = pattern.cells();
@@ -97,15 +99,14 @@ TEST_CASE("EdenGrowthPattern grows monotonically", "[algorithms][eden]") {
     pattern.setActiveCount(20);
     const auto& grown = pattern.cells();
 
-    // Every cell active at count=10 should still be active at count=20.
-    for (std::size_t i = 0; i < snapshot.size(); ++i) {
+    for (std::size_t i = 0; i < snapshot.size(); ++i)
         if (snapshot[i]) REQUIRE(grown[i]);
-    }
-    REQUIRE(countActive(grown) == 20);
+
+    REQUIRE(countActive(grown, pattern.gridCellCount()) == 20);
 }
 
 TEST_CASE("EdenGrowthPattern shrink reverses growth", "[algorithms][eden]") {
-    EdenGrowthPattern pattern(99);
+    EdenGrowthPattern pattern(defaultDim, 99);
 
     pattern.setActiveCount(15);
     const auto target = pattern.cells();
@@ -117,10 +118,10 @@ TEST_CASE("EdenGrowthPattern shrink reverses growth", "[algorithms][eden]") {
 }
 
 TEST_CASE("EdenGrowthPattern reseed clears state and resets RNG", "[algorithms][eden]") {
-    EdenGrowthPattern a(2024);
+    EdenGrowthPattern a(defaultDim, 2024);
     a.setActiveCount(20);
 
-    EdenGrowthPattern b(2024);
+    EdenGrowthPattern b(defaultDim, 2024);
     b.setActiveCount(20);
 
     REQUIRE(a.cells() == b.cells());
@@ -132,9 +133,43 @@ TEST_CASE("EdenGrowthPattern reseed clears state and resets RNG", "[algorithms][
 }
 
 TEST_CASE("EdenGrowthPattern setActiveCount(0) clears", "[algorithms][eden]") {
-    EdenGrowthPattern pattern(5);
+    EdenGrowthPattern pattern(defaultDim, 5);
     pattern.setActiveCount(30);
     pattern.setActiveCount(0);
     REQUIRE(pattern.activeCount() == 0);
-    REQUIRE(countActive(pattern.cells()) == 0);
+    REQUIRE(countActive(pattern.cells(), pattern.gridCellCount()) == 0);
+}
+
+TEST_CASE("EdenGrowthPattern works on smaller grids", "[algorithms][eden]") {
+    SECTION("4x4 grid clamps to 16 and connects") {
+        EdenGrowthPattern pattern(4, 11);
+        Grid grid(4);
+        pattern.setActiveCount(8);
+        REQUIRE(pattern.activeCount() == 8);
+        REQUIRE(countActive(pattern.cells(), 16) == 8);
+        REQUIRE(isConnected(pattern.cells(), grid));
+
+        pattern.setActiveCount(999);
+        REQUIRE(pattern.activeCount() == 16);
+    }
+
+    SECTION("2x2 grid only ever holds 4 cells") {
+        EdenGrowthPattern pattern(2, 22);
+        pattern.setActiveCount(3);
+        REQUIRE(pattern.activeCount() == 3);
+        REQUIRE(countActive(pattern.cells(), 4) == 3);
+    }
+}
+
+TEST_CASE("EdenGrowthPattern setGridDim resets cluster", "[algorithms][eden]") {
+    EdenGrowthPattern pattern(defaultDim, 42);
+    pattern.setActiveCount(20);
+    REQUIRE(pattern.activeCount() == 20);
+
+    pattern.setGridDim(4);
+    REQUIRE(pattern.gridDim() == 4);
+    REQUIRE(pattern.activeCount() == 0);
+
+    pattern.setActiveCount(8);
+    REQUIRE(pattern.activeCount() == 8);
 }
