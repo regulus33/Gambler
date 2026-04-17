@@ -67,6 +67,8 @@ protected:
 
 private:
     void updateUIFromState();
+    std::array<bool, 64> readProbabilityArray() const;
+    void pushStateToGauge();
 
     AnalogueSlider probabilitySlider;
     ProbabilityGauge probabilityGauge;

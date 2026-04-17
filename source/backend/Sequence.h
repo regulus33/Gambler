@@ -3,12 +3,13 @@
 #include "Step.h"
 #include "ScaleQuantizer.h"
 #include "InternalState.h"
+#include "../algorithms/probability/EdenGrowthPattern.h"
 #include "../data/Params.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <array>
 #include <atomic>
+#include <cstddef>
 #include <random>
-#include <vector>
 
 /**
  * Sequence - The sequencer's playback and mutation engine.
@@ -101,21 +102,13 @@ public:
 
     void setProbabilityPercentage(int percentage) {
         percentage = juce::jlimit(0, 100, percentage);
-        int numToPlay = (ParamConstants::MAX_STEPS * percentage) / 100;
+        const int numToPlay = (ParamConstants::MAX_STEPS * percentage) / 100;
 
-        for (int i = 0; i < ParamConstants::MAX_STEPS; i++)
-            setPlayProbability(i, false);
+        probabilityPattern.setActiveCount(numToPlay);
+        const auto& cells = probabilityPattern.cells();
 
-        thread_local std::random_device rd;
-        thread_local std::mt19937 gen(rd());
-
-        std::vector<int> indices;
-        for (int i = 0; i < ParamConstants::MAX_STEPS; i++)
-            indices.push_back(i);
-        std::shuffle(indices.begin(), indices.end(), gen);
-
-        for (int i = 0; i < numToPlay && i < static_cast<int>(indices.size()); i++)
-            setPlayProbability(indices[i], true);
+        for (int i = 0; i < ParamConstants::MAX_STEPS; ++i)
+            setPlayProbability(i, cells[static_cast<std::size_t>(i)]);
     }
 
     // ========================================
@@ -276,6 +269,8 @@ private:
     APVTS& apvts;
     InternalState& internal;
     ScaleQuantizer& scaleQ;
+
+    algorithms::probability::EdenGrowthPattern probabilityPattern;
 
     // Lock-free SPSC ring buffer
     struct PendingNoteWrite {

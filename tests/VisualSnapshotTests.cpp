@@ -120,6 +120,38 @@ TEST_CASE ("Visual - ProbabilityGauge", "[visual]")
     snap (f.getMainScreen().getMainControls().getProbabilityControls().getProbabilityGauge(), "probability_gauge");
 }
 
+static void snapEdenAt (PluginTestFixture& f, int percent, const char* name)
+{
+    f.getState().setProbabilityPercentage (percent);
+    std::array<bool, 64> cells{};
+    for (int i = 0; i < 64; ++i)
+        cells[static_cast<std::size_t>(i)] = f.getState().getPlayProbability (i);
+    auto& gauge = f.getMainScreen().getMainControls().getProbabilityControls().getProbabilityGauge();
+    gauge.updateFromProbabilityArray (cells);
+    snap (gauge, name);
+}
+
+TEST_CASE ("Visual - ProbabilityGauge Eden 25%", "[visual]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    snapEdenAt (f, 25, "probability_gauge_eden_25");
+}
+
+TEST_CASE ("Visual - ProbabilityGauge Eden 50%", "[visual]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    snapEdenAt (f, 50, "probability_gauge_eden_50");
+}
+
+TEST_CASE ("Visual - ProbabilityGauge Eden 75%", "[visual]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    snapEdenAt (f, 75, "probability_gauge_eden_75");
+}
+
 TEST_CASE ("Visual - SequenceOverviewComponent", "[visual]")
 {
     getJuceInit();
