@@ -52,11 +52,12 @@ namespace MainScreenLayout {
     // Compact mode shared layout — both compact rows target the same ideal
     // window height so swapping modes doesn't resize the host. Driven by the
     // compact-top row's minimum needs.
-    constexpr int compactContentGap    = 15;  // gap between navbar and the row (both modes)
-    constexpr int compactBottomPadding = 32;  // breathing room below content (compact top)
+    constexpr int compactTopContentGap    = 15;  // gap between navbar and content (compact top row)
+    constexpr int compactBottomContentGap = 15;  // gap between navbar and content (compact bottom row)
+    constexpr int compactBottomPadding    = 32;  // breathing room below content (compact top)
     // = 45 (navbar) + 15 (gap) + 25 (titles) + 210 (content) + 32 (bottom) = 327
     constexpr int compactIdealHeight =
-        NavBarConstants::height + compactContentGap + titleRowHeight
+        NavBarConstants::height + compactTopContentGap + titleRowHeight
         + compactTopContentHeight + compactBottomPadding;
 }
 
@@ -151,10 +152,9 @@ public:
         area.removeFromTop(NavBarConstants::height);
 
         if (compactMode_) {
-            // Compact mode: both rows use the same gap below the navbar so the
-            // row sits at the same vertical distance from the logo/navbar
-            // regardless of which mode is active.
-            area.removeFromTop(compactContentGap);
+            // Compact mode: each row has its own gap below the navbar so they
+            // can be tuned independently.
+            area.removeFromTop(showingTopRow_ ? compactTopContentGap : compactBottomContentGap);
 
             if (showingTopRow_) {
                 // Title row reserves its own height above the content block.
