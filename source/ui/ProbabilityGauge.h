@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <vector>
 
 namespace ProbabilityGaugeConstants {
@@ -60,6 +61,15 @@ public:
 
         const int blockSize = gridSize / currentGridDim;
 
+        // Map the underlying step highlight (0..63) into the current display grid
+        // so highlighting still works after dividing.
+        int highlightedDisplayIndex = -1;
+        if (highlightedCircleIndex >= 0 && highlightedCircleIndex < gridSize * gridSize) {
+            const int hRow = highlightedCircleIndex / gridSize;
+            const int hCol = highlightedCircleIndex % gridSize;
+            highlightedDisplayIndex = (hRow / blockSize) * currentGridDim + (hCol / blockSize);
+        }
+
         for (int row = 0; row < currentGridDim; ++row) {
             for (int col = 0; col < currentGridDim; ++col) {
                 const int displayIndex = row * currentGridDim + col;
@@ -70,7 +80,7 @@ public:
                 const float x = offsetX + static_cast<float>(col) * cellSize + padding;
                 const float y = offsetY + static_cast<float>(row) * cellSize + padding;
 
-                const bool isHighlighted = (displayIndex == highlightedCircleIndex);
+                const bool isHighlighted = (displayIndex == highlightedDisplayIndex);
                 const bool isActive = circleStates[static_cast<std::size_t>(underlyingIndex)];
 
                 if (isHighlighted)
@@ -87,6 +97,33 @@ public:
         // The component size is fixed based on the grid dimensions
         // No dynamic resizing needed - parent should allocate appropriate space
     }
+
+    void mouseDown(const juce::MouseEvent& e) override {
+        const auto bounds = getLocalBounds();
+        const float boundsW = static_cast<float>(bounds.getWidth());
+        const float boundsH = static_cast<float>(bounds.getHeight());
+        const float cellW = boundsW / static_cast<float>(currentGridDim);
+        const float cellH = boundsH / static_cast<float>(currentGridDim);
+        const float cellSize = std::min(cellW, cellH);
+        const float totalGridSize = cellSize * static_cast<float>(currentGridDim);
+        const float offsetX = (boundsW - totalGridSize) * 0.5f;
+        const float offsetY = (boundsH - totalGridSize) * 0.5f;
+
+        const float relX = static_cast<float>(e.x) - offsetX;
+        const float relY = static_cast<float>(e.y) - offsetY;
+        if (relX < 0.0f || relY < 0.0f || relX >= totalGridSize || relY >= totalGridSize) return;
+
+        const int col = static_cast<int>(relX / cellSize);
+        const int row = static_cast<int>(relY / cellSize);
+        if (col < 0 || col >= currentGridDim || row < 0 || row >= currentGridDim) return;
+
+        if (onCellClicked) onCellClicked(row, col);
+    }
+
+    // Fired when the user clicks a display cell. Coordinates are in the current
+    // display grid (0..currentGridDim-1). The owner is responsible for mapping
+    // to the underlying 64-step array and updating state.
+    std::function<void(int row, int col)> onCellClicked;
 
     /**
      * Update the gauge display from a boolean array (from backend).

@@ -47,6 +47,25 @@ ProbabilityControlsComponent::ProbabilityControlsComponent(PluginProcessor& proc
         syncGaugeGridDim();
         pushStateToGauge();
     };
+
+    probabilityGauge.onCellClicked = [this](int row, int col) {
+        auto& state = getState();
+        const int dim = state.getProbabilityGridDim();
+        const int blockSize = ProbabilityGaugeConstants::gridSize / dim;
+        const int topLeftRow = row * blockSize;
+        const int topLeftCol = col * blockSize;
+        const int topLeftIdx = topLeftRow * ProbabilityGaugeConstants::gridSize + topLeftCol;
+        const bool nextState = ! state.getPlayProbability(topLeftIdx);
+
+        for (int dr = 0; dr < blockSize; ++dr) {
+            for (int dc = 0; dc < blockSize; ++dc) {
+                const int idx = (topLeftRow + dr) * ProbabilityGaugeConstants::gridSize
+                              + (topLeftCol + dc);
+                state.setPlayProbability(idx, nextState);
+            }
+        }
+        updateUIFromState();
+    };
 }
 
 void ProbabilityControlsComponent::paint(juce::Graphics& g) {
@@ -75,10 +94,13 @@ void ProbabilityControlsComponent::resized() {
 
     probabilitySlider.setBounds(sliderArea.withSizeKeepingCentre(sliderArea.getWidth(), sliderArea.getHeight()));
 
+    buttonCol.removeFromTop(randomizeMarginTop);
+    buttonCol.removeFromBottom(divideMarginBottom);
     const int half = buttonCol.getHeight() / 2;
     auto topButton = buttonCol.removeFromTop(half);
     auto bottomButton = buttonCol;
-    const int buttonSide = juce::jmin(topButton.getWidth(), topButton.getHeight()) - 6;
+    const int rawSide = juce::jmin(topButton.getWidth(), topButton.getHeight());
+    const int buttonSide = static_cast<int>(rawSide * buttonScale);
     randomizeButton.setBounds(topButton.withSizeKeepingCentre(buttonSide, buttonSide));
     divideButton.setBounds(bottomButton.withSizeKeepingCentre(buttonSide, buttonSide));
 

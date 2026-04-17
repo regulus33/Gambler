@@ -15,6 +15,9 @@ namespace ProbabilityControlsConstants {
     constexpr int gaugeSize = 56;        // legacy fixed size (unused)
     constexpr float gaugeScale = 0.7f;   // scale factor for gauge within its padded area
     constexpr int containerHeight = 94;  // Height of the component
+    constexpr float buttonScale = 0.7f;  // scale factor for dice/divide button icons
+    constexpr int randomizeMarginTop = 6;   // top margin above the randomize (dice) button
+    constexpr int divideMarginBottom = 6;   // bottom margin below the divide button
 }
 
 /**
