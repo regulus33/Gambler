@@ -81,9 +81,9 @@ void ProbabilityControlsComponent::resized() {
     auto bounds = getLocalBounds();
     const int totalW = bounds.getWidth();
 
-    // 3-column layout: slider | buttons | gauge. Buttons column is narrow
-    // (two stacked square buttons), slider and gauge split the rest evenly.
-    const int buttonColWidth = juce::jmin(totalW / 5, 44);
+    // 3-column layout: slider | buttons | gauge. Button column is narrow so the
+    // slider keeps room for its "Probability" label.
+    const int buttonColWidth = juce::jmin(totalW / 8, buttonColMaxWidth);
     const int sideWidth = (totalW - buttonColWidth) / 2;
 
     auto sliderArea = bounds.removeFromLeft(sideWidth);
@@ -92,20 +92,18 @@ void ProbabilityControlsComponent::resized() {
 
     probabilitySlider.setBounds(sliderArea.withSizeKeepingCentre(sliderArea.getWidth(), sliderArea.getHeight()));
 
-    buttonCol.removeFromTop(randomizeMarginTop);
-    buttonCol.removeFromBottom(divideMarginBottom);
-    const int half = buttonCol.getHeight() / 2;
-    auto topButton = buttonCol.removeFromTop(half);
-    auto bottomButton = buttonCol;
-    const int rawSide = juce::jmin(topButton.getWidth(), topButton.getHeight());
-    const int buttonSide = static_cast<int>(rawSide * buttonScale);
-    randomizeButton.setBounds(topButton.withSizeKeepingCentre(buttonSide, buttonSide));
-    divideButton.setBounds(bottomButton.withSizeKeepingCentre(buttonSide, buttonSide));
-
     constexpr int gaugePadding = 5;
     auto paddedGauge = gaugeArea.reduced(gaugePadding);
-    int side = static_cast<int>(std::min(paddedGauge.getWidth(), paddedGauge.getHeight()) * gaugeScale);
-    probabilityGauge.setBounds(paddedGauge.withSizeKeepingCentre(side, side));
+    const int gaugeSide = static_cast<int>(std::min(paddedGauge.getWidth(), paddedGauge.getHeight()) * gaugeScale);
+    auto gaugeBounds = paddedGauge.withSizeKeepingCentre(gaugeSide, gaugeSide);
+    probabilityGauge.setBounds(gaugeBounds);
+
+    // Buttons hug the gauge: dice top edge = gauge top, divide bottom = gauge bottom.
+    const int rawSide = juce::jmin(buttonCol.getWidth(), buttonCol.getHeight() / 2);
+    const int buttonSide = static_cast<int>(rawSide * buttonScale);
+    const int btnX = buttonCol.getCentreX() - buttonSide / 2;
+    randomizeButton.setBounds(btnX, gaugeBounds.getY(), buttonSide, buttonSide);
+    divideButton.setBounds(btnX, gaugeBounds.getBottom() - buttonSide, buttonSide, buttonSide);
 }
 
 void ProbabilityControlsComponent::onStateChanged() {
