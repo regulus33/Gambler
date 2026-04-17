@@ -48,20 +48,18 @@ ProbabilityControlsComponent::ProbabilityControlsComponent(PluginProcessor& proc
         pushStateToGauge();
     };
 
-    probabilityGauge.onCellClicked = [this](int row, int col) {
+    probabilityGauge.onCellPainted = [this](int row, int col, bool active) {
         auto& state = getState();
         const int dim = state.getProbabilityGridDim();
         const int blockSize = ProbabilityGaugeConstants::gridSize / dim;
         const int topLeftRow = row * blockSize;
         const int topLeftCol = col * blockSize;
-        const int topLeftIdx = topLeftRow * ProbabilityGaugeConstants::gridSize + topLeftCol;
-        const bool nextState = ! state.getPlayProbability(topLeftIdx);
 
         for (int dr = 0; dr < blockSize; ++dr) {
             for (int dc = 0; dc < blockSize; ++dc) {
                 const int idx = (topLeftRow + dr) * ProbabilityGaugeConstants::gridSize
                               + (topLeftCol + dc);
-                state.setPlayProbability(idx, nextState);
+                state.setPlayProbability(idx, active);
             }
         }
         updateUIFromState();

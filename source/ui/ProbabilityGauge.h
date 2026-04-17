@@ -97,31 +97,35 @@ public:
     }
 
     void mouseDown(const juce::MouseEvent& e) override {
-        const auto bounds = getLocalBounds();
-        const float boundsW = static_cast<float>(bounds.getWidth());
-        const float boundsH = static_cast<float>(bounds.getHeight());
-        const float cellW = boundsW / static_cast<float>(currentGridDim);
-        const float cellH = boundsH / static_cast<float>(currentGridDim);
-        const float cellSize = std::min(cellW, cellH);
-        const float totalGridSize = cellSize * static_cast<float>(currentGridDim);
-        const float offsetX = (boundsW - totalGridSize) * 0.5f;
-        const float offsetY = (boundsH - totalGridSize) * 0.5f;
+        int row, col;
+        if (! hitTestCell(e.x, e.y, row, col)) return;
 
-        const float relX = static_cast<float>(e.x) - offsetX;
-        const float relY = static_cast<float>(e.y) - offsetY;
-        if (relX < 0.0f || relY < 0.0f || relX >= totalGridSize || relY >= totalGridSize) return;
+        // Paint state for this drag stroke = inverse of the cell we started on.
+        const int blockSize = ProbabilityGaugeConstants::gridSize / currentGridDim;
+        const int underlyingIdx =
+            (row * blockSize) * ProbabilityGaugeConstants::gridSize + (col * blockSize);
+        dragPaintActive_ = ! circleStates[static_cast<std::size_t>(underlyingIdx)];
+        lastPaintedRow_ = row;
+        lastPaintedCol_ = col;
 
-        const int col = static_cast<int>(relX / cellSize);
-        const int row = static_cast<int>(relY / cellSize);
-        if (col < 0 || col >= currentGridDim || row < 0 || row >= currentGridDim) return;
-
-        if (onCellClicked) onCellClicked(row, col);
+        if (onCellPainted) onCellPainted(row, col, dragPaintActive_);
     }
 
-    // Fired when the user clicks a display cell. Coordinates are in the current
-    // display grid (0..currentGridDim-1). The owner is responsible for mapping
-    // to the underlying 64-step array and updating state.
-    std::function<void(int row, int col)> onCellClicked;
+    void mouseDrag(const juce::MouseEvent& e) override {
+        int row, col;
+        if (! hitTestCell(e.x, e.y, row, col)) return;
+        if (row == lastPaintedRow_ && col == lastPaintedCol_) return;
+
+        lastPaintedRow_ = row;
+        lastPaintedCol_ = col;
+        if (onCellPainted) onCellPainted(row, col, dragPaintActive_);
+    }
+
+    // Fired when the user clicks or drags over a display cell. Coordinates are
+    // in the current display grid (0..currentGridDim-1). `active` is the state
+    // to apply (set on mouseDown as the inverse of the starting cell, then held
+    // for the rest of the drag stroke).
+    std::function<void(int row, int col, bool active)> onCellPainted;
 
     /**
      * Update the gauge display from a boolean array (from backend).
@@ -187,6 +191,36 @@ public:
     }
 
 private:
+    bool hitTestCell(int mouseX, int mouseY, int& rowOut, int& colOut) const {
+        const auto bounds = getLocalBounds();
+        const float boundsW = static_cast<float>(bounds.getWidth());
+        const float boundsH = static_cast<float>(bounds.getHeight());
+        const float cellW = boundsW / static_cast<float>(currentGridDim);
+        const float cellH = boundsH / static_cast<float>(currentGridDim);
+        const float cellSize = std::min(cellW, cellH);
+        const float totalGridSize = cellSize * static_cast<float>(currentGridDim);
+        const float offsetX = (boundsW - totalGridSize) * 0.5f;
+        const float offsetY = (boundsH - totalGridSize) * 0.5f;
+
+        const float relX = static_cast<float>(mouseX) - offsetX;
+        const float relY = static_cast<float>(mouseY) - offsetY;
+        if (relX < 0.0f || relY < 0.0f || relX >= totalGridSize || relY >= totalGridSize)
+            return false;
+
+        const int col = static_cast<int>(relX / cellSize);
+        const int row = static_cast<int>(relY / cellSize);
+        if (col < 0 || col >= currentGridDim || row < 0 || row >= currentGridDim) return false;
+
+        rowOut = row;
+        colOut = col;
+        return true;
+    }
+
+    // Drag-paint state (set on mouseDown, applied throughout the drag stroke)
+    bool dragPaintActive_ = false;
+    int lastPaintedRow_ = -1;
+    int lastPaintedCol_ = -1;
+
     // Colors
     const juce::Colour activeColour { ProbabilityGaugeConstants::activeColourHex };
     const juce::Colour inactiveColour { ProbabilityGaugeConstants::inactiveColourHex };
