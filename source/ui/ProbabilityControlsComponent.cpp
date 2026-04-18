@@ -78,7 +78,7 @@ void ProbabilityControlsComponent::paint(juce::Graphics& g) {
 void ProbabilityControlsComponent::resized() {
     using namespace ProbabilityControlsConstants;
 
-    auto bounds = getLocalBounds();
+    auto bounds = getLocalBounds().reduced(innerPadding);
     const int totalW = bounds.getWidth();
 
     // 3-column layout: slider | buttons | gauge. Button column is narrow so the

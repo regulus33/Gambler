@@ -17,6 +17,7 @@ namespace ProbabilityControlsConstants {
     constexpr int containerHeight = 94;  // Height of the component
     constexpr float buttonScale = 1.05f;    // scale factor for dice/divide button icons (0.7 * 1.5)
     constexpr int buttonColMaxWidth = 24;   // upper bound on the dice/divide column width
+    constexpr int innerPadding = 7;         // gap between border and inner content (matches NoteControlsComponent)
 }
 
 /**
