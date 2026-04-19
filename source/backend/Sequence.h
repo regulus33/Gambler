@@ -199,8 +199,9 @@ public:
             }
 
             int unquantized = generateRandomNoteUnquantized();
-            queueNoteWrite(idx, substepIdx, scaleQ.bake(unquantized));
-            return scaleQ.quantize(unquantized);
+            int baked = scaleQ.bake(unquantized);
+            queueNoteWrite(idx, substepIdx, baked);
+            return scaleQ.destructiveScale() ? baked : scaleQ.quantize(unquantized);
         }
 
         return tickStep(idx);
