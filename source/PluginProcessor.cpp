@@ -1039,15 +1039,9 @@ void PluginProcessor::routeLearnableMessage (MidiMessageType type,
         return;
     }
 
-    MidiControlId controlId;
-    if (type == MidiMessageType::NOTE) {
-        // Notes always route somewhere: user mapping first, else default scale key
-        controlId = MidiNoteRouter::resolve(midiLearnRegistry, channel, midiNumber);
-    } else {
-        controlId = midiLearnRegistry.findUserMapping(type, channel, midiNumber);
-        if (controlId == MidiControlId::COUNT)
-            return;
-    }
+    MidiControlId controlId = midiLearnRegistry.findUserMapping(type, channel, midiNumber);
+    if (controlId == MidiControlId::COUNT)
+        return;
 
     MidiMapping mapping { type, midiNumber, controlId };
 

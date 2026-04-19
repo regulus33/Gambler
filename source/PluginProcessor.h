@@ -4,7 +4,6 @@
 #include "backend/DawSync.h"
 #include "backend/InternalState.h"
 #include "backend/MidiLearnRegistry.h"
-#include "backend/MidiNoteRouter.h"
 #include "backend/NoteOffScheduler.h"
 #include "backend/PresetManager.h"
 #include "backend/PreviewMidiFifo.h"

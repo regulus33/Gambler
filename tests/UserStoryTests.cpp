@@ -13,7 +13,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <data/Params.h>
 #include <backend/Scale.h>
-#include <backend/MidiNoteRouter.h>
 #include <ui/MainScreenComponent.h>
 #include <ui/SequenceGrid.h>
 #include <ui/SequenceOverviewComponent.h>
@@ -2654,20 +2653,16 @@ SCENARIO("MIDI-driven destructive scale+range combined bakes notes and freezes o
 }
 
 // ============================================================================
-// MIDI NOTE ROUTING: default scale keys vs. user overrides
+// MIDI NOTE ROUTING: only explicitly mapped notes trigger controls
 // ============================================================================
 //
-// By default, every incoming MIDI note triggers the corresponding piano-roll
-// scale key (note % 12 → SCALE_NOTE_C .. SCALE_NOTE_B). When the user
-// explicitly maps a note to another control via MIDI learn, that override
-// takes priority and the scale key is no longer triggered.
-//
-// This scenario simulates: create a sequence with Roll, verify that un-mapped
-// MIDI notes control the scale, then remap some of those notes to other
-// controls and verify the overrides work while un-mapped notes still reach
-// their scale keys.
+// Incoming MIDI notes fire a control only when the user has explicitly mapped
+// that note via MIDI learn. Unmapped notes are ignored — they do NOT auto-route
+// to piano-roll scale keys. Earlier builds auto-mapped any unmapped note to
+// the matching scale key (note % 12), which caused external MIDI input to
+// silently toggle scale notes during normal play. That behaviour is rolled back.
 
-SCENARIO("MIDI notes default to scale keys unless overridden by user mapping",
+SCENARIO("Unmapped MIDI notes do not trigger any control",
          "[user-story][midi-routing][scale]") {
     GamblerTestInitialiser juceInit;
 
@@ -2675,7 +2670,7 @@ SCENARIO("MIDI notes default to scale keys unless overridden by user mapping",
         TestApp app;
         auto& state = app.state();
 
-        // Enable scale latch so MIDI note-on toggles scale keys
+        // Enable scale latch so a note-on *would* toggle scale keys if it were routed
         if (auto* p = app.processor().getAPVTS().getParameter(Params::Keys::ID::SCALE_LATCH))
             p->setValueNotifyingHost(1.0f);
 
@@ -2692,40 +2687,20 @@ SCENARIO("MIDI notes default to scale keys unless overridden by user mapping",
         WHEN("User sends MIDI note 60 (C4) with no user mappings") {
             app.sendMidiNoteOn(60);
 
-            THEN("Scale note C is toggled off (default routing to SCALE_NOTE_C)") {
-                REQUIRE(state.getGlobalScaleNote(0) == false);
-            }
-
-            AND_THEN("All other scale notes remain enabled") {
-                for (int i = 1; i < 12; ++i)
+            THEN("No scale note is toggled") {
+                for (int i = 0; i < 12; ++i)
                     REQUIRE(state.getGlobalScaleNote(i) == true);
             }
         }
 
-        WHEN("User sends several notes across octaves to toggle scale keys") {
-            // Note 36 = C2 → SCALE_NOTE_C (index 0)
-            // Note 62 = D4 → SCALE_NOTE_D (index 2)
-            // Note 79 = G5 → SCALE_NOTE_G (index 7)
-            app.sendMidiNoteOn(36);  // C
-            app.sendMidiNoteOn(62);  // D
-            app.sendMidiNoteOn(79);  // G
+        WHEN("User sends several notes across octaves with no mappings") {
+            app.sendMidiNoteOn(36);  // C2
+            app.sendMidiNoteOn(62);  // D4
+            app.sendMidiNoteOn(79);  // G5
 
-            THEN("C, D, and G are toggled off (regardless of octave)") {
-                REQUIRE(state.getGlobalScaleNote(0) == false);  // C
-                REQUIRE(state.getGlobalScaleNote(2) == false);  // D
-                REQUIRE(state.getGlobalScaleNote(7) == false);  // G
-            }
-
-            AND_THEN("Other scale notes remain enabled") {
-                REQUIRE(state.getGlobalScaleNote(1) == true);   // Db
-                REQUIRE(state.getGlobalScaleNote(3) == true);   // Eb
-                REQUIRE(state.getGlobalScaleNote(4) == true);   // E
-                REQUIRE(state.getGlobalScaleNote(5) == true);   // F
-                REQUIRE(state.getGlobalScaleNote(6) == true);   // Gb
-                REQUIRE(state.getGlobalScaleNote(8) == true);   // Ab
-                REQUIRE(state.getGlobalScaleNote(9) == true);   // A
-                REQUIRE(state.getGlobalScaleNote(10) == true);  // Bb
-                REQUIRE(state.getGlobalScaleNote(11) == true);  // B
+            THEN("No scale notes are toggled") {
+                for (int i = 0; i < 12; ++i)
+                    REQUIRE(state.getGlobalScaleNote(i) == true);
             }
         }
 
@@ -2747,7 +2722,7 @@ SCENARIO("MIDI notes default to scale keys unless overridden by user mapping",
                     REQUIRE(state.getIsRandom() == true);
                 }
 
-                AND_THEN("Scale note C is NOT toggled (override took priority)") {
+                AND_THEN("Scale note C is NOT toggled") {
                     REQUIRE(state.getGlobalScaleNote(0) == true);
                 }
             }
@@ -2756,71 +2731,33 @@ SCENARIO("MIDI notes default to scale keys unless overridden by user mapping",
                 app.sendMidiNoteOn(64);
 
                 THEN("Play/Pause is triggered") {
-                    // The param was set — verify it was toggled on
                     auto* param = app.processor().getAPVTS().getParameter(Params::Keys::ID::PLAY_PAUSE);
                     REQUIRE(param->getValue() >= 0.5f);
                 }
 
-                AND_THEN("Scale note E is NOT toggled (override took priority)") {
+                AND_THEN("Scale note E is NOT toggled") {
                     REQUIRE(state.getGlobalScaleNote(4) == true);
                 }
             }
 
-            AND_WHEN("User sends note 62 (D4, NOT mapped — should still hit scale)") {
+            AND_WHEN("User sends note 62 (D4, NOT mapped)") {
                 app.sendMidiNoteOn(62);
 
-                THEN("Scale note D is toggled off (default routing still works)") {
-                    REQUIRE(state.getGlobalScaleNote(2) == false);
+                THEN("Scale note D is NOT toggled (unmapped notes are ignored)") {
+                    REQUIRE(state.getGlobalScaleNote(2) == true);
                 }
             }
 
-            AND_WHEN("User sends note 72 (C5, same pitch class as 60 but different note — no mapping)") {
+            AND_WHEN("User sends note 72 (C5, same pitch class as 60 but a different note)") {
                 app.sendMidiNoteOn(72);
 
-                THEN("Scale note C is toggled off (only note 60 was mapped, not 72)") {
-                    REQUIRE(state.getGlobalScaleNote(0) == false);
+                THEN("Scale note C is NOT toggled (only note 60 was mapped, not 72)") {
+                    REQUIRE(state.getGlobalScaleNote(0) == true);
                 }
-            }
-        }
-    }
-}
 
-SCENARIO("MidiNoteRouter resolves default scale keys and user overrides correctly",
-         "[user-story][midi-routing][unit]") {
-    GamblerTestInitialiser juceInit;
-
-    GIVEN("An empty MidiLearnRegistry (no user mappings)") {
-        MidiLearnRegistry registry;
-
-        THEN("Every MIDI note resolves to its pitch-class scale key") {
-            // Spot-check a range of notes across octaves
-            REQUIRE(MidiNoteRouter::resolve(registry, 1, 0)   == MidiControlId::SCALE_NOTE_C);
-            REQUIRE(MidiNoteRouter::resolve(registry, 1, 12)  == MidiControlId::SCALE_NOTE_C);
-            REQUIRE(MidiNoteRouter::resolve(registry, 1, 60)  == MidiControlId::SCALE_NOTE_C);
-            REQUIRE(MidiNoteRouter::resolve(registry, 1, 61)  == MidiControlId::SCALE_NOTE_Db);
-            REQUIRE(MidiNoteRouter::resolve(registry, 1, 64)  == MidiControlId::SCALE_NOTE_E);
-            REQUIRE(MidiNoteRouter::resolve(registry, 1, 67)  == MidiControlId::SCALE_NOTE_G);
-            REQUIRE(MidiNoteRouter::resolve(registry, 1, 69)  == MidiControlId::SCALE_NOTE_A);
-            REQUIRE(MidiNoteRouter::resolve(registry, 1, 127) == MidiControlId::SCALE_NOTE_G);
-        }
-
-        WHEN("A user mapping is added for note 60 → BUTTON_ROLL") {
-            registry.enterLearnMode();
-            registry.setLearningControl(MidiControlId::BUTTON_ROLL);
-            registry.learnMidiMessage(MidiMessageType::NOTE, 1, 60);
-            registry.exitLearnMode();
-
-            THEN("Note 60 resolves to BUTTON_ROLL") {
-                REQUIRE(MidiNoteRouter::resolve(registry, 1, 60) == MidiControlId::BUTTON_ROLL);
-            }
-
-            AND_THEN("Note 72 (C5, same pitch class) still resolves to SCALE_NOTE_C") {
-                REQUIRE(MidiNoteRouter::resolve(registry, 1, 72) == MidiControlId::SCALE_NOTE_C);
-            }
-
-            AND_THEN("hasUserMapping returns true for 60, false for 72") {
-                REQUIRE(MidiNoteRouter::hasUserMapping(registry, 1, 60) == true);
-                REQUIRE(MidiNoteRouter::hasUserMapping(registry, 1, 72) == false);
+                AND_THEN("Roll is NOT activated (mapping is per-note, not per pitch class)") {
+                    REQUIRE(state.getIsRandom() == false);
+                }
             }
         }
     }
@@ -2861,7 +2798,7 @@ SCENARIO("MIDI learn mode blocks all control triggers",
             // Send note 60 (mapped to Roll) — should NOT activate Roll
             app.sendMidiNoteOn(60);
 
-            // Send note 62 (unmapped, would default to SCALE_NOTE_D) — should NOT toggle D
+            // Send note 62 (unmapped) — should be ignored, no control fires
             app.sendMidiNoteOn(62);
 
             // Send note-off for 60 — should NOT fire Roll off
@@ -2903,9 +2840,9 @@ SCENARIO("MIDI learn mode blocks all control triggers",
                 app.sendMidiNoteOn(60);
                 REQUIRE(state.getIsRandom() == true);
 
-                // And note 62 should toggle scale D
+                // Note 62 remains unmapped and is still ignored — scale D stays on
                 app.sendMidiNoteOn(62);
-                REQUIRE(state.getGlobalScaleNote(2) == false);
+                REQUIRE(state.getGlobalScaleNote(2) == true);
 
                 // Note-off for 60 should deactivate Roll
                 app.sendMidiNoteOff(60);
