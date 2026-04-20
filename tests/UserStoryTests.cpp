@@ -2172,6 +2172,63 @@ SCENARIO("Destructive scale quantization bakes notes and freezes on scale shift"
 }
 
 // ============================================================================
+// DESTRUCTIVE SCALE QUANTIZATION (ROLL)
+// ============================================================================
+//
+// Regression: in destructive-scale mode, the roll path used to return
+// scaleQ.quantize(unquantized). quantize() short-circuits when destructive
+// scale is on, so live-played notes bypassed scale snapping even though the
+// stored copy was baked. The live note is now the baked note.
+
+SCENARIO("Destructive scale snaps rolled notes to the active scale",
+         "[user-story][roll][scale][quantization][destructive]") {
+    GamblerTestInitialiser juceInit;
+    using namespace SRT;
+
+    GIVEN("A playing sequencer with destructive scale ON and scale {C, E, G}") {
+        TestApp app;
+        app.state().setCurrentIndex(-1);
+        app.setAllPlayProbabilities(true);
+
+        setScaleCEG(app, false);
+        enableDestructive(app, true, false);
+        app.processMessages();
+        checkScaleCEG(app.state());
+
+        WHEN("User presses Roll and the sequencer ticks many times") {
+            app.sequencerControls().rollButton().press();
+            app.processMessages();
+            REQUIRE(app.state().getIsRandom() == true);
+
+            constexpr int numTicks = 64;
+            std::array<int, numTicks> playedNotes {};
+            for (int i = 0; i < numTicks; ++i)
+                playedNotes[i] = app.state().tick();
+            app.state().applyPendingNoteWrites();
+
+            THEN("Every played note's pitch class is in {C, E, G}") {
+                const std::set<int> scalePcs { 0, 4, 7 };
+                for (int i = 0; i < numTicks; ++i) {
+                    INFO("tick=" << i << " note=" << playedNotes[i]);
+                    REQUIRE(playedNotes[i] >= 0);
+                    REQUIRE(scalePcs.count(playedNotes[i] % 12) == 1);
+                }
+            }
+
+            AND_THEN("Every stored note's pitch class is also in {C, E, G}") {
+                const std::set<int> scalePcs { 0, 4, 7 };
+                for (int i = 0; i < 8; ++i) {
+                    int stored = app.state().getStepNote(i, 0);
+                    INFO("step=" << i << " stored=" << stored);
+                    REQUIRE(stored >= 0);
+                    REQUIRE(scalePcs.count(stored % 12) == 1);
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
 // DESTRUCTIVE SCALE QUANTIZATION (MIDI-driven)
 // ============================================================================
 
