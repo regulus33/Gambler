@@ -81,7 +81,7 @@ public:
         if (selected_) {
             auto checkBounds = juce::Rectangle<float>(
                 static_cast<float>(rightEdge - checkmarkSize),
-                static_cast<float>(area.getCentreY() - checkmarkSize / 2),
+                static_cast<float>(area.getCentreY()) - checkmarkSize / 2.0f,
                 static_cast<float>(checkmarkSize),
                 static_cast<float>(checkmarkSize));
             Icons::strokeIcon(g, Icons::createCheckmarkIcon(), checkBounds,
@@ -100,7 +100,7 @@ public:
 
             auto deleteBounds = juce::Rectangle<float>(
                 static_cast<float>(deleteX),
-                static_cast<float>(area.getCentreY() - deleteIconSize / 2),
+                static_cast<float>(area.getCentreY()) - deleteIconSize / 2.0f,
                 static_cast<float>(deleteIconSize),
                 static_cast<float>(deleteIconSize));
 
@@ -226,7 +226,7 @@ public:
             if (i == selectedIndex_) {
                 auto checkBounds = juce::Rectangle<float>(
                     static_cast<float>(rightEdge - checkmarkSize),
-                    static_cast<float>(area.getCentreY() - checkmarkSize / 2),
+                    static_cast<float>(area.getCentreY()) - checkmarkSize / 2.0f,
                     static_cast<float>(checkmarkSize),
                     static_cast<float>(checkmarkSize));
                 Icons::strokeIcon(g, Icons::createCheckmarkIcon(), checkBounds,
@@ -241,7 +241,7 @@ public:
 
                 auto deleteBounds = juce::Rectangle<float>(
                     static_cast<float>(deleteX),
-                    static_cast<float>(area.getCentreY() - deleteIconSize / 2),
+                    static_cast<float>(area.getCentreY()) - deleteIconSize / 2.0f,
                     static_cast<float>(deleteIconSize),
                     static_cast<float>(deleteIconSize));
 

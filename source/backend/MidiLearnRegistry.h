@@ -24,7 +24,7 @@
  * Information about a mappable control
  */
 struct MappableControlInfo {
-    MidiControlId controlId;
+    MidiControlId controlId = MidiControlId::COUNT;
     juce::Rectangle<int> bounds;  // Bounds in screen coordinates
     juce::String displayName;     // Human-readable name
     bool isActive = true;         // Whether control is currently visible/mappable
@@ -34,9 +34,9 @@ struct MappableControlInfo {
  * MIDI message identifier (for display)
  */
 struct MidiMessageIdentifier {
-    MidiMessageType type;
-    int channel;      // 1-16
-    int number;       // CC number or Note number
+    MidiMessageType type = MidiMessageType::CC;
+    int channel = 0;  // 1-16
+    int number = 0;   // CC number or Note number
 
     juce::String toString() const {
         juce::String typeStr = (type == MidiMessageType::CC) ? "CC" : "N";

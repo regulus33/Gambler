@@ -182,10 +182,12 @@ public:
      */
     int tick() {
         int len = length();
+        if (len <= 0) return -1;
         int idx = (currentIndex() + 1) % len;
         setCurrentIndex(idx);
 
         const int displayCells = probabilityPattern.gridCellCount();
+        if (displayCells <= 0) return -1;
         int tickN = (lastProbabilityIndex() + 1) % displayCells;
         setLastProbabilityIndex(tickN);
         const int probIdx = tickToUnderlyingIndex(tickN);
@@ -225,7 +227,7 @@ public:
         if (len <= 1) return;
 
         Step first = step(0);
-        std::array<int, ParamConstants::MAX_SUBSTEPS> tempNotes;
+        std::array<int, ParamConstants::MAX_SUBSTEPS> tempNotes{};
         for (int s = 0; s < ParamConstants::MAX_SUBSTEPS; s++)
             tempNotes[s] = first.note(s);
         int tempLen = first.substepCount();
@@ -244,7 +246,7 @@ public:
         if (len <= 1) return;
 
         Step last = step(len - 1);
-        std::array<int, ParamConstants::MAX_SUBSTEPS> tempNotes;
+        std::array<int, ParamConstants::MAX_SUBSTEPS> tempNotes{};
         for (int s = 0; s < ParamConstants::MAX_SUBSTEPS; s++)
             tempNotes[s] = last.note(s);
         int tempLen = last.substepCount();
@@ -363,7 +365,8 @@ private:
         for (int patternRow = 0; patternRow < dim; ++patternRow) {
             for (int patternCol = 0; patternCol < dim; ++patternCol) {
                 const bool on = patternCells[
-                    static_cast<std::size_t>(patternRow * dim + patternCol)];
+                    static_cast<std::size_t>(patternRow) * static_cast<std::size_t>(dim)
+                    + static_cast<std::size_t>(patternCol)];
                 for (int dr = 0; dr < blockSize; ++dr) {
                     for (int dc = 0; dc < blockSize; ++dc) {
                         const int row = patternRow * blockSize + dr;

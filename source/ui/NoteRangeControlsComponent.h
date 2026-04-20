@@ -247,7 +247,7 @@ private:
     int minNote = 0;
     int maxNote = 127;
     int activeNote = -1;  // -1 means no active note
-    std::array<bool, 12> scaleNotes;  // Which pitch classes are in the scale
+    std::array<bool, 12> scaleNotes{};  // Which pitch classes are in the scale
 
     // Raw APVTS param values — needed for accurate drag conversion
     int rawOffset_ = 0;
@@ -425,7 +425,7 @@ public:
         float labelAreaTop = static_cast<float>(sliderPadding);
         float labelAreaBottom = static_cast<float>(getHeight() - sliderPadding - sliderDiameter - sliderVerticalSpacing - sliderDiameter - labelGapFromSlider);
         float labelAreaHeight = labelAreaBottom - labelAreaTop;
-        float labelAreaCentreX = static_cast<float>(sliderPadding + contentPaddingLeft + sliderDiameter / 2);
+        float labelAreaCentreX = static_cast<float>(sliderPadding + contentPaddingLeft) + sliderDiameter / 2.0f;
         float labelAreaCentreY = labelAreaTop + labelAreaHeight / 2.0f;
 
         g.setColour (juce::Colours::white);
@@ -496,7 +496,7 @@ protected:
         rangeGauge.setRange(minNote, maxNote);
 
         // Update scale notes for coloring
-        std::array<bool, 12> scaleNotes;
+        std::array<bool, 12> scaleNotes{};
         for (int i = 0; i < 12; ++i) {
             scaleNotes[i] = state.getGlobalScaleNote(i);
         }

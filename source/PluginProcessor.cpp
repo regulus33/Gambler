@@ -581,7 +581,7 @@ void PluginProcessor::parameterChanged (const juce::String& parameterID, float n
             int j = dis (gen);
             // Swap steps i and j
             int lenI = state.getStepNotesLength (i);
-            std::array<int, ParamConstants::MAX_SUBSTEPS> notesI;
+            std::array<int, ParamConstants::MAX_SUBSTEPS> notesI{};
             for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
                 notesI[static_cast<size_t> (n)] = state.getStepNote (i, n);
             }
@@ -799,7 +799,7 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
     }
 
     // Use override note if provided, otherwise read from step
-    int note;
+    int note = 0;
     if (noteOverride >= 0) {
         note = noteOverride;
         DBG ("  Using override note: " << note);

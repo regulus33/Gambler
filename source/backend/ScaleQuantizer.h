@@ -37,7 +37,7 @@ public:
     }
 
     std::array<int, 12> scaleNotes() const {
-        std::array<int, 12> notes;
+        std::array<int, 12> notes{};
         for (int i = 0; i < 12; i++)
             notes[i] = scaleNote(i) ? 1 : 0;
         return notes;

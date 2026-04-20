@@ -337,7 +337,7 @@ public:
      * Get the current scale
      */
     Scale getScale() const {
-        std::array<int, 12> scaleNotes;
+        std::array<int, 12> scaleNotes{};
         for (int i = 0; i < 12; i++) {
             scaleNotes[i] = keys[i]->isToggled ? 1 : 0;
         }
@@ -776,7 +776,7 @@ private:
 
     // MIDI learn support
     MidiLearnRegistry* registry_ = nullptr;
-    std::array<MidiControlId, 12> keyMidiControlIds_;
+    std::array<MidiControlId, 12> keyMidiControlIds_{};
 
     // Momentary key press tracking — maps touch source index to key index
     // Supports multi-touch so each finger releases its own key

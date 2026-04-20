@@ -224,7 +224,7 @@ public:
     }
 
 private:
-    std::array<int, NUM_CHROMATIC_NOTES> scaleNotes;
+    std::array<int, NUM_CHROMATIC_NOTES> scaleNotes{};
     int rangeMin = MIN_MIDI_NOTE;
     int rangeMax = MAX_MIDI_NOTE;
 };

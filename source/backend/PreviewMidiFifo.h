@@ -32,9 +32,9 @@
 class PreviewMidiFifo {
 public:
     struct Message {
-        int noteNumber;
-        bool isNoteOn;
-        juce::uint8 velocity;
+        int noteNumber = 0;
+        bool isNoteOn = false;
+        juce::uint8 velocity = 0;
     };
 
     static constexpr int capacity = 32;
@@ -42,7 +42,7 @@ public:
     /** Push a single message (call from UI thread). */
     void push (Message msg)
     {
-        int start1, size1, start2, size2;
+        int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
         fifo.prepareToWrite (1, start1, size1, start2, size2);
         if (size1 > 0) {
             buffer[static_cast<size_t> (start1)] = msg;
@@ -54,7 +54,7 @@ public:
      *  Returns the number of messages drained. */
     int drainInto (juce::MidiBuffer& midiMessages, int midiChannel)
     {
-        int start1, size1, start2, size2;
+        int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
         fifo.prepareToRead (fifo.getNumReady(), start1, size1, start2, size2);
 
         auto addMsg = [&] (const Message& msg) {
@@ -68,10 +68,10 @@ public:
         };
 
         for (int i = 0; i < size1; ++i)
-            addMsg (buffer[static_cast<size_t> (start1 + i)]);
+            addMsg (buffer[static_cast<size_t> (start1) + static_cast<size_t> (i)]);
 
         for (int i = 0; i < size2; ++i)
-            addMsg (buffer[static_cast<size_t> (start2 + i)]);
+            addMsg (buffer[static_cast<size_t> (start2) + static_cast<size_t> (i)]);
 
         int total = size1 + size2;
         if (total > 0)

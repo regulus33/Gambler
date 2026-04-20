@@ -113,9 +113,9 @@ enum class MidiControlId {
  * All MIDI channels (1-16) accepted - no channel filtering
  */
 struct MidiMapping {
-    MidiMessageType type;      // CC or NOTE
-    int midiNumber;            // CC number (0-127) or Note number (0-127)
-    MidiControlId controlId;   // Which control to trigger
+    MidiMessageType type = MidiMessageType::CC;  // CC or NOTE
+    int midiNumber = 0;        // CC number (0-127) or Note number (0-127)
+    MidiControlId controlId = MidiControlId::COUNT;  // Which control to trigger
 
     // Value transformation (for ranged controls like sliders)
     float minValue = 0.0f;     // Min normalized value (0.0-1.0)

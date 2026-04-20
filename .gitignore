@@ -15,6 +15,13 @@ component_snapshots/**
 Builds/*
 !Builds/.gitkeep
 build/*
+build-*/
+!build-ios
+!build-ios-sim
+!build-ios-device
+!build-ios-release
+
+.claude/scheduled_tasks.lock
 
 # This should never exist
 Install/*

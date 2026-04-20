@@ -97,7 +97,7 @@ public:
     }
 
     void mouseDown(const juce::MouseEvent& e) override {
-        int row, col;
+        int row = 0, col = 0;
         if (! hitTestCell(e.x, e.y, row, col)) return;
 
         // Paint state for this drag stroke = inverse of the cell we started on.
@@ -112,7 +112,7 @@ public:
     }
 
     void mouseDrag(const juce::MouseEvent& e) override {
-        int row, col;
+        int row = 0, col = 0;
         if (! hitTestCell(e.x, e.y, row, col)) return;
         if (row == lastPaintedRow_ && col == lastPaintedCol_) return;
 
