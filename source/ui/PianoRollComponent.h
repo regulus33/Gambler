@@ -644,7 +644,6 @@ private:
         xPos += aWidth;
 
         // Bb key - centered between A and B
-        float bWidth = 57.1f - 0.5f;
         float bbOffset = xPos - (aWidth / 2.0f) - (blackKeyWidth / 2.0f) + blackKeyShift;
         keys[10]->path = createBlackKey (bbOffset);
 

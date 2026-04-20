@@ -245,7 +245,7 @@ private:
 
     class LookAndFeel : public juce::LookAndFeel_V4 {
     public:
-        explicit LookAndFeel (AnalogueSlider* parent) : parent (parent) {}
+        LookAndFeel() = default;
 
         void drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height,
                                float sliderPosProportional, float rotaryStartAngle,
@@ -277,14 +277,12 @@ private:
                                                          juce::PathStrokeType::rounded));
         }
 
-    private:
-        AnalogueSlider* parent;
     };
 
     juce::String labelText;
     juce::Typeface::Ptr interFont;
     juce::Slider slider;
-    LookAndFeel lookAndFeel { this };
+    LookAndFeel lookAndFeel;
     juce::Rectangle<int> labelBounds;
     juce::Rectangle<int> gaugeBounds;
     MidiLearnOverlay midiLearnOverlay_;

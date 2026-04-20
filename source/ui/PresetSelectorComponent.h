@@ -337,7 +337,7 @@ private:
         if (!saveDialog) {
             saveDialog = std::make_unique<SavePresetDialogComponent>();
 
-            saveDialog->onSave = [this, parent](const juce::String& name) {
+            saveDialog->onSave = [this](const juce::String& name) {
                 if (onSavePreset)
                     onSavePreset(name);
                 hideSaveDialog();

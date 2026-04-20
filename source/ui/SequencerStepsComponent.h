@@ -68,7 +68,7 @@ public:
 
     ~SequencerStepsComponent() override = default;
 
-    void paint (juce::Graphics& g) override {
+    void paint (juce::Graphics& /*g*/) override {
         // Buttons handle their own painting
     }
 

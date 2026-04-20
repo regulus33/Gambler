@@ -221,7 +221,7 @@ float PluginEditor::getScaleFactor() const {
     return juce::jmin (scaleX, scaleY);
 }
 
-void PluginEditor::componentMovedOrResized (juce::Component& component, bool wasMoved, bool wasResized) {
+void PluginEditor::componentMovedOrResized (juce::Component& component, bool /*wasMoved*/, bool wasResized) {
     using namespace PluginEditorLayout;
 
     // Ignore if not resized or if we're already adjusting

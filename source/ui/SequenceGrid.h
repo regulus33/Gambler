@@ -396,7 +396,7 @@ public:
     /**
      * Mouse up handler - finalizes length change or triggers click
      */
-    void mouseUp(const juce::MouseEvent& event) override {
+    void mouseUp(const juce::MouseEvent& /*event*/) override {
         if (isDraggingLength) {
             // We were dragging - finalize the length change
             if (onLengthDragged && dragTargetLength > 0) {

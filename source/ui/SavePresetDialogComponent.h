@@ -46,7 +46,7 @@ public:
         g.drawRect(0, 0, width, height, SavePresetDialogConstants::borderWidth);
     }
 
-    void fillTextEditorBackground(juce::Graphics& g, int width, int height,
+    void fillTextEditorBackground(juce::Graphics& g, int /*width*/, int /*height*/,
                                    juce::TextEditor& editor) override
     {
         juce::ignoreUnused(editor);

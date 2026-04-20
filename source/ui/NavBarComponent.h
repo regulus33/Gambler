@@ -163,7 +163,7 @@ public:
         // Add settings button
         addAndMakeVisible(settingsButton);
         settingsButton.setMidiControlId(MidiControlId::SETTINGS_TOGGLE);
-        settingsButton.onClick = [this](bool toggled) {
+        settingsButton.onClick = [this](bool /*toggled*/) {
             if (onSettingsClicked) {
                 onSettingsClicked();
             }
@@ -172,7 +172,7 @@ public:
         // Add play/pause button
         addAndMakeVisible(playPauseButton);
         playPauseButton.setMidiControlId(MidiControlId::PLAY_PAUSE);
-        playPauseButton.onClick = [this](bool toggled) {
+        playPauseButton.onClick = [this](bool /*toggled*/) {
             if (onPlayPauseClicked) {
                 onPlayPauseClicked();
             }
@@ -181,7 +181,7 @@ public:
         // Add stop button
         addAndMakeVisible(stopButton);
         stopButton.setMidiControlId(MidiControlId::STOP);
-        stopButton.onClick = [this](bool toggled) {
+        stopButton.onClick = [this](bool /*toggled*/) {
             if (onStopClicked) {
                 onStopClicked();
             }

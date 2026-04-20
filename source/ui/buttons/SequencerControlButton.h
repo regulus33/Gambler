@@ -138,7 +138,7 @@ public:
         paintMidiLearnOverlay(g);
     }
 
-    void mouseDown(const juce::MouseEvent& event) override {
+    void mouseDown(const juce::MouseEvent& /*event*/) override {
         // Handle MIDI learn mode
         if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT) {
             registry_->setLearningControl(midiControlId_);
@@ -150,7 +150,7 @@ public:
         setParamOn(true);
     }
 
-    void mouseUp(const juce::MouseEvent& event) override {
+    void mouseUp(const juce::MouseEvent& /*event*/) override {
         // Set parameter to OFF
         setParamOn(false);
     }

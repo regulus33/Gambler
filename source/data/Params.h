@@ -269,7 +269,7 @@ namespace Params
      * Create the complete parameter layout for all sequencer state.
      * This creates ~2500 parameters to back all domain state.
      */
-    static AudioProcessorValueTreeState::ParameterLayout createDefaultParameterLayout()
+    inline AudioProcessorValueTreeState::ParameterLayout createDefaultParameterLayout()
     {
         vector<unique_ptr<RangedAudioParameter>> params;
 
