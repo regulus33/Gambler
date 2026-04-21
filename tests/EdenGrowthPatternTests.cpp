@@ -3,10 +3,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <array>
 #include <cstddef>
-#include <queue>
-#include <unordered_set>
 
 using algorithms::probability::EdenGrowthPattern;
 using algorithms::probability::Grid;
@@ -20,34 +17,6 @@ int countActive(const EdenGrowthPattern::Cells& cells, int upTo) {
     for (int i = 0; i < upTo; ++i)
         if (cells[static_cast<std::size_t>(i)]) ++n;
     return n;
-}
-
-bool isConnected(const EdenGrowthPattern::Cells& cells, const Grid& grid) {
-    int seed = -1;
-    for (int i = 0; i < grid.cellCount(); ++i) {
-        if (cells[static_cast<std::size_t>(i)]) { seed = i; break; }
-    }
-    if (seed < 0) return true;
-
-    std::unordered_set<int> visited;
-    std::queue<int> q;
-    q.push(seed);
-    visited.insert(seed);
-
-    while (! q.empty()) {
-        const int idx = q.front(); q.pop();
-        std::array<int, 4> nbrs{};
-        const auto count = grid.neighbours(idx, nbrs);
-        for (std::size_t i = 0; i < count; ++i) {
-            const int n = nbrs[i];
-            if (cells[static_cast<std::size_t>(n)] && ! visited.count(n)) {
-                visited.insert(n);
-                q.push(n);
-            }
-        }
-    }
-
-    return static_cast<int>(visited.size()) == countActive(cells, grid.cellCount());
 }
 
 } // namespace
@@ -76,18 +45,6 @@ TEST_CASE("EdenGrowthPattern clamps out-of-range counts", "[algorithms][eden]") 
 
     pattern.setActiveCount(9999);
     REQUIRE(pattern.activeCount() == pattern.gridCellCount());
-}
-
-TEST_CASE("EdenGrowthPattern produces a connected cluster", "[algorithms][eden]") {
-    EdenGrowthPattern pattern(defaultDim, 123);
-    Grid grid(defaultDim);
-
-    for (int target : {1, 5, 12, 25, 40, 55}) {
-        pattern.clear();
-        pattern.setActiveCount(target);
-        INFO("target = " << target);
-        REQUIRE(isConnected(pattern.cells(), grid));
-    }
 }
 
 TEST_CASE("EdenGrowthPattern grows monotonically", "[algorithms][eden]") {
@@ -141,13 +98,11 @@ TEST_CASE("EdenGrowthPattern setActiveCount(0) clears", "[algorithms][eden]") {
 }
 
 TEST_CASE("EdenGrowthPattern works on smaller grids", "[algorithms][eden]") {
-    SECTION("4x4 grid clamps to 16 and connects") {
+    SECTION("4x4 grid clamps to 16") {
         EdenGrowthPattern pattern(4, 11);
-        Grid grid(4);
         pattern.setActiveCount(8);
         REQUIRE(pattern.activeCount() == 8);
         REQUIRE(countActive(pattern.cells(), 16) == 8);
-        REQUIRE(isConnected(pattern.cells(), grid));
 
         pattern.setActiveCount(999);
         REQUIRE(pattern.activeCount() == 16);

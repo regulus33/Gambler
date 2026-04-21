@@ -3,22 +3,21 @@
 #include "Grid.h"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <random>
-#include <set>
 #include <vector>
 
 namespace algorithms::probability {
 
-// Stateful Eden growth model on a square Grid of runtime dimension.
+// Stateful random-scatter pattern on a square Grid of runtime dimension.
 //
-// Eden growth: plant a random seed cell, then repeatedly activate a random
-// inactive cell that is adjacent to the existing cluster. Produces organic
-// blob-like shapes that look "grown" rather than scattered.
+// Each grow step activates a uniformly random inactive cell anywhere on the
+// grid, producing scattered placement rather than a connected cluster.
 //
-// The model is monotonic: increasing the active count adds cells to the
-// existing cluster; decreasing pops cells in reverse growth order, so the
-// shape shrinks back along the path it grew.
+// The model is monotonic: increasing the active count adds new random cells
+// while preserving existing ones; decreasing pops cells in reverse order of
+// insertion, so nudging the slider back recovers the exact previous shape.
 class EdenGrowthPattern {
 public:
     using Cells = std::array<bool, Grid::maxCellCount>;
@@ -48,11 +47,10 @@ public:
     int gridDim() const noexcept { return grid_.dim(); }
     int gridCellCount() const noexcept { return grid_.cellCount(); }
 
-    // Forget the current cluster. Next grow() will pick a fresh seed cell.
+    // Forget the current pattern.
     void clear() {
         cells_.fill (false);
         growthOrder_.clear();
-        boundary_.clear();
     }
 
     // Resize the cluster to exactly `count` active cells (clamped to
@@ -84,81 +82,32 @@ private:
     }
 
     void growOne() {
-        const int next = growthOrder_.empty()
-                             ? pickSeed()
-                             : pickFromBoundary();
+        // Pick the k-th inactive cell for a uniformly random k.
+        const int n = grid_.cellCount();
+        const int inactiveCount = n - activeCount();
+        std::uniform_int_distribution<int> dist (0, inactiveCount - 1);
+        int k = dist (rng_);
+
+        int next = 0;
+        for (; next < n; ++next) {
+            if (cells_[static_cast<std::size_t> (next)]) continue;
+            if (k == 0) break;
+            --k;
+        }
 
         cells_[static_cast<std::size_t> (next)] = true;
         growthOrder_.push_back (next);
-        boundary_.erase (next);
-
-        std::array<int, 4> nbrs{};
-        const auto count = grid_.neighbours (next, nbrs);
-        for (std::size_t i = 0; i < count; ++i) {
-            const int idx = nbrs[i];
-            if (! cells_[static_cast<std::size_t> (idx)])
-                boundary_.insert (idx);
-        }
     }
 
     void shrinkOne() {
         const int last = growthOrder_.back();
         growthOrder_.pop_back();
         cells_[static_cast<std::size_t> (last)] = false;
-
-        if (hasActiveNeighbour (last))
-            boundary_.insert (last);
-
-        std::array<int, 4> nbrs{};
-        const auto count = grid_.neighbours (last, nbrs);
-        for (std::size_t i = 0; i < count; ++i) {
-            const int idx = nbrs[i];
-            if (cells_[static_cast<std::size_t> (idx)]) continue;
-            if (! hasActiveNeighbour (idx))
-                boundary_.erase (idx);
-        }
-    }
-
-    int pickSeed() {
-        std::uniform_int_distribution<int> dist (0, grid_.cellCount() - 1);
-        return dist (rng_);
-    }
-
-    int pickFromBoundary() {
-        if (boundary_.empty())
-            return pickAnyInactive();
-
-        std::uniform_int_distribution<std::size_t> dist (0, boundary_.size() - 1);
-        auto it = boundary_.begin();
-        std::advance (it, dist (rng_));
-        return *it;
-    }
-
-    int pickAnyInactive() {
-        std::vector<int> inactive;
-        const int n = grid_.cellCount();
-        inactive.reserve (static_cast<std::size_t> (n));
-        for (int i = 0; i < n; ++i)
-            if (! cells_[static_cast<std::size_t> (i)])
-                inactive.push_back (i);
-
-        std::uniform_int_distribution<std::size_t> dist (0, inactive.size() - 1);
-        return inactive[dist (rng_)];
-    }
-
-    bool hasActiveNeighbour (int index) const {
-        std::array<int, 4> nbrs{};
-        const auto count = grid_.neighbours (index, nbrs);
-        for (std::size_t i = 0; i < count; ++i)
-            if (cells_[static_cast<std::size_t> (nbrs[i])])
-                return true;
-        return false;
     }
 
     Grid grid_;
     Cells cells_{};
     std::vector<int> growthOrder_;
-    std::set<int> boundary_;
     std::mt19937 rng_;
 };
 
