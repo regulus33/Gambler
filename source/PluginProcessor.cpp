@@ -177,198 +177,161 @@ bool PluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const 
 }
 
 void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
-    juce::ScopedNoDenormals noDenormals; // this is a precision thing, may not be needed for this
+    juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // Clear any output channels that didn't contain input data
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
-    }
 
-    // Drain virtual-keyboard note-on/off events into the incoming MIDI buffer
-    // so they are visible to processMidiInput (MIDI learn / mappings).
-    keyboardState.processNextMidiBuffer (midiMessages, 0, buffer.getNumSamples(), true);
-
-    // Process incoming MIDI for control mapping (before clearing)
-    // we just do it all here so we don't muddy up this method too much more.
+    drainVirtualKeyboard(midiMessages, buffer.getNumSamples());
     processMidiInput (midiMessages);
-
-    // Clear incoming MIDI (we're generating, not processing MIDI through and this is good practice with buffers)
     midiMessages.clear();
 
-    // This kinda has nothing to do with midi, its just sending preview notes...
-    // more info in PreviewMidiFifo file for why we use this.
     previewMidiFifo.drainInto (midiMessages, getMidiOutputChannel());
 
-    // Check if scheduled note-off should be sent (sample-accurate within this buffer)
-    if (noteOffScheduler.processScheduledNoteOff (midiMessages, getMidiOutputChannel(),
-                                                   midiOutput.get(), currentSamplePosition,
-                                                   buffer.getNumSamples()))
-    {
-        // Notify UI that note-off occurred (thread-safe via AsyncUpdater)
+    handleNoteOffScheduling(midiMessages, buffer.getNumSamples());
+    currentSamplePosition += buffer.getNumSamples();
+
+    processClockForBlock(buffer.getNumSamples());
+    emitMidiClockPulses();
+    detectDawTransport();
+
+    if (sequencerState.load() == PlaybackState::Playing && clock.shouldTick())
+        tickSequencer(midiMessages);
+}
+
+void PluginProcessor::drainVirtualKeyboard(juce::MidiBuffer& midiMessages, int numSamples) {
+    keyboardState.processNextMidiBuffer(midiMessages, 0, numSamples, true);
+}
+
+void PluginProcessor::handleNoteOffScheduling(juce::MidiBuffer& midiMessages, int numSamples) {
+    if (noteOffScheduler.processScheduledNoteOff(midiMessages, getMidiOutputChannel(),
+                                                  midiOutput.get(), currentSamplePosition,
+                                                  numSamples)) {
         auto noteOffCallback = onNoteOff;
         if (noteOffCallback)
             noteOffCallback();
     }
+}
 
-    // Update current sample position for the midi note off scheduling
-    currentSamplePosition += buffer.getNumSamples();
-
-    // Process clock based on current mode
+void PluginProcessor::processClockForBlock(int numSamples) {
     if (clock.getMode() == ClockMode::DAW_SYNC) {
-        // DAW sync mode: get timing from host transport (that's the play-head)
         if (auto* playHead = getPlayHead()) {
-            // get the ppqn count
             auto position = playHead->getPosition();
-            // save the latest position into DawSync
-            int pulseCount = dawSync.update (position);
-            // send clock the latest pulse count which we calculate by feeding the position to dawSync.update() above.
-            clock.updateDawSync (pulseCount);
+            int pulseCount = dawSync.update(position);
+            clock.updateDawSync(pulseCount);
         }
     } else {
-        // Internal clock mode, accumulate / process samples with sample accurate clock
-        clock.processInternalClock (buffer.getNumSamples());
+        clock.processInternalClock(numSamples);
     }
+}
 
-    // If we are in standalone, we can send the midi clock out to the device.
-    // NOTE: we send clock to all outputs when in internal clock mode.
-    if (clock.getMode() == ClockMode::INTERNAL && !midiClockOutputs.empty()) {
-        // Get accumulated MIDI clock pulses to send
-        int midiClockPulses = clock.getMidiClockPulsesToSend();
+void PluginProcessor::emitMidiClockPulses() {
+    if (clock.getMode() != ClockMode::INTERNAL || midiClockOutputs.empty())
+        return;
 
-        // Send accumulated MIDI clock messages
-        for (int i = 0; i < midiClockPulses; ++i) {
-            auto clockMsg = juce::MidiMessage::midiClock();
-            for (auto& output : midiClockOutputs) {
-                if (output) {
-                    output->sendMessageNow (clockMsg);
-                }
-            }
-        }
+    int midiClockPulses = clock.getMidiClockPulsesToSend();
+    for (int i = 0; i < midiClockPulses; ++i) {
+        auto clockMsg = juce::MidiMessage::midiClock();
+        for (auto& output : midiClockOutputs)
+            if (output)
+                output->sendMessageNow(clockMsg);
     }
+}
 
-    // ================ DAW TRANSPORT DETECTION (for auto-resume in external clock mode) ================================
-    // Detect when DAW transitions from stopped to playing in external clock mode
-    if (clock.getMode() == ClockMode::DAW_SYNC) {
-        if (auto* playHead = getPlayHead()) {
-            auto position = playHead->getPosition();
-            bool dawIsPlaying = position.hasValue() && position->getIsPlaying();
+void PluginProcessor::detectDawTransport() {
+    if (clock.getMode() != ClockMode::DAW_SYNC)
+        return;
 
-            // Detect transition from stopped to playing
-            if (dawIsPlaying && !previousDawIsPlaying) {
-                // DAW just started - resume sequencer playback (to Playing state)
-                auto currentState = sequencerState.load();
-                if (currentState == PlaybackState::Stopped || currentState == PlaybackState::Paused) {
-                    sequencerState.store(PlaybackState::Playing);
-                    DBG("DAW started - sequencer auto-resumed");
-                }
-            }
+    auto* playHead = getPlayHead();
+    if (!playHead)
+        return;
 
-            previousDawIsPlaying = dawIsPlaying;
+    auto position = playHead->getPosition();
+    bool dawIsPlaying = position.hasValue() && position->getIsPlaying();
+
+    if (dawIsPlaying && !previousDawIsPlaying) {
+        auto currentState = sequencerState.load();
+        if (currentState == PlaybackState::Stopped || currentState == PlaybackState::Paused) {
+            sequencerState.store(PlaybackState::Playing);
+            DBG("DAW started - sequencer auto-resumed");
         }
     }
+    previousDawIsPlaying = dawIsPlaying;
+}
 
-    // ================ MAIN PART ========================================================================================
-    if (sequencerState.load() == PlaybackState::Playing && clock.shouldTick()) {
-        // Accumulate MIDI clock pulses for the next cycle
-        // We need to do this because the normal clock rate is not even close to the ppqn midi uses.
-        // So we accumulate and barrage the midi ticks (we spread them out but all in between 16th note ppqn cycles which is gambler's default timing)
-        if (clock.getMode() == ClockMode::INTERNAL && !midiClockOutputs.empty()) {
-            clock.accumulateMidiClockPulse();
-        }
+double PluginProcessor::computeCurrentDawBpm() {
+    if (clock.getMode() != ClockMode::DAW_SYNC)
+        return 0.0;
 
-        // Send immediate note-off for previous note and cancel any scheduled one
-        noteOffScheduler.sendImmediateNoteOff (midiMessages, getMidiOutputChannel(), midiOutput.get());
+    auto* playHead = getPlayHead();
+    if (!playHead)
+        return 0.0;
 
-        // Tick the sequence to get the next note (using APVTS-backed state)
-        auto& state = getState(); // get the avpts wrapper
+    auto position = playHead->getPosition();
+    if (position.hasValue() && position->getBpm().hasValue())
+        return *position->getBpm();
+    return 0.0;
+}
 
-        int note = state.tick(); // get next note (quantized with the global scale)
-        int currentStepIndex = state.getCurrentIndex(); // get current step index
-
-        DBG ("Clock tick! Step: " << currentStepIndex << ", Note: " << note);
-
-        // Make sure it is not a rest
-        if (note >= 0) {
-            // Get step modulations for this step (using APVTS-backed state)
-            auto selectedMods = state.getSelectedModulations (currentStepIndex);
-
-            // Determine velocity (default to 100 if no velocity modulation is selected)
-            juce::uint8 velocity = 100;
-
-            // Send CC messages and check for velocity modulation
-            // These come from the step modulations panel, 7 slots for each step
-            for (const auto& mod : selectedMods) {
-                // if velocity then modulate the note
-                if (mod.getType() == ModulationType::Velocity) {
-                    // Use this as the note velocity
-                    velocity = static_cast<juce::uint8> (mod.getValue());
-                    // Otherwise it is just a CC, send that
-                } else if (mod.getType() == ModulationType::CC) {
-                    // Send CC message
-                    auto ccMsg = juce::MidiMessage::controllerEvent (getMidiOutputChannel(), mod.getCCNumber(), mod.getValue());
-                    // send the event
-                    midiMessages.addEvent (ccMsg, 0);
-
-                    // Send directly to MIDI output device (for standalone mode)
-                    if (midiOutput) {
-                        midiOutput->sendMessageNow (ccMsg);
-                    }
-                    DBG ("MIDI CC: " << mod.getCCNumber() << " = " << mod.getValue());
-                }
-            }
-
-            // Valid note - send note on with velocity
-            auto noteOn = juce::MidiMessage::noteOn (getMidiOutputChannel(), note, velocity);
-            // add this note to the messages
-            midiMessages.addEvent (noteOn, 0);
-
-            // Send directly to MIDI output device (for standalone mode)
-            if (midiOutput) {
-                // send the message.
-                midiOutput->sendMessageNow (noteOn);
-            }
-            DBG ("MIDI Note ON: " << note << " (velocity " << (int) velocity << ", channel 1)");
-            noteOffScheduler.setLastPlayedNote (note);
-
-            // Calculate samples per step based on current clock settings
-            double dawBpm = 0.0;
-            if (clock.getMode() == ClockMode::DAW_SYNC) {
-                if (auto* playHead = getPlayHead()) {
-                    auto position = playHead->getPosition();
-                    if (position.hasValue() && position->getBpm().hasValue()) {
-                        dawBpm = *position->getBpm();
-                    }
-                }
-            }
-
-            double samplesPerStep = clock.calculateSamplesPerStep(dawBpm, getSampleRate());
-
-            if (samplesPerStep > 0.0) {
-                double noteLengthPercent = state.getNoteLength();
-                juce::int64 noteOffDelay = static_cast<juce::int64> (samplesPerStep * noteLengthPercent);
-                noteOffScheduler.scheduleNoteOff (note, currentSamplePosition + noteOffDelay);
-                DBG ("Scheduled note-off for note " << note
-                     << " (delay: " << noteOffDelay << " samples, " << (noteLengthPercent * 100.0) << "% of step)");
-            }
-        } else {
-            // Rest - no note to play
-            noteOffScheduler.setLastPlayedNote (-1);
-            // Note: Rest recording is now handled inside state.tick() when roll is engaged
-            if (state.getIsRandom()) {
-                DBG ("Rest recorded at step: " << currentStepIndex);
-            }
-        }
-
-        // Notify UI that a tick occurred (thread-safe via AsyncUpdater)
-        // Make a local copy to avoid race condition with UI thread clearing the callback
-        auto callback = onSequenceTick;
-        if (callback) {
-            callback();
+void PluginProcessor::emitCcModulations(juce::MidiBuffer& midiMessages,
+                                         const std::vector<StepModulationData>& mods,
+                                         juce::uint8& velocityOut) {
+    for (const auto& mod : mods) {
+        if (mod.getType() == ModulationType::Velocity) {
+            velocityOut = static_cast<juce::uint8>(mod.getValue());
+        } else if (mod.getType() == ModulationType::CC) {
+            auto ccMsg = juce::MidiMessage::controllerEvent(getMidiOutputChannel(), mod.getCCNumber(), mod.getValue());
+            midiMessages.addEvent(ccMsg, 0);
+            if (midiOutput)
+                midiOutput->sendMessageNow(ccMsg);
+            DBG ("MIDI CC: " << mod.getCCNumber() << " = " << mod.getValue());
         }
     }
+}
 
+void PluginProcessor::tickSequencer(juce::MidiBuffer& midiMessages) {
+    if (clock.getMode() == ClockMode::INTERNAL && !midiClockOutputs.empty())
+        clock.accumulateMidiClockPulse();
+
+    noteOffScheduler.sendImmediateNoteOff(midiMessages, getMidiOutputChannel(), midiOutput.get());
+
+    auto& state = getState();
+    int note = state.tick();
+    int currentStepIndex = state.getCurrentIndex();
+
+    DBG ("Clock tick! Step: " << currentStepIndex << ", Note: " << note);
+
+    if (note >= 0) {
+        auto selectedMods = state.getSelectedModulations(currentStepIndex);
+        juce::uint8 velocity = 100;
+        emitCcModulations(midiMessages, selectedMods, velocity);
+
+        auto noteOn = juce::MidiMessage::noteOn(getMidiOutputChannel(), note, velocity);
+        midiMessages.addEvent(noteOn, 0);
+        if (midiOutput)
+            midiOutput->sendMessageNow(noteOn);
+        DBG ("MIDI Note ON: " << note << " (velocity " << (int) velocity << ", channel 1)");
+        noteOffScheduler.setLastPlayedNote(note);
+
+        double samplesPerStep = clock.calculateSamplesPerStep(computeCurrentDawBpm(), getSampleRate());
+        if (samplesPerStep > 0.0) {
+            double noteLengthPercent = state.getNoteLength();
+            juce::int64 noteOffDelay = static_cast<juce::int64>(samplesPerStep * noteLengthPercent);
+            noteOffScheduler.scheduleNoteOff(note, currentSamplePosition + noteOffDelay);
+            DBG ("Scheduled note-off for note " << note
+                 << " (delay: " << noteOffDelay << " samples, " << (noteLengthPercent * 100.0) << "% of step)");
+        }
+    } else {
+        noteOffScheduler.setLastPlayedNote(-1);
+        if (state.getIsRandom())
+            DBG ("Rest recorded at step: " << currentStepIndex);
+    }
+
+    auto callback = onSequenceTick;
+    if (callback)
+        callback();
 }
 
 //==============================================================================
@@ -480,214 +443,182 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes) {
 
 // Note all this is pretty straightforward, we are changing the state based on param changes.
 void PluginProcessor::parameterChanged (const juce::String& parameterID, float newValue) {
-    // Handle sequencer control button actions
-    // These are triggered when the button param transitions to ON (true)
-    // The param is set by UI clicks, DAW automation, or MIDI input
+    const bool isOn = newValue > 0.5f;
+    handlePrimaryRowParam (parameterID, isOn);
+    handleSecondaryRowParam (parameterID, isOn);
+    handleDestructiveParam (parameterID, isOn);
+    handlePresetCycleParam (parameterID, isOn);
+    handleTransportParam (parameterID, isOn);
+    handleClockParam (parameterID, newValue);
+}
 
-    bool isOn = newValue > 0.5f;
+void PluginProcessor::handlePrimaryRowParam (const juce::String& id, bool isOn) {
+    auto& state = getState();
 
-    // ========== SEQUENCER CONTROL BUTTONS ==========
-    // Only trigger action on the ON transition (debounce)
-
-    // ========== PRIMARY ROW BUTTONS ==========
-
-    if (parameterID == Params::Keys::ID::ROLL) {
-        // Roll is momentary - set isRandom to match param state
-        getState().setIsRandom (isOn);
-        DBG ("ROLL " + juce::String (isOn ? "ON" : "OFF") + " - isRandom: " + juce::String (getState().getIsRandom() ? "true" : "false"));
+    if (id == Params::Keys::ID::ROLL) {
+        state.setIsRandom (isOn);
+        DBG ("ROLL " + juce::String (isOn ? "ON" : "OFF") + " - isRandom: " + juce::String (state.getIsRandom() ? "true" : "false"));
+        return;
     }
-
-    // PAGE_LEFT and PAGE_RIGHT are handled in UI (need window position)
-    // The param change will trigger UI callback via StateListenerComponent
-
-    if (parameterID == Params::Keys::ID::LENGTH_PLUS && isOn) {
-        getState().increaseLength();
-        DBG ("LENGTH_PLUS triggered - new length: " + juce::String (getState().getLength()));
+    if (id == Params::Keys::ID::LENGTH_PLUS && isOn) {
+        state.increaseLength();
+        DBG ("LENGTH_PLUS triggered - new length: " + juce::String (state.getLength()));
+        return;
     }
-
-    if (parameterID == Params::Keys::ID::LENGTH_MINUS && isOn) {
-        getState().decreaseLength();
-        DBG ("LENGTH_MINUS triggered - new length: " + juce::String (getState().getLength()));
+    if (id == Params::Keys::ID::LENGTH_MINUS && isOn) {
+        state.decreaseLength();
+        DBG ("LENGTH_MINUS triggered - new length: " + juce::String (state.getLength()));
+        return;
     }
-
-    if (parameterID == Params::Keys::ID::NUDGE_LEFT && isOn) {
-        getState().nudgeLeft();
+    if (id == Params::Keys::ID::NUDGE_LEFT && isOn) {
+        state.nudgeLeft();
         DBG ("NUDGE_LEFT triggered");
+        return;
     }
-
-    if (parameterID == Params::Keys::ID::NUDGE_RIGHT && isOn) {
-        getState().nudgeRight();
+    if (id == Params::Keys::ID::NUDGE_RIGHT && isOn) {
+        state.nudgeRight();
         DBG ("NUDGE_RIGHT triggered");
+        return;
     }
-
-    if (parameterID == Params::Keys::ID::SEQ_IS_SHIFT) {
-        // SEQ_IS_SHIFT is the actual shift state - just log it
+    if (id == Params::Keys::ID::SEQ_IS_SHIFT) {
         DBG ("SEQ_IS_SHIFT " + juce::String (isOn ? "ON" : "OFF"));
     }
+}
 
-    // ========== SECONDARY ROW BUTTONS ==========
+void PluginProcessor::handleSecondaryRowParam (const juce::String& id, bool isOn) {
+    if (! isOn) return;
+    auto& state = getState();
 
-    if (parameterID == Params::Keys::ID::DUPLICATE && isOn) {
-        auto& state = getState();
-        int currentLength = state.getLength();
-        int newLength = juce::jmin (currentLength * 2, ParamConstants::MAX_STEPS);
-        int stepsToCopy = newLength - currentLength;
-
+    if (id == Params::Keys::ID::DUPLICATE) {
+        const int currentLength = state.getLength();
+        const int newLength = juce::jmin (currentLength * 2, ParamConstants::MAX_STEPS);
+        const int stepsToCopy = newLength - currentLength;
         for (int i = 0; i < stepsToCopy; i++) {
-            int srcIdx = i;
-            int dstIdx = currentLength + i;
-            state.setStepNotesLength (dstIdx, state.getStepNotesLength (srcIdx));
+            const int dstIdx = currentLength + i;
+            state.setStepNotesLength (dstIdx, state.getStepNotesLength (i));
             for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                state.setStepNote (dstIdx, n, state.getStepNote (srcIdx, n));
+                state.setStepNote (dstIdx, n, state.getStepNote (i, n));
             }
         }
         state.setLength (newLength);
         DBG ("DUPLICATE triggered - new length: " + juce::String (newLength));
+        return;
     }
-
-    // CLEAR_WINDOW is handled in UI (needs window position)
-
-    if (parameterID == Params::Keys::ID::CLEAR_STEP && isOn) {
-        auto& state = getState();
-        int selectedStep = state.getSelectedStepForEditing();
-        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
+    if (id == Params::Keys::ID::CLEAR_STEP) {
+        const int selectedStep = state.getSelectedStepForEditing();
+        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++)
             state.setStepNote (selectedStep, n, -1);
-        }
         DBG ("CLEAR_STEP triggered - cleared step " + juce::String (selectedStep));
+        return;
     }
-
-    if (parameterID == Params::Keys::ID::RANDOMIZE_STEP && isOn) {
-        auto& state = getState();
-        int selectedStep = state.getSelectedStepForEditing();
+    if (id == Params::Keys::ID::RANDOMIZE_STEP) {
+        const int selectedStep = state.getSelectedStepForEditing();
         state.randomizeStepNote (selectedStep);
         DBG ("RANDOMIZE_STEP triggered - randomized step " + juce::String (selectedStep));
+        return;
     }
-
-    if (parameterID == Params::Keys::ID::RANDOMIZE_ALL && isOn) {
-        auto& state = getState();
-        for (int i = 0; i < state.getLength(); i++) {
+    if (id == Params::Keys::ID::RANDOMIZE_ALL) {
+        for (int i = 0; i < state.getLength(); i++)
             state.randomizeStepNote (i);
-        }
         DBG ("RANDOMIZE_ALL triggered");
+        return;
     }
-
-    if (parameterID == Params::Keys::ID::SHUFFLE && isOn) {
-        auto& state = getState();
-        int len = state.getLength();
-        static std::random_device rd;
-        static std::mt19937 gen (rd());
-        for (int i = len - 1; i > 0; i--) {
-            std::uniform_int_distribution<> dis (0, i);
-            int j = dis (gen);
-            // Swap steps i and j
-            int lenI = state.getStepNotesLength (i);
-            std::array<int, ParamConstants::MAX_SUBSTEPS> notesI{};
-            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                notesI[static_cast<size_t> (n)] = state.getStepNote (i, n);
-            }
-            // Copy j to i
-            state.setStepNotesLength (i, state.getStepNotesLength (j));
-            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                state.setStepNote (i, n, state.getStepNote (j, n));
-            }
-            // Copy saved i to j
-            state.setStepNotesLength (j, lenI);
-            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++) {
-                state.setStepNote (j, n, notesI[static_cast<size_t> (n)]);
-            }
-        }
+    if (id == Params::Keys::ID::SHUFFLE) {
+        performShuffle();
         DBG ("SHUFFLE triggered");
     }
+}
 
-    // ========== DESTRUCTIVE MODE TRANSITIONS ==========
-    // When switching from OFF → ON, immediately bake all existing notes
-    // so the user doesn't hear out-of-scale/range notes that were stored raw.
+void PluginProcessor::performShuffle() {
+    auto& state = getState();
+    const int len = state.getLength();
+    static std::random_device rd;
+    static std::mt19937 gen (rd());
+    for (int i = len - 1; i > 0; i--) {
+        std::uniform_int_distribution<> dis (0, i);
+        const int j = dis (gen);
+        const int lenI = state.getStepNotesLength (i);
+        std::array<int, ParamConstants::MAX_SUBSTEPS> notesI{};
+        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++)
+            notesI[static_cast<size_t> (n)] = state.getStepNote (i, n);
+        state.setStepNotesLength (i, state.getStepNotesLength (j));
+        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++)
+            state.setStepNote (i, n, state.getStepNote (j, n));
+        state.setStepNotesLength (j, lenI);
+        for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++)
+            state.setStepNote (j, n, notesI[static_cast<size_t> (n)]);
+    }
+}
 
-    if (parameterID == Params::Keys::ID::PREF_DESTRUCTIVE_SCALE && isOn) {
+void PluginProcessor::handleDestructiveParam (const juce::String& id, bool isOn) {
+    if (! isOn) return;
+    if (id == Params::Keys::ID::PREF_DESTRUCTIVE_SCALE) {
         getState().bakeAllExistingNotes();
         DBG ("DESTRUCTIVE_SCALE ON - baked all existing notes to current scale");
-    }
-
-    if (parameterID == Params::Keys::ID::PREF_DESTRUCTIVE_RANGE && isOn) {
+    } else if (id == Params::Keys::ID::PREF_DESTRUCTIVE_RANGE) {
         getState().bakeAllExistingNotes();
         DBG ("DESTRUCTIVE_RANGE ON - baked all existing notes to current range");
     }
+}
 
-    // ========== PRESET CYCLING ==========
-    // These are trigger params - action happens on the ON transition
-    // The actual preset loading is handled by the UI via onPresetCycleUp/Down callbacks
-
-    if (parameterID == Params::Keys::ID::PRESET_CYCLE_UP && isOn) {
-        if (onPresetCycleUp) {
-            onPresetCycleUp();
-        }
+void PluginProcessor::handlePresetCycleParam (const juce::String& id, bool isOn) {
+    if (! isOn) return;
+    if (id == Params::Keys::ID::PRESET_CYCLE_UP) {
+        if (onPresetCycleUp) onPresetCycleUp();
         DBG ("PRESET_CYCLE_UP triggered");
-    }
-
-    if (parameterID == Params::Keys::ID::PRESET_CYCLE_DOWN && isOn) {
-        if (onPresetCycleDown) {
-            onPresetCycleDown();
-        }
+    } else if (id == Params::Keys::ID::PRESET_CYCLE_DOWN) {
+        if (onPresetCycleDown) onPresetCycleDown();
         DBG ("PRESET_CYCLE_DOWN triggered");
     }
+}
 
-    // ========== TRANSPORT CONTROLS ==========
-    // These are trigger params - action happens on the ON transition
-
-    if (parameterID == Params::Keys::ID::PLAY_PAUSE && isOn) {
+void PluginProcessor::handleTransportParam (const juce::String& id, bool isOn) {
+    if (! isOn) return;
+    if (id == Params::Keys::ID::PLAY_PAUSE) {
         togglePlayPause();
-        if (onPlayPauseTriggered) {
-            onPlayPauseTriggered();
-        }
+        if (onPlayPauseTriggered) onPlayPauseTriggered();
         DBG ("PLAY_PAUSE triggered");
-    }
-
-    if (parameterID == Params::Keys::ID::STOP && isOn) {
+    } else if (id == Params::Keys::ID::STOP) {
         stopSequencer();
-        if (onStopTriggered) {
-            onStopTriggered();
-        }
+        if (onStopTriggered) onStopTriggered();
         DBG ("STOP triggered");
     }
+}
 
-    // ========== CLOCK PARAMETERS ==========
-
-    if (parameterID == Params::Keys::ID::CLOCK_MODE) {
-        int intValue = static_cast<int>(newValue);
-        // APVTS values: 0=INTERNAL, 1=DAW_SYNC, 2=EXTERNAL_MIDI_CLOCK
-        switch (intValue) {
+void PluginProcessor::handleClockParam (const juce::String& id, float newValue) {
+    if (id == Params::Keys::ID::CLOCK_MODE) {
+        switch (static_cast<int> (newValue)) {
             case 0:
-                clock.setMode(ClockMode::INTERNAL);
+                clock.setMode (ClockMode::INTERNAL);
                 clock.start();
-                DBG("Clock mode set to INTERNAL (started)");
+                DBG ("Clock mode set to INTERNAL (started)");
                 break;
             case 1:
-                clock.setMode(ClockMode::DAW_SYNC);
+                clock.setMode (ClockMode::DAW_SYNC);
                 clock.stop();
-                DBG("Clock mode set to DAW_SYNC");
+                DBG ("Clock mode set to DAW_SYNC");
                 break;
             case 2:
-                clock.setMode(ClockMode::EXTERNAL_MIDI_CLOCK);
+                clock.setMode (ClockMode::EXTERNAL_MIDI_CLOCK);
                 clock.stop();
-                DBG("Clock mode set to EXTERNAL_MIDI_CLOCK");
+                DBG ("Clock mode set to EXTERNAL_MIDI_CLOCK");
                 break;
             default:
                 break;
         }
+        return;
     }
-
-    if (parameterID == Params::Keys::ID::CLOCK_BPM) {
-        clock.setBpm(static_cast<double>(newValue));
-        DBG("Clock BPM set to " + juce::String(newValue));
+    if (id == Params::Keys::ID::CLOCK_BPM) {
+        clock.setBpm (static_cast<double> (newValue));
+        DBG ("Clock BPM set to " + juce::String (newValue));
+        return;
     }
-
-    if (parameterID == Params::Keys::ID::CLOCK_SUBDIVISION) {
-        auto newSubdivision = static_cast<Subdivision>(static_cast<int>(newValue));
-        clock.setSubdivision(newSubdivision);
-        dawSync.setSubdivision(newSubdivision);
-        DBG("Clock subdivision set to " + juce::String(static_cast<int>(newValue)));
+    if (id == Params::Keys::ID::CLOCK_SUBDIVISION) {
+        const auto newSubdivision = static_cast<Subdivision> (static_cast<int> (newValue));
+        clock.setSubdivision (newSubdivision);
+        dawSync.setSubdivision (newSubdivision);
+        DBG ("Clock subdivision set to " + juce::String (static_cast<int> (newValue)));
     }
-
 }
 
 //==============================================================================
@@ -1067,358 +998,248 @@ void PluginProcessor::notifyMidiLearned() {
     }
 }
 
-void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiValue, bool isNoteOnOrCCPositive) {
+void PluginProcessor::fireTickCallback() {
+    auto callback = onSequenceTick;
+    if (callback) callback();
+}
+
+void PluginProcessor::setTriggerParam (const juce::String& paramId, bool isOn) {
+    if (auto* param = apvts.getParameter (paramId)) {
+        param->setValueNotifyingHost (isOn ? 1.0f : 0.0f);
+        DBG ("  → " << paramId << " param set to " << (isOn ? "ON" : "OFF"));
+    }
+}
+
+void PluginProcessor::handleOctaveSlider (int midiValue) {
     auto& state = getState();
+    const int octaveIndex = MidiValueConverter::midiToDiscreteIndex (midiValue, 9);
+    const int selectedStep = state.getSelectedStepForEditing();
+    const int currentNote = state.getSelectedNoteForStep (selectedStep);
+    const int pitchClass = currentNote % 12;
+    const int newNote = octaveIndex * 12 + pitchClass;
+    state.updateSelectedNoteForStep (selectedStep, newNote);
+    DBG ("  → Octave changed to " << octaveIndex << " (MIDI note " << newNote << ")");
+    fireTickCallback();
+}
 
-    // Convert MIDI value using the mapping's conversion settings
-    float normalizedValue = MidiValueConverter::midiToScaled (
-        midiValue,
-        mapping.minValue,
-        mapping.maxValue,
-        mapping.invert);
+void PluginProcessor::handleNoteSlider (int midiValue) {
+    auto& state = getState();
+    const int pitchClass = MidiValueConverter::midiToDiscreteIndex (midiValue, 11);
+    const int selectedStep = state.getSelectedStepForEditing();
+    const int currentNote = state.getSelectedNoteForStep (selectedStep);
+    const int octave = currentNote / 12;
+    const int newNote = octave * 12 + pitchClass;
+    state.updateSelectedNoteForStep (selectedStep, newNote);
+    DBG ("  → Note changed to pitch class " << pitchClass << " (MIDI note " << newNote << ")");
+    fireTickCallback();
+}
 
-    // Handle each control type
+void PluginProcessor::handleProbabilitySlider (float normalizedValue) {
+    const int percentage = static_cast<int> (normalizedValue * 100.0f);
+    getState().setProbabilityPercentage (percentage);
+    DBG ("  → Probability changed to " << percentage << "%");
+    fireTickCallback();
+}
+
+void PluginProcessor::handleShiftAwareButton (const juce::String& primaryParam,
+                                              const juce::String& shiftParam,
+                                              bool isOn) {
+    const bool isShiftActive = getState().getIsShift();
+    setTriggerParam (isShiftActive ? shiftParam : primaryParam, isOn);
+}
+
+void PluginProcessor::handleShiftToggle (bool isOn) {
+    if (! isOn) return;
+    if (auto* param = apvts.getParameter (Params::Keys::ID::SEQ_IS_SHIFT)) {
+        const bool currentState = param->getValue() > 0.5f;
+        param->setValueNotifyingHost (currentState ? 0.0f : 1.0f);
+        DBG ("  → SEQ_IS_SHIFT toggled to " << (! currentState ? "ON" : "OFF"));
+    }
+}
+
+void PluginProcessor::handleStepSelect (MidiControlId controlId) {
+    auto& state = getState();
+    const int localStepIndex = static_cast<int> (controlId) - static_cast<int> (MidiControlId::STEP_0);
+    const int absoluteStep = state.getViewWindowStart() + localStepIndex;
+    if (absoluteStep < state.getLength()) {
+        state.setSelectedStepForEditing (absoluteStep);
+        DBG ("  → Step " << absoluteStep << " selected for editing (window " << localStepIndex << ")");
+    }
+    fireTickCallback();
+}
+
+void PluginProcessor::handleSubseqMinus() {
+    auto& state = getState();
+    const int selectedStep = state.getSelectedStepForEditing();
+    const int currentLength = state.getStepNotesLength (selectedStep);
+    if (currentLength > 1) {
+        state.setStepNotesLength (selectedStep, currentLength - 1);
+        DBG ("  → Substep length decreased to " << (currentLength - 1));
+    }
+    fireTickCallback();
+}
+
+void PluginProcessor::handleSubseqPlus() {
+    auto& state = getState();
+    const int selectedStep = state.getSelectedStepForEditing();
+    const int currentLength = state.getStepNotesLength (selectedStep);
+    if (currentLength < ParamConstants::MAX_SUBSTEPS) {
+        state.setStepNotesLength (selectedStep, currentLength + 1);
+        DBG ("  → Substep length increased to " << (currentLength + 1));
+    }
+    fireTickCallback();
+}
+
+void PluginProcessor::handleSubseqBarSelect (MidiControlId controlId) {
+    auto& state = getState();
+    const int barIndex = static_cast<int> (controlId) - static_cast<int> (MidiControlId::SUBSEQ_BAR_0);
+    const int selectedStep = state.getSelectedStepForEditing();
+    if (barIndex < state.getStepNotesLength (selectedStep)) {
+        state.setSelectedSubstepIndex (selectedStep, barIndex);
+        DBG ("  → Substep " << barIndex << " selected for editing");
+    }
+    fireTickCallback();
+}
+
+void PluginProcessor::handleNoteRangeMin (int midiValue) {
+    const int offset = MidiValueConverter::midiToDiscreteIndex (midiValue, 127);
+    getState().setScaleWindowOffset (offset);
+    DBG ("  → Note range offset set to " << offset);
+    fireTickCallback();
+}
+
+void PluginProcessor::handleNoteRangeMax (int midiValue) {
+    const int size = MidiValueConverter::midiToDiscreteIndex (midiValue, 127) + 1;
+    getState().setScaleWindowSize (size);
+    DBG ("  → Note range size set to " << size);
+    fireTickCallback();
+}
+
+void PluginProcessor::handleSubdivision (int midiValue) {
+    const int subdivisionIndex = MidiValueConverter::midiToDiscreteIndex (midiValue, 3);
+    if (auto* param = apvts.getParameter (Params::Keys::ID::CLOCK_SUBDIVISION)) {
+        param->setValueNotifyingHost (param->convertTo0to1 (static_cast<float> (subdivisionIndex)));
+        DBG ("  → Subdivision set to " << subdivisionIndex);
+    }
+}
+
+void PluginProcessor::handleScaleNote (MidiControlId controlId, bool isOn) {
+    auto& state = getState();
+    const int noteIndex = static_cast<int> (controlId) - static_cast<int> (MidiControlId::SCALE_NOTE_C);
+    const bool currentState = state.getGlobalScaleNote (noteIndex);
+
+    bool isLatched = false;
+    if (auto* latchParam = apvts.getParameter (Params::Keys::ID::SCALE_LATCH))
+        isLatched = latchParam->getValue() > 0.5f;
+
+    if (isLatched) {
+        if (isOn) {
+            state.setGlobalScaleNote (noteIndex, ! currentState);
+            DBG ("  → Global scale note " << noteIndex << " toggled to " << (! currentState ? "ON" : "OFF"));
+            fireTickCallback();
+        }
+    } else {
+        if (isOn != currentState) {
+            state.setGlobalScaleNote (noteIndex, isOn);
+            DBG ("  → Global scale note " << noteIndex << " momentary set to " << (isOn ? "ON" : "OFF"));
+            fireTickCallback();
+        }
+    }
+}
+
+void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiValue, bool isNoteOnOrCCPositive) {
+    const float normalizedValue = MidiValueConverter::midiToScaled (
+        midiValue, mapping.minValue, mapping.maxValue, mapping.invert);
+
     switch (mapping.controlId) {
-        // ========== OCTAVE SLIDER ==========
-        case MidiControlId::OCTAVE_SLIDER: {
-            int octaveIndex = MidiValueConverter::midiToDiscreteIndex (midiValue, 9); // 0-9
-            // Update via APVTS-backed state (thread-safe)
-            int selectedStep = state.getSelectedStepForEditing();
-            int currentNote = state.getSelectedNoteForStep (selectedStep);
-            int pitchClass = currentNote % 12;
-            int newNote = octaveIndex * 12 + pitchClass;
-            state.updateSelectedNoteForStep (selectedStep, newNote);
-            DBG ("  → Octave changed to " << octaveIndex << " (MIDI note " << newNote << ")");
-            auto callback = onSequenceTick;
-            if (callback)
-                callback();
+        case MidiControlId::OCTAVE_SLIDER:      handleOctaveSlider (midiValue); break;
+        case MidiControlId::NOTE_SLIDER:        handleNoteSlider (midiValue); break;
+        case MidiControlId::PROBABILITY_SLIDER: handleProbabilitySlider (normalizedValue); break;
+
+        case MidiControlId::BUTTON_ROLL:
+            setTriggerParam (Params::Keys::ID::ROLL, isNoteOnOrCCPositive);
             break;
-        }
 
-        // ========== NOTE SLIDER ==========
-        case MidiControlId::NOTE_SLIDER: {
-            int pitchClass = MidiValueConverter::midiToDiscreteIndex (midiValue, 11); // 0-11
-            // Update via APVTS-backed state (thread-safe)
-            int selectedStep = state.getSelectedStepForEditing();
-            int currentNote = state.getSelectedNoteForStep (selectedStep);
-            int octave = currentNote / 12;
-            int newNote = octave * 12 + pitchClass;
-            state.updateSelectedNoteForStep (selectedStep, newNote);
-            DBG ("  → Note changed to pitch class " << pitchClass << " (MIDI note " << newNote << ")");
-            auto callback = onSequenceTick;
-            if (callback)
-                callback();
+        case MidiControlId::BUTTON_PAGE_LEFT:
+            handleShiftAwareButton (Params::Keys::ID::INDEX_LEFT, Params::Keys::ID::DUPLICATE, isNoteOnOrCCPositive);
             break;
-        }
-
-        // ========== PROBABILITY SLIDER ==========
-        case MidiControlId::PROBABILITY_SLIDER: {
-            int percentage = static_cast<int> (normalizedValue * 100.0f);
-            state.setProbabilityPercentage (percentage);
-            DBG ("  → Probability changed to " << percentage << "%");
-            auto callback = onSequenceTick;
-            if (callback)
-                callback();
+        case MidiControlId::BUTTON_PAGE_RIGHT:
+            handleShiftAwareButton (Params::Keys::ID::INDEX_RIGHT, Params::Keys::ID::CLEAR_WINDOW, isNoteOnOrCCPositive);
             break;
-        }
-
-            // ========== SEQUENCER CONTROL BUTTONS - PRIMARY ROW ==========
-            // All buttons use param-based approach: set param on note-on/off,
-            // parameterChanged handles the action, UI observes param for visual state
-
-        case MidiControlId::BUTTON_ROLL: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::ROLL)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → ROLL param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
+        case MidiControlId::BUTTON_LENGTH_PLUS:
+            handleShiftAwareButton (Params::Keys::ID::LENGTH_PLUS, Params::Keys::ID::CLEAR_STEP, isNoteOnOrCCPositive);
             break;
-        }
-
-        // ========== POSITION 1: PAGE_LEFT / DUPLICATE (shift-aware) ==========
-        case MidiControlId::BUTTON_PAGE_LEFT: {
-            bool isShiftActive = state.getIsShift();
-            juce::String paramId = isShiftActive ? Params::Keys::ID::DUPLICATE : Params::Keys::ID::INDEX_LEFT;
-            if (auto* param = apvts.getParameter (paramId)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → " << (isShiftActive ? "DUPLICATE" : "INDEX_LEFT") << " param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
+        case MidiControlId::BUTTON_LENGTH_MINUS:
+            handleShiftAwareButton (Params::Keys::ID::LENGTH_MINUS, Params::Keys::ID::RANDOMIZE_ALL, isNoteOnOrCCPositive);
             break;
-        }
-
-        // ========== POSITION 2: PAGE_RIGHT / CLEAR_WINDOW (shift-aware) ==========
-        case MidiControlId::BUTTON_PAGE_RIGHT: {
-            bool isShiftActive = state.getIsShift();
-            juce::String paramId = isShiftActive ? Params::Keys::ID::CLEAR_WINDOW : Params::Keys::ID::INDEX_RIGHT;
-            if (auto* param = apvts.getParameter (paramId)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → " << (isShiftActive ? "CLEAR_WINDOW" : "INDEX_RIGHT") << " param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
+        case MidiControlId::BUTTON_NUDGE_LEFT:
+            handleShiftAwareButton (Params::Keys::ID::NUDGE_LEFT, Params::Keys::ID::RANDOMIZE_STEP, isNoteOnOrCCPositive);
             break;
-        }
-
-        // ========== POSITION 3: LENGTH_PLUS / CLEAR_STEP (shift-aware) ==========
-        case MidiControlId::BUTTON_LENGTH_PLUS: {
-            bool isShiftActive = state.getIsShift();
-            juce::String paramId = isShiftActive ? Params::Keys::ID::CLEAR_STEP : Params::Keys::ID::LENGTH_PLUS;
-            if (auto* param = apvts.getParameter (paramId)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → " << (isShiftActive ? "CLEAR_STEP" : "LENGTH_PLUS") << " param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
+        case MidiControlId::BUTTON_NUDGE_RIGHT:
+            handleShiftAwareButton (Params::Keys::ID::NUDGE_RIGHT, Params::Keys::ID::SHUFFLE, isNoteOnOrCCPositive);
             break;
-        }
 
-        // ========== POSITION 4: LENGTH_MINUS / RANDOMIZE_ALL (shift-aware) ==========
-        case MidiControlId::BUTTON_LENGTH_MINUS: {
-            bool isShiftActive = state.getIsShift();
-            juce::String paramId = isShiftActive ? Params::Keys::ID::RANDOMIZE_ALL : Params::Keys::ID::LENGTH_MINUS;
-            if (auto* param = apvts.getParameter (paramId)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → " << (isShiftActive ? "RANDOMIZE_ALL" : "LENGTH_MINUS") << " param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
+        case MidiControlId::BUTTON_SHIFT:
+            handleShiftToggle (isNoteOnOrCCPositive);
             break;
-        }
 
-        // ========== POSITION 5: NUDGE_LEFT / RANDOMIZE_STEP (shift-aware) ==========
-        case MidiControlId::BUTTON_NUDGE_LEFT: {
-            bool isShiftActive = state.getIsShift();
-            juce::String paramId = isShiftActive ? Params::Keys::ID::RANDOMIZE_STEP : Params::Keys::ID::NUDGE_LEFT;
-            if (auto* param = apvts.getParameter (paramId)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → " << (isShiftActive ? "RANDOMIZE_STEP" : "NUDGE_LEFT") << " param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
+        case MidiControlId::STEP_0: case MidiControlId::STEP_1:
+        case MidiControlId::STEP_2: case MidiControlId::STEP_3:
+        case MidiControlId::STEP_4: case MidiControlId::STEP_5:
+        case MidiControlId::STEP_6: case MidiControlId::STEP_7:
+            if (isNoteOnOrCCPositive) handleStepSelect (mapping.controlId);
             break;
-        }
 
-        // ========== POSITION 6: NUDGE_RIGHT / SHUFFLE (shift-aware) ==========
-        case MidiControlId::BUTTON_NUDGE_RIGHT: {
-            bool isShiftActive = state.getIsShift();
-            juce::String paramId = isShiftActive ? Params::Keys::ID::SHUFFLE : Params::Keys::ID::NUDGE_RIGHT;
-            if (auto* param = apvts.getParameter (paramId)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → " << (isShiftActive ? "SHUFFLE" : "NUDGE_RIGHT") << " param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
+        case MidiControlId::SUBSEQ_MINUS:
+            if (isNoteOnOrCCPositive) handleSubseqMinus();
             break;
-        }
-
-        case MidiControlId::BUTTON_SHIFT: {
-            // Shift is a toggle - only toggle on note-on/CC positive
-            if (isNoteOnOrCCPositive) {
-                if (auto* param = apvts.getParameter (Params::Keys::ID::SEQ_IS_SHIFT)) {
-                    bool currentState = param->getValue() > 0.5f;
-                    param->setValueNotifyingHost (currentState ? 0.0f : 1.0f);
-                    DBG ("  → SEQ_IS_SHIFT toggled to " << (!currentState ? "ON" : "OFF"));
-                }
-            }
+        case MidiControlId::SUBSEQ_PLUS:
+            if (isNoteOnOrCCPositive) handleSubseqPlus();
             break;
-        }
 
-        // ========== SEQUENCER WINDOW STEPS (0-7) ==========
-        case MidiControlId::STEP_0:
-        case MidiControlId::STEP_1:
-        case MidiControlId::STEP_2:
-        case MidiControlId::STEP_3:
-        case MidiControlId::STEP_4:
-        case MidiControlId::STEP_5:
-        case MidiControlId::STEP_6:
-        case MidiControlId::STEP_7: {
-            if (isNoteOnOrCCPositive) {
-                int localStepIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::STEP_0);
-                int windowStart = state.getViewWindowStart();
-                int absoluteStep = windowStart + localStepIndex;
-                if (absoluteStep < state.getLength()) {
-                    state.setSelectedStepForEditing (absoluteStep);
-                    DBG ("  → Step " << absoluteStep << " selected for editing (window " << localStepIndex << ")");
-                }
-                auto callback = onSequenceTick;
-                if (callback)
-                    callback();
-            }
+        case MidiControlId::SUBSEQ_BAR_0: case MidiControlId::SUBSEQ_BAR_1:
+        case MidiControlId::SUBSEQ_BAR_2: case MidiControlId::SUBSEQ_BAR_3:
+        case MidiControlId::SUBSEQ_BAR_4: case MidiControlId::SUBSEQ_BAR_5:
+        case MidiControlId::SUBSEQ_BAR_6: case MidiControlId::SUBSEQ_BAR_7:
+            if (isNoteOnOrCCPositive) handleSubseqBarSelect (mapping.controlId);
             break;
-        }
 
-        // ========== SUBSEQUENCE CONTROLS ==========
-        case MidiControlId::SUBSEQ_MINUS: {
-            if (isNoteOnOrCCPositive) {
-                int selectedStep = state.getSelectedStepForEditing();
-                int currentLength = state.getStepNotesLength (selectedStep);
-                if (currentLength > 1) {
-                    state.setStepNotesLength (selectedStep, currentLength - 1);
-                    DBG ("  → Substep length decreased to " << (currentLength - 1));
-                }
-                auto callback = onSequenceTick;
-                if (callback)
-                    callback();
-            }
+        case MidiControlId::NOTE_RANGE_MIN:     handleNoteRangeMin (midiValue); break;
+        case MidiControlId::NOTE_RANGE_MAX:     handleNoteRangeMax (midiValue); break;
+        case MidiControlId::SUBDIVISION_SLIDER: handleSubdivision (midiValue); break;
+
+        case MidiControlId::SCALE_NOTE_C:  case MidiControlId::SCALE_NOTE_Db:
+        case MidiControlId::SCALE_NOTE_D:  case MidiControlId::SCALE_NOTE_Eb:
+        case MidiControlId::SCALE_NOTE_E:  case MidiControlId::SCALE_NOTE_F:
+        case MidiControlId::SCALE_NOTE_Gb: case MidiControlId::SCALE_NOTE_G:
+        case MidiControlId::SCALE_NOTE_Ab: case MidiControlId::SCALE_NOTE_A:
+        case MidiControlId::SCALE_NOTE_Bb: case MidiControlId::SCALE_NOTE_B:
+            handleScaleNote (mapping.controlId, isNoteOnOrCCPositive);
             break;
-        }
 
-        case MidiControlId::SUBSEQ_PLUS: {
-            if (isNoteOnOrCCPositive) {
-                int selectedStep = state.getSelectedStepForEditing();
-                int currentLength = state.getStepNotesLength (selectedStep);
-                if (currentLength < ParamConstants::MAX_SUBSTEPS) {
-                    state.setStepNotesLength (selectedStep, currentLength + 1);
-                    DBG ("  → Substep length increased to " << (currentLength + 1));
-                }
-                auto callback = onSequenceTick;
-                if (callback)
-                    callback();
-            }
+        case MidiControlId::SETTINGS_TOGGLE:
+            if (isNoteOnOrCCPositive) DBG ("  → Settings toggle (UI only)");
             break;
-        }
 
-        case MidiControlId::SUBSEQ_BAR_0:
-        case MidiControlId::SUBSEQ_BAR_1:
-        case MidiControlId::SUBSEQ_BAR_2:
-        case MidiControlId::SUBSEQ_BAR_3:
-        case MidiControlId::SUBSEQ_BAR_4:
-        case MidiControlId::SUBSEQ_BAR_5:
-        case MidiControlId::SUBSEQ_BAR_6:
-        case MidiControlId::SUBSEQ_BAR_7: {
-            if (isNoteOnOrCCPositive) {
-                int barIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::SUBSEQ_BAR_0);
-                int selectedStep = state.getSelectedStepForEditing();
-                int substepLength = state.getStepNotesLength (selectedStep);
-                if (barIndex < substepLength) {
-                    state.setSelectedSubstepIndex (selectedStep, barIndex);
-                    DBG ("  → Substep " << barIndex << " selected for editing");
-                }
-                if (onSequenceTick)
-                    onSequenceTick();
-            }
+        case MidiControlId::PRESET_CYCLE_UP:
+            setTriggerParam (Params::Keys::ID::PRESET_CYCLE_UP, isNoteOnOrCCPositive);
             break;
-        }
-
-        // ========== NOTE RANGE CONTROLS ==========
-        // These set the APVTS window params directly so param listeners fire
-        case MidiControlId::NOTE_RANGE_MIN: {
-            int offset = MidiValueConverter::midiToDiscreteIndex (midiValue, 127);
-            state.setScaleWindowOffset (offset);
-            DBG ("  → Note range offset set to " << offset);
-            if (onSequenceTick)
-                onSequenceTick();
+        case MidiControlId::PRESET_CYCLE_DOWN:
+            setTriggerParam (Params::Keys::ID::PRESET_CYCLE_DOWN, isNoteOnOrCCPositive);
             break;
-        }
-
-        case MidiControlId::NOTE_RANGE_MAX: {
-            int size = MidiValueConverter::midiToDiscreteIndex (midiValue, 127) + 1; // 1-128
-            state.setScaleWindowSize (size);
-            DBG ("  → Note range size set to " << size);
-            if (onSequenceTick)
-                onSequenceTick();
+        case MidiControlId::PLAY_PAUSE:
+            setTriggerParam (Params::Keys::ID::PLAY_PAUSE, isNoteOnOrCCPositive);
             break;
-        }
-
-        // ========== SUBDIVISION SLIDER ==========
-        case MidiControlId::SUBDIVISION_SLIDER: {
-            int subdivisionIndex = MidiValueConverter::midiToDiscreteIndex (midiValue, 3);
-            if (auto* param = apvts.getParameter (Params::Keys::ID::CLOCK_SUBDIVISION)) {
-                param->setValueNotifyingHost (param->convertTo0to1 (static_cast<float> (subdivisionIndex)));
-                DBG ("  → Subdivision set to " << subdivisionIndex);
-            }
+        case MidiControlId::STOP:
+            setTriggerParam (Params::Keys::ID::STOP, isNoteOnOrCCPositive);
             break;
-        }
-
-        // ========== PIANO ROLL SCALE NOTES ==========
-        case MidiControlId::SCALE_NOTE_C:
-        case MidiControlId::SCALE_NOTE_Db:
-        case MidiControlId::SCALE_NOTE_D:
-        case MidiControlId::SCALE_NOTE_Eb:
-        case MidiControlId::SCALE_NOTE_E:
-        case MidiControlId::SCALE_NOTE_F:
-        case MidiControlId::SCALE_NOTE_Gb:
-        case MidiControlId::SCALE_NOTE_G:
-        case MidiControlId::SCALE_NOTE_Ab:
-        case MidiControlId::SCALE_NOTE_A:
-        case MidiControlId::SCALE_NOTE_Bb:
-        case MidiControlId::SCALE_NOTE_B: {
-            int noteIndex = static_cast<int> (mapping.controlId) - static_cast<int> (MidiControlId::SCALE_NOTE_C);
-            bool currentState = state.getGlobalScaleNote(noteIndex);
-
-            // Honor SCALE_LATCH parameter: latched = toggle on press,
-            // momentary = ON on press / OFF on release
-            bool isLatched = false;
-            if (auto* latchParam = apvts.getParameter (Params::Keys::ID::SCALE_LATCH))
-                isLatched = latchParam->getValue() > 0.5f;
-
-            if (isLatched) {
-                // Latched mode: Note ON toggles, Note OFF does nothing
-                if (isNoteOnOrCCPositive) {
-                    state.setGlobalScaleNote(noteIndex, !currentState);
-                    DBG ("  → Global scale note " << noteIndex << " toggled to " << (!currentState ? "ON" : "OFF"));
-                    if (onSequenceTick)
-                        onSequenceTick();
-                }
-            } else {
-                // Momentary mode: Note ON turns on, Note OFF turns off
-                bool newState = isNoteOnOrCCPositive;
-                if (newState != currentState) {
-                    state.setGlobalScaleNote(noteIndex, newState);
-                    DBG ("  → Global scale note " << noteIndex << " momentary set to " << (newState ? "ON" : "OFF"));
-                    if (onSequenceTick)
-                        onSequenceTick();
-                }
-            }
+        case MidiControlId::SCALE_LATCH:
+            setTriggerParam (Params::Keys::ID::SCALE_LATCH, isNoteOnOrCCPositive);
             break;
-        }
-
-        // ========== NAVIGATION ==========
-        case MidiControlId::SETTINGS_TOGGLE: {
-            if (isNoteOnOrCCPositive) {
-                // This is purely a UI concern - would need UI callback
-                DBG ("  → Settings toggle (UI only)");
-            }
-            break;
-        }
-
-        // ========== PRESET CONTROLS ==========
-        case MidiControlId::PRESET_CYCLE_UP: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::PRESET_CYCLE_UP)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → PRESET_CYCLE_UP param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
-            break;
-        }
-
-        case MidiControlId::PRESET_CYCLE_DOWN: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::PRESET_CYCLE_DOWN)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → PRESET_CYCLE_DOWN param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
-            break;
-        }
-
-        // ========== TRANSPORT CONTROLS ==========
-        case MidiControlId::PLAY_PAUSE: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::PLAY_PAUSE)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → PLAY_PAUSE param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
-            break;
-        }
-
-        case MidiControlId::STOP: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::STOP)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → STOP param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
-            break;
-        }
-
-        case MidiControlId::SCALE_LATCH: {
-            if (auto* param = apvts.getParameter (Params::Keys::ID::SCALE_LATCH)) {
-                param->setValueNotifyingHost (isNoteOnOrCCPositive ? 1.0f : 0.0f);
-                DBG ("  → SCALE_LATCH param set to " << (isNoteOnOrCCPositive ? "ON" : "OFF"));
-            }
-            break;
-        }
 
         case MidiControlId::COUNT:
-            // This is just a sentinel value, not an actual control
             break;
-
         default:
-            // Unhandled control - log for debugging
             DBG ("  → Unhandled MIDI control: " << getMidiControlName (mapping.controlId));
             break;
     }

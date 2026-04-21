@@ -72,7 +72,7 @@ The app has three layers, running on two threads:
 | `PluginProcessor` | `source/PluginProcessor.cpp` | Audio callback, MIDI I/O, parameter listener |
 | `SequenceState` | `source/backend/SequenceState.h` | Public API wrapping state + quantizer |
 | `Sequence` | `source/backend/Sequence.h` | Playback engine (tick, nudge, randomize) |
-| `Step` | `source/backend/Step.h` | Lightweight view of one step's data |
+| `Step` | `source/backend/Step/Step.h` | Lightweight view of one step's data |
 | `ScaleQuantizer` | `source/backend/ScaleQuantizer.h` | Scale/range quantization logic |
 | `Scale` | `source/backend/Scale.h` | Static math for range window conversions |
 | `ApplicationComponent` | `source/ui/ApplicationComponent.h` | Wires UI callbacks to state |

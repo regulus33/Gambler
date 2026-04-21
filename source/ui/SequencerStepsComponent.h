@@ -3,7 +3,7 @@
 #include "../PluginProcessor.h"
 #include "BinaryData.h"
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "SequenceGrid.h"
+#include "SequenceGrid/SequenceGrid.h"
 #include "StateListenerComponent.h"
 #include "buttons/StepButton.h"
 #include <array>

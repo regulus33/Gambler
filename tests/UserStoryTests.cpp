@@ -14,7 +14,7 @@
 #include <data/Params.h>
 #include <backend/Scale.h>
 #include <ui/MainScreenComponent.h>
-#include <ui/SequenceGrid.h>
+#include <ui/SequenceGrid/SequenceGrid.h>
 #include <ui/SequenceOverviewComponent.h>
 #include <ui/MainControlsComponent.h>
 #include <ui/NoteControlsComponent.h>

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../backend/MidiLearnRegistry.h"
-#include "../../backend/MidiMapping.h"
+#include "../../backend/MidiLearnRegistry/MidiLearnRegistry.h"
+#include "../../backend/MidiMapping/MidiMapping.h"
 #include "../MidiLearnOverlayPainter.h"
 #include "BinaryData.h"
 #include <functional>

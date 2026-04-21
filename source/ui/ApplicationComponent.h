@@ -3,9 +3,9 @@
 #include "../PluginProcessor.h"
 #include "../backend/MidiExporter.h"
 #include "LogoComponent.h"
-#include "PresetSelectorComponent.h"
+#include "PresetSelectorComponent/PresetSelectorComponent.h"
 #include "MainScreenComponent.h"
-#include "SettingsScreenComponent.h"
+#include "SettingsScreenComponent/SettingsScreenComponent.h"
 #include "../backend/ClockMode.h"
 #include "../util/PlatformUtils.h"
 #include "../native/iOSNativeDialogs.h"
@@ -30,18 +30,34 @@ public:
           navBar(processor),
           mainScreen(processor)
     {
-        // Add main screen first (visible by default)
         addAndMakeVisible(mainScreen);
-
-        // Add logo, preset selector, and navbar last so they paint on top of screen components
         addAndMakeVisible(logo);
         addAndMakeVisible(presetSelector);
         addAndMakeVisible(navBar);
 
-        // ========================================
-        // NavBar callbacks (wired once, shared across screens)
-        // ========================================
+        setupNavBarCallbacks();
+        setupPresetSelector();
+        setupPianoRollAndNoteCallbacks();
+        setupSequenceGridCallbacks();
+        setupSubsequenceCallbacks();
 
+        mainScreen.getSequencerSteps().onStepClicked = [this](int stepIndex) {
+            processorRef.triggerStepMidi(stepIndex);
+            DBG("Step clicked: " + juce::String(stepIndex));
+        };
+
+        setupMidiLearnRegistries();
+        setupNoteRangeCallbacks();
+
+        mainScreen.onIdealHeightChanged = [this](int newHeight) {
+            if (onDesignHeightChanged) onDesignHeightChanged(newHeight);
+        };
+
+        setupProcessorCallbacks();
+        setupApvtsListeners();
+    }
+
+    void setupNavBarCallbacks() {
         navBar.onSettingsClicked = [this]() {
             if (settingsScreen && settingsScreen->isVisible())
                 showMainScreen();
@@ -65,15 +81,12 @@ public:
             processorRef.togglePlayPause();
             updatePlayPauseButtonState();
         };
-
         navBar.onStopClicked = [this]() {
             processorRef.stopSequencer();
             updatePlayPauseButtonState();
         };
 
-        navBar.onExportClicked = [this]() {
-            exportMidiFile();
-        };
+        navBar.onExportClicked = [this]() { exportMidiFile(); };
         navBar.onExportDragStarted = [this]() -> juce::File {
             auto midiFile = MidiExporter::createMidiFile(processorRef.getState());
             return MidiExporter::writeToTempFile(midiFile);
@@ -82,22 +95,12 @@ public:
         navBar.onCompactViewToggled = [this](bool compact) {
             mainScreen.setCompactMode(compact);
         };
-
         navBar.onSwapRowClicked = [this](bool showingTop) {
             mainScreen.setShowingTopRow(showingTop);
         };
+    }
 
-        // ========================================
-        // Preset selector
-        // ========================================
-        setupPresetSelector();
-
-        // ========================================
-        // MainScreen child component callbacks
-        // (previously scattered across MainScreenComponent)
-        // ========================================
-
-        // Piano roll: scale changes
+    void setupPianoRollAndNoteCallbacks() {
         mainScreen.getPianoRoll().onNoteChanged = [this]() {
             Scale newScale = mainScreen.getPianoRoll().getScale();
             auto& state = processorRef.getState();
@@ -107,77 +110,70 @@ public:
             int selectedStep = state.getSelectedStepForEditing();
             int selectedNote = state.getSelectedNoteForStep(selectedStep);
             updateNoteControlOptions(selectedNote);
-
             triggerAsyncUpdate();
         };
 
-        // Note controls: pitch class changes
-        mainScreen.getMainControls().getNoteControls().onNoteChanged = [this](int pitchClass) {
+        auto& noteControls = mainScreen.getMainControls().getNoteControls();
+
+        noteControls.onNoteChanged = [this](int pitchClass) {
             auto& state = processorRef.getState();
-            int selectedStep = state.getSelectedStepForEditing();
-            int selectedSubstep = state.getSelectedSubstepIndex(selectedStep);
-            int currentNote = state.getQuantizedStepNote(selectedStep, selectedSubstep);
-            int currentOctave = currentNote / 12;
-            int newNote = currentOctave * 12 + pitchClass;
+            const int selectedStep = state.getSelectedStepForEditing();
+            const int selectedSubstep = state.getSelectedSubstepIndex(selectedStep);
+            const int currentNote = state.getQuantizedStepNote(selectedStep, selectedSubstep);
+            const int currentOctave = currentNote / 12;
+            const int newNote = currentOctave * 12 + pitchClass;
 
             state.updateSelectedNoteForStep(selectedStep, newNote);
             DBG("Note changed to pitch class " << pitchClass << " -> MIDI note " << newNote);
+            maybePreviewNote(newNote);
 
-            if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
-                processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_PREVIEW_NOTES))) {
-                if (param->get()) {
-                    processorRef.triggerCurrentStepMidi(newNote);
-                }
-            }
-
-            // Refilter octave options for the new pitch class and reposition slider
             updateNoteControlOptions(newNote);
             mainScreen.getMainControls().getNoteControls().setOctave(currentOctave);
         };
 
-        // Note controls: octave changes
-        mainScreen.getMainControls().getNoteControls().onOctaveChanged = [this](int octaveIndex) {
+        noteControls.onOctaveChanged = [this](int octaveIndex) {
             auto& state = processorRef.getState();
-            int selectedStep = state.getSelectedStepForEditing();
-            int selectedSubstep = state.getSelectedSubstepIndex(selectedStep);
-            int currentNote = state.getQuantizedStepNote(selectedStep, selectedSubstep);
-            int pitchClass = currentNote % 12;
-            int newNote = octaveIndex * 12 + pitchClass;
+            const int selectedStep = state.getSelectedStepForEditing();
+            const int selectedSubstep = state.getSelectedSubstepIndex(selectedStep);
+            const int currentNote = state.getQuantizedStepNote(selectedStep, selectedSubstep);
+            const int pitchClass = currentNote % 12;
+            const int newNote = octaveIndex * 12 + pitchClass;
 
             state.updateSelectedNoteForStep(selectedStep, newNote);
             DBG("Octave changed to " << octaveIndex << " -> MIDI note " << newNote);
+            maybePreviewNote(newNote);
 
-            if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
-                processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_PREVIEW_NOTES))) {
-                if (param->get()) {
-                    processorRef.triggerCurrentStepMidi(newNote);
-                }
-            }
-
-            // Refilter note options for the new octave and reposition slider
             updateNoteControlOptions(newNote);
             mainScreen.getMainControls().getNoteControls().setNote(pitchClass);
         };
+    }
 
-        // Sequence grid: click to navigate
-        mainScreen.getSequenceOverview().getSequenceGrid().onSquareClicked = [this](int stepIndex) {
-            int rowIndex = stepIndex / 8;
-            int windowStart = rowIndex * 8;
-            mainScreen.setSequencerWindow(windowStart);
+    void maybePreviewNote(int midiNote) {
+        if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
+                processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_PREVIEW_NOTES))) {
+            if (param->get())
+                processorRef.triggerCurrentStepMidi(midiNote);
+        }
+    }
+
+    void setupSequenceGridCallbacks() {
+        auto& grid = mainScreen.getSequenceOverview().getSequenceGrid();
+
+        grid.onSquareClicked = [this](int stepIndex) {
+            const int rowIndex = stepIndex / 8;
+            mainScreen.setSequencerWindow(rowIndex * 8);
 
             auto& state = processorRef.getState();
             state.setSelectedStepForEditing(stepIndex);
 
-            int currentStep = state.getCurrentIndex();
-            mainScreen.getSequenceOverview().getSequenceGrid().updateFromState(state, currentStep);
+            mainScreen.getSequenceOverview().getSequenceGrid().updateFromState(state, state.getCurrentIndex());
             mainScreen.setActiveStepAndNote(stepIndex);
 
-            DBG("Sequence grid clicked: step " + juce::String(stepIndex) +
-                " -> navigating to row " + juce::String(rowIndex));
+            DBG("Sequence grid clicked: step " + juce::String(stepIndex)
+                + " -> navigating to row " + juce::String(rowIndex));
         };
 
-        // Sequence grid: double-click to jump
-        mainScreen.getSequenceOverview().getSequenceGrid().onSquareDoubleClicked = [this](int stepIndex) {
+        grid.onSquareDoubleClicked = [this](int stepIndex) {
             auto& state = processorRef.getState();
             if (stepIndex < state.getLength()) {
                 state.setCurrentIndex(stepIndex);
@@ -185,46 +181,17 @@ public:
             }
         };
 
-        // Sequence grid: drag to change length
-        mainScreen.getSequenceOverview().getSequenceGrid().onLengthDragged = [this](int newLength) {
+        grid.onLengthDragged = [this](int newLength) {
             auto& state = processorRef.getState();
             state.setLength(newLength);
             DBG("Sequence grid dragged: new length = " + juce::String(newLength));
-
-            int currentStep = state.getCurrentIndex();
-            mainScreen.getSequenceOverview().getSequenceGrid().updateFromState(state, currentStep);
+            mainScreen.getSequenceOverview().getSequenceGrid().updateFromState(state, state.getCurrentIndex());
         };
+    }
 
-        // Subsequence controls
-        setupSubsequenceCallbacks();
-
-        // Sequencer step clicks
-        mainScreen.getSequencerSteps().onStepClicked = [this](int stepIndex) {
-            processorRef.triggerStepMidi(stepIndex);
-            DBG("Step clicked: " + juce::String(stepIndex));
-        };
-
-        // MIDI learn registry wiring for all components
-        setupMidiLearnRegistries();
-
-        // Note range callbacks
-        setupNoteRangeCallbacks();
-
-        // ========================================
-        // MainScreen layout callbacks
-        // ========================================
-
-        mainScreen.onIdealHeightChanged = [this](int newHeight) {
-            if (onDesignHeightChanged) onDesignHeightChanged(newHeight);
-        };
-
-        // ========================================
-        // Processor callbacks
-        // ========================================
-
-        processorRef.onSequenceTick = [this]() {
-            triggerAsyncUpdate();
-        };
+    void setupProcessorCallbacks() {
+        processorRef.onSequenceTick = [this]() { triggerAsyncUpdate(); };
+        processorRef.onMidiLearned = [this]() { triggerAsyncUpdate(); };
 
         processorRef.onNoteOff = [this]() {
             juce::MessageManager::callAsync([this]() {
@@ -232,24 +199,15 @@ public:
             });
         };
 
-        processorRef.onMidiLearned = [this]() {
-            triggerAsyncUpdate();
-        };
-
         processorRef.onPlayPauseTriggered = [this]() {
-            juce::MessageManager::callAsync([this]() {
-                updatePlayPauseButtonState();
-            });
+            juce::MessageManager::callAsync([this]() { updatePlayPauseButtonState(); });
         };
         processorRef.onStopTriggered = [this]() {
-            juce::MessageManager::callAsync([this]() {
-                updatePlayPauseButtonState();
-            });
+            juce::MessageManager::callAsync([this]() { updatePlayPauseButtonState(); });
         };
+    }
 
-        // ========================================
-        // APVTS parameter listeners (UI-specific actions needing window position)
-        // ========================================
+    void setupApvtsListeners() {
         processorRef.getAPVTS().addParameterListener(Params::Keys::ID::INDEX_LEFT, this);
         processorRef.getAPVTS().addParameterListener(Params::Keys::ID::INDEX_RIGHT, this);
         processorRef.getAPVTS().addParameterListener(Params::Keys::ID::CLEAR_WINDOW, this);
@@ -564,110 +522,109 @@ private:
 
     void showSettingsScreen() {
         wasCompactBeforeSettings = mainScreen.isCompactMode();
-        if (wasCompactBeforeSettings) {
-            if (onDesignHeightChanged)
-                onDesignHeightChanged(MainScreenComponent::fullDesignHeight);
-        }
+        if (wasCompactBeforeSettings && onDesignHeightChanged)
+            onDesignHeightChanged(MainScreenComponent::fullDesignHeight);
 
-        if (!settingsScreen) {
-            settingsScreen = std::make_unique<SettingsScreenComponent>(processorRef);
+        ensureSettingsScreenCreated();
 
-            // Wire up settings callbacks to processor's clock
-            auto currentClockMode = processorRef.getClock().getMode();
-            settingsScreen->setInternalClockEnabled(currentClockMode == ClockMode::INTERNAL);
-            settingsScreen->setExternalMidiClockEnabled(currentClockMode == ClockMode::EXTERNAL_MIDI_CLOCK);
-            settingsScreen->setTempo(processorRef.getClock().getBpm());
-
-            settingsScreen->onInternalClockChanged = [this](bool enabled) {
-                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::CLOCK_MODE)) {
-                    param->setValueNotifyingHost(param->convertTo0to1(enabled ? 0.0f : 1.0f));
-                    DBG("Internal clock " + juce::String(enabled ? "enabled" : "disabled"));
-                }
-            };
-
-            settingsScreen->onTempoChanged = [this](double bpm) {
-                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::CLOCK_BPM)) {
-                    param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(bpm)));
-                    DBG("Tempo changed to: " + juce::String(bpm) + " BPM");
-                }
-            };
-
-            float currentNoteLength = processorRef.getState().getNoteLength();
-            settingsScreen->setNoteLength(currentNoteLength);
-            settingsScreen->onNoteLengthChanged = [this](double length) {
-                processorRef.getState().setNoteLength(static_cast<float>(length));
-            };
-
-            if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
-                processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_PREVIEW_NOTES))) {
-                settingsScreen->setPreviewNotesEnabled(param->get());
-            }
-            settingsScreen->onPreviewNotesChanged = [this](bool enabled) {
-                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_PREVIEW_NOTES)) {
-                    param->setValueNotifyingHost(enabled ? 1.0f : 0.0f);
-                    DBG("Preview notes on edit: " + juce::String(enabled ? "enabled" : "disabled"));
-                }
-            };
-
-            if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
-                processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_FOLLOW_STEP))) {
-                settingsScreen->setFollowStepEnabled(param->get());
-            }
-            settingsScreen->onFollowStepChanged = [this](bool enabled) {
-                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_FOLLOW_STEP)) {
-                    param->setValueNotifyingHost(enabled ? 1.0f : 0.0f);
-                    DBG("Follow step: " + juce::String(enabled ? "enabled" : "disabled"));
-                }
-            };
-
-            settingsScreen->setMidiClockOutputEnabled(false);
-            settingsScreen->onMidiClockOutputChanged = [this](bool enabled) {
-                if (enabled) {
-                    processorRef.openAllMidiClockOutputs();
-                    DBG("MIDI clock output enabled - opened all devices");
-                } else {
-                    processorRef.closeAllMidiClockOutputs();
-                    DBG("MIDI clock output disabled - closed all devices");
-                }
-            };
-
-            settingsScreen->onExternalMidiClockChanged = [this](bool enabled) {
-                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::CLOCK_MODE)) {
-                    param->setValueNotifyingHost(param->convertTo0to1(enabled ? 2.0f : 0.0f));
-                    DBG("External MIDI clock " + juce::String(enabled ? "enabled" : "disabled"));
-                }
-            };
-
-            if (auto* param = dynamic_cast<juce::AudioParameterInt*>(
-                    processorRef.getAPVTS().getParameter(Params::Keys::ID::MIDI_OUTPUT_CHANNEL))) {
-                settingsScreen->setMidiOutputChannel(param->get());
-            }
-            settingsScreen->onMidiOutputChannelChanged = [this](int channel) {
-                if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::MIDI_OUTPUT_CHANNEL)) {
-                    param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(channel)));
-                    DBG("MIDI output channel changed to: " + juce::String(channel));
-                }
-            };
-
-            addAndMakeVisible(*settingsScreen);
-            settingsScreen->setBounds(getLocalBounds());
-        }
-
-        // Show settings screen, hide main screen
         mainScreen.setVisible(false);
         settingsScreen->setVisible(true);
 
-        // Ensure logo, preset selector, and navbar stay on top of the settings screen
         logo.toFront(false);
         presetSelector.toFront(false);
         navBar.toFront(false);
 
-        // Toggle settings button to show X icon
         navBar.setSettingsToggled(true);
+        navBar.setMidiLearnToggled(processorRef.getMidiLearnRegistry().isLearning());
+    }
 
-        // Sync MIDI Learn button state
-        bool midiLearnActive = processorRef.getMidiLearnRegistry().isLearning();
-        navBar.setMidiLearnToggled(midiLearnActive);
+    void ensureSettingsScreenCreated() {
+        if (settingsScreen) return;
+        settingsScreen = std::make_unique<SettingsScreenComponent>(processorRef);
+        wireSettingsClockCallbacks();
+        wireSettingsPreferenceCallbacks();
+        wireSettingsMidiCallbacks();
+        addAndMakeVisible(*settingsScreen);
+        settingsScreen->setBounds(getLocalBounds());
+    }
+
+    void wireSettingsClockCallbacks() {
+        const auto currentClockMode = processorRef.getClock().getMode();
+        settingsScreen->setInternalClockEnabled(currentClockMode == ClockMode::INTERNAL);
+        settingsScreen->setExternalMidiClockEnabled(currentClockMode == ClockMode::EXTERNAL_MIDI_CLOCK);
+        settingsScreen->setTempo(processorRef.getClock().getBpm());
+
+        settingsScreen->onInternalClockChanged = [this](bool enabled) {
+            if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::CLOCK_MODE)) {
+                param->setValueNotifyingHost(param->convertTo0to1(enabled ? 0.0f : 1.0f));
+                DBG("Internal clock " + juce::String(enabled ? "enabled" : "disabled"));
+            }
+        };
+        settingsScreen->onTempoChanged = [this](double bpm) {
+            if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::CLOCK_BPM)) {
+                param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(bpm)));
+                DBG("Tempo changed to: " + juce::String(bpm) + " BPM");
+            }
+        };
+        settingsScreen->onExternalMidiClockChanged = [this](bool enabled) {
+            if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::CLOCK_MODE)) {
+                param->setValueNotifyingHost(param->convertTo0to1(enabled ? 2.0f : 0.0f));
+                DBG("External MIDI clock " + juce::String(enabled ? "enabled" : "disabled"));
+            }
+        };
+    }
+
+    void wireSettingsPreferenceCallbacks() {
+        settingsScreen->setNoteLength(processorRef.getState().getNoteLength());
+        settingsScreen->onNoteLengthChanged = [this](double length) {
+            processorRef.getState().setNoteLength(static_cast<float>(length));
+        };
+
+        if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
+            processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_PREVIEW_NOTES))) {
+            settingsScreen->setPreviewNotesEnabled(param->get());
+        }
+        settingsScreen->onPreviewNotesChanged = [this](bool enabled) {
+            if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_PREVIEW_NOTES)) {
+                param->setValueNotifyingHost(enabled ? 1.0f : 0.0f);
+                DBG("Preview notes on edit: " + juce::String(enabled ? "enabled" : "disabled"));
+            }
+        };
+
+        if (auto* param = dynamic_cast<juce::AudioParameterBool*>(
+            processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_FOLLOW_STEP))) {
+            settingsScreen->setFollowStepEnabled(param->get());
+        }
+        settingsScreen->onFollowStepChanged = [this](bool enabled) {
+            if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::PREF_FOLLOW_STEP)) {
+                param->setValueNotifyingHost(enabled ? 1.0f : 0.0f);
+                DBG("Follow step: " + juce::String(enabled ? "enabled" : "disabled"));
+            }
+        };
+    }
+
+    void wireSettingsMidiCallbacks() {
+        settingsScreen->setMidiClockOutputEnabled(false);
+        settingsScreen->onMidiClockOutputChanged = [this](bool enabled) {
+            if (enabled) {
+                processorRef.openAllMidiClockOutputs();
+                DBG("MIDI clock output enabled - opened all devices");
+            } else {
+                processorRef.closeAllMidiClockOutputs();
+                DBG("MIDI clock output disabled - closed all devices");
+            }
+        };
+
+        if (auto* param = dynamic_cast<juce::AudioParameterInt*>(
+                processorRef.getAPVTS().getParameter(Params::Keys::ID::MIDI_OUTPUT_CHANNEL))) {
+            settingsScreen->setMidiOutputChannel(param->get());
+        }
+        settingsScreen->onMidiOutputChannelChanged = [this](int channel) {
+            if (auto* param = processorRef.getAPVTS().getParameter(Params::Keys::ID::MIDI_OUTPUT_CHANNEL)) {
+                param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(channel)));
+                DBG("MIDI output channel changed to: " + juce::String(channel));
+            }
+        };
     }
 
     void showMainScreen() {

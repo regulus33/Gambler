@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SequenceGrid.h"
+#include "SequenceGrid/SequenceGrid.h"
 #include "StateListenerComponent.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 

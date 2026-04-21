@@ -3,8 +3,8 @@
 #include "ClickFlashMixin.h"
 #include "Icons.h"
 #include "MidiLearnOverlayPainter.h"
-#include "../backend/MidiLearnRegistry.h"
-#include "../backend/MidiMapping.h"
+#include "../backend/MidiLearnRegistry/MidiLearnRegistry.h"
+#include "../backend/MidiMapping/MidiMapping.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_animation/juce_animation.h>
 #include <functional>

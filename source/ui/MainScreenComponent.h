@@ -2,14 +2,14 @@
 
 #include "../PluginProcessor.h"
 #include "BinaryData.h"
-#include "NavBarComponent.h"
-#include "PianoRollComponent.h"
+#include "NavBarComponent/NavBarComponent.h"
+#include "PianoRollComponent/PianoRollComponent.h"
 #include "SequencerStepsComponent.h"
 #include "SequencerControlsComponent.h"
 #include "MainControlsComponent.h"
 #include "SequenceOverviewComponent.h"
 #include "SubsequencerComponent/SubsequenceControlsComponent.h"
-#include "NoteRangeControlsComponent.h"
+#include "NoteRangeControlsComponent/NoteRangeControlsComponent.h"
 #include "../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 

@@ -13,11 +13,11 @@
 #include "../source/ui/GlobalScaleQuantizerComponent.h"
 #include "../source/ui/LogoComponent.h"
 #include "../source/ui/NoteColourPickerComponent.h"
-#include "../source/ui/StyledDropdown.h"
-#include "../source/ui/SavePresetDialogComponent.h"
+#include "../source/ui/StyledDropdown/StyledDropdown.h"
+#include "../source/ui/SavePresetDialogComponent/SavePresetDialogComponent.h"
 #include "../source/ui/ScaleLatchButton.h"
-#include "../source/ui/SettingsGroup.h"
-#include "../source/ui/SettingsScreenComponent.h"
+#include "../source/ui/SettingsGroup/SettingsGroup.h"
+#include "../source/ui/SettingsScreenComponent/SettingsScreenComponent.h"
 #include "../source/ui/ToggleIconButton.h"
 #include <catch2/catch_test_macros.hpp>
 

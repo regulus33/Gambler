@@ -3,7 +3,7 @@
 #include "backend/Clock.h"
 #include "backend/DawSync.h"
 #include "backend/InternalState.h"
-#include "backend/MidiLearnRegistry.h"
+#include "backend/MidiLearnRegistry/MidiLearnRegistry.h"
 #include "backend/NoteOffScheduler.h"
 #include "backend/PresetManager.h"
 #include "backend/PreviewMidiFifo.h"
@@ -278,4 +278,42 @@ private:
      * @param isNoteOnOrCCPositive True for Note On or positive CC value
      */
     void handleMidiMapping(const MidiMapping& mapping, int midiValue, bool isNoteOnOrCCPositive);
+
+    // --- handleMidiMapping helpers (split by control category) ---
+    void fireTickCallback();
+    void setTriggerParam(const juce::String& paramId, bool isOn);
+    void handleOctaveSlider(int midiValue);
+    void handleNoteSlider(int midiValue);
+    void handleProbabilitySlider(float normalizedValue);
+    void handleShiftAwareButton(const juce::String& primaryParam, const juce::String& shiftParam, bool isOn);
+    void handleShiftToggle(bool isOn);
+    void handleStepSelect(MidiControlId controlId);
+    void handleSubseqMinus();
+    void handleSubseqPlus();
+    void handleSubseqBarSelect(MidiControlId controlId);
+    void handleNoteRangeMin(int midiValue);
+    void handleNoteRangeMax(int midiValue);
+    void handleSubdivision(int midiValue);
+    void handleScaleNote(MidiControlId controlId, bool isOn);
+
+    // --- parameterChanged helpers (split by param category) ---
+    void handlePrimaryRowParam(const juce::String& id, bool isOn);
+    void handleSecondaryRowParam(const juce::String& id, bool isOn);
+    void handleDestructiveParam(const juce::String& id, bool isOn);
+    void handlePresetCycleParam(const juce::String& id, bool isOn);
+    void handleTransportParam(const juce::String& id, bool isOn);
+    void handleClockParam(const juce::String& id, float newValue);
+    void performShuffle();
+
+    // --- processBlock helpers (split by responsibility) ---
+    void drainVirtualKeyboard(juce::MidiBuffer& midiMessages, int numSamples);
+    void handleNoteOffScheduling(juce::MidiBuffer& midiMessages, int numSamples);
+    void processClockForBlock(int numSamples);
+    void emitMidiClockPulses();
+    void detectDawTransport();
+    void tickSequencer(juce::MidiBuffer& midiMessages);
+    void emitCcModulations(juce::MidiBuffer& midiMessages,
+                           const std::vector<StepModulationData>& mods,
+                           juce::uint8& velocityOut);
+    double computeCurrentDawBpm();
 };

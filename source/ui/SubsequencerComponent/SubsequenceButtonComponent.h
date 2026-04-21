@@ -1,8 +1,8 @@
 #pragma once
 
 #include "SubsequenceConstants.h"
-#include "../../backend/MidiLearnRegistry.h"
-#include "../../backend/MidiMapping.h"
+#include "../../backend/MidiLearnRegistry/MidiLearnRegistry.h"
+#include "../../backend/MidiMapping/MidiMapping.h"
 #include "BinaryData.h"
 #include "../MidiLearnOverlayPainter.h"
 #include <juce_gui_basics/juce_gui_basics.h>

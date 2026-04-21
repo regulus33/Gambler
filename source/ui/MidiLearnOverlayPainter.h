@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../backend/MidiLearnRegistry.h"
+#include "../backend/MidiLearnRegistry/MidiLearnRegistry.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /**

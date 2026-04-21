@@ -4,7 +4,7 @@
 #include "../MusicConstants.h"
 #include "../MidiLearnOverlayPainter.h"
 #include "../UIConstants.h"
-#include "../../backend/MidiLearnRegistry.h"
+#include "../../backend/MidiLearnRegistry/MidiLearnRegistry.h"
 #include "../../data/Params.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_animation/juce_animation.h>

@@ -18,8 +18,8 @@
 #include "test_helpers.h"
 #include <PluginEditor.h>
 #include <PluginProcessor.h>
-#include <backend/MidiLearnRegistry.h>
-#include <backend/MidiMapping.h>
+#include <backend/MidiLearnRegistry/MidiLearnRegistry.h>
+#include <backend/MidiMapping/MidiMapping.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
 // Forward declarations for component types

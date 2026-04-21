@@ -2,7 +2,7 @@
 
 #include "NoteControlsComponent.h"
 #include "ProbabilityControlsComponent.h"
-#include "../backend/MidiLearnRegistry.h"
+#include "../backend/MidiLearnRegistry/MidiLearnRegistry.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 // Forward declaration

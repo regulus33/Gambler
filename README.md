@@ -92,11 +92,11 @@ ApplicationComponent
 
 | Component | File | Snapshot | Description |
 |-----------|------|----------|-------------|
-| NavBarComponent | `source/ui/NavBarComponent.h` | ![](tests/snapshots/nav_bar.png) | Top bar with preset selector, transport, tools, settings |
+| NavBarComponent | `source/ui/NavBarComponent/NavBarComponent.h` | ![](tests/snapshots/nav_bar.png) | Top bar with preset selector, transport, tools, settings |
 | LogoComponent | `source/ui/LogoComponent.h` | ![](tests/snapshots/logo.png) | "Gambler" text logo with dice icon |
 | PresetSelectorComponent | `source/ui/PresetSelectorComponent.h` | ![](tests/snapshots/preset_selector.png) | StyledDropdown + cycle buttons for preset navigation |
 | SavePresetDialogComponent | `source/ui/SavePresetDialogComponent.h` | ![](tests/snapshots/save_preset_dialog.png) | Modal dialog for saving presets |
-| ExportButton | `source/ui/NavBarComponent.h` | — | Click-to-save or drag-to-DAW MIDI export |
+| ExportButton | `source/ui/NavBarComponent/NavBarComponent.h` | — | Click-to-save or drag-to-DAW MIDI export |
 | ScaleLatchButton | `source/ui/ScaleLatchButton.h` | ![](tests/snapshots/scale_latch_button.png) | Toggle momentary/latched scale editing |
 | SubdivisionSlider | `source/ui/sliders/SubdivisionSlider.h` | ![](tests/snapshots/subdivision_slider.png) | Clock division selector (1/4, 1/8, 1/16, 1/32) |
 | ToggleIconButton | `source/ui/ToggleIconButton.h` | ![](tests/snapshots/toggle_icon_button.png) | Generic two-state icon button (used for Settings, Play, Stop, etc.) |
@@ -106,7 +106,7 @@ ApplicationComponent
 
 | Component | File | Snapshot | Description |
 |-----------|------|----------|-------------|
-| PianoRollComponent | `source/ui/PianoRollComponent.h` | ![](tests/snapshots/piano_roll.png) | 12-key chromatic keyboard for global scale selection |
+| PianoRollComponent | `source/ui/PianoRollComponent/PianoRollComponent.h` | ![](tests/snapshots/piano_roll.png) | 12-key chromatic keyboard for global scale selection |
 | GlobalScaleQuantizerComponent | `source/ui/GlobalScaleQuantizerComponent.h` | ![](tests/snapshots/global_scale_quantizer.png) | Scale type dropdown + preset scale buttons (settings) |
 | NoteColourPickerComponent | `source/ui/NoteColourPickerComponent.h` | ![](tests/snapshots/note_colour_picker.png) | Per-note colour customization (settings) |
 
@@ -131,7 +131,7 @@ ApplicationComponent
 | StepButton | `source/ui/buttons/StepButton.h` | ![](tests/snapshots/step_button.png) | Individual step: shows note name, selection state, playhead |
 | SequencerControlsComponent | `source/ui/SequencerControlsComponent.h` | ![](tests/snapshots/sequencer_controls.png) | 8-button row with normal/shift modes |
 | SequenceOverviewComponent | `source/ui/SequenceOverviewComponent.h` | ![](tests/snapshots/sequence_overview.png) | 8×8 grid overview of entire 64-step sequence |
-| SequenceGrid | `source/ui/SequenceGrid.h` | ![](tests/snapshots/sequence_grid.png) | Clickable grid for navigation and length adjustment |
+| SequenceGrid | `source/ui/SequenceGrid/SequenceGrid.h` | ![](tests/snapshots/sequence_grid.png) | Clickable grid for navigation and length adjustment |
 
 ### Sequencer Control Buttons
 

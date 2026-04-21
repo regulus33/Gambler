@@ -122,7 +122,7 @@ add_library(SharedCode INTERFACE
         source/backend/DawSync.h
         source/backend/InternalState.h
         source/backend/InternalState.cpp
-        source/ui/PianoRollComponent.h
+        source/ui/PianoRollComponent/PianoRollComponent.h
 )
 
 clap_juce_extensions_plugin(TARGET "${PROJECT_NAME}"

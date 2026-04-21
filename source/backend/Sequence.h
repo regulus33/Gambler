@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Step.h"
+#include "Step/Step.h"
 #include "ScaleQuantizer.h"
 #include "InternalState.h"
 #include "../algorithms/probability/EdenGrowthPattern.h"

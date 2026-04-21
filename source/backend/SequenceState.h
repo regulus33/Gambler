@@ -2,7 +2,7 @@
 
 #include "../data/Params.h"
 #include "InternalState.h"
-#include "Step.h"
+#include "Step/Step.h"
 #include "Scale.h"
 #include "ScaleQuantizer.h"
 #include "Sequence.h"

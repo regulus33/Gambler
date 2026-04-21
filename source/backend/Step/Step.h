@@ -1,23 +1,9 @@
 #pragma once
 
-#include "InternalState.h"
-#include "ModulationType.h"
-#include "../data/Params.h"
-
-/**
- * StepModulationData - Lightweight struct for step modulation data
- */
-struct StepModulationData {
-    ModulationType type = ModulationType::CC;
-    int ccNumber = 1;
-    int value = 64;
-    bool selected = false;
-
-    ModulationType getType() const { return type; }
-    int getCCNumber() const { return ccNumber; }
-    int getValue() const { return value; }
-    bool isSelected() const { return selected; }
-};
+#include "StepModulationData.h"
+#include "../InternalState.h"
+#include "../ModulationType.h"
+#include "../../data/Params.h"
 
 /**
  * Step - A lightweight view into one step of the sequencer.
@@ -75,18 +61,15 @@ public:
         state.setSelectedSubstepIndex(index, idx);
     }
 
-    /** The substep that is currently active (clamped so pre-start -1 maps to 0). */
     int effectiveCurrentSubstep() const {
         int cs = currentSubstep();
         return (cs < 0) ? 0 : cs;
     }
 
-    /** Raw (unquantized) note for the currently-active substep. */
     int rawCurrentNote() const {
         return note(effectiveCurrentSubstep());
     }
 
-    /** True if the currently-active substep is a rest (-1). */
     bool isRest() const {
         return rawCurrentNote() < 0;
     }
@@ -95,10 +78,6 @@ public:
     // SUBSTEP ADVANCEMENT
     // ========================================
 
-    /**
-     * Advance the substep index and return the raw note at the new position.
-     * This is the per-step tick used during playback.
-     */
     int tick() {
         int len = substepCount();
         int idx = (currentSubstep() + 1) % len;
@@ -106,10 +85,6 @@ public:
         return note(idx);
     }
 
-    /**
-     * Advance the substep index without returning the note.
-     * Returns the new substep index.
-     */
     int advanceSubstep() {
         int len = substepCount();
         int idx = (currentSubstep() + 1) % len;
@@ -172,7 +147,6 @@ public:
     // BULK NOTE OPERATIONS
     // ========================================
 
-    /** Copy all substep notes and length from another step. */
     void copyNotesFrom(const Step& other) {
         for (int s = 0; s < ParamConstants::MAX_SUBSTEPS; s++) {
             setNote(s, other.note(s));
