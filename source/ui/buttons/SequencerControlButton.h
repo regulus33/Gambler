@@ -14,7 +14,6 @@ namespace SequencerButtonConstants {
     constexpr float borderWidth = 2.2f;
     constexpr juce::uint32 bgColorActive = 0xffffffff;     // White when active
     constexpr juce::uint32 bgColorInactive = 0xff303030;  // Dark grey when inactive
-    constexpr juce::uint32 bgColorLocked = 0xff5a1a1a;    // Dark maroon when locked
     constexpr float maxIconSize = 26.0f;
     constexpr float textAreaHeight = 33.0f;   // Match SequencerControlsConstants
     constexpr float iconVerticalOffset = 13.0f;
