@@ -185,6 +185,9 @@ public:
     /// Click step button at local index (0-7 within current window)
     void clickStep(int localIndex);
 
+    /// Release step button at local index (mouseUp) — fires the audition note-off
+    void releaseStep(int localIndex);
+
     SequencerStepsComponent& raw() { return comp_; }
 
 private:
@@ -413,6 +416,12 @@ inline void SequencerStepsProxy::clickStep(int localIndex) {
         // onStepClicked is wired in ApplicationComponent to call triggerStepMidi(stepIndex)
         // but the stepIndex from SequencerStepsComponent is already absolute
         comp_.onStepClicked(localIndex);
+    }
+}
+
+inline void SequencerStepsProxy::releaseStep(int localIndex) {
+    if (comp_.onStepReleased) {
+        comp_.onStepReleased(localIndex);
     }
 }
 

@@ -107,6 +107,20 @@ public:
     void triggerCurrentStepMidi(int noteOverride = -1);
 
     /**
+     * Release the held UI-preview note. Sends a MIDI note-off for the most
+     * recent preview note-on (set by triggerStepMidi / triggerCurrentStepMidi).
+     * Called on step-button mouse-up so a tapped step doesn't leave a stuck note.
+     */
+    void releasePreviewMidi();
+
+    /**
+     * Internal: fires when the slider-preview gate timer elapses.
+     * Public only because juce::Timer::timerCallback is invoked from a
+     * private member class. Not intended for outside callers.
+     */
+    void firePreviewGateOff();
+
+    /**
      * Sequencer playback states
      */
     enum class PlaybackState {
@@ -229,6 +243,22 @@ private:
     // Preview MIDI queue (for UI-triggered notes in DAW mode)
     // Thread-safe queue to pass MIDI from UI thread to audio thread
     PreviewMidiFifo previewMidiFifo;
+
+    // Slider-preview note-off gate. When the user nudges the note/octave
+    // slider, triggerCurrentStepMidi sends a preview note-on and starts this
+    // timer for `noteLength × stepDurationMs`. When it fires, we emit the
+    // matching note-off so the preview can't get stuck.
+    class PreviewGateTimer : public juce::Timer {
+    public:
+        explicit PreviewGateTimer(PluginProcessor& p) : processor_(p) {}
+        void timerCallback() override {
+            stopTimer();
+            processor_.firePreviewGateOff();
+        }
+    private:
+        PluginProcessor& processor_;
+    };
+    PreviewGateTimer previewGateTimer { *this };
 
     // MIDI learn registry for user-configurable mappings
     MidiLearnRegistry midiLearnRegistry;

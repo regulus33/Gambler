@@ -46,6 +46,10 @@ public:
             DBG("Step clicked: " + juce::String(stepIndex));
         };
 
+        mainScreen.getSequencerSteps().onStepReleased = [this](int /*stepIndex*/) {
+            processorRef.releasePreviewMidi();
+        };
+
         setupMidiLearnRegistries();
         setupNoteRangeCallbacks();
 

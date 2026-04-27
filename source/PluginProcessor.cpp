@@ -506,9 +506,19 @@ void PluginProcessor::handleSecondaryRowParam (const juce::String& id, bool isOn
     }
     if (id == Params::Keys::ID::CLEAR_STEP) {
         const int selectedStep = state.getSelectedStepForEditing();
+        int sub = state.getSelectedSubstepIndex (selectedStep);
+        if (sub < 0) sub = 0;
+        state.setStepNote (selectedStep, sub, -1);
+        DBG ("CLEAR_STEP triggered - cleared step " + juce::String (selectedStep)
+             + " substep " + juce::String (sub));
+        return;
+    }
+    if (id == Params::Keys::ID::CLEAR_STEP_ALL) {
+        const int selectedStep = state.getSelectedStepForEditing();
         for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++)
             state.setStepNote (selectedStep, n, -1);
-        DBG ("CLEAR_STEP triggered - cleared step " + juce::String (selectedStep));
+        state.setStepNotesLength (selectedStep, 1);
+        DBG ("CLEAR_STEP_ALL triggered - wiped step " + juce::String (selectedStep));
         return;
     }
     if (id == Params::Keys::ID::RANDOMIZE_STEP) {
@@ -628,6 +638,11 @@ void PluginProcessor::handleClockParam (const juce::String& id, float newValue) 
 void PluginProcessor::triggerStepMidi (int stepIndex) {
     if (stepIndex < 0 || stepIndex >= 64)
         return;
+
+    // A step press takes ownership of the preview channel; cancel any
+    // pending slider-preview gate so it can't fire a stale note-off
+    // while the user is still holding the step button.
+    previewGateTimer.stopTimer();
 
     auto& state = getState();
 
@@ -764,11 +779,37 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
             DBG ("  Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int) velocity << ")");
         }
         noteOffScheduler.setLastPlayedNote (note);
+
+        // Schedule a matching preview note-off after `noteLength × stepDuration`
+        // so a slider tweak doesn't leave the previewed note ringing forever.
+        // Fallback when the DAW BPM is unavailable (standalone idle, tests):
+        // assume a 16th-note step at 120 BPM (125 ms) so the gate still elapses.
+        const double samplesPerStep = clock.calculateSamplesPerStep (computeCurrentDawBpm(), getSampleRate());
+        const double sr = getSampleRate();
+        const float noteLength = state.getNoteLength();
+        double stepMs = 125.0;
+        if (samplesPerStep > 0.0 && sr > 0.0)
+            stepMs = samplesPerStep * 1000.0 / sr;
+        const int gateMs = juce::jmax (1, static_cast<int> (stepMs * noteLength));
+        previewGateTimer.startTimer (gateMs);
     } else {
         noteOffScheduler.setLastPlayedNote (-1);
         DBG ("  No note to play (note < 0)");
     }
     DBG ("=== triggerCurrentStepMidi() complete ===");
+}
+
+void PluginProcessor::releasePreviewMidi() {
+    previewGateTimer.stopTimer();
+    noteOffScheduler.sendPreviewNoteOff (getMidiOutputChannel(), midiOutput.get(), previewMidiFifo);
+    noteOffScheduler.setLastPlayedNote (-1);
+    DBG ("releasePreviewMidi() — preview note released");
+}
+
+void PluginProcessor::firePreviewGateOff() {
+    noteOffScheduler.sendPreviewNoteOff (getMidiOutputChannel(), midiOutput.get(), previewMidiFifo);
+    noteOffScheduler.setLastPlayedNote (-1);
+    DBG ("firePreviewGateOff() — slider-preview gate elapsed");
 }
 
 //==============================================================================

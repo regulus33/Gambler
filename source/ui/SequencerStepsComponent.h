@@ -59,6 +59,14 @@ public:
                 }
             };
 
+            // Wire up release callback (mouseUp) — used to send MIDI note-off
+            // so an auditioned step doesn't leave a stuck note.
+            button->onStepReleased = [this](int absoluteStepIndex) {
+                if (onStepReleased) {
+                    onStepReleased(absoluteStepIndex);
+                }
+            };
+
             addAndMakeVisible(*button);
             stepButtons_[i] = std::move(button);
         }
@@ -92,6 +100,13 @@ public:
      * Receives the absolute step index (0-63)
      */
     std::function<void(int stepIndex)> onStepClicked;
+
+    /**
+     * Callback when a step button is released (mouseUp).
+     * Receives the absolute step index (0-63). Used to send MIDI note-off
+     * for the audition press.
+     */
+    std::function<void(int stepIndex)> onStepReleased;
 
     /**
      * Get access to individual step buttons (for MIDI learn registration, etc.)

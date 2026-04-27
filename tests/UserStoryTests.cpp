@@ -21,6 +21,7 @@
 #include <ui/sliders/NoteSlider.h>
 #include <ui/sliders/OctaveSlider.h>
 #include <ui/sliders/NotchedSlider.h>
+#include <native/HapticFeedback.h>
 #include <set>
 
 // ============================================================================
@@ -409,6 +410,121 @@ SCENARIO("Roll randomizes all substeps as the sequencer cycles through them", "[
                 // 3 visits: -1→0, 0→1, 1→2, and since length is 3: (2+1)%3 would be next
                 // After 3 ticks on this step, currentIndex should be 2
                 REQUIRE(app.state().getStepNotesCurrentIndex(0) == 2);
+            }
+        }
+    }
+}
+
+SCENARIO("Randomize Step writes every substep, not just the current one",
+         "[user-story][substep][randomize][regression]") {
+    // Regression: randomizeStepNote previously only wrote the currently-playing
+    // substep, so steps with substep length > 1 only ever had one slot updated.
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 has 3 substeps, all initialised as rests (-1)") {
+        TestApp app;
+        app.state().setSelectedStepForEditing(0);
+        app.state().setStepNotesLength(0, 3);
+        for (int s = 0; s < ParamConstants::MAX_SUBSTEPS; ++s)
+            app.state().setStepNote(0, s, -1);
+
+        // Pin the playhead so currentSubstep can't bias which slot gets written
+        app.state().setStepNotesCurrentIndex(0, 1);
+
+        WHEN("User triggers Randomize Step") {
+            app.state().randomizeStepNote(0);
+            app.processMessages();
+
+            THEN("All 3 in-range substeps now hold a real note") {
+                for (int s = 0; s < 3; ++s)
+                    REQUIRE(app.state().getStepNote(0, s) >= 0);
+            }
+
+            AND_THEN("Substeps beyond the step length are left untouched") {
+                for (int s = 3; s < ParamConstants::MAX_SUBSTEPS; ++s)
+                    REQUIRE(app.state().getStepNote(0, s) == -1);
+            }
+        }
+    }
+
+    GIVEN("Step 0 has the default 1 substep set to a rest") {
+        TestApp app;
+        app.state().setSelectedStepForEditing(0);
+        app.state().setStepNotesLength(0, 1);
+        app.state().setStepNote(0, 0, -1);
+
+        WHEN("User triggers Randomize Step") {
+            app.state().randomizeStepNote(0);
+            app.processMessages();
+
+            THEN("The single substep gets a real note") {
+                REQUIRE(app.state().getStepNote(0, 0) >= 0);
+            }
+        }
+    }
+}
+
+SCENARIO("Erase (single tap) clears only the selected substep, not the others",
+         "[user-story][substep][erase][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 has 3 substeps with notes 60/62/64, substep 1 is selected for editing") {
+        TestApp app;
+        app.state().setSelectedStepForEditing(0);
+        app.state().setStepNotesLength(0, 3);
+        app.state().setStepNote(0, 0, 60);
+        app.state().setStepNote(0, 1, 62);
+        app.state().setStepNote(0, 2, 64);
+        app.state().setSelectedSubstepIndex(0, 1);
+
+        WHEN("User triggers Erase (CLEAR_STEP)") {
+            auto& apvts = app.processor().getAPVTS();
+            if (auto* p = apvts.getParameter(Params::Keys::ID::CLEAR_STEP))
+                p->setValueNotifyingHost(1.0f);
+            app.processMessages();
+
+            THEN("Only the selected substep becomes a rest") {
+                REQUIRE(app.state().getStepNote(0, 0) == 60);
+                REQUIRE(app.state().getStepNote(0, 1) == -1);
+                REQUIRE(app.state().getStepNote(0, 2) == 64);
+            }
+
+            AND_THEN("Substep length is unchanged") {
+                REQUIRE(app.state().getStepNotesLength(0) == 3);
+            }
+        }
+    }
+}
+
+SCENARIO("Erase (double tap) wipes every substep of the parent step and resets length",
+         "[user-story][substep][erase][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Step 0 has 3 substeps with notes 60/62/64 and length 3") {
+        TestApp app;
+        app.state().setSelectedStepForEditing(0);
+        app.state().setStepNotesLength(0, 3);
+        app.state().setStepNote(0, 0, 60);
+        app.state().setStepNote(0, 1, 62);
+        app.state().setStepNote(0, 2, 64);
+        // Stamp non-rest values into the unused substep slots too, to prove
+        // CLEAR_STEP_ALL really wipes all 8 slots, not just the in-length ones.
+        for (int s = 3; s < ParamConstants::MAX_SUBSTEPS; ++s)
+            app.state().setStepNote(0, s, 70 + s);
+
+        WHEN("User triggers Erase-All (CLEAR_STEP_ALL, fired by double tap)") {
+            auto& apvts = app.processor().getAPVTS();
+            if (auto* p = apvts.getParameter(Params::Keys::ID::CLEAR_STEP_ALL))
+                p->setValueNotifyingHost(1.0f);
+            app.processMessages();
+
+            THEN("Every substep slot is a rest") {
+                for (int s = 0; s < ParamConstants::MAX_SUBSTEPS; ++s)
+                    REQUIRE(app.state().getStepNote(0, s) == -1);
+            }
+
+            AND_THEN("Substep length is reset to 1") {
+                REQUIRE(app.state().getStepNotesLength(0) == 1);
             }
         }
     }
@@ -2904,6 +3020,171 @@ SCENARIO("MIDI learn mode blocks all control triggers",
                 // Note-off for 60 should deactivate Roll
                 app.sendMidiNoteOff(60);
                 REQUIRE(state.getIsRandom() == false);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// HAPTIC FEEDBACK (item #4 of release punch list)
+// ============================================================================
+
+SCENARIO("NotchedSlider notch crossing fires haptic feedback",
+         "[user-story][haptic][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A 3-position notched slider parked on index 0") {
+        juce::Array<juce::String> names; names.add("A"); names.add("B"); names.add("C");
+        juce::Array<juce::Colour> colours;
+        colours.add(juce::Colours::red);
+        colours.add(juce::Colours::green);
+        colours.add(juce::Colours::blue);
+        NotchedSlider slider("Test", names, colours);
+        slider.getSlider().setValue(0.0, juce::sendNotificationSync);
+
+        HapticFeedback::resetTickCount();
+        REQUIRE(HapticFeedback::tickCount() == 0);
+
+        WHEN("The slider value crosses to a new notch") {
+            slider.getSlider().setValue(1.0, juce::sendNotificationSync);
+
+            THEN("HapticFeedback::tick() was called") {
+                REQUIRE(HapticFeedback::tickCount() == 1);
+            }
+
+            AND_WHEN("It crosses to another notch") {
+                slider.getSlider().setValue(2.0, juce::sendNotificationSync);
+
+                THEN("Tick fires again") {
+                    REQUIRE(HapticFeedback::tickCount() == 2);
+                }
+            }
+        }
+
+        WHEN("The slider value is set to its current notch (no crossing)") {
+            slider.getSlider().setValue(0.0, juce::sendNotificationSync);
+
+            THEN("No haptic tick is fired") {
+                REQUIRE(HapticFeedback::tickCount() == 0);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// PREVIEW NOTE-OFF (items #5 + #6 of release punch list)
+// ============================================================================
+
+namespace {
+    int countNoteOnFor(const juce::MidiBuffer& buf, int note) {
+        int n = 0;
+        for (const auto md : buf) {
+            const auto m = md.getMessage();
+            if (m.isNoteOn() && m.getNoteNumber() == note) ++n;
+        }
+        return n;
+    }
+    int countNoteOffFor(const juce::MidiBuffer& buf, int note) {
+        int n = 0;
+        for (const auto md : buf) {
+            const auto m = md.getMessage();
+            if (m.isNoteOff() && m.getNoteNumber() == note) ++n;
+        }
+        return n;
+    }
+}
+
+SCENARIO("Pressing and releasing a step button emits paired note-on and note-off",
+         "[user-story][preview][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A freshly launched app with step 0 set to a known note") {
+        TestApp app;
+        app.state().setStepNotesLength(0, 1);
+        app.state().setStepNote(0, 0, 60);
+        app.state().setSelectedSubstepIndex(0, 0);
+
+        WHEN("User presses step 0 and releases it") {
+            app.sequencerSteps().clickStep(0);
+            app.processMessages();
+            auto onBuf = app.simulateAudioBlockWithMidi();
+
+            app.sequencerSteps().releaseStep(0);
+            app.processMessages();
+            auto offBuf = app.simulateAudioBlockWithMidi();
+
+            THEN("Note-on for 60 was emitted on press") {
+                REQUIRE(countNoteOnFor(onBuf, 60) >= 1);
+            }
+
+            AND_THEN("Note-off for 60 was emitted on release") {
+                REQUIRE(countNoteOffFor(offBuf, 60) >= 1);
+            }
+        }
+    }
+}
+
+SCENARIO("Slider preview emits note-off after the configured note length elapses",
+         "[user-story][preview][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A freshly launched app") {
+        TestApp app;
+
+        WHEN("User triggers a slider preview and waits for the gate to elapse") {
+            app.processor().triggerCurrentStepMidi(60);
+            app.processMessages();
+            auto onBuf = app.simulateAudioBlockWithMidi();
+
+            // Slider-preview gate is `noteLength × stepDurationMs`. At default
+            // BPM the gate is well under a second; pump message dispatch long
+            // enough for the juce::Timer to fire.
+            app.processMessages(2000);
+            auto offBuf = app.simulateAudioBlockWithMidi();
+
+            THEN("Note-on for 60 was emitted on the preview trigger") {
+                REQUIRE(countNoteOnFor(onBuf, 60) >= 1);
+            }
+
+            AND_THEN("Note-off for 60 was emitted once the gate elapsed") {
+                REQUIRE(countNoteOffFor(offBuf, 60) >= 1);
+            }
+        }
+    }
+}
+
+SCENARIO("Releasing a step cancels the slider-preview gate so it cannot double-off",
+         "[user-story][preview][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A freshly launched app") {
+        TestApp app;
+        app.state().setStepNotesLength(0, 1);
+        app.state().setStepNote(0, 0, 60);
+        app.state().setSelectedSubstepIndex(0, 0);
+
+        WHEN("User presses a step (which should cancel any pending preview gate)") {
+            // Prime the preview gate with a slider-style trigger first.
+            app.processor().triggerCurrentStepMidi(72);
+            app.processMessages();
+            (void) app.simulateAudioBlockWithMidi();
+
+            // Now press a step button — this should stop the gate timer.
+            app.sequencerSteps().clickStep(0);
+            app.processMessages();
+            (void) app.simulateAudioBlockWithMidi();
+
+            // Wait long enough that the original gate timer would have fired.
+            app.processMessages(2000);
+            app.sequencerSteps().releaseStep(0);
+            app.processMessages();
+            auto buf = app.simulateAudioBlockWithMidi();
+
+            THEN("Only the step-press release emits note-off (no extra off from the cancelled gate)") {
+                // The press auditioned step 0 (note 60). On release we expect a
+                // single note-off for 60. The gate timer for note 72 was cancelled
+                // when triggerStepMidi ran, so no off for 72 should appear.
+                REQUIRE(countNoteOffFor(buf, 72) == 0);
             }
         }
     }

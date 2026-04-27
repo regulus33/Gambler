@@ -135,6 +135,7 @@ namespace Params
             inline const String DUPLICATE = "duplicate";
             inline const String CLEAR_WINDOW = "clear_window";
             inline const String CLEAR_STEP = "clear_step";
+            inline const String CLEAR_STEP_ALL = "clear_step_all";
             inline const String RANDOMIZE_STEP = "randomize_step";
             inline const String RANDOMIZE_ALL = "randomize_all";
             inline const String SHUFFLE = "shuffle";
@@ -256,6 +257,7 @@ namespace Params
             inline const String DUPLICATE = "Duplicate";
             inline const String CLEAR_WINDOW = "Clear Window";
             inline const String CLEAR_STEP = "Clear Step";
+            inline const String CLEAR_STEP_ALL = "Clear Step (All Substeps)";
             inline const String RANDOMIZE_STEP = "Randomize Step";
             inline const String RANDOMIZE_ALL = "Randomize All";
             inline const String SHUFFLE = "Shuffle";
@@ -361,6 +363,7 @@ namespace Params
         params.push_back(createBoolParam(Keys::ID::DUPLICATE, Keys::LABEL::DUPLICATE));
         params.push_back(createBoolParam(Keys::ID::CLEAR_WINDOW, Keys::LABEL::CLEAR_WINDOW));
         params.push_back(createBoolParam(Keys::ID::CLEAR_STEP, Keys::LABEL::CLEAR_STEP));
+        params.push_back(createBoolParam(Keys::ID::CLEAR_STEP_ALL, Keys::LABEL::CLEAR_STEP_ALL));
         params.push_back(createBoolParam(Keys::ID::RANDOMIZE_STEP, Keys::LABEL::RANDOMIZE_STEP));
         params.push_back(createBoolParam(Keys::ID::RANDOMIZE_ALL, Keys::LABEL::RANDOMIZE_ALL));
         params.push_back(createBoolParam(Keys::ID::SHUFFLE, Keys::LABEL::SHUFFLE));

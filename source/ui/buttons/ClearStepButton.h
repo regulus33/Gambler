@@ -3,26 +3,56 @@
 #include "SequencerControlButton.h"
 
 /**
- * ClearStepButton - Clears the currently selected step (sets to rest)
+ * ClearStepButton - Erase button on the sequencer control row.
  *
- * Observer pattern implementation:
- * - mouseDown sets CLEAR_STEP param to true
- * - mouseUp sets CLEAR_STEP param to false
- * - Visual state reflects param value (white when true, grey when false)
- * - PluginProcessor::parameterChanged handles the actual clear step action
+ * - Single tap: clears only the *selected* substep of the selected step
+ *   (sets it to a rest).
+ * - Double tap: wipes every substep slot of the selected step and resets
+ *   its substep length to 1, leaving an empty step.
  *
- * MIDI Mapping:
- * - Shares BUTTON_LENGTH_PLUS MIDI mapping (shift-aware routing in PluginProcessor)
+ * Both actions are surfaced as APVTS triggers (CLEAR_STEP and
+ * CLEAR_STEP_ALL) so PluginProcessor::parameterChanged owns the actual
+ * mutation. CLEAR_STEP shares the BUTTON_LENGTH_PLUS MIDI mapping;
+ * CLEAR_STEP_ALL is param-only for now (no spare MidiControlId slot).
  */
 class ClearStepButton : public SequencerControlButton {
 public:
     explicit ClearStepButton(PluginProcessor& processor)
         : SequencerControlButton(processor,
                                   Params::Keys::ID::CLEAR_STEP,
-                                  MidiControlId::BUTTON_LENGTH_PLUS)  // Shares mapping with LengthPlus
+                                  MidiControlId::BUTTON_LENGTH_PLUS)
     {
         setIcon(Icons::createEraserIcon());
         setLabel("Erase");
     }
-};
 
+    void mouseDown(const juce::MouseEvent& event) override {
+        if (auto* reg = getRegistry(); reg && reg->isLearning()) {
+            SequencerControlButton::mouseDown(event);
+            return;
+        }
+        if (event.getNumberOfClicks() >= 2) {
+            doubleTapPending_ = true;
+            fireClearAll(true);
+            return;
+        }
+        SequencerControlButton::mouseDown(event);
+    }
+
+    void mouseUp(const juce::MouseEvent& event) override {
+        if (doubleTapPending_) {
+            doubleTapPending_ = false;
+            fireClearAll(false);
+            return;
+        }
+        SequencerControlButton::mouseUp(event);
+    }
+
+private:
+    void fireClearAll(bool on) {
+        if (auto* p = getProcessor().getAPVTS().getParameter(Params::Keys::ID::CLEAR_STEP_ALL))
+            p->setValueNotifyingHost(on ? 1.0f : 0.0f);
+    }
+
+    bool doubleTapPending_ = false;
+};

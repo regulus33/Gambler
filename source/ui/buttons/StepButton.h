@@ -100,6 +100,12 @@ public:
      * Receives the absolute step index (0-63)
      */
     std::function<void(int absoluteStepIndex)> onStepClicked;
+
+    /**
+     * Callback when the step button is released (mouseUp).
+     * Used to send a MIDI note-off so a tapped step doesn't leave a stuck note.
+     */
+    std::function<void(int absoluteStepIndex)> onStepReleased;
     
     void paint(juce::Graphics& g) override {
         using namespace StepButtonConstants;
@@ -210,6 +216,15 @@ public:
                 onStepClicked(absoluteStepIndex);
             }
         }
+    }
+
+    void mouseUp(const juce::MouseEvent& /*event*/) override {
+        if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT)
+            return;
+
+        int absoluteStepIndex = getAbsoluteStepIndex();
+        if (absoluteStepIndex < 64 && onStepReleased)
+            onStepReleased(absoluteStepIndex);
     }
 
     void mouseDoubleClick(const juce::MouseEvent& event) override {

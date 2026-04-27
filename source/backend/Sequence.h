@@ -275,12 +275,13 @@ public:
     }
 
     void randomizeStepNote(int stepIndex) {
-        int randomNote = scaleQ.bake(generateRandomNoteUnquantized());
-
         Step s = step(stepIndex);
-        int substepIdx = s.currentSubstep();
-        if (substepIdx < 0) substepIdx = 0;
-        s.setNote(substepIdx, randomNote);
+        int len = s.substepCount();
+        if (len <= 0) len = 1;
+        for (int sub = 0; sub < len; ++sub) {
+            int randomNote = scaleQ.bake(generateRandomNoteUnquantized());
+            s.setNote(sub, randomNote);
+        }
     }
 
     /** Bake all existing notes through the current scale/range. */
