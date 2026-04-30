@@ -13,6 +13,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <data/Params.h>
 #include <backend/Scale.h>
+#include <backend/MidiExporter.h>
 #include <ui/MainScreenComponent.h>
 #include <ui/SequenceGrid/SequenceGrid.h>
 #include <ui/SequenceOverviewComponent.h>
@@ -22,7 +23,9 @@
 #include <ui/sliders/OctaveSlider.h>
 #include <ui/sliders/NotchedSlider.h>
 #include <native/HapticFeedback.h>
+#include <algorithm>
 #include <set>
+#include <vector>
 
 // ============================================================================
 // DEFAULT STATE
@@ -3153,6 +3156,59 @@ SCENARIO("Slider preview emits note-off after the configured note length elapses
     }
 }
 
+SCENARIO("External MIDI clock pulses advance the sequencer in standalone",
+         "[user-story][clock][external-midi-clock][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A freshly launched app with EXTERNAL_MIDI_CLOCK mode enabled") {
+        TestApp app;
+
+        // Switch the clock to EXTERNAL_MIDI_CLOCK via the same APVTS path the
+        // settings toggle uses.
+        if (auto* param = app.processor().getAPVTS().getParameter(Params::Keys::ID::CLOCK_MODE)) {
+            param->setValueNotifyingHost(param->convertTo0to1(2.0f));
+        }
+        app.processMessages();
+
+        REQUIRE(app.processor().getClock().getMode() == ClockMode::EXTERNAL_MIDI_CLOCK);
+
+        WHEN("MIDI Start arrives followed by 6 timing-clock pulses (one 16th note)") {
+            const int startIndex = app.state().getCurrentIndex();
+
+            // 0xFA — MIDI Start. Should set sequencer to Playing.
+            app.sendMidiRealtime(0xFA);
+            app.processMessages();
+
+            // 6 × 0xF8 — at SIXTEENTH subdivision (24 PPQN / 4 = 6 pulses per tick),
+            // this should produce exactly one sequencer tick.
+            app.sendMidiRealtimeBurst(0xF8, 6);
+            app.processMessages();
+
+            THEN("The sequencer transitioned to Playing on Start") {
+                REQUIRE(app.processor().getSequencerState() == PluginProcessor::PlaybackState::Playing);
+            }
+
+            AND_THEN("The sequencer advanced one step") {
+                REQUIRE(app.state().getCurrentIndex() != startIndex);
+            }
+        }
+
+        WHEN("MIDI Stop arrives while the external clock is running") {
+            app.sendMidiRealtime(0xFA);  // start
+            app.processMessages();
+            app.sendMidiRealtimeBurst(0xF8, 6);
+            app.processMessages();
+
+            app.sendMidiRealtime(0xFC);  // stop
+            app.processMessages();
+
+            THEN("The external clock running flag is cleared") {
+                REQUIRE_FALSE(app.processor().getClock().isExternalClockRunning());
+            }
+        }
+    }
+}
+
 SCENARIO("Releasing a step cancels the slider-preview gate so it cannot double-off",
          "[user-story][preview][regression]") {
     GamblerTestInitialiser juceInit;
@@ -3185,6 +3241,1006 @@ SCENARIO("Releasing a step cancels the slider-preview gate so it cannot double-o
                 // single note-off for 60. The gate timer for note 72 was cancelled
                 // when triggerStepMidi ran, so no off for 72 should appear.
                 REQUIRE(countNoteOffFor(buf, 72) == 0);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// MIDI EXPORT
+// ============================================================================
+//
+// These scenarios exercise the export pipeline against the full mutation
+// surface of the app. For each user-flow we:
+//   1. Drive the state via the same APVTS params the UI buttons use.
+//   2. Call MidiExporter::createMidiFile() (and writeToFile() for roundtrip).
+//   3. Read the resulting file back with juce::MidiFile and assert on its
+//      structure: note count, pitches, channel, ticks, scale/range obedience.
+//
+// The export path quantises notes through the global scale + range at write
+// time when destructive mode is OFF. When destructive mode is ON, notes are
+// already baked through scale/range at the moment they were stored. The tests
+// cover both directions.
+
+namespace MidiExportTest {
+
+    /** Snapshot of a single noteOn event, with its matched-pair noteOff tick. */
+    struct NoteEvt {
+        int channel = 0;
+        int pitch   = 0;
+        int velocity = 0;
+        int onTick   = 0;
+        int offTick  = 0;
+        int duration() const { return offTick - onTick; }
+    };
+
+    /** Pull all matched note-on/note-off pairs out of a juce::MidiFile track. */
+    inline std::vector<NoteEvt> extractNotes(const juce::MidiFile& mf, int trackIndex = 0) {
+        std::vector<NoteEvt> out;
+        if (trackIndex >= mf.getNumTracks()) return out;
+        const auto* track = mf.getTrack(trackIndex);
+        if (track == nullptr) return out;
+
+        for (int i = 0; i < track->getNumEvents(); ++i) {
+            const auto* evt = track->getEventPointer(i);
+            const auto& msg = evt->message;
+            if (! msg.isNoteOn()) continue;
+
+            NoteEvt n;
+            n.channel  = msg.getChannel();
+            n.pitch    = msg.getNoteNumber();
+            n.velocity = msg.getVelocity();
+            n.onTick   = static_cast<int>(msg.getTimeStamp());
+            n.offTick  = (evt->noteOffObject != nullptr)
+                           ? static_cast<int>(evt->noteOffObject->message.getTimeStamp())
+                           : n.onTick;
+            out.push_back(n);
+        }
+        return out;
+    }
+
+    /** Count CC events on a given controller number anywhere in the track. */
+    inline int countCcOn(const juce::MidiFile& mf, int ccNumber, int trackIndex = 0) {
+        if (trackIndex >= mf.getNumTracks()) return 0;
+        const auto* track = mf.getTrack(trackIndex);
+        if (track == nullptr) return 0;
+
+        int count = 0;
+        for (int i = 0; i < track->getNumEvents(); ++i) {
+            const auto& msg = track->getEventPointer(i)->message;
+            if (msg.isController() && msg.getControllerNumber() == ccNumber)
+                ++count;
+        }
+        return count;
+    }
+
+    /** Roundtrip: write the file to a TemporaryFile, read it back, return the parsed MidiFile. */
+    inline juce::MidiFile roundtrip(const juce::MidiFile& source) {
+        juce::TemporaryFile tmp(".mid");
+        REQUIRE(MidiExporter::writeToFile(source, tmp.getFile()));
+
+        juce::MidiFile parsed;
+        juce::FileInputStream in(tmp.getFile());
+        REQUIRE(in.openedOk());
+        REQUIRE(parsed.readFrom(in));
+        return parsed;
+    }
+
+    /** True when every note pitch falls in [lo, hi]. */
+    inline bool allPitchesInRange(const std::vector<NoteEvt>& notes, int lo, int hi) {
+        for (const auto& n : notes)
+            if (n.pitch < lo || n.pitch > hi) return false;
+        return true;
+    }
+
+    /** True when every note pitch (mod 12) is in the enabled-pitch-class set. */
+    inline bool allPitchesInScale(const std::vector<NoteEvt>& notes,
+                                   const std::set<int>& enabledPitchClasses) {
+        for (const auto& n : notes)
+            if (enabledPitchClasses.find(n.pitch % 12) == enabledPitchClasses.end())
+                return false;
+        return true;
+    }
+
+    /** Disable every scale note, then enable only the pitch classes provided. */
+    inline void setScaleNotes(TestApp& app, const std::set<int>& pitchClasses) {
+        for (int pc = 0; pc < 12; ++pc) {
+            const bool enabled = pitchClasses.find(pc) != pitchClasses.end();
+            app.setBoolParam(Params::Keys::ID::globalScaleNote(pc), enabled);
+        }
+    }
+
+    /** All 12 pitch classes enabled (chromatic — no scale filtering). */
+    inline void enableAllScaleNotes(TestApp& app) {
+        for (int pc = 0; pc < 12; ++pc)
+            app.setBoolParam(Params::Keys::ID::globalScaleNote(pc), true);
+    }
+
+    /** Force the export pipeline to a known shape: all 8 steps single-substep at MIDI 60. */
+    inline void resetSequenceToCleanState(TestApp& app) {
+        for (int s = 0; s < ParamConstants::MAX_STEPS; ++s) {
+            app.state().setStepNotesLength(s, 1);
+            for (int sub = 0; sub < ParamConstants::MAX_SUBSTEPS; ++sub)
+                app.state().setStepNote(s, sub, 60);
+        }
+        app.state().setLength(8);
+    }
+
+} // namespace MidiExportTest
+
+// ----------------------------------------------------------------------------
+// A. Baseline export shape
+// ----------------------------------------------------------------------------
+
+SCENARIO("Export of default sequence has correct shape", "[user-story][export][baseline]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A freshly launched app (8 steps, all middle C, default 16th-note subdivision)") {
+        TestApp app;
+        MidiExportTest::enableAllScaleNotes(app);
+
+        WHEN("MIDI is exported") {
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("File has one track at 480 PPQ") {
+                REQUIRE(mf.getTimeFormat() == 480);
+                REQUIRE(mf.getNumTracks() == 1);
+            }
+
+            AND_THEN("File contains exactly 8 noteOn/noteOff pairs") {
+                REQUIRE(notes.size() == 8);
+            }
+
+            AND_THEN("All notes are middle C on channel 1") {
+                for (const auto& n : notes) {
+                    REQUIRE(n.pitch == 60);
+                    REQUIRE(n.channel == 1);
+                }
+            }
+
+            AND_THEN("Notes are placed at 16th-note ticks (480/4 = 120 each)") {
+                for (int i = 0; i < (int) notes.size(); ++i)
+                    REQUIRE(notes[(size_t) i].onTick == i * 120);
+            }
+        }
+    }
+}
+
+SCENARIO("Export honours custom subdivision",
+         "[user-story][export][subdivision]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("An app with eighth-note subdivision") {
+        TestApp app;
+        MidiExportTest::enableAllScaleNotes(app);
+        app.setIntParam(Params::Keys::ID::CLOCK_SUBDIVISION, 1);  // 1 = EIGHTH
+
+        WHEN("MIDI is exported") {
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Each note is 240 ticks apart (8th = 480/2)") {
+                REQUIRE(notes.size() == 8);
+                for (int i = 0; i < (int) notes.size(); ++i)
+                    REQUIRE(notes[(size_t) i].onTick == i * 240);
+            }
+        }
+    }
+
+    GIVEN("An app with thirty-second-note subdivision") {
+        TestApp app;
+        MidiExportTest::enableAllScaleNotes(app);
+        app.setIntParam(Params::Keys::ID::CLOCK_SUBDIVISION, 3);  // 3 = THIRTY_SECOND
+
+        WHEN("MIDI is exported") {
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Each note is 60 ticks apart (32nd = 480/8)") {
+                REQUIRE(notes.size() == 8);
+                for (int i = 0; i < (int) notes.size(); ++i)
+                    REQUIRE(notes[(size_t) i].onTick == i * 60);
+            }
+        }
+    }
+}
+
+SCENARIO("Export uses the configured MIDI output channel",
+         "[user-story][export][channel]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("An app set to MIDI channel 7") {
+        TestApp app;
+        MidiExportTest::enableAllScaleNotes(app);
+        app.setIntParam(Params::Keys::ID::MIDI_OUTPUT_CHANNEL, 7);
+
+        WHEN("MIDI is exported") {
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Every event uses channel 7") {
+                REQUIRE(notes.size() == 8);
+                for (const auto& n : notes)
+                    REQUIRE(n.channel == 7);
+            }
+        }
+    }
+}
+
+SCENARIO("Export note-off timing follows note length percentage",
+         "[user-story][export][note-length]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("An app with note length set to 50% at 16th-note subdivision") {
+        TestApp app;
+        MidiExportTest::enableAllScaleNotes(app);
+        app.setFloatParam(Params::Keys::ID::PREF_NOTE_LENGTH, 0.5f);
+
+        WHEN("MIDI is exported") {
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Each note-off lands halfway through the 120-tick step (60 ticks)") {
+                REQUIRE(notes.size() == 8);
+                for (const auto& n : notes)
+                    REQUIRE(n.duration() == 60);
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// B. Mutating buttons
+// ----------------------------------------------------------------------------
+
+SCENARIO("Randomize Step changes only the selected step",
+         "[user-story][export][randomize]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with all steps at C4") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+
+        // Pin the random range so we always know what's "valid".
+        app.state().setScaleRangeMin(40);
+        app.state().setScaleRangeMax(80);
+
+        app.state().setSelectedStepForEditing(3);
+
+        WHEN("RANDOMIZE_STEP fires once") {
+            app.firePush(Params::Keys::ID::RANDOMIZE_STEP);
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Step 3's note is now within the configured range") {
+                REQUIRE(notes.size() == 8);
+                REQUIRE(notes[3].pitch >= 40);
+                REQUIRE(notes[3].pitch <= 80);
+            }
+
+            AND_THEN("Steps 0–2 and 4–7 are still middle C") {
+                for (int i = 0; i < 8; ++i)
+                    if (i != 3) REQUIRE(notes[(size_t) i].pitch == 60);
+            }
+        }
+    }
+}
+
+SCENARIO("Randomize Step writes every substep when length > 1",
+         "[user-story][export][randomize][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with step 2 expanded to 4 substeps, all C4") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+        app.state().setScaleRangeMin(40);
+        app.state().setScaleRangeMax(80);
+
+        app.state().setStepNotesLength(2, 4);
+        for (int sub = 0; sub < 4; ++sub) app.state().setStepNote(2, sub, 60);
+
+        app.state().setSelectedStepForEditing(2);
+
+        WHEN("RANDOMIZE_STEP fires once and the file is exported") {
+            app.firePush(Params::Keys::ID::RANDOMIZE_STEP);
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Step 2's 4 substeps unroll into 4 consecutive ticks in the file") {
+                // 7 single-substep steps + 4 unrolled substeps = 11 notes.
+                REQUIRE(notes.size() == 11);
+            }
+
+            AND_THEN("All 4 unrolled substeps land within the configured range") {
+                // After step 0 and 1 (2 notes) come the 4 unrolled substeps of step 2.
+                for (int sub = 0; sub < 4; ++sub) {
+                    const auto& n = notes[(size_t) (2 + sub)];
+                    REQUIRE(n.pitch >= 40);
+                    REQUIRE(n.pitch <= 80);
+                }
+            }
+        }
+    }
+}
+
+SCENARIO("Randomize All replaces every step",
+         "[user-story][export][randomize]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with everything at C4 and a tight random range") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+        app.state().setScaleRangeMin(70);
+        app.state().setScaleRangeMax(80);
+
+        WHEN("RANDOMIZE_ALL fires once") {
+            app.firePush(Params::Keys::ID::RANDOMIZE_ALL);
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Every exported note falls inside [70, 80]") {
+                REQUIRE(notes.size() == 8);
+                REQUIRE(MidiExportTest::allPitchesInRange(notes, 70, 80));
+            }
+        }
+    }
+}
+
+SCENARIO("Clear Step (single tap) erases only the selected substep",
+         "[user-story][export][clear]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with step 4 expanded to 3 substeps") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+
+        app.state().setStepNotesLength(4, 3);
+        app.state().setStepNote(4, 0, 60);
+        app.state().setStepNote(4, 1, 64);
+        app.state().setStepNote(4, 2, 67);
+
+        app.state().setSelectedStepForEditing(4);
+        app.state().setSelectedSubstepIndex(4, 1);  // middle substep
+
+        WHEN("CLEAR_STEP fires") {
+            app.firePush(Params::Keys::ID::CLEAR_STEP);
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Step 4's middle substep was erased; siblings remain") {
+                // 7 single steps + 2 surviving substeps of step 4 = 9 notes.
+                REQUIRE(notes.size() == 9);
+
+                // Find pitches at the unrolled substep positions.
+                // Steps 0..3 produce notes 0..3, then step 4's 3 substeps would
+                // be notes 4..6, then steps 5..7 produce notes 7..9.
+                // After clearing substep 1 of step 4, that note is dropped.
+                // So notes 4 and 5 are step 4's substeps 0 and 2.
+                REQUIRE(notes[4].pitch == 60);
+                REQUIRE(notes[5].pitch == 67);
+            }
+        }
+    }
+}
+
+SCENARIO("Clear Step All (double tap) wipes all 8 substeps and resets length",
+         "[user-story][export][clear]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with step 5 expanded to 4 substeps") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+
+        app.state().setStepNotesLength(5, 4);
+        for (int sub = 0; sub < 4; ++sub) app.state().setStepNote(5, sub, 60);
+
+        app.state().setSelectedStepForEditing(5);
+
+        WHEN("CLEAR_STEP_ALL fires") {
+            app.firePush(Params::Keys::ID::CLEAR_STEP_ALL);
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Step 5 contributes zero notes") {
+                // 7 surviving single steps, step 5 wholly silent → 7 notes.
+                REQUIRE(notes.size() == 7);
+            }
+
+            AND_THEN("Step 5's substep length resets to 1") {
+                REQUIRE(app.state().getStepNotesLength(5) == 1);
+            }
+        }
+    }
+}
+
+SCENARIO("Clear Window erases all 8 steps in the visible window",
+         "[user-story][export][clear]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app at the default 8-step length and visible window 0–7") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+
+        WHEN("CLEAR_WINDOW fires") {
+            app.firePush(Params::Keys::ID::CLEAR_WINDOW);
+            // CLEAR_WINDOW dispatches via MessageManager::callAsync; pump it.
+            app.processMessages(50);
+
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Exported file is empty (all 8 steps cleared to rests)") {
+                REQUIRE(notes.empty());
+            }
+        }
+    }
+}
+
+SCENARIO("Nudge Right rotates the sequence forward",
+         "[user-story][export][nudge]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with a distinct note per step (60..67)") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+
+        for (int s = 0; s < 8; ++s) app.state().setStepNote(s, 0, 60 + s);
+
+        WHEN("NUDGE_RIGHT fires once") {
+            app.firePush(Params::Keys::ID::NUDGE_RIGHT);
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Pitches rotate so the last step lands at index 0") {
+                REQUIRE(notes.size() == 8);
+                // After right-nudge, original step 7 (note 67) is now at step 0,
+                // step 0 (60) at step 1, etc.
+                REQUIRE(notes[0].pitch == 67);
+                for (int i = 1; i < 8; ++i)
+                    REQUIRE(notes[(size_t) i].pitch == 60 + (i - 1));
+            }
+        }
+    }
+}
+
+SCENARIO("Nudge Left rotates the sequence backward",
+         "[user-story][export][nudge]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with a distinct note per step (60..67)") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+        for (int s = 0; s < 8; ++s) app.state().setStepNote(s, 0, 60 + s);
+
+        WHEN("NUDGE_LEFT fires once") {
+            app.firePush(Params::Keys::ID::NUDGE_LEFT);
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Pitches rotate so the first step lands at the end") {
+                REQUIRE(notes.size() == 8);
+                for (int i = 0; i < 7; ++i)
+                    REQUIRE(notes[(size_t) i].pitch == 61 + i);
+                REQUIRE(notes[7].pitch == 60);
+            }
+        }
+    }
+}
+
+SCENARIO("Length+ adds a step that appears in the exported file",
+         "[user-story][export][length]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean 8-step app") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+
+        WHEN("LENGTH_PLUS fires once") {
+            app.firePush(Params::Keys::ID::LENGTH_PLUS);
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Exported file has 9 notes covering 9 ticks of length") {
+                REQUIRE(notes.size() == 9);
+                REQUIRE(notes[8].onTick == 8 * 120);
+            }
+        }
+    }
+}
+
+SCENARIO("Length- removes the trailing step from the exported file",
+         "[user-story][export][length]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean 8-step app") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+
+        WHEN("LENGTH_MINUS fires once") {
+            app.firePush(Params::Keys::ID::LENGTH_MINUS);
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Exported file has only 7 notes") {
+                REQUIRE(notes.size() == 7);
+            }
+        }
+    }
+}
+
+SCENARIO("Duplicate doubles the sequence in the exported file",
+         "[user-story][export][duplicate]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean 4-step app with distinct pitches") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+
+        app.state().setLength(4);
+        for (int s = 0; s < 4; ++s) app.state().setStepNote(s, 0, 60 + s);
+
+        WHEN("DUPLICATE fires once") {
+            app.firePush(Params::Keys::ID::DUPLICATE);
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Sequence length and exported notes both doubled to 8") {
+                REQUIRE(app.state().getLength() == 8);
+                REQUIRE(notes.size() == 8);
+            }
+
+            AND_THEN("Steps 4–7 mirror steps 0–3") {
+                for (int i = 0; i < 4; ++i) {
+                    REQUIRE(notes[(size_t) i].pitch == 60 + i);
+                    REQUIRE(notes[(size_t) (i + 4)].pitch == 60 + i);
+                }
+            }
+        }
+    }
+}
+
+SCENARIO("Shuffle preserves the multiset of pitches but reorders them",
+         "[user-story][export][shuffle]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with distinct pitches per step") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+        for (int s = 0; s < 8; ++s) app.state().setStepNote(s, 0, 60 + s);
+
+        WHEN("SHUFFLE fires once") {
+            app.firePush(Params::Keys::ID::SHUFFLE);
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            std::vector<int> pitches;
+            for (const auto& n : notes) pitches.push_back(n.pitch);
+            std::sort(pitches.begin(), pitches.end());
+
+            THEN("Same multiset of pitches survives") {
+                REQUIRE(pitches == std::vector<int>{60, 61, 62, 63, 64, 65, 66, 67});
+            }
+        }
+    }
+}
+
+SCENARIO("Roll button does not bake random previews into exported notes",
+         "[user-story][export][roll][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with steady pitches and Roll held during playback") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+        for (int s = 0; s < 8; ++s) app.state().setStepNote(s, 0, 60 + s);
+
+        WHEN("ROLL is held while a few audio blocks pass, then released, then exported") {
+            // Press Roll (only sets isRandom flag — does NOT mutate stored notes).
+            if (auto* p = app.processor().getAPVTS().getParameter(Params::Keys::ID::ROLL))
+                p->setValueNotifyingHost(1.0f);
+            app.processMessages();
+
+            // Pump some audio (the engine emits random previews while rolling,
+            // but those go to MIDI out, not to stored notes).
+            for (int i = 0; i < 16; ++i) (void) app.simulateAudioBlockWithMidi();
+
+            if (auto* p = app.processor().getAPVTS().getParameter(Params::Keys::ID::ROLL))
+                p->setValueNotifyingHost(0.0f);
+            app.processMessages();
+
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Exported pitches still match the originals (60..67)") {
+                REQUIRE(notes.size() == 8);
+                for (int i = 0; i < 8; ++i)
+                    REQUIRE(notes[(size_t) i].pitch == 60 + i);
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// C. Quantization (non-destructive)
+// ----------------------------------------------------------------------------
+
+SCENARIO("Out-of-scale stored notes snap to scale on export (non-destructive)",
+         "[user-story][export][quantize]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with destructive scale OFF and only C-major enabled") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE, false);
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_RANGE, false);
+
+        // C major: C(0), D(2), E(4), F(5), G(7), A(9), B(11)
+        const std::set<int> cMajor = {0, 2, 4, 5, 7, 9, 11};
+        MidiExportTest::setScaleNotes(app, cMajor);
+
+        // Store an out-of-scale F# (66) at step 0 directly (UI-bypass write).
+        app.state().setStepNote(0, 0, 66);
+
+        WHEN("MIDI is exported") {
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("All exported pitches sit on the C-major scale") {
+                REQUIRE(MidiExportTest::allPitchesInScale(notes, cMajor));
+            }
+
+            AND_THEN("The original F# at step 0 was snapped to F (65) or G (67)") {
+                REQUIRE((notes[0].pitch == 65 || notes[0].pitch == 67));
+            }
+        }
+    }
+}
+
+SCENARIO("Empty scale produces an empty exported file",
+         "[user-story][export][quantize]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with every scale note disabled") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE, false);
+        MidiExportTest::setScaleNotes(app, {});
+
+        WHEN("MIDI is exported") {
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Quantizer returns -1 for every step → no events emitted") {
+                REQUIRE(notes.empty());
+            }
+        }
+    }
+}
+
+SCENARIO("Single-pitch scale forces all exported notes to that pitch class",
+         "[user-story][export][quantize]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with only C enabled in the global scale") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE, false);
+        MidiExportTest::setScaleNotes(app, {0});
+
+        // Spread the stored notes across an octave so the quantizer has work to do.
+        for (int s = 0; s < 8; ++s) app.state().setStepNote(s, 0, 60 + s);
+
+        WHEN("MIDI is exported") {
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Every exported pitch class is C (0 mod 12)") {
+                REQUIRE(notes.size() == 8);
+                for (const auto& n : notes) REQUIRE(n.pitch % 12 == 0);
+            }
+        }
+    }
+}
+
+SCENARIO("Narrow range clamps exported pitches at export time (non-destructive)",
+         "[user-story][export][range]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app, range [62, 65], destructive range OFF, all scale notes on") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE, false);
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_RANGE, false);
+        MidiExportTest::enableAllScaleNotes(app);
+
+        app.state().setScaleRangeMin(62);
+        app.state().setScaleRangeMax(65);
+
+        // Force pitches outside the range.
+        app.state().setStepNote(0, 0, 30);   // way below
+        app.state().setStepNote(7, 0, 100);  // way above
+
+        WHEN("MIDI is exported") {
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Every exported pitch sits in [62, 65]") {
+                REQUIRE(notes.size() == 8);
+                REQUIRE(MidiExportTest::allPitchesInRange(notes, 62, 65));
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// D. Destructive vs non-destructive
+// ----------------------------------------------------------------------------
+
+SCENARIO("Destructive scale bakes randomised notes at write time",
+         "[user-story][export][destructive][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with destructive scale ON and only C-major enabled") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE, true);
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_RANGE, false);
+
+        const std::set<int> cMajor = {0, 2, 4, 5, 7, 9, 11};
+        MidiExportTest::setScaleNotes(app, cMajor);
+
+        app.state().setScaleRangeMin(48);
+        app.state().setScaleRangeMax(72);
+
+        WHEN("RANDOMIZE_ALL fires (notes are baked through scale at write time)") {
+            app.firePush(Params::Keys::ID::RANDOMIZE_ALL);
+
+            // Now flip every scale note OFF — proving that the previously baked
+            // notes survive even when the scale is no longer "compatible".
+            MidiExportTest::setScaleNotes(app, {});
+
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Exported notes still come out (because scale isn't reapplied)") {
+                REQUIRE(notes.size() == 8);
+            }
+
+            AND_THEN("And every one of them was C-major-baked at write time") {
+                REQUIRE(MidiExportTest::allPitchesInScale(notes, cMajor));
+            }
+        }
+    }
+}
+
+SCENARIO("Destructive range clamps notes at write time",
+         "[user-story][export][destructive]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with destructive range ON and a tight [60, 64] window") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_RANGE, true);
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE, false);
+        MidiExportTest::enableAllScaleNotes(app);
+
+        app.state().setScaleRangeMin(60);
+        app.state().setScaleRangeMax(64);
+
+        WHEN("RANDOMIZE_ALL fires (notes are baked through range)") {
+            app.firePush(Params::Keys::ID::RANDOMIZE_ALL);
+
+            // Open the range up afterwards — destructive bake means notes don't move.
+            app.state().setScaleRangeMin(0);
+            app.state().setScaleRangeMax(127);
+
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Exported notes stay inside the original [60, 64] window") {
+                REQUIRE(notes.size() == 8);
+                REQUIRE(MidiExportTest::allPitchesInRange(notes, 60, 64));
+            }
+        }
+    }
+}
+
+SCENARIO("Non-destructive scale change re-quantises stored notes on export",
+         "[user-story][export][destructive]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with destructive scale OFF and a fixed stored melody") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE, false);
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_RANGE, false);
+        MidiExportTest::enableAllScaleNotes(app);
+
+        // Store a chromatic ladder 60..67.
+        for (int s = 0; s < 8; ++s) app.state().setStepNote(s, 0, 60 + s);
+
+        WHEN("Scale narrows to C-only after the notes were stored") {
+            MidiExportTest::setScaleNotes(app, {0});  // C only
+
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Every exported pitch class is now C (live quantisation kicked in)") {
+                REQUIRE(notes.size() == 8);
+                for (const auto& n : notes) REQUIRE(n.pitch % 12 == 0);
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// E. File roundtrip
+// ----------------------------------------------------------------------------
+
+SCENARIO("Exported file survives a write→read roundtrip with all notes intact",
+         "[user-story][export][roundtrip]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with a known melody and channel 4") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+        app.setIntParam(Params::Keys::ID::MIDI_OUTPUT_CHANNEL, 4);
+        for (int s = 0; s < 8; ++s) app.state().setStepNote(s, 0, 60 + s);
+
+        WHEN("File is written to disk and read back") {
+            auto src = MidiExporter::createMidiFile(app.state());
+            auto parsed = MidiExportTest::roundtrip(src);
+
+            auto srcNotes    = MidiExportTest::extractNotes(src);
+            auto parsedNotes = MidiExportTest::extractNotes(parsed);
+
+            THEN("Track count, PPQ, and event count match the source") {
+                REQUIRE(parsed.getNumTracks() == src.getNumTracks());
+                REQUIRE(parsed.getTimeFormat() == src.getTimeFormat());
+                REQUIRE(parsedNotes.size() == srcNotes.size());
+            }
+
+            AND_THEN("Every note pitch, channel, and tick survives the roundtrip") {
+                for (size_t i = 0; i < srcNotes.size(); ++i) {
+                    REQUIRE(parsedNotes[i].pitch   == srcNotes[i].pitch);
+                    REQUIRE(parsedNotes[i].channel == srcNotes[i].channel);
+                    REQUIRE(parsedNotes[i].onTick  == srcNotes[i].onTick);
+                    REQUIRE(parsedNotes[i].offTick == srcNotes[i].offTick);
+                }
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// F. Combined permutations
+// ----------------------------------------------------------------------------
+
+SCENARIO("Randomize All + tight scale + tight range stays within both",
+         "[user-story][export][permutation]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app with C-pentatonic enabled and a one-octave range") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_SCALE, false);
+        app.setBoolParam(Params::Keys::ID::PREF_DESTRUCTIVE_RANGE, false);
+
+        const std::set<int> pent = {0, 2, 4, 7, 9};  // C major pentatonic
+        MidiExportTest::setScaleNotes(app, pent);
+
+        app.state().setScaleRangeMin(60);
+        app.state().setScaleRangeMax(72);
+
+        WHEN("RANDOMIZE_ALL fires and the file is exported") {
+            app.firePush(Params::Keys::ID::RANDOMIZE_ALL);
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Every note sits on the pentatonic scale") {
+                REQUIRE(MidiExportTest::allPitchesInScale(notes, pent));
+            }
+
+            AND_THEN("Every note sits inside [60, 72]") {
+                REQUIRE(MidiExportTest::allPitchesInRange(notes, 60, 72));
+            }
+        }
+    }
+}
+
+SCENARIO("Full user-flow chain produces a coherent exported file",
+         "[user-story][export][permutation]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean 8-step app, all middle C, all scale notes on") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+        app.state().setScaleRangeMin(48);
+        app.state().setScaleRangeMax(72);
+
+        WHEN("User runs Length+ → Length+ → Duplicate → ClearWindow → RandomizeAll → NudgeRight → export") {
+            app.firePush(Params::Keys::ID::LENGTH_PLUS);
+            app.firePush(Params::Keys::ID::LENGTH_PLUS);
+            // 10 steps, all at C now.
+            app.firePush(Params::Keys::ID::DUPLICATE);
+            // Length doubles to 20.
+            REQUIRE(app.state().getLength() == 20);
+
+            app.firePush(Params::Keys::ID::CLEAR_WINDOW);
+            app.processMessages(50);
+            // Steps 0-7 are rests (cleared window); 8..19 still at C.
+
+            app.firePush(Params::Keys::ID::RANDOMIZE_ALL);
+            // Every step gets a new random note in [48, 72].
+
+            app.firePush(Params::Keys::ID::NUDGE_RIGHT);
+
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("Exported file contains exactly one note per step (length 20)") {
+                REQUIRE(notes.size() == 20);
+            }
+
+            AND_THEN("Every exported note sits inside the configured range") {
+                REQUIRE(MidiExportTest::allPitchesInRange(notes, 48, 72));
+            }
+        }
+    }
+}
+
+SCENARIO("Substep-expanded steps unroll cleanly with a custom MIDI channel",
+         "[user-story][export][permutation][substep]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("A clean app on channel 9 with step 1 expanded to 3 substeps") {
+        TestApp app;
+        MidiExportTest::resetSequenceToCleanState(app);
+        MidiExportTest::enableAllScaleNotes(app);
+        app.setIntParam(Params::Keys::ID::MIDI_OUTPUT_CHANNEL, 9);
+
+        app.state().setStepNotesLength(1, 3);
+        app.state().setStepNote(1, 0, 60);
+        app.state().setStepNote(1, 1, 64);
+        app.state().setStepNote(1, 2, 67);
+
+        WHEN("MIDI is exported") {
+            auto mf = MidiExporter::createMidiFile(app.state());
+            auto notes = MidiExportTest::extractNotes(mf);
+
+            THEN("File has 10 notes (7 single + 3 unrolled substeps)") {
+                REQUIRE(notes.size() == 10);
+            }
+
+            AND_THEN("Every event uses channel 9") {
+                for (const auto& n : notes) REQUIRE(n.channel == 9);
+            }
+
+            AND_THEN("Step 1's substeps appear at consecutive 120-tick offsets with the C-E-G chord") {
+                // Step 0 is at tick 0. Step 1's three substeps start at tick 120,
+                // and each substep is 120 ticks long (same as the parent step).
+                REQUIRE(notes[1].pitch == 60);
+                REQUIRE(notes[1].onTick == 120);
+                REQUIRE(notes[2].pitch == 64);
+                REQUIRE(notes[2].onTick == 240);
+                REQUIRE(notes[3].pitch == 67);
+                REQUIRE(notes[3].onTick == 360);
             }
         }
     }

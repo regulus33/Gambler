@@ -335,6 +335,58 @@ public:
         processor_.processBlock(buffer, midi);
     }
 
+    // --- Fire a momentary push button via APVTS (sets to 1 then back to 0) ---
+    // Most action buttons (RANDOMIZE, CLEAR, NUDGE, etc.) only act on the rising edge.
+    void firePush(const juce::String& paramId) {
+        if (auto* p = processor_.getAPVTS().getParameter(paramId)) {
+            p->setValueNotifyingHost(1.0f);
+            processMessages();
+            p->setValueNotifyingHost(0.0f);
+            processMessages();
+        }
+    }
+
+    // --- Set a bool APVTS param ---
+    void setBoolParam(const juce::String& paramId, bool value) {
+        if (auto* p = processor_.getAPVTS().getParameter(paramId)) {
+            p->setValueNotifyingHost(value ? 1.0f : 0.0f);
+            processMessages();
+        }
+    }
+
+    // --- Set an int APVTS param (in raw, un-normalised units) ---
+    void setIntParam(const juce::String& paramId, int value) {
+        if (auto* p = processor_.getAPVTS().getParameter(paramId)) {
+            p->setValueNotifyingHost(p->convertTo0to1(static_cast<float>(value)));
+            processMessages();
+        }
+    }
+
+    // --- Set a float APVTS param (in raw units) ---
+    void setFloatParam(const juce::String& paramId, float value) {
+        if (auto* p = processor_.getAPVTS().getParameter(paramId)) {
+            p->setValueNotifyingHost(p->convertTo0to1(value));
+            processMessages();
+        }
+    }
+
+    // --- Send a single realtime MIDI byte (0xF8 clock, 0xFA start, 0xFB continue, 0xFC stop) ---
+    void sendMidiRealtime(juce::uint8 status) {
+        juce::AudioBuffer<float> buffer(2, 512);
+        juce::MidiBuffer midi;
+        midi.addEvent(juce::MidiMessage(status), 0);
+        processor_.processBlock(buffer, midi);
+    }
+
+    // --- Send N realtime MIDI bytes in a single processBlock ---
+    void sendMidiRealtimeBurst(juce::uint8 status, int count) {
+        juce::AudioBuffer<float> buffer(2, 512);
+        juce::MidiBuffer midi;
+        for (int i = 0; i < count; ++i)
+            midi.addEvent(juce::MidiMessage(status), i);
+        processor_.processBlock(buffer, midi);
+    }
+
     // Convenience: get MainScreenComponent
     MainScreenComponent& mainScreen() {
         return editor_.getApplicationComponent().getMainScreen();
