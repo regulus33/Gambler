@@ -2,6 +2,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "ClockMode.h"
+#include <cmath>
+#include <vector>
 
 /**
  *
@@ -49,60 +51,100 @@ public:
     }
     
     /**
-     * This is called every frame of processBlock()
-     *
-     * @param position Optional position info from AudioPlayHead
-     * @return Current pulse count
+     * Result of a single processBlock-worth of DAW sync work.
      */
-    int update(const juce::Optional<juce::AudioPlayHead::PositionInfo>& position) {
+    struct UpdateResult {
+        int currentPulseCount = 0;
+        std::vector<int> newPulseOffsets;  // sub-block sample offsets for pulses that fired
+    };
+
+    /**
+     * Called every processBlock() in DAW_SYNC mode. Returns the cumulative
+     * DAW pulse count plus the sub-block sample offset of every pulse that
+     * crossed inside this block.
+     *
+     * @param position    Optional playhead position info.
+     * @param sampleRate  Audio sample rate (required for sub-block math).
+     * @param numSamples  Length of this audio block (samples).
+     */
+    UpdateResult update(const juce::Optional<juce::AudioPlayHead::PositionInfo>& position,
+                        double sampleRate,
+                        int numSamples) {
+        UpdateResult result;
+        result.currentPulseCount = currentPulseCount;
+
         if (!position.hasValue()) {
-            // No position info available
-            // not sure when this would be the case
             isPlaying = false;
-            return currentPulseCount;
+            return result;
         }
 
-        // this is the audio playhead position info object
         auto& pos = *position;
-        
-        // Check if DAW is playing by talking to the position info
-        if (pos.getIsPlaying()) {
-            isPlaying = true;
-            
-            // This provides us with that double, i.e we are at bar 4.6787
-            auto ppqPos = pos.getPpqPosition();
-            if (ppqPos.hasValue()) {
-                // this is not a derefernce of a pointer, it s juce optional and how we get the value.
-                double currentPpq = *ppqPos;
-                
-                // Detect play-head jump using buffers
-                // 0.1 is to make sure that we don't mistakenly detect backwards movement from
-                // floating point accumulation errors
-                // Expected: 8.5000000000
-                // Actual:   8.4999999997  // Oops, looks like it went "backward"!
-                // similarly with the forward jump but we can play with this...
-                // NOTE: this +1 maybe could be a source of a stupid bug?
-                if (currentPpq < lastPpqPosition - backPlayHeadJumpBuffer || currentPpq > lastPpqPosition + forwardPlayHeadJumpBuffer) {
-                    // Playhead jumped - recalculate pulse count
-                    currentPulseCount = calculatePulseCount(currentPpq);
-                } else {
-                    // Normal playback - update pulse count
-                    currentPulseCount = calculatePulseCount(currentPpq);
-                }
-
-                lastPpqPosition = currentPpq; // just get ready for the next round
-            }
-        } else {
-            // DAW stopped
-            if (isPlaying) {
-                // Just stopped - reset
-                // TODO: this should be configurable in settings
-                reset();
-            }
+        if (!pos.getIsPlaying()) {
+            if (isPlaying) reset();
             isPlaying = false;
+            result.currentPulseCount = currentPulseCount;
+            return result;
         }
-        
-        return currentPulseCount;
+
+        isPlaying = true;
+        auto ppqPos = pos.getPpqPosition();
+        if (!ppqPos.hasValue())
+            return result;
+
+        const double currentPpq = *ppqPos;
+        const int pulsesPerQuarter = getPulsesPerQuarterNote(subdivision);
+
+        // Detect play-head jump (loop point, manual seek). On a jump we
+        // re-anchor without emitting any new pulses for this block —
+        // sub-block math only makes sense for contiguous playback.
+        const bool jumped = currentPpq < lastPpqPosition - backPlayHeadJumpBuffer
+                          || currentPpq > lastPpqPosition + forwardPlayHeadJumpBuffer;
+        if (jumped) {
+            currentPulseCount = calculatePulseCount(currentPpq);
+            lastPpqPosition = currentPpq;
+            result.currentPulseCount = currentPulseCount;
+            return result;
+        }
+
+        // Compute new pulses that crossed inside this block.
+        // Block spans [lastPpqPosition, currentPpq) in PPQ space.
+        if (sampleRate > 0.0 && numSamples > 0 && currentPpq > lastPpqPosition) {
+            const double pulsesAtBlockStart = lastPpqPosition * static_cast<double>(pulsesPerQuarter);
+            const double pulsesAtBlockEnd   = currentPpq      * static_cast<double>(pulsesPerQuarter);
+
+            // First pulse index strictly greater than block-start. Using
+            // floor()+1 (rather than ceil) keeps the boundary case "block
+            // starts exactly on a pulse" from double-firing across blocks.
+            int nextPulseIndex = static_cast<int>(std::floor(pulsesAtBlockStart)) + 1;
+
+            // PPQ → samples conversion factor for this block.
+            // BPM may be missing in tests; derive from the PPQ delta if so.
+            double samplesPerQuarter = 0.0;
+            auto bpmOpt = pos.getBpm();
+            if (bpmOpt.hasValue() && *bpmOpt > 0.0) {
+                samplesPerQuarter = sampleRate * 60.0 / *bpmOpt;
+            } else {
+                const double ppqDelta = currentPpq - lastPpqPosition;
+                if (ppqDelta > 0.0)
+                    samplesPerQuarter = static_cast<double>(numSamples) / ppqDelta;
+            }
+            while (static_cast<double>(nextPulseIndex) < pulsesAtBlockEnd) {
+                const double pulsePpq = static_cast<double>(nextPulseIndex)
+                                          / static_cast<double>(pulsesPerQuarter);
+                const double offsetD = (pulsePpq - lastPpqPosition)
+                                          * samplesPerQuarter;
+                int offset = static_cast<int>(std::lround(offsetD));
+                if (offset < 0) offset = 0;
+                if (offset >= numSamples) offset = numSamples - 1;
+                result.newPulseOffsets.push_back(offset);
+                nextPulseIndex++;
+            }
+        }
+
+        currentPulseCount = calculatePulseCount(currentPpq);
+        lastPpqPosition = currentPpq;
+        result.currentPulseCount = currentPulseCount;
+        return result;
     }
     
     /**

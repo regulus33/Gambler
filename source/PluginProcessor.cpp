@@ -191,14 +191,19 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     previewMidiFifo.drainInto (midiMessages, getMidiOutputChannel());
 
     handleNoteOffScheduling(midiMessages, buffer.getNumSamples());
-    currentSamplePosition += buffer.getNumSamples();
+    const int blockSize = buffer.getNumSamples();
+    currentSamplePosition += blockSize;
 
-    processClockForBlock(buffer.getNumSamples());
+    processClockForBlock(blockSize);
     emitMidiClockPulses();
     detectDawTransport();
 
-    if (sequencerState.load() == PlaybackState::Playing && clock.shouldTick())
-        tickSequencer(midiMessages);
+    if (sequencerState.load() == PlaybackState::Playing) {
+        for (int sampleOffset : clock.drainPulses())
+            tickSequencer(midiMessages, sampleOffset, blockSize);
+    } else {
+        clock.drainPulses();  // discard so they don't pile up while paused
+    }
 }
 
 void PluginProcessor::drainVirtualKeyboard(juce::MidiBuffer& midiMessages, int numSamples) {
@@ -219,8 +224,8 @@ void PluginProcessor::processClockForBlock(int numSamples) {
     if (clock.getMode() == ClockMode::DAW_SYNC) {
         if (auto* playHead = getPlayHead()) {
             auto position = playHead->getPosition();
-            int pulseCount = dawSync.update(position);
-            clock.updateDawSync(pulseCount);
+            auto syncResult = dawSync.update(position, getSampleRate(), numSamples);
+            clock.enqueueDawPulses(syncResult.currentPulseCount, syncResult.newPulseOffsets);
         }
     } else {
         clock.processInternalClock(numSamples);
@@ -277,13 +282,14 @@ double PluginProcessor::computeCurrentDawBpm() {
 
 void PluginProcessor::emitCcModulations(juce::MidiBuffer& midiMessages,
                                          const std::vector<StepModulationData>& mods,
-                                         juce::uint8& velocityOut) {
+                                         juce::uint8& velocityOut,
+                                         int sampleOffsetInBlock) {
     for (const auto& mod : mods) {
         if (mod.getType() == ModulationType::Velocity) {
             velocityOut = static_cast<juce::uint8>(mod.getValue());
         } else if (mod.getType() == ModulationType::CC) {
             auto ccMsg = juce::MidiMessage::controllerEvent(getMidiOutputChannel(), mod.getCCNumber(), mod.getValue());
-            midiMessages.addEvent(ccMsg, 0);
+            midiMessages.addEvent(ccMsg, sampleOffsetInBlock);
             if (midiOutput)
                 midiOutput->sendMessageNow(ccMsg);
             DBG ("MIDI CC: " << mod.getCCNumber() << " = " << mod.getValue());
@@ -291,25 +297,34 @@ void PluginProcessor::emitCcModulations(juce::MidiBuffer& midiMessages,
     }
 }
 
-void PluginProcessor::tickSequencer(juce::MidiBuffer& midiMessages) {
+void PluginProcessor::tickSequencer(juce::MidiBuffer& midiMessages,
+                                     int sampleOffsetInBlock,
+                                     int blockSize) {
     if (clock.getMode() == ClockMode::INTERNAL && !midiClockOutputs.empty())
         clock.accumulateMidiClockPulse();
 
-    noteOffScheduler.sendImmediateNoteOff(midiMessages, getMidiOutputChannel(), midiOutput.get());
+    noteOffScheduler.sendImmediateNoteOff(midiMessages, getMidiOutputChannel(),
+                                            midiOutput.get(), sampleOffsetInBlock);
 
     auto& state = getState();
     int note = state.tick();
     int currentStepIndex = state.getCurrentIndex();
 
-    DBG ("Clock tick! Step: " << currentStepIndex << ", Note: " << note);
+    DBG ("Clock tick! Step: " << currentStepIndex << ", Note: " << note
+         << " (block offset: " << sampleOffsetInBlock << ")");
+
+    // currentSamplePosition was bumped to end-of-block at the top of processBlock,
+    // so the absolute sample position of this pulse is (end - blockSize + offset).
+    const juce::int64 blockStartSample = currentSamplePosition - static_cast<juce::int64>(blockSize);
+    const juce::int64 noteOnSample     = blockStartSample + static_cast<juce::int64>(sampleOffsetInBlock);
 
     if (note >= 0) {
         auto selectedMods = state.getSelectedModulations(currentStepIndex);
         juce::uint8 velocity = 100;
-        emitCcModulations(midiMessages, selectedMods, velocity);
+        emitCcModulations(midiMessages, selectedMods, velocity, sampleOffsetInBlock);
 
         auto noteOn = juce::MidiMessage::noteOn(getMidiOutputChannel(), note, velocity);
-        midiMessages.addEvent(noteOn, 0);
+        midiMessages.addEvent(noteOn, sampleOffsetInBlock);
         if (midiOutput)
             midiOutput->sendMessageNow(noteOn);
         DBG ("MIDI Note ON: " << note << " (velocity " << (int) velocity << ", channel 1)");
@@ -319,7 +334,7 @@ void PluginProcessor::tickSequencer(juce::MidiBuffer& midiMessages) {
         if (samplesPerStep > 0.0) {
             double noteLengthPercent = state.getNoteLength();
             juce::int64 noteOffDelay = static_cast<juce::int64>(samplesPerStep * noteLengthPercent);
-            noteOffScheduler.scheduleNoteOff(note, currentSamplePosition + noteOffDelay);
+            noteOffScheduler.scheduleNoteOff(note, noteOnSample + noteOffDelay);
             DBG ("Scheduled note-off for note " << note
                  << " (delay: " << noteOffDelay << " samples, " << (noteLengthPercent * 100.0) << "% of step)");
         }
@@ -932,7 +947,7 @@ void PluginProcessor::processMidiInput (const juce::MidiBuffer& midiMessages) {
     for (const auto& metadata : midiMessages) {
         auto msg = metadata.getMessage();
 
-        if (handleTransportMessage (msg))
+        if (handleTransportMessage (msg, metadata.samplePosition))
             continue;
 
         if (msg.isController())
@@ -942,12 +957,12 @@ void PluginProcessor::processMidiInput (const juce::MidiBuffer& midiMessages) {
     }
 }
 
-bool PluginProcessor::handleTransportMessage (const juce::MidiMessage& msg) {
+bool PluginProcessor::handleTransportMessage (const juce::MidiMessage& msg, int sampleOffsetInBlock) {
     if (clock.getMode() != ClockMode::EXTERNAL_MIDI_CLOCK)
         return false;
 
     if (msg.isMidiClock()) {  // 0xF8 timing clock
-        clock.processExternalMidiClockPulse();
+        clock.processExternalMidiClockPulse(sampleOffsetInBlock);
         return true;
     }
     if (msg.isMidiStart()) {  // 0xFA

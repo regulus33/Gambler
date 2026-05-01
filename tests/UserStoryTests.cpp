@@ -4260,9 +4260,9 @@ SCENARIO("Substep-expanded steps unroll cleanly with a custom MIDI channel",
 // fired inside the block. Notes therefore quantise to the start of whichever
 // processBlock call they fell in, which gives jitter bounded by buffer size.
 //
-// These tests fail today on purpose. They pin the bug in place so a future
-// fix (Clock reports the sub-block sample offset of each pulse, processBlock
-// passes it to addEvent) can be verified by them turning green.
+// Fixed: Clock now reports per-block sub-block sample offsets for every
+// pulse boundary crossed; processBlock iterates them and passes each offset
+// to addEvent + the note-off scheduler.
 
 namespace LiveTimingTest {
 
@@ -4317,7 +4317,7 @@ constexpr double samplesPerStepFor(double sampleRate, double bpm, int pulsesPerQ
 } // namespace LiveTimingTest
 
 SCENARIO("Live note-ons land on the 1/16 grid within ±1 sample at 48 kHz / 64-sample buffer",
-         "[user-story][timing][drift][!shouldfail]") {
+         "[user-story][timing][drift]") {
     GamblerTestInitialiser juceInit;
 
     GIVEN("Internal clock at 120 BPM, 1/16 subdivision, small block size") {
@@ -4366,7 +4366,7 @@ SCENARIO("Live note-ons land on the 1/16 grid within ±1 sample at 48 kHz / 64-s
 }
 
 SCENARIO("Live note-ons land on the 1/16 grid within ±1 sample at 44.1 kHz / 256-sample buffer",
-         "[user-story][timing][drift][!shouldfail]") {
+         "[user-story][timing][drift]") {
     GamblerTestInitialiser juceInit;
 
     GIVEN("Internal clock at 137 BPM, 1/16 subdivision, typical DAW block size") {
@@ -4407,7 +4407,7 @@ SCENARIO("Live note-ons land on the 1/16 grid within ±1 sample at 44.1 kHz / 25
 }
 
 SCENARIO("Live note-ons fire one per pulse even when block is larger than samplesPerPulse",
-         "[user-story][timing][lost-pulses][!shouldfail]") {
+         "[user-story][timing][lost-pulses]") {
     GamblerTestInitialiser juceInit;
 
     // At 200 BPM, 1/32, 44.1 kHz: samplesPerPulse ≈ 1654.

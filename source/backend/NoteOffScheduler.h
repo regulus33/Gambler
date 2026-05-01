@@ -68,14 +68,15 @@ public:
      */
     void sendImmediateNoteOff (juce::MidiBuffer& midiMessages,
                                int midiChannel,
-                               juce::MidiOutput* midiOutput)
+                               juce::MidiOutput* midiOutput,
+                               int sampleOffsetInBlock = 0)
     {
         cancelScheduled();
 
         if (lastPlayedNote >= 0)
         {
             auto noteOff = juce::MidiMessage::noteOff (midiChannel, lastPlayedNote, (juce::uint8) 0);
-            midiMessages.addEvent (noteOff, 0);
+            midiMessages.addEvent (noteOff, sampleOffsetInBlock);
 
             if (midiOutput)
                 midiOutput->sendMessageNow (noteOff);

@@ -283,7 +283,7 @@ private:
 
     /** Forward real-time transport messages to the clock when slaved to
      *  external MIDI clock. Returns true if the message was consumed. */
-    bool handleTransportMessage(const juce::MidiMessage& msg);
+    bool handleTransportMessage(const juce::MidiMessage& msg, int sampleOffsetInBlock);
 
     /** Dispatch a Control Change message to learn-mode or user mapping. */
     void handleControlChange(const juce::MidiMessage& msg);
@@ -341,9 +341,10 @@ private:
     void processClockForBlock(int numSamples);
     void emitMidiClockPulses();
     void detectDawTransport();
-    void tickSequencer(juce::MidiBuffer& midiMessages);
+    void tickSequencer(juce::MidiBuffer& midiMessages, int sampleOffsetInBlock, int blockSize);
     void emitCcModulations(juce::MidiBuffer& midiMessages,
                            const std::vector<StepModulationData>& mods,
-                           juce::uint8& velocityOut);
+                           juce::uint8& velocityOut,
+                           int sampleOffsetInBlock);
     double computeCurrentDawBpm();
 };

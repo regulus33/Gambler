@@ -3,6 +3,7 @@
 #include "ClockMode.h"
 #include "InternalClock.h"
 #include <juce_core/juce_core.h>
+#include <vector>
 
 /**
  * Clock - Master timing mechanism for Gambler
@@ -26,12 +27,11 @@ public:
      * Default constructor
      * Initializes in INTERNAL mode with 120 BPM and 16th note subdivision
      */
-    Clock() 
+    Clock()
         : mode(ClockMode::INTERNAL) // default to internal
         , subdivision(Subdivision::SIXTEENTH) // TODO: we can make this configurable in Settings
         , internalClock() // initialize our internal clock
-        , lastDawPulseCount(0) // TODO: what is this?
-        , shouldTriggerPulse(false) {
+        , lastDawPulseCount(0) {
         
         internalClock.setBpm(120.0); // default internal bpm
         internalClock.setSubdivision(subdivision); // default subdivision
@@ -188,65 +188,48 @@ public:
         internalClock.reset();
         lastDawPulseCount = 0;
         externalMidiClockPulseCount = 0;
-        shouldTriggerPulse = false;
+        pendingPulseOffsets.clear();
     }
-    
+
     /**
-     * Process samples for internal clock mode
-     * 
-     * This should be called from the audio callback when in INTERNAL mode.
-     * 
-     * @param numSamples Number of samples in the current audio buffer
+     * Process samples for internal clock mode.
+     * Pushes the sub-block sample offset of every pulse boundary crossed in
+     * this block onto the pending-pulse queue. May enqueue 0..N offsets.
      */
     void processInternalClock(int numSamples) {
-        if (mode == ClockMode::INTERNAL) {
-            shouldTriggerPulse = internalClock.processSamples(numSamples);
-        }
+        if (mode != ClockMode::INTERNAL) return;
+        auto offsets = internalClock.processSamples(numSamples);
+        pendingPulseOffsets.insert(pendingPulseOffsets.end(),
+                                    offsets.begin(), offsets.end());
     }
-    
-    /**
-     * Update DAW sync state
-     *
-     * This should be called from the audio callback when in DAW_SYNC mode.
-     * The pulse count should be calculated by the DawSync utility based on
-     * the AudioPlayHead position.
-     * The algorithm is based on ppqn which we get from playHead, we are getting a double back
-     * and every frame (call of processblock) that number increments by just a hair (remember doubles are higher precision than floats)
-     * so we continuously in every prcess block multiply the ppqPosition by 4 (or whatever the subdivision is) and
-     * that's our number, then whenever that number reaches a whole number, the pulse ticks and we add the count.
-     *
-     * @param currentPulseCount Current pulse count from DAW position
-     */
-    void updateDawSync(int currentPulseCount) {
-        if (mode == ClockMode::DAW_SYNC) {
-            // Detect if pulse count went backwards (DAW restarted or looped)
-            // otherwise stopping daw makes seq stop and won't start back.
-            if (currentPulseCount < lastDawPulseCount) {
-                // Reset to allow pulses to trigger from the new position
-                lastDawPulseCount = currentPulseCount - 1;
-            }
 
-            // Trigger a pulse if the count has incremented
-            if (currentPulseCount > lastDawPulseCount) {
-                shouldTriggerPulse = true;
-                lastDawPulseCount = currentPulseCount;
-            } else {
-                shouldTriggerPulse = false;
-            }
-        }
-    }
-    
     /**
-     * Check if a clock pulse should be triggered
-     *
-     * This is the main method that the sequencer checks to determine
-     * if it should advance to the next step.
-     *
-     * @return true if a pulse should be triggered, false otherwise
+     * Enqueue a list of pre-computed DAW pulse offsets.
+     * @param currentPulseCount  Cumulative pulse count from DAW (for edge tracking).
+     * @param newPulseOffsets    Sub-block sample offsets, one per pulse that fired this block.
      */
-    bool shouldTick() {
-        bool result = shouldTriggerPulse;
-        shouldTriggerPulse = false;  // Clear the flag after reading
+    void enqueueDawPulses(int currentPulseCount, const std::vector<int>& newPulseOffsets) {
+        if (mode != ClockMode::DAW_SYNC) return;
+
+        // Detect a backwards jump (DAW looped / restarted). DawSync also re-syncs
+        // its own state on jumps, so we just realign here.
+        if (currentPulseCount < lastDawPulseCount)
+            lastDawPulseCount = currentPulseCount;
+
+        for (int offset : newPulseOffsets)
+            pendingPulseOffsets.push_back(offset);
+
+        if (currentPulseCount > lastDawPulseCount)
+            lastDawPulseCount = currentPulseCount;
+    }
+
+    /**
+     * Drain the pending-pulse queue. Each int is a sub-block sample offset
+     * (in [0, blockSize)) where a pulse fired this block. The queue is cleared.
+     */
+    std::vector<int> drainPulses() {
+        std::vector<int> result;
+        std::swap(result, pendingPulseOffsets);
         return result;
     }
 
@@ -255,18 +238,18 @@ public:
     // ========================================
 
     /**
-     * Process an incoming external MIDI clock pulse (0xF8)
-     * Called from processBlock when in EXTERNAL_MIDI_CLOCK mode.
-     * Counts 24 PPQN pulses and triggers sequencer ticks at subdivision boundaries.
+     * Process an incoming external MIDI clock pulse (0xF8).
+     * @param sampleOffsetInBlock  The sample offset of the 0xF8 message within
+     *        the current audio block (from the MIDI buffer metadata).
      */
-    void processExternalMidiClockPulse() {
+    void processExternalMidiClockPulse(int sampleOffsetInBlock = 0) {
         if (mode != ClockMode::EXTERNAL_MIDI_CLOCK) return;
 
         externalMidiClockPulseCount++;
         int pulsesPerTick = getPulsesPerMidiClock(subdivision);
 
         if (externalMidiClockPulseCount >= pulsesPerTick) {
-            shouldTriggerPulse = true;
+            pendingPulseOffsets.push_back(sampleOffsetInBlock);
             externalMidiClockPulseCount -= pulsesPerTick;  // Carry over remainder
         }
     }
@@ -331,12 +314,11 @@ public:
     }
     
     /**
-     * Manually trigger a clock pulse
-     * 
-     * This is used for manual stepping (e.g., keyboard "C" key)
+     * Manually trigger a clock pulse at the start of the next block.
+     * Used for manual stepping (e.g. keyboard "C" key).
      */
     void manualTrigger() {
-        shouldTriggerPulse = true;
+        pendingPulseOffsets.push_back(0);
     }
     
     /**
@@ -412,7 +394,7 @@ private:
     Subdivision subdivision;       // Note subdivision
     InternalClock internalClock;   // Internal timing engine
     int lastDawPulseCount;         // Last pulse count from DAW (for edge detection)
-    bool shouldTriggerPulse;       // Flag indicating a pulse should be triggered
+    std::vector<int> pendingPulseOffsets;  // Sub-block sample offsets where pulses fired this block
     int midiClockPulsesAccumulated = 0;  // Accumulated MIDI clock pulses to send
 
     // External MIDI clock state

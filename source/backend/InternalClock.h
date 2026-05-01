@@ -1,6 +1,8 @@
 #pragma once
 
 #include "ClockMode.h"
+#include <cmath>
+#include <vector>
 
 /**
  * InternalClock - Pure domain object for internal timing
@@ -118,33 +120,37 @@ public:
     }
     
     /**
-     * Process a block of samples and determine if a pulse should be triggered
-     * 
-     * This is the main method called from the audio callback.
-     * It accumulates samples and triggers pulses at the correct intervals.
-     * 
-     * @param numSamples Number of samples in the current audio buffer
-     * @return true if a pulse should be triggered, false otherwise
+     * Process a block of samples and return the sub-block sample offsets
+     * where pulses crossed the boundary.
+     *
+     * Multiple pulses may fire in a single block (block size > samplesPerPulse).
+     * accumulatedSamples carries the fractional residue forward so cross-block
+     * timing stays exact.
      */
-    bool processSamples(int numSamples) {
-        if (!isRunning) {
-            return false;
+    std::vector<int> processSamples(int numSamples) {
+        std::vector<int> offsets;
+        if (!isRunning || numSamples <= 0) return offsets;
+
+        const double samplesPerPulse = calculateSamplesPerPulse();
+        if (samplesPerPulse <= 0.0) return offsets;
+
+        // samplesUntilNextPulse: distance from the start of this block to the
+        // next pulse boundary. accumulatedSamples is "samples elapsed since the
+        // last pulse" at block start.
+        double samplesUntilNextPulse = samplesPerPulse - accumulatedSamples;
+
+        while (samplesUntilNextPulse < static_cast<double>(numSamples)) {
+            int offset = static_cast<int>(std::lround(samplesUntilNextPulse));
+            if (offset < 0) offset = 0;
+            if (offset >= numSamples) offset = numSamples - 1;
+            offsets.push_back(offset);
+            samplesUntilNextPulse += samplesPerPulse;
         }
-        
-        // Calculate samples per pulse based on BPM and subdivision
-        double samplesPerPulse = calculateSamplesPerPulse();
-        
-        // Accumulate samples
-        accumulatedSamples += numSamples;
-        
-        // Check if we've accumulated enough samples for a pulse
-        if (accumulatedSamples >= samplesPerPulse) {
-            // Carry over the remainder to maintain accuracy
-            accumulatedSamples -= samplesPerPulse;
-            return true;
-        }
-        
-        return false;
+
+        accumulatedSamples += static_cast<double>(numSamples);
+        accumulatedSamples -= static_cast<double>(offsets.size()) * samplesPerPulse;
+
+        return offsets;
     }
     
     /**
