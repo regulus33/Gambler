@@ -4246,3 +4246,201 @@ SCENARIO("Substep-expanded steps unroll cleanly with a custom MIDI channel",
     }
 }
 
+// ============================================================================
+// LIVE TIMING DRIFT (RELEASE_TODO #15)
+// ============================================================================
+//
+// Symptom (user-reported): MIDI generated live by Gambler is audibly off-grid
+// compared to the same sequence rendered to a MIDI file. Recording Gambler's
+// live MIDI back into a DAW shows note-ons that don't land on 1/16 boundaries.
+//
+// Root cause (suspected, not yet fixed): in PluginProcessor::tickSequencer,
+// every note-on is added with `midiMessages.addEvent(noteOn, 0)` — sample
+// offset 0 within the block — regardless of where the clock pulse actually
+// fired inside the block. Notes therefore quantise to the start of whichever
+// processBlock call they fell in, which gives jitter bounded by buffer size.
+//
+// These tests fail today on purpose. They pin the bug in place so a future
+// fix (Clock reports the sub-block sample offset of each pulse, processBlock
+// passes it to addEvent) can be verified by them turning green.
+
+namespace LiveTimingTest {
+
+// Drive the processor for `numBlocks` blocks at the given block size and
+// return the absolute sample position of every note-on we observe.
+inline std::vector<juce::int64> captureNoteOnSamples(TestApp& app,
+                                                      double sampleRate,
+                                                      int blockSize,
+                                                      int numBlocks) {
+    std::vector<juce::int64> samples;
+    juce::AudioBuffer<float> buffer(2, blockSize);
+    for (int b = 0; b < numBlocks; ++b) {
+        juce::MidiBuffer midi;
+        buffer.clear();
+        app.processor().processBlock(buffer, midi);
+        for (const auto meta : midi) {
+            if (meta.getMessage().isNoteOn()) {
+                samples.push_back(static_cast<juce::int64>(b) * blockSize
+                                   + static_cast<juce::int64>(meta.samplePosition));
+            }
+        }
+    }
+    juce::ignoreUnused(sampleRate);
+    return samples;
+}
+
+// Set up: every step has a note, length=16, internal clock running.
+inline void primeForLiveTimingTest(TestApp& app, double bpm, int subdivision,
+                                    double sampleRate, int blockSize) {
+    app.state().setLength(16);
+    for (int i = 0; i < 16; ++i) {
+        app.state().setStepNote(i, 0, 60 + (i % 12));
+        app.state().setStepNotesLength(i, 1);
+        app.state().setPlayProbability(i, true);
+    }
+
+    app.setIntParam(Params::Keys::ID::CLOCK_MODE, 0); // INTERNAL
+    app.setFloatParam(Params::Keys::ID::CLOCK_BPM, static_cast<float>(bpm));
+    app.setIntParam(Params::Keys::ID::CLOCK_SUBDIVISION, subdivision);
+
+    app.processor().prepareToPlay(sampleRate, blockSize);
+    app.processor().getClock().setSampleRate(sampleRate);
+    app.processor().getClock().setBpm(bpm);
+    app.processor().getClock().start();
+    app.processMessages();
+}
+
+constexpr double samplesPerStepFor(double sampleRate, double bpm, int pulsesPerQuarter) {
+    return sampleRate * 60.0 / (bpm * static_cast<double>(pulsesPerQuarter));
+}
+
+} // namespace LiveTimingTest
+
+SCENARIO("Live note-ons land on the 1/16 grid within ±1 sample at 48 kHz / 64-sample buffer",
+         "[user-story][timing][drift][!shouldfail]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Internal clock at 120 BPM, 1/16 subdivision, small block size") {
+        TestApp app;
+        constexpr double sampleRate = 48000.0;
+        constexpr int    blockSize  = 64;
+        constexpr double bpm        = 120.0;
+        constexpr int    subdivisionParam = 2; // 0=Q, 1=8th, 2=16th, 3=32nd
+        constexpr int    pulsesPerQuarter = 4;
+
+        LiveTimingTest::primeForLiveTimingTest(app, bpm, subdivisionParam,
+                                                sampleRate, blockSize);
+
+        const double samplesPerStep = LiveTimingTest::samplesPerStepFor(
+            sampleRate, bpm, pulsesPerQuarter);
+        // 48000 * 60 / (120 * 4) = 6000.0 samples per 16th note.
+
+        WHEN("processBlock is driven for 17 steps' worth of audio") {
+            const int totalSamples = static_cast<int>(samplesPerStep * 17.0);
+            const int numBlocks    = (totalSamples + blockSize - 1) / blockSize;
+            auto noteOnSamples = LiveTimingTest::captureNoteOnSamples(
+                app, sampleRate, blockSize, numBlocks);
+
+            THEN("At least 16 note-ons were emitted") {
+                REQUIRE(noteOnSamples.size() >= 16);
+            }
+
+            AND_THEN("Each note-on is within ±1 sample of (t0 + i * samplesPerStep)") {
+                REQUIRE(noteOnSamples.size() >= 16);
+                const juce::int64 t0 = noteOnSamples[0];
+                juce::int64 maxAbsError = 0;
+                for (size_t i = 1; i < 16; ++i) {
+                    const juce::int64 expected = t0
+                        + static_cast<juce::int64>(std::llround(static_cast<double>(i) * samplesPerStep));
+                    const juce::int64 actual = noteOnSamples[i];
+                    const juce::int64 err    = std::abs(actual - expected);
+                    if (err > maxAbsError) maxAbsError = err;
+                    INFO("step " << i << " expected=" << expected
+                         << " actual=" << actual << " error=" << err);
+                    REQUIRE(err <= 1);
+                }
+                INFO("max |error| across 15 steps = " << maxAbsError << " samples");
+            }
+        }
+    }
+}
+
+SCENARIO("Live note-ons land on the 1/16 grid within ±1 sample at 44.1 kHz / 256-sample buffer",
+         "[user-story][timing][drift][!shouldfail]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Internal clock at 137 BPM, 1/16 subdivision, typical DAW block size") {
+        TestApp app;
+        constexpr double sampleRate = 44100.0;
+        constexpr int    blockSize  = 256;
+        constexpr double bpm        = 137.0; // intentionally non-integer-friendly
+        constexpr int    subdivisionParam = 2;
+        constexpr int    pulsesPerQuarter = 4;
+
+        LiveTimingTest::primeForLiveTimingTest(app, bpm, subdivisionParam,
+                                                sampleRate, blockSize);
+
+        const double samplesPerStep = LiveTimingTest::samplesPerStepFor(
+            sampleRate, bpm, pulsesPerQuarter);
+
+        WHEN("processBlock is driven for 17 steps' worth of audio") {
+            const int totalSamples = static_cast<int>(samplesPerStep * 17.0);
+            const int numBlocks    = (totalSamples + blockSize - 1) / blockSize;
+            auto noteOnSamples = LiveTimingTest::captureNoteOnSamples(
+                app, sampleRate, blockSize, numBlocks);
+
+            THEN("Each note-on is within ±1 sample of (t0 + i * samplesPerStep)") {
+                REQUIRE(noteOnSamples.size() >= 16);
+                const juce::int64 t0 = noteOnSamples[0];
+                for (size_t i = 1; i < 16; ++i) {
+                    const juce::int64 expected = t0
+                        + static_cast<juce::int64>(std::llround(static_cast<double>(i) * samplesPerStep));
+                    const juce::int64 actual = noteOnSamples[i];
+                    INFO("step " << i << " expected=" << expected
+                         << " actual=" << actual
+                         << " error=" << std::abs(actual - expected));
+                    REQUIRE(std::abs(actual - expected) <= 1);
+                }
+            }
+        }
+    }
+}
+
+SCENARIO("Live note-ons fire one per pulse even when block is larger than samplesPerPulse",
+         "[user-story][timing][lost-pulses][!shouldfail]") {
+    GamblerTestInitialiser juceInit;
+
+    // At 200 BPM, 1/32, 44.1 kHz: samplesPerPulse ≈ 1654.
+    // With a 4096-sample block, two pulses fall inside each block — but
+    // InternalClock::processSamples only returns true once. The second
+    // pulse is silently dropped, so we end up with too few note-ons.
+    GIVEN("Internal clock at 200 BPM, 1/32 subdivision, 4096-sample block") {
+        TestApp app;
+        constexpr double sampleRate = 44100.0;
+        constexpr int    blockSize  = 4096;
+        constexpr double bpm        = 200.0;
+        constexpr int    subdivisionParam = 3; // 1/32
+        constexpr int    pulsesPerQuarter = 8;
+
+        LiveTimingTest::primeForLiveTimingTest(app, bpm, subdivisionParam,
+                                                sampleRate, blockSize);
+
+        const double samplesPerStep = LiveTimingTest::samplesPerStepFor(
+            sampleRate, bpm, pulsesPerQuarter);
+
+        WHEN("processBlock is driven for 17 steps' worth of audio") {
+            const int totalSamples = static_cast<int>(samplesPerStep * 17.0);
+            const int numBlocks    = (totalSamples + blockSize - 1) / blockSize + 2;
+            auto noteOnSamples = LiveTimingTest::captureNoteOnSamples(
+                app, sampleRate, blockSize, numBlocks);
+
+            THEN("16 distinct note-ons fired (no lost pulses)") {
+                INFO("samplesPerStep=" << samplesPerStep
+                     << " blockSize=" << blockSize
+                     << " ratio=" << (blockSize / samplesPerStep));
+                REQUIRE(noteOnSamples.size() >= 16);
+            }
+        }
+    }
+}
+
