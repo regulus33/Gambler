@@ -3549,15 +3549,17 @@ SCENARIO("Randomize Step writes every substep when length > 1",
             auto mf = MidiExporter::createMidiFile(app.state());
             auto notes = MidiExportTest::extractNotes(mf);
 
-            THEN("Step 2's 4 substeps unroll into 4 consecutive ticks in the file") {
-                // 7 single-substep steps + 4 unrolled substeps = 11 notes.
-                REQUIRE(notes.size() == 11);
+            THEN("Step 2 contributes one note per pass for LCM=4 passes (32 total)") {
+                // Substep counts = [1,1,4,1,1,1,1,1] → LCM = 4 passes.
+                // Each pass emits 8 notes, so 4 × 8 = 32 total. Step 2's
+                // four substeps surface one-per-pass at flat indices
+                // 2, 10, 18, 26 (its slot is index 2 within each 8-note pass).
+                REQUIRE(notes.size() == 32);
             }
 
-            AND_THEN("All 4 unrolled substeps land within the configured range") {
-                // After step 0 and 1 (2 notes) come the 4 unrolled substeps of step 2.
-                for (int sub = 0; sub < 4; ++sub) {
-                    const auto& n = notes[(size_t) (2 + sub)];
+            AND_THEN("All 4 of step 2's substep notes land within the configured range") {
+                for (int p : {2, 10, 18, 26}) {
+                    const auto& n = notes[(size_t) p];
                     REQUIRE(n.pitch >= 40);
                     REQUIRE(n.pitch <= 80);
                 }
@@ -3613,16 +3615,20 @@ SCENARIO("Clear Step (single tap) erases only the selected substep",
             auto notes = MidiExportTest::extractNotes(mf);
 
             THEN("Step 4's middle substep was erased; siblings remain") {
-                // 7 single steps + 2 surviving substeps of step 4 = 9 notes.
-                REQUIRE(notes.size() == 9);
+                // Substep counts = [1,1,1,1,3,1,1,1] → LCM = 3 passes.
+                // Each pass: 7 non-step-4 notes plus step 4's current substep
+                // (60 in pass 0, REST in pass 1, 67 in pass 2) → 8+7+8 = 23.
+                REQUIRE(notes.size() == 23);
 
-                // Find pitches at the unrolled substep positions.
-                // Steps 0..3 produce notes 0..3, then step 4's 3 substeps would
-                // be notes 4..6, then steps 5..7 produce notes 7..9.
-                // After clearing substep 1 of step 4, that note is dropped.
-                // So notes 4 and 5 are step 4's substeps 0 and 2.
-                REQUIRE(notes[4].pitch == 60);
-                REQUIRE(notes[5].pitch == 67);
+                // Step 4 fires at tick = 4 within each pass; ticksPerStep=120.
+                // Pass 0 emits at tick 4*120=480 (substep 0 = 60).
+                // Pass 1's step-4 visit at tick (8+4)*120=1440 is a rest, so
+                // the next event is step 5 at tick 1560.
+                // Pass 2 emits at tick (16+4)*120=2400 (substep 2 = 67).
+                REQUIRE(notes[4].onTick == 4 * 120);
+                REQUIRE(notes[4].pitch  == 60);
+                REQUIRE(notes[19].onTick == 20 * 120);
+                REQUIRE(notes[19].pitch  == 67);
             }
         }
     }
@@ -4224,23 +4230,26 @@ SCENARIO("Substep-expanded steps unroll cleanly with a custom MIDI channel",
             auto mf = MidiExporter::createMidiFile(app.state());
             auto notes = MidiExportTest::extractNotes(mf);
 
-            THEN("File has 10 notes (7 single + 3 unrolled substeps)") {
-                REQUIRE(notes.size() == 10);
+            THEN("File has 24 notes (LCM=3 passes × 8 steps)") {
+                // Substep counts = [1,3,1,1,1,1,1,1] → LCM = 3.
+                REQUIRE(notes.size() == 24);
             }
 
             AND_THEN("Every event uses channel 9") {
                 for (const auto& n : notes) REQUIRE(n.channel == 9);
             }
 
-            AND_THEN("Step 1's substeps appear at consecutive 120-tick offsets with the C-E-G chord") {
-                // Step 0 is at tick 0. Step 1's three substeps start at tick 120,
-                // and each substep is 120 ticks long (same as the parent step).
-                REQUIRE(notes[1].pitch == 60);
+            AND_THEN("Step 1's three substeps surface one per pass as a C-E-G arpeggio") {
+                // Step 1 lives at tick 1 within each 8-step pass; ticksPerStep=120.
+                // Pass 0 (tick 120): substep 0 = 60.
+                // Pass 1 (tick 9*120=1080): substep 1 = 64.
+                // Pass 2 (tick 17*120=2040): substep 2 = 67.
+                REQUIRE(notes[1].pitch  == 60);
                 REQUIRE(notes[1].onTick == 120);
-                REQUIRE(notes[2].pitch == 64);
-                REQUIRE(notes[2].onTick == 240);
-                REQUIRE(notes[3].pitch == 67);
-                REQUIRE(notes[3].onTick == 360);
+                REQUIRE(notes[9].pitch  == 64);
+                REQUIRE(notes[9].onTick == 9 * 120);
+                REQUIRE(notes[17].pitch  == 67);
+                REQUIRE(notes[17].onTick == 17 * 120);
             }
         }
     }

@@ -3,6 +3,8 @@
 #include "SequenceState.h"
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_core/juce_core.h>
+#include <numeric>
+#include <vector>
 
 /**
  * MidiExporter - Converts current sequence state to a standard MIDI file.
@@ -17,10 +19,14 @@ public:
     /**
      * Build a MidiFile from the current SequenceState.
      *
-     * Substeps are "unrolled" — each substep becomes its own full-length step
-     * in the MIDI file so the user can edit the complete melody in their DAW.
-     * A step with 1 substep produces 1 MIDI step; a step with 3 substeps
-     * produces 3 MIDI steps at the same tick duration each.
+     * The exported file is a faithful render of one natural-loop's worth of
+     * the live sequencer's output: the same algorithm Sequence::tick() would
+     * produce, walked for LCM(substepCounts) full passes. With all substep
+     * counts equal to 1, that is one pass (the common case); when any step
+     * has a substep count > 1, the file unrolls just enough passes that
+     * every substep cursor is simultaneously back at 0 — i.e. the file
+     * loops cleanly in a DAW and stays in lock-step with what live
+     * playback does forever.
      */
     static juce::MidiFile createMidiFile(const SequenceState& state) {
         juce::MidiFile midiFile;
@@ -28,27 +34,37 @@ public:
 
         juce::MidiMessageSequence track;
 
-        // Ticks per step based on subdivision
-        int ticksPerStep = ticksForSubdivision(state.getClockSubdivision());
+        const int ticksPerStep = ticksForSubdivision(state.getClockSubdivision());
+        const float noteLength = state.getNoteLength();
+        const int channel      = getMidiChannel(state);
+        const int seqLength    = state.getLength();
+        if (seqLength <= 0) {
+            midiFile.addTrack(track);
+            return midiFile;
+        }
 
-        // Note length as fraction of step duration
-        float noteLength = state.getNoteLength();
+        // Number of full passes we need: LCM of every step's substep count.
+        // Steps with substep count 0 are treated as 1 (defensive — should
+        // never happen in practice).
+        long long passes = 1;
+        for (int s = 0; s < seqLength; ++s) {
+            const long long count = std::max(1, state.getStepNotesLength(s));
+            passes = std::lcm(passes, count);
+        }
 
-        // MIDI channel
-        int channel = getMidiChannel(state);
+        // Per-step substep cursor. Mirrors Step::advanceSubstep but read-
+        // then-advance (Sequence::reset() leaves the live cursor at -1 so
+        // the first pre-incrementing call returns 0 — equivalent).
+        std::vector<int> cursors(static_cast<size_t>(seqLength), 0);
 
-        int seqLength = state.getLength();
         int currentTick = 0;
+        for (long long pass = 0; pass < passes; ++pass) {
+            for (int step = 0; step < seqLength; ++step) {
+                const int substepCount = std::max(1, state.getStepNotesLength(step));
+                const int sub          = cursors[(size_t) step];
 
-        for (int step = 0; step < seqLength; ++step) {
-            int substepCount = state.getStepNotesLength(step);
-
-            // Gather velocity and CC modulations for this step
-            int velocity = ParamConstants::DEFAULT_VELOCITY;
-            auto mods = state.getSelectedModulations(step);
-
-            for (int sub = 0; sub < substepCount; ++sub) {
-                // CC events at the start of each unrolled step
+                int velocity = ParamConstants::DEFAULT_VELOCITY;
+                auto mods    = state.getSelectedModulations(step);
                 for (const auto& mod : mods) {
                     if (mod.getType() == ModulationType::Velocity) {
                         velocity = mod.getValue();
@@ -60,12 +76,13 @@ public:
                     }
                 }
 
-                int note = state.getQuantizedStepNote(step, sub);
+                const int note = state.getQuantizedStepNote(step, sub);
                 if (note >= 0) {
-                    int noteDurationTicks = std::max(1,
-                        static_cast<int>(ticksPerStep * noteLength));
+                    const int noteDurationTicks = std::max(1,
+                        static_cast<int>(static_cast<float>(ticksPerStep) * noteLength));
 
-                    auto noteOn = juce::MidiMessage::noteOn(channel, note, static_cast<juce::uint8>(velocity));
+                    auto noteOn = juce::MidiMessage::noteOn(channel, note,
+                        static_cast<juce::uint8>(velocity));
                     noteOn.setTimeStamp(static_cast<double>(currentTick));
                     track.addEvent(noteOn);
 
@@ -75,6 +92,7 @@ public:
                 }
 
                 currentTick += ticksPerStep;
+                cursors[(size_t) step] = (sub + 1) % substepCount;
             }
         }
 
