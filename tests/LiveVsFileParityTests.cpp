@@ -22,6 +22,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <cmath>
 #include <optional>
+#include <set>
 #include <vector>
 
 namespace LiveVsFileParityTest {
@@ -151,6 +152,61 @@ constexpr double samplesPerStepFor(double sampleRate, double bpm, int pulsesPerQ
     return sampleRate * 60.0 / (bpm * static_cast<double>(pulsesPerQuarter));
 }
 
+// Walk both streams in lock-step for `expectedCount` events. Asserts:
+//   - both streams yield exactly that many events
+//   - pitch / velocity / channel match exactly at every index
+//   - relative timing (delta from each stream's first event) matches
+//     within `timingToleranceSamples` per event
+//
+// Defined as an inline function (not a SECTION) so callers can drive it
+// from inside their own SCENARIO/GIVEN/WHEN/THEN blocks.
+inline void compareStreams(MidiEventStream& fileStream,
+                           MidiEventStream& liveStream,
+                           int expectedCount,
+                           double samplesPerStep,
+                           double timingToleranceSamples = 2.0) {
+    std::vector<StreamEvent> fileEvents;
+    std::vector<StreamEvent> liveEvents;
+    for (int i = 0; i < expectedCount; ++i) {
+        auto a = fileStream.next();
+        auto b = liveStream.next();
+        INFO("collecting event " << i);
+        REQUIRE(a.has_value());
+        REQUIRE(b.has_value());
+        fileEvents.push_back(*a);
+        liveEvents.push_back(*b);
+    }
+    REQUIRE_FALSE(fileStream.next().has_value());
+
+    for (int i = 0; i < expectedCount; ++i) {
+        INFO("event " << i
+             << " file=(p=" << fileEvents[(size_t) i].pitch
+             << " v=" << fileEvents[(size_t) i].velocity
+             << " ch=" << fileEvents[(size_t) i].channel << ")"
+             << " live=(p=" << liveEvents[(size_t) i].pitch
+             << " v=" << liveEvents[(size_t) i].velocity
+             << " ch=" << liveEvents[(size_t) i].channel << ")");
+        REQUIRE(fileEvents[(size_t) i].pitch    == liveEvents[(size_t) i].pitch);
+        REQUIRE(fileEvents[(size_t) i].velocity == liveEvents[(size_t) i].velocity);
+        REQUIRE(fileEvents[(size_t) i].channel  == liveEvents[(size_t) i].channel);
+    }
+
+    const double fileT0 = fileEvents.front().stepIndexFloat;
+    const double liveT0 = liveEvents.front().stepIndexFloat;
+    for (int i = 1; i < expectedCount; ++i) {
+        const double fileRelSamples =
+            (fileEvents[(size_t) i].stepIndexFloat - fileT0) * samplesPerStep;
+        const double liveRelSamples =
+            (liveEvents[(size_t) i].stepIndexFloat - liveT0) * samplesPerStep;
+        const double err = std::abs(liveRelSamples - fileRelSamples);
+        INFO("event " << i
+             << " fileRelSamples=" << fileRelSamples
+             << " liveRelSamples=" << liveRelSamples
+             << " err=" << err);
+        REQUIRE(err <= timingToleranceSamples);
+    }
+}
+
 } // namespace LiveVsFileParityTest
 
 // ============================================================================
@@ -193,64 +249,165 @@ SCENARIO("Live processBlock MIDI matches exported MIDI file note-for-note",
                                                         samplesPerStep, numBlocks);
 
         WHEN("the two streams are walked in lock-step") {
-            std::vector<LiveVsFileParityTest::StreamEvent> fileEvents;
-            std::vector<LiveVsFileParityTest::StreamEvent> liveEvents;
-            for (int i = 0; i < 16; ++i) {
-                auto a = fileStream.next();
-                auto b = liveStream.next();
-                REQUIRE(a.has_value());
-                REQUIRE(b.has_value());
-                fileEvents.push_back(*a);
-                liveEvents.push_back(*b);
+            THEN("All 16 events match in pitch/velocity/channel and timing") {
+                LiveVsFileParityTest::compareStreams(fileStream, liveStream,
+                                                      16, samplesPerStep);
             }
+        }
+    }
+}
 
-            THEN("Both streams emit exactly 16 note-ons") {
-                REQUIRE(fileEvents.size() == 16);
-                REQUIRE(liveEvents.size() == 16);
-                // No spurious 17th event in either stream.
-                REQUIRE_FALSE(fileStream.next().has_value());
+// ============================================================================
+// Custom subdivision (1/8) — exercises pulsesPerQuarter=2 path
+// ============================================================================
+
+SCENARIO("Parity holds when subdivision is 1/8 instead of 1/16",
+         "[user-story][parity][export-vs-live][subdivision]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Same 16-step chromatic fixture but at 1/8 subdivision") {
+        constexpr double sampleRate        = 48000.0;
+        constexpr int    blockSize         = 256;
+        constexpr double bpm               = 120.0;
+        constexpr int    subdivisionParam  = 1;   // 1 = EIGHTH
+        constexpr int    pulsesPerQuarter  = 2;
+        constexpr double ticksPerStep      = 480.0 / pulsesPerQuarter; // 240
+
+        TestApp fileApp;
+        LiveVsFileParityTest::primeFixture(fileApp);
+        fileApp.setIntParam(Params::Keys::ID::CLOCK_SUBDIVISION, subdivisionParam);
+        auto midiFile = MidiExporter::createMidiFile(fileApp.state());
+        LiveVsFileParityTest::FileMidiStream fileStream(midiFile, ticksPerStep);
+
+        TestApp liveApp;
+        LiveVsFileParityTest::primeFixture(liveApp);
+        LiveVsFileParityTest::startLiveClock(liveApp, sampleRate, blockSize,
+                                             bpm, subdivisionParam);
+
+        const double samplesPerStep = LiveVsFileParityTest::samplesPerStepFor(
+            sampleRate, bpm, pulsesPerQuarter);
+        const int totalSamples = static_cast<int>(samplesPerStep * 16.4);
+        const int numBlocks    = (totalSamples + blockSize - 1) / blockSize;
+        LiveVsFileParityTest::LiveMidiStream liveStream(liveApp, blockSize,
+                                                        samplesPerStep, numBlocks);
+
+        WHEN("both paths run with 1/8 subdivision") {
+            THEN("All 16 events still match in pitch/velocity/channel and timing") {
+                LiveVsFileParityTest::compareStreams(fileStream, liveStream,
+                                                      16, samplesPerStep);
             }
+        }
+    }
+}
 
-            AND_THEN("Pitch, velocity, and channel match exactly at every index") {
-                for (size_t i = 0; i < 16; ++i) {
-                    INFO("event " << i
-                         << " file=(p=" << fileEvents[i].pitch
-                         << " v=" << fileEvents[i].velocity
-                         << " ch=" << fileEvents[i].channel << ")"
-                         << " live=(p=" << liveEvents[i].pitch
-                         << " v=" << liveEvents[i].velocity
-                         << " ch=" << liveEvents[i].channel << ")");
-                    REQUIRE(fileEvents[i].pitch    == liveEvents[i].pitch);
-                    REQUIRE(fileEvents[i].velocity == liveEvents[i].velocity);
-                    REQUIRE(fileEvents[i].channel  == liveEvents[i].channel);
+// ============================================================================
+// Custom MIDI output channel — exercises MIDI_OUTPUT_CHANNEL plumbing
+// ============================================================================
+
+SCENARIO("Parity holds when MIDI output channel is changed",
+         "[user-story][parity][export-vs-live][channel]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Same fixture, MIDI output channel set to 7 on both apps") {
+        constexpr double sampleRate        = 48000.0;
+        constexpr int    blockSize         = 256;
+        constexpr double bpm               = 120.0;
+        constexpr int    subdivisionParam  = 2;
+        constexpr int    pulsesPerQuarter  = 4;
+        constexpr double ticksPerStep      = 480.0 / pulsesPerQuarter;
+        constexpr int    customChannel     = 7;
+
+        TestApp fileApp;
+        LiveVsFileParityTest::primeFixture(fileApp);
+        fileApp.setIntParam(Params::Keys::ID::MIDI_OUTPUT_CHANNEL, customChannel);
+        auto midiFile = MidiExporter::createMidiFile(fileApp.state());
+        LiveVsFileParityTest::FileMidiStream fileStream(midiFile, ticksPerStep);
+
+        TestApp liveApp;
+        LiveVsFileParityTest::primeFixture(liveApp);
+        liveApp.setIntParam(Params::Keys::ID::MIDI_OUTPUT_CHANNEL, customChannel);
+        LiveVsFileParityTest::startLiveClock(liveApp, sampleRate, blockSize,
+                                             bpm, subdivisionParam);
+
+        const double samplesPerStep = LiveVsFileParityTest::samplesPerStepFor(
+            sampleRate, bpm, pulsesPerQuarter);
+        const int totalSamples = static_cast<int>(samplesPerStep * 16.4);
+        const int numBlocks    = (totalSamples + blockSize - 1) / blockSize;
+        LiveVsFileParityTest::LiveMidiStream liveStream(liveApp, blockSize,
+                                                        samplesPerStep, numBlocks);
+
+        WHEN("both paths run with channel 7") {
+            THEN("Both streams emit channel 7 throughout, in lock-step") {
+                LiveVsFileParityTest::compareStreams(fileStream, liveStream,
+                                                      16, samplesPerStep);
+                // compareStreams checks that fileChannel == liveChannel; this
+                // extra pass confirms it's the channel we asked for.
+                LiveVsFileParityTest::FileMidiStream verifyStream(midiFile, ticksPerStep);
+                while (auto e = verifyStream.next()) {
+                    REQUIRE(e->channel == customChannel);
                 }
             }
+        }
+    }
+}
 
-            AND_THEN("Relative timing matches within 2 samples per event") {
-                // Both streams are anchored at their own first event — the
-                // file starts at tick 0, the live starts at whatever sample
-                // the first internal-clock pulse fires. We compare *deltas*
-                // from event[0], converted to samples for a unit-friendly
-                // tolerance.
-                const double fileT0 = fileEvents[0].stepIndexFloat;
-                const double liveT0 = liveEvents[0].stepIndexFloat;
+// ============================================================================
+// Non-destructive scale quantisation — both paths must snap to the same
+// pitches when the global scale narrows the available pitch classes.
+// ============================================================================
 
-                double maxAbsErrorSamples = 0.0;
-                for (size_t i = 1; i < 16; ++i) {
-                    const double fileRelSamples =
-                        (fileEvents[i].stepIndexFloat - fileT0) * samplesPerStep;
-                    const double liveRelSamples =
-                        (liveEvents[i].stepIndexFloat - liveT0) * samplesPerStep;
-                    const double err = std::abs(liveRelSamples - fileRelSamples);
-                    if (err > maxAbsErrorSamples) maxAbsErrorSamples = err;
-                    INFO("event " << i
-                         << " fileRelSamples=" << fileRelSamples
-                         << " liveRelSamples=" << liveRelSamples
-                         << " err=" << err);
-                    REQUIRE(err <= 2.0);
+SCENARIO("Parity holds when notes are non-destructively snapped to scale",
+         "[user-story][parity][export-vs-live][scale]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("16 chromatic notes but the global scale is restricted to C major") {
+        constexpr double sampleRate        = 48000.0;
+        constexpr int    blockSize         = 256;
+        constexpr double bpm               = 120.0;
+        constexpr int    subdivisionParam  = 2;
+        constexpr int    pulsesPerQuarter  = 4;
+        constexpr double ticksPerStep      = 480.0 / pulsesPerQuarter;
+
+        // C major: pitch classes {0, 2, 4, 5, 7, 9, 11} — i.e. C, D, E, F, G, A, B.
+        const std::set<int> cMajor{0, 2, 4, 5, 7, 9, 11};
+
+        auto applyCMajor = [&](TestApp& app) {
+            for (int pc = 0; pc < 12; ++pc) {
+                const bool enabled = cMajor.find(pc) != cMajor.end();
+                app.setBoolParam(Params::Keys::ID::globalScaleNote(pc), enabled);
+            }
+        };
+
+        TestApp fileApp;
+        LiveVsFileParityTest::primeFixture(fileApp);
+        applyCMajor(fileApp);
+        auto midiFile = MidiExporter::createMidiFile(fileApp.state());
+        LiveVsFileParityTest::FileMidiStream fileStream(midiFile, ticksPerStep);
+
+        TestApp liveApp;
+        LiveVsFileParityTest::primeFixture(liveApp);
+        applyCMajor(liveApp);
+        LiveVsFileParityTest::startLiveClock(liveApp, sampleRate, blockSize,
+                                             bpm, subdivisionParam);
+
+        const double samplesPerStep = LiveVsFileParityTest::samplesPerStepFor(
+            sampleRate, bpm, pulsesPerQuarter);
+        const int totalSamples = static_cast<int>(samplesPerStep * 16.4);
+        const int numBlocks    = (totalSamples + blockSize - 1) / blockSize;
+        LiveVsFileParityTest::LiveMidiStream liveStream(liveApp, blockSize,
+                                                        samplesPerStep, numBlocks);
+
+        WHEN("both paths run with C major as the active scale") {
+            THEN("Every emitted pitch is in C major, and the two streams agree") {
+                LiveVsFileParityTest::compareStreams(fileStream, liveStream,
+                                                      16, samplesPerStep);
+
+                // Walk the file again to confirm every pitch class is in C major.
+                LiveVsFileParityTest::FileMidiStream verifyStream(midiFile, ticksPerStep);
+                while (auto e = verifyStream.next()) {
+                    INFO("pitch " << e->pitch << " (pc=" << (e->pitch % 12) << ")");
+                    REQUIRE(cMajor.find(e->pitch % 12) != cMajor.end());
                 }
-                INFO("max |timing error| across 15 events = "
-                     << maxAbsErrorSamples << " samples");
             }
         }
     }
