@@ -94,11 +94,31 @@ public:
         const double currentPpq = *ppqPos;
         const int pulsesPerQuarter = getPulsesPerQuarterNote(subdivision);
 
-        // Detect play-head jump (loop point, manual seek). On a jump we
-        // re-anchor without emitting any new pulses for this block —
-        // sub-block math only makes sense for contiguous playback.
-        const bool jumped = currentPpq < lastPpqPosition - backPlayHeadJumpBuffer
-                          || currentPpq > lastPpqPosition + forwardPlayHeadJumpBuffer;
+        // Detect play-head jump (loop point, manual seek, transport-state
+        // gap). The contract for DAW_SYNC is "the host clocks the sequencer":
+        // a tick fires only when PPQ moves forward continuously across a
+        // pulse boundary. Anything else — backwards motion, or a forward
+        // jump bigger than what continuous playback in one block could
+        // produce — must re-anchor without emitting pulses, otherwise we
+        // end up firing spurious catch-up pulses to "match" the new
+        // position.
+        const double observedDelta = currentPpq - lastPpqPosition;
+        double expectedDelta = -1.0;
+        auto bpmOpt = pos.getBpm();
+        if (bpmOpt.hasValue() && *bpmOpt > 0.0 && sampleRate > 0.0 && numSamples > 0) {
+            expectedDelta = (static_cast<double>(numSamples) / sampleRate) * (*bpmOpt / 60.0);
+        }
+
+        bool jumped = observedDelta < -backPlayHeadJumpBuffer;
+        if (!jumped) {
+            if (expectedDelta > 0.0) {
+                jumped = observedDelta > expectedDelta * continuousPlaybackTolerance;
+            } else {
+                // BPM unavailable — keep the legacy generous threshold so we
+                // don't false-positive on hosts that don't report tempo.
+                jumped = observedDelta > forwardPlayHeadJumpBuffer;
+            }
+        }
         if (jumped) {
             currentPulseCount = calculatePulseCount(currentPpq);
             lastPpqPosition = currentPpq;
@@ -120,7 +140,6 @@ public:
             // PPQ → samples conversion factor for this block.
             // BPM may be missing in tests; derive from the PPQ delta if so.
             double samplesPerQuarter = 0.0;
-            auto bpmOpt = pos.getBpm();
             if (bpmOpt.hasValue() && *bpmOpt > 0.0) {
                 samplesPerQuarter = sampleRate * 60.0 / *bpmOpt;
             } else {
@@ -201,7 +220,18 @@ private:
     double lastPpqPosition;                     // Last PPQ position from DAW
     int currentPulseCount;                      // Current pulse count
     bool isPlaying;                             // Whether DAW is playing
-    double backPlayHeadJumpBuffer = 0.1;        // detection buffer see notes above
-    double forwardPlayHeadJumpBuffer = 1.0;     // detection buffer see notes above
+    // Backwards-motion tolerance: hosts may report tiny non-monotonic PPQ
+    // jitter during continuous play. Anything more than ~1ms-equivalent of
+    // backwards motion is a real seek, not jitter.
+    double backPlayHeadJumpBuffer = 0.001;
+
+    // Forward jump multiplier on top of the per-block expected PPQ delta
+    // (numSamples/sampleRate × BPM/60). 1.5 leaves headroom for host jitter
+    // while still rejecting any deliberate forward scrub.
+    double continuousPlaybackTolerance = 1.5;
+
+    // Fallback forward threshold used when the host doesn't report BPM and
+    // we can't compute a tight per-block expected delta.
+    double forwardPlayHeadJumpBuffer = 1.0;
 };
 
