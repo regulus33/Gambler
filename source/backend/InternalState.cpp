@@ -60,8 +60,8 @@ void InternalState::setStepNotesLength(int stepIndex, int length) {
 }
 
 int InternalState::getStepNotesCurrentIndex(int stepIndex) const {
-    if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return 0;
-    return tree.getProperty(IDs::stepNotesCurrentIndex(stepIndex), 0);
+    if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return -1;
+    return tree.getProperty(IDs::stepNotesCurrentIndex(stepIndex), -1);
 }
 
 void InternalState::setStepNotesCurrentIndex(int stepIndex, int index) {
@@ -225,7 +225,7 @@ void InternalState::initializeDefaults() {
             tree.setProperty(IDs::stepNote(step, substep), ParamConstants::DEFAULT_NOTE, nullptr);
         }
         tree.setProperty(IDs::stepNotesLength(step), 1, nullptr);
-        tree.setProperty(IDs::stepNotesCurrentIndex(step), 0, nullptr);
+        tree.setProperty(IDs::stepNotesCurrentIndex(step), -1, nullptr);
     }
 
     // Initialize step modulations

@@ -141,13 +141,6 @@ inline void startLiveClock(TestApp& app, double sampleRate, int blockSize,
     app.setFloatParam(Params::Keys::ID::CLOCK_BPM, static_cast<float>(bpm));
     app.setIntParam(Params::Keys::ID::CLOCK_SUBDIVISION, subdivisionParam);
 
-    // Mirror what togglePlayPause does on Stopped→Playing: reset the sequence
-    // so currentIndex and every step's currentSubstep go to -1. Without this
-    // they sit at the InternalState default of 0 and the first pre-incrementing
-    // advanceSubstep skips over substep 0 — visible only on multi-substep
-    // fixtures because mod-1 swallows the off-by-one for single-substep steps.
-    app.state().reset();
-
     app.processor().prepareToPlay(sampleRate, blockSize);
     app.processor().getClock().setSampleRate(sampleRate);
     app.processor().getClock().setBpm(bpm);
