@@ -3209,6 +3209,213 @@ SCENARIO("External MIDI clock pulses advance the sequencer in standalone",
     }
 }
 
+// ============================================================================
+// DAW_SYNC (host-clocked plugin mode)
+//
+// Contract: in DAW_SYNC the host clocks the sequencer. A pulse fires only when
+// host PPQ moves forward continuously across a pulse boundary. Backwards jumps
+// (loop), manual scrubs, and forward seeks must NOT produce catch-up pulses.
+// Regression: prior to d6309702, scrub-then-play and small forward seeks fired
+// spurious pulses because the forward jump-buffer (1.0 PPQ) was looser than
+// any realistic per-block continuous delta at typical block sizes.
+// ============================================================================
+
+namespace {
+    // Host playhead stub: scripts whatever PPQ/transport state the test wants.
+    class DawSyncFakePlayHead : public juce::AudioPlayHead {
+    public:
+        juce::Optional<juce::AudioPlayHead::PositionInfo> getPosition() const override {
+            juce::AudioPlayHead::PositionInfo info;
+            info.setIsPlaying(isPlaying);
+            info.setPpqPosition(ppq);
+            info.setBpm(bpm);
+            return info;
+        }
+        bool   isPlaying = false;
+        double ppq       = 0.0;
+        double bpm       = 120.0;
+    };
+
+    // 6240 samples / 48 kHz × 120/60 = 0.26 PPQ — one 1/16 pulse per block, so
+    // +0.26 PPQ/block matches what continuous host playback would produce
+    // (and clears the continuity check). Any larger jump is a seek.
+    constexpr double kDawSampleRate  = 48000.0;
+    constexpr int    kDawBlockSize   = 6240;
+    constexpr double kDawPpqPerBlock = 0.26;
+
+    void primeDawSync(TestApp& app, DawSyncFakePlayHead& playHead) {
+        for (int pc = 0; pc < 12; ++pc)
+            app.setBoolParam(Params::Keys::ID::globalScaleNote(pc), true);
+
+        app.state().setLength(16);
+        for (int i = 0; i < 16; ++i) {
+            app.state().setStepNote(i, 0, 60 + i);
+            app.state().setStepNotesLength(i, 1);
+            app.state().setPlayProbability(i, true);
+        }
+
+        app.setIntParam(Params::Keys::ID::CLOCK_SUBDIVISION, 2); // 1/16
+        app.setIntParam(Params::Keys::ID::CLOCK_MODE, 1);        // DAW_SYNC
+
+        app.processor().setRateAndBufferSizeDetails(kDawSampleRate, kDawBlockSize);
+        app.processor().prepareToPlay(kDawSampleRate, kDawBlockSize);
+        app.processor().setPlayHead(&playHead);
+        app.processMessages();
+    }
+
+    int driveDawBlock(TestApp& app) {
+        juce::AudioBuffer<float> buffer(2, kDawBlockSize);
+        juce::MidiBuffer midi;
+        buffer.clear();
+        app.processor().processBlock(buffer, midi);
+
+        int noteOns = 0;
+        for (const auto meta : midi)
+            if (meta.getMessage().isNoteOn()) ++noteOns;
+        return noteOns;
+    }
+}
+
+SCENARIO("DAW continuous forward play ticks the sequencer one step per pulse",
+         "[user-story][clock][daw-sync][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("DAW_SYNC at 1/16, fake playhead playing from PPQ 0") {
+        TestApp app;
+        DawSyncFakePlayHead playHead;
+        primeDawSync(app, playHead);
+
+        playHead.isPlaying = true;
+        playHead.ppq       = 0.0;
+
+        WHEN("Host PPQ advances by ~one 1/16 (0.26) per block, 4 blocks total") {
+            std::vector<int> pulsesPerBlock;
+            for (int i = 0; i < 4; ++i) {
+                playHead.ppq = (i + 1) * kDawPpqPerBlock;
+                pulsesPerBlock.push_back(driveDawBlock(app));
+            }
+
+            THEN("Each block emits exactly one pulse and sequencer reaches step 3") {
+                for (int p : pulsesPerBlock) REQUIRE(p == 1);
+                REQUIRE(app.state().getCurrentIndex() == 3);
+            }
+        }
+    }
+}
+
+SCENARIO("DAW loop-back to PPQ 0 fires no pulses and the sequencer index holds",
+         "[user-story][clock][daw-sync][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Sequencer driven to step 3 by four DAW pulses") {
+        TestApp app;
+        DawSyncFakePlayHead playHead;
+        primeDawSync(app, playHead);
+
+        playHead.isPlaying = true;
+        for (int i = 0; i < 4; ++i) {
+            playHead.ppq = (i + 1) * kDawPpqPerBlock;
+            driveDawBlock(app);
+        }
+        REQUIRE(app.state().getCurrentIndex() == 3);
+
+        WHEN("Host playhead loops backwards to PPQ 0") {
+            playHead.ppq = 0.0;
+            int loopBlockPulses = driveDawBlock(app);
+
+            THEN("No pulses fire on the loop-back block; index stays at step 3") {
+                REQUIRE(loopBlockPulses == 0);
+                REQUIRE(app.state().getCurrentIndex() == 3);
+            }
+
+            AND_WHEN("Forward play resumes from PPQ 0 and crosses one pulse") {
+                playHead.ppq = kDawPpqPerBlock;
+                int nextPulses = driveDawBlock(app);
+
+                THEN("Exactly one pulse fires and sequencer advances to step 4") {
+                    REQUIRE(nextPulses == 1);
+                    REQUIRE(app.state().getCurrentIndex() == 4);
+                }
+            }
+        }
+    }
+}
+
+SCENARIO("DAW scrub-while-stopped + play does not catch up the sequencer",
+         "[user-story][clock][daw-sync][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Sequencer driven to step 3, then DAW stops and user scrubs to PPQ 0.5") {
+        TestApp app;
+        DawSyncFakePlayHead playHead;
+        primeDawSync(app, playHead);
+
+        playHead.isPlaying = true;
+        for (int i = 0; i < 4; ++i) {
+            playHead.ppq = (i + 1) * kDawPpqPerBlock;
+            driveDawBlock(app);
+        }
+        REQUIRE(app.state().getCurrentIndex() == 3);
+
+        playHead.isPlaying = false;
+        playHead.ppq       = 1.04;
+        driveDawBlock(app);
+
+        playHead.ppq = 0.5;
+        driveDawBlock(app);
+        REQUIRE(app.state().getCurrentIndex() == 3);
+
+        WHEN("DAW transport resumes from the scrubbed PPQ 0.5") {
+            playHead.isPlaying = true;
+            playHead.ppq       = 0.5;
+            int firstPulses = driveDawBlock(app);
+
+            THEN("First block fires no catch-up pulses; sequencer stays at step 3") {
+                REQUIRE(firstPulses == 0);
+                REQUIRE(app.state().getCurrentIndex() == 3);
+            }
+        }
+    }
+}
+
+SCENARIO("DAW small forward seek during play does not catch up the sequencer",
+         "[user-story][clock][daw-sync][regression]") {
+    GamblerTestInitialiser juceInit;
+
+    GIVEN("Sequencer driven to step 3 via continuous play to PPQ 1.04") {
+        TestApp app;
+        DawSyncFakePlayHead playHead;
+        primeDawSync(app, playHead);
+
+        playHead.isPlaying = true;
+        for (int i = 0; i < 4; ++i) {
+            playHead.ppq = (i + 1) * kDawPpqPerBlock;
+            driveDawBlock(app);
+        }
+        REQUIRE(app.state().getCurrentIndex() == 3);
+
+        WHEN("Playhead jumps forward 0.51 PPQ in a single block (manual seek)") {
+            playHead.ppq = 1.04 + 0.51;
+            int seekBlockPulses = driveDawBlock(app);
+
+            THEN("No catch-up pulses fire; sequencer stays at step 3") {
+                REQUIRE(seekBlockPulses == 0);
+                REQUIRE(app.state().getCurrentIndex() == 3);
+            }
+
+            AND_WHEN("Continuous play resumes from PPQ 1.55 across one pulse") {
+                playHead.ppq = 1.55 + kDawPpqPerBlock;
+                int nextPulses = driveDawBlock(app);
+
+                THEN("Exactly one pulse fires and sequencer advances to step 4") {
+                    REQUIRE(nextPulses == 1);
+                    REQUIRE(app.state().getCurrentIndex() == 4);
+                }
+            }
+        }
+    }
+}
+
 SCENARIO("Releasing a step cancels the slider-preview gate so it cannot double-off",
          "[user-story][preview][regression]") {
     GamblerTestInitialiser juceInit;
