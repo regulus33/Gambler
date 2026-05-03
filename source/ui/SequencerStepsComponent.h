@@ -4,7 +4,9 @@
 #include "BinaryData.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "SequenceGrid/SequenceGrid.h"
+#include "SequenceGrid/SequenceGridConstants.h"
 #include "StateListenerComponent.h"
+#include "UIConstants.h"
 #include "buttons/StepButton.h"
 #include <array>
 
@@ -68,6 +70,13 @@ public:
             };
 
             addAndMakeVisible(*button);
+            // Forward the button's mouse events to this parent so we can
+            // detect a click-and-drag across multiple buttons (the same
+            // gesture SequenceGrid uses to set sequence length). The button
+            // still handles its own click/release for note auditioning;
+            // we just observe so we can paint a drag-preview overlay and
+            // commit the new length on release.
+            button->addMouseListener(this, false);
             stepButtons_[i] = std::move(button);
         }
 
@@ -78,6 +87,25 @@ public:
 
     void paint (juce::Graphics& /*g*/) override {
         // Buttons handle their own painting
+    }
+
+    void paintOverChildren (juce::Graphics& g) override {
+        if (!isDraggingLength_) return;
+
+        for (int i = 0; i < SequencerStepsConstants::numVisibleSteps; ++i) {
+            auto bounds = stepButtons_[i]->getBounds().toFloat();
+            juce::Colour fill = (i <= dragTargetLocalIndex_)
+                ? juce::Colour(SequenceGridConstants::dragPreviewOrangeHex)
+                : juce::Colour(SequenceGridConstants::outOfBoundsGreyHex);
+            g.setColour(fill);
+            g.fillRoundedRectangle(bounds, StepButtonConstants::cornerRadius);
+
+            if (i == dragTargetLocalIndex_) {
+                g.setColour(UIConstants::stepIndicatorWhite.withAlpha(0.5f));
+                g.drawRoundedRectangle(bounds.reduced(1.0f),
+                                       StepButtonConstants::cornerRadius, 1.5f);
+            }
+        }
     }
 
     void resized() override {
@@ -94,6 +122,54 @@ public:
             );
         }
     }
+
+    // ===== Drag-to-set-length (parent-level mouse listener on each button) ====
+    //
+    // Mirrors SequenceGrid's gesture: press a step, drag across to another
+    // step, release — sequence length becomes (lastDragStep + 1). Only enabled
+    // when the visible window is the first row (steps 0–7), so the local index
+    // and the absolute step index are identical.
+    void mouseDown (const juce::MouseEvent& event) override {
+        if (!isFirstRow()) return;
+
+        auto p = event.getEventRelativeTo(this).getPosition();
+        mouseDownLocalIndex_ = localIndexAtPosition(p);
+        dragTargetLocalIndex_ = mouseDownLocalIndex_;
+        isDraggingLength_ = false;
+    }
+
+    void mouseDrag (const juce::MouseEvent& event) override {
+        if (!isFirstRow() || mouseDownLocalIndex_ < 0) return;
+
+        auto p = event.getEventRelativeTo(this).getPosition();
+        int hovered = localIndexAtPosition(p);
+        if (hovered < 0) return;
+
+        if (!isDraggingLength_ && hovered != mouseDownLocalIndex_) {
+            isDraggingLength_ = true;
+        }
+        if (isDraggingLength_ && hovered != dragTargetLocalIndex_) {
+            dragTargetLocalIndex_ = hovered;
+            repaint();
+        }
+    }
+
+    void mouseUp (const juce::MouseEvent& /*event*/) override {
+        if (isDraggingLength_) {
+            if (onLengthDragged && dragTargetLocalIndex_ >= 0)
+                onLengthDragged(dragTargetLocalIndex_ + 1);
+            isDraggingLength_ = false;
+            repaint();
+        }
+        mouseDownLocalIndex_ = -1;
+        dragTargetLocalIndex_ = -1;
+    }
+
+    /**
+     * Callback when the user drags across step buttons to set sequence length.
+     * Receives the new length (1–8). Only fires when the first row is visible.
+     */
+    std::function<void(int newLength)> onLengthDragged;
 
     /**
      * Callback when a step is clicked
@@ -141,6 +217,21 @@ private:
     void onStateChanged() override {
         // Buttons automatically repaint themselves via their own StateListenerComponent
     }
+
+    bool isFirstRow() const {
+        return getState().getViewWindowStart() == 0;
+    }
+
+    int localIndexAtPosition (juce::Point<int> p) const {
+        for (int i = 0; i < SequencerStepsConstants::numVisibleSteps; ++i) {
+            if (stepButtons_[i]->getBounds().contains(p)) return i;
+        }
+        return -1;
+    }
+
+    int  mouseDownLocalIndex_ = -1;
+    int  dragTargetLocalIndex_ = -1;
+    bool isDraggingLength_ = false;
 
     std::array<std::unique_ptr<StepButton>, SequencerStepsConstants::numVisibleSteps> stepButtons_;
 

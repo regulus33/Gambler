@@ -203,28 +203,32 @@ public:
 
     void mouseDown(const juce::MouseEvent& event) override {
         if (event.mods.isLeftButtonDown()) {
-            // Handle MIDI learn mode first
+            // MIDI-learn capture happens immediately on press.
             if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT) {
                 registry_->setLearningControl(midiControlId_);
                 repaint();
                 return;
             }
-
-            // Normal click behavior
-            int absoluteStepIndex = getAbsoluteStepIndex();
-            if (absoluteStepIndex < 64 && onStepClicked) {
-                onStepClicked(absoluteStepIndex);
-            }
+            // Audition fires on release (mouseUp). Deferring it lets the
+            // parent SequencerStepsComponent's drag-to-set-length gesture
+            // suppress the preview cleanly: if the release lands on a
+            // different button, JUCE delivers mouseUp here with a position
+            // outside our local bounds, and we skip the audition.
         }
     }
 
-    void mouseUp(const juce::MouseEvent& /*event*/) override {
+    void mouseUp(const juce::MouseEvent& event) override {
         if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT)
             return;
 
+        // Release outside our own bounds means the user dragged off this
+        // button — treat it as a drag, not a click, and skip the audition.
+        if (!getLocalBounds().contains(event.getPosition()))
+            return;
+
         int absoluteStepIndex = getAbsoluteStepIndex();
-        if (absoluteStepIndex < 64 && onStepReleased)
-            onStepReleased(absoluteStepIndex);
+        if (absoluteStepIndex < 64 && onStepClicked)
+            onStepClicked(absoluteStepIndex);
     }
 
     void mouseDoubleClick(const juce::MouseEvent& event) override {

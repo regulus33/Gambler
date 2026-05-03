@@ -50,6 +50,13 @@ public:
             processorRef.releasePreviewMidi();
         };
 
+        mainScreen.getSequencerSteps().onLengthDragged = [this](int newLength) {
+            auto& state = processorRef.getState();
+            state.setLength(newLength);
+            mainScreen.getSequenceOverview().getSequenceGrid()
+                .updateFromState(state, state.getCurrentIndex());
+        };
+
         setupMidiLearnRegistries();
         setupNoteRangeCallbacks();
 
