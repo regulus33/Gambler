@@ -55,18 +55,19 @@ inline const std::array<juce::String, NUM_OCTAVES> OCTAVE_LABELS = {
     juce::String ("10")
 };
 
-// For now all octaves share the same accent colour (matching existing UI)
+// Octave gradient: same red hue, brightness ramps up as octave increases
+// (low octaves saturated/darker, high octaves lighter/pinker).
 inline const std::array<juce::Colour, NUM_OCTAVES> OCTAVE_COLOURS = {
-    juce::Colour (0xFFFF6B6B),
-    juce::Colour (0xFFFF6B6B),
-    juce::Colour (0xFFFF6B6B),
-    juce::Colour (0xFFFF6B6B),
-    juce::Colour (0xFFFF6B6B),
-    juce::Colour (0xFFFF6B6B),
-    juce::Colour (0xFFFF6B6B),
-    juce::Colour (0xFFFF6B6B),
-    juce::Colour (0xFFFF6B6B),
-    juce::Colour (0xFFFF6B6B)
+    juce::Colour (0xFFB23838), // 1  - darkest red
+    juce::Colour (0xFFC44949),
+    juce::Colour (0xFFD45656),
+    juce::Colour (0xFFE76060),
+    juce::Colour (0xFFFF6B6B), // 5  - base
+    juce::Colour (0xFFFF7F7F),
+    juce::Colour (0xFFFF9595),
+    juce::Colour (0xFFFFAAAA),
+    juce::Colour (0xFFFFBFBF),
+    juce::Colour (0xFFFFD4D4)  // 10 - lightest pink
 };
 
 // --- Helper to convert std::array -> juce::Array ---

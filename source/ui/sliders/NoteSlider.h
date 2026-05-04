@@ -5,6 +5,7 @@
 #include "../MidiLearnOverlayPainter.h"
 #include "../MusicConstants.h"
 #include "NotchedSlider.h"
+#include "WedgePickerPopup.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /**
@@ -28,6 +29,8 @@ public:
         }
 
         addAndMakeVisible(slider_);
+        // Slider is display-only now: tap on NoteSlider opens a wedge picker popup.
+        slider_.setInterceptsMouseClicks(false, false);
 
         // Add invisible overlay for MIDI learn mode (sits on top, initially hidden)
         addAndMakeVisible(midiLearnOverlay_);
@@ -177,38 +180,51 @@ public:
         midiLearnOverlay_.setBounds(getLocalBounds());
     }
 
-    void mouseDown(const juce::MouseEvent& event) override {
-        // Handle MIDI learn mode
+    void mouseDown(const juce::MouseEvent&) override {
         if (registry_ && registry_->isLearning() && midiControlId_ != MidiControlId::COUNT) {
-            DBG("NoteSlider: Setting learning control to " << static_cast<int>(midiControlId_));
             registry_->setLearningControl(midiControlId_);
-            DBG("NoteSlider: Learning control is now " << static_cast<int>(registry_->getLearningControl()));
             repaint();
             return;
         }
 
         if (slider_.isLocked()) return;
-
-        // Forward to slider
-        slider_.mouseDown(event.withNewPosition(event.position - slider_.getPosition().toFloat()));
-    }
-
-    void mouseDrag(const juce::MouseEvent& event) override {
-        if (registry_ && registry_->isLearning()) return;
-        if (slider_.isLocked()) return;
-        slider_.mouseDrag(event.withNewPosition(event.position - slider_.getPosition().toFloat()));
-    }
-
-    void mouseUp(const juce::MouseEvent& event) override {
-        if (registry_ && registry_->isLearning()) return;
-        if (slider_.isLocked()) return;
-        slider_.mouseUp(event.withNewPosition(event.position - slider_.getPosition().toFloat()));
+        openPicker();
     }
 
     // Accessor for testing
     NotchedSlider& getSlider() { return slider_; }
 
 private:
+    void openPicker() {
+        juce::Array<WedgePickerPopup::Wedge> wedges;
+        const int currentPc = getChromaticPitchClass();
+        for (int pc = 0; pc < 12; ++pc) {
+            const bool inScale = scaleNoteIndices_.contains(pc);
+            const juce::Colour col = (allNoteColours_.size() == 12)
+                ? allNoteColours_[pc]
+                : MusicConstants::NOTE_COLOURS[static_cast<size_t>(pc)];
+            wedges.add({MusicConstants::CHROMATIC_NOTE_NAMES[static_cast<size_t>(pc)],
+                        col, inScale, pc});
+        }
+
+        auto* popup = new WedgePickerPopup(
+            wedges, currentPc,
+            [this](int pc) {
+                for (int i = 0; i < scaleNoteIndices_.size(); ++i) {
+                    if (scaleNoteIndices_[i] == pc) {
+                        slider_.getSlider().setValue((double) i, juce::sendNotificationSync);
+                        return;
+                    }
+                }
+            });
+
+        const auto bounds = localAreaToGlobal(getLocalBounds());
+        juce::CallOutBox::launchAsynchronously(
+            std::unique_ptr<juce::Component>(popup),
+            bounds,
+            getTopLevelComponent());
+    }
+
     void paintMidiLearnOverlay(juce::Graphics& g) {
         // No corner radius for sliders (they're circular knobs)
         MidiLearnOverlayPainter::paint(g, getLocalBounds(), registry_, midiControlId_, 0.0f);
