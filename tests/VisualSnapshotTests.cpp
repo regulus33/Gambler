@@ -19,8 +19,6 @@
 #include "../source/ui/SettingsGroup/SettingsGroup.h"
 #include "../source/ui/SettingsScreenComponent/SettingsScreenComponent.h"
 #include "../source/ui/ToggleIconButton.h"
-#include "../source/ui/MusicConstants.h"
-#include "../source/ui/sliders/WedgePickerPopup.h"
 #include <catch2/catch_test_macros.hpp>
 
 // ============================================================================
@@ -346,38 +344,6 @@ TEST_CASE ("Visual - SettingsGroup", "[visual]")
     SettingsGroup comp ("Test Group");
     comp.setSize (300, 120);
     snap (comp, "settings_group");
-}
-
-TEST_CASE ("Visual - WedgePickerPopup Note", "[visual]")
-{
-    getJuceInit();
-    juce::Array<WedgePickerPopup::Wedge> wedges;
-    // C major scale: enable C, D, E, F, G, A, B; disable Db, Eb, F#, Ab, Bb
-    static const bool inCMajor[12] = {
-        true, false, true, false, true, true, false, true, false, true, false, true
-    };
-    for (int pc = 0; pc < 12; ++pc) {
-        wedges.add ({MusicConstants::CHROMATIC_NOTE_NAMES[(size_t) pc],
-                     MusicConstants::NOTE_COLOURS[(size_t) pc],
-                     inCMajor[pc], pc});
-    }
-    WedgePickerPopup comp (wedges, /*selected=*/4 /*E*/, [](int){});
-    snap (comp, "wedge_picker_note");
-}
-
-TEST_CASE ("Visual - WedgePickerPopup Octave", "[visual]")
-{
-    getJuceInit();
-    juce::Array<WedgePickerPopup::Wedge> wedges;
-    // Reachable octaves: 3..6 enabled, others dimmed
-    for (int oct = 0; oct < MusicConstants::NUM_OCTAVES; ++oct) {
-        const bool reachable = (oct >= 3 && oct <= 6);
-        wedges.add ({MusicConstants::OCTAVE_LABELS[(size_t) oct],
-                     MusicConstants::OCTAVE_COLOURS[(size_t) oct],
-                     reachable, oct});
-    }
-    WedgePickerPopup comp (wedges, /*selected=*/4, [](int){});
-    snap (comp, "wedge_picker_octave");
 }
 
 // ============================================================================
