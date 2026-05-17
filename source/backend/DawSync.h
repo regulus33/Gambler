@@ -120,6 +120,18 @@ public:
             }
         }
         if (jumped) {
+            // Backwards jump = DAW loop-back (or rare backwards scrub during
+            // play). Fire one pulse at sub-block offset 0 representing the
+            // pulse-at-loop-start. Without this, every DAW loop iteration
+            // silently drops the pulse at the loop boundary and the sequencer
+            // drifts one step per loop.
+            //
+            // Forward jump = scrub during play / start-from-mid-position.
+            // No pulses — re-anchor only, matching the "no catch-up" contract.
+            const bool backwardsJump = observedDelta < 0.0;
+            if (backwardsJump)
+                result.newPulseOffsets.push_back(0);
+
             currentPulseCount = calculatePulseCount(currentPpq);
             lastPpqPosition = currentPpq;
             result.currentPulseCount = currentPulseCount;

@@ -3303,7 +3303,7 @@ SCENARIO("DAW continuous forward play ticks the sequencer one step per pulse",
     }
 }
 
-SCENARIO("DAW loop-back to PPQ 0 fires no pulses and the sequencer index holds",
+SCENARIO("DAW loop-back fires the pulse at the loop-start position",
          "[user-story][clock][daw-sync][regression]") {
     GamblerTestInitialiser juceInit;
 
@@ -3323,18 +3323,18 @@ SCENARIO("DAW loop-back to PPQ 0 fires no pulses and the sequencer index holds",
             playHead.ppq = 0.0;
             int loopBlockPulses = driveDawBlock(app);
 
-            THEN("No pulses fire on the loop-back block; index stays at step 3") {
-                REQUIRE(loopBlockPulses == 0);
-                REQUIRE(app.state().getCurrentIndex() == 3);
+            THEN("One pulse fires for the pulse at the loop-start") {
+                REQUIRE(loopBlockPulses == 1);
+                REQUIRE(app.state().getCurrentIndex() == 4);
             }
 
             AND_WHEN("Forward play resumes from PPQ 0 and crosses one pulse") {
                 playHead.ppq = kDawPpqPerBlock;
                 int nextPulses = driveDawBlock(app);
 
-                THEN("Exactly one pulse fires and sequencer advances to step 4") {
+                THEN("One more pulse fires and sequencer advances to step 5") {
                     REQUIRE(nextPulses == 1);
-                    REQUIRE(app.state().getCurrentIndex() == 4);
+                    REQUIRE(app.state().getCurrentIndex() == 5);
                 }
             }
         }
