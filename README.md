@@ -658,11 +658,8 @@ Visual snapshot tests live in `tests/VisualSnapshotTests.cpp`. Golden images are
 
 #### Docs
 
- The .tex source is alongside it if you want to tweak anything. You can rebuild it with:
- `cd docs && pdflatex gambler-codebase-guide.tex && pdflatex gambler-codebase-guide.tex`
-(two passes needed for the table of contents and cross-references)
+See [`DOCS.md`](DOCS.md) for the architecture, information flow, and developer guide.
 
-                                                         
 
 #### Tests API
 
