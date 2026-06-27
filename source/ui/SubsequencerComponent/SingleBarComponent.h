@@ -42,6 +42,14 @@ public:
         using namespace SubsequenceControlsConstants;
         auto bounds = getLocalBounds().toFloat();
 
+        // Placeholder bars (substeps beyond the subsequence length) render as a
+        // dashed outline with no fill, to read as "not a real step yet".
+        if (isPlaceholder_) {
+            UIConstants::drawPlaceholderOutline (g, bounds, barCornerRadius);
+            MidiLearnOverlayPainter::paint (g, getLocalBounds(), registry_, midiControlId_, barCornerRadius);
+            return;
+        }
+
         // Fill bar with color
         g.setColour (color_);
         g.fillRoundedRectangle (bounds, barCornerRadius);
@@ -150,6 +158,11 @@ public:
         repaint();
     }
 
+    void setPlaceholder(bool placeholder) {
+        isPlaceholder_ = placeholder;
+        repaint();
+    }
+
     std::function<void()> onClick;
     std::function<void()> onDoubleClick;
 
@@ -176,6 +189,7 @@ private:
     BarBorderStyle borderStyle_ = BarBorderStyle::none;
     juce::String noteLabel_;
     bool isCurrent_ = false;
+    bool isPlaceholder_ = false;
     MidiControlId midiControlId_ = MidiControlId::COUNT;
     MidiLearnRegistry* registry_ = nullptr;
 

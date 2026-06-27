@@ -135,6 +135,8 @@ protected:
 
         for (int i = 0; i < SubsequenceControlsConstants::numBars; ++i) {
             if (i < substepLength) {
+                subsequenceBar.setBarPlaceholder(i, false);
+
                 int noteNumber = state.getQuantizedStepNote(selectedStep, i);
                 bool isActive = (i == currentSubstep);
 
@@ -168,7 +170,8 @@ protected:
                     subsequenceBar.setBarBorderStyle(i, BarBorderStyle::none);
                 }
             } else {
-                subsequenceBar.setBarColor(i, juce::Colour(SubsequenceControlsConstants::defaultGreyHex));
+                // Out-of-length substep: dashed placeholder outline, no fill.
+                subsequenceBar.setBarPlaceholder(i, true);
                 subsequenceBar.setBarNoteLabel(i, "");
                 subsequenceBar.setBarCurrent(i, false);
                 subsequenceBar.setBarBorderStyle(i, BarBorderStyle::none);

@@ -10,6 +10,7 @@ struct SquareState {
     juce::Colour color { juce::Colour (SequenceGridConstants::defaultGreyHex) };
     bool hasBorder { false };      // Border indicates selected step for editing
     bool isCurrent { false };      // Current step (playback position) - white fill
+    bool isOutOfBounds { false };  // Step beyond sequence length - dashed placeholder outline
 
     SquareState() = default;
     SquareState (juce::Colour c, bool border = false, bool current = false)

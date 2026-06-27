@@ -142,7 +142,9 @@ public:
                 targetColor = getState().getNoteColour(chromaticNote);
             }
         } else {
-            targetColor = StepButtonConstants::emptyStepColor;
+            // Out-of-bounds step (beyond sequence length): no solid fill —
+            // rendered as a dashed placeholder outline below.
+            targetColor = juce::Colours::transparentBlack;
         }
 
         // Animate: lerp displayColour_ toward targetColor
@@ -160,6 +162,11 @@ public:
         // Fill background with animated color
         g.setColour(displayColour_);
         g.fillRoundedRectangle(bounds, cornerRadius);
+
+        // Out-of-bounds steps get a dashed placeholder outline instead of a fill.
+        if (!isWithinSequence) {
+            UIConstants::drawPlaceholderOutline(g, bounds, cornerRadius);
+        }
 
         if (isWithinSequence) {
             // Animate border width toward target

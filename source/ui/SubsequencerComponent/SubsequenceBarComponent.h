@@ -100,6 +100,12 @@ public:
         }
     }
 
+    void setBarPlaceholder(int index, bool placeholder) {
+        if (index >= 0 && index < SubsequenceControlsConstants::numBars) {
+            bars[index]->setPlaceholder(placeholder);
+        }
+    }
+
     /**
      * Get direct access to a bar component
      * @param index Bar index (0-7)

@@ -41,7 +41,21 @@ public:
                 auto squareBounds = getSquareBounds(row, col).toFloat();
 
                 juce::Colour targetColor = computeTargetColour(row, col, stepIndex);
-                stillAnimating |= animateFill(row, col, targetColor, squareBounds, g);
+
+                // Out-of-bounds squares are placeholders: no fill, dashed
+                // outline. Snap straight to the (transparent) target — skipping
+                // the colour fade avoids a single-frame snapshot (or the first
+                // runtime frame after shrinking) catching a still-opaque grey
+                // that would mask the dashes. Suppressed during a length-drag,
+                // which paints its own grey preview fill beyond the drag target.
+                bool isPlaceholder = squareStates[row][col].isOutOfBounds && !isDraggingLength;
+                if (isPlaceholder) {
+                    displayColours_[row][col] = targetColor;
+                    UIConstants::drawPlaceholderOutline(g, squareBounds, squareCornerRadius);
+                } else {
+                    stillAnimating |= animateFill(row, col, targetColor, squareBounds, g);
+                }
+
                 stillAnimating |= animateBorder(row, col, squareBounds, g);
                 paintDragTargetHighlight(stepIndex, squareBounds, g);
             }
@@ -141,6 +155,7 @@ public:
             squareStates[row][col].color = colourForStep(state, stepIndex, sequenceLength);
             squareStates[row][col].hasBorder = (stepIndex == selectedStep);
             squareStates[row][col].isCurrent = (stepIndex == playbackStep);
+            squareStates[row][col].isOutOfBounds = (stepIndex >= sequenceLength);
         }
 
         repaint();
@@ -291,7 +306,7 @@ private:
     juce::Colour colourForStep(SequenceState& state, int stepIndex, int sequenceLength) const {
         using namespace SequenceGridConstants;
         if (stepIndex >= sequenceLength)
-            return juce::Colour(outOfBoundsGreyHex);
+            return juce::Colours::transparentBlack;  // placeholder: dashed outline, no fill
 
         int midiNote = state.getCurrentNoteForStep(stepIndex);
         if (midiNote < 0)
