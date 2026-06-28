@@ -46,9 +46,12 @@ public:
                 // outline. Snap straight to the (transparent) target — skipping
                 // the colour fade avoids a single-frame snapshot (or the first
                 // runtime frame after shrinking) catching a still-opaque grey
-                // that would mask the dashes. Suppressed during a length-drag,
-                // which paints its own grey preview fill beyond the drag target.
-                bool isPlaceholder = squareStates[row][col].isOutOfBounds && !isDraggingLength;
+                // that would mask the dashes. During a length-drag, the steps
+                // that will fall out of bounds (beyond the drag target) get the
+                // same placeholder treatment as a live preview.
+                bool isPlaceholder = isDraggingLength
+                    ? (stepIndex >= dragTargetLength)
+                    : squareStates[row][col].isOutOfBounds;
                 if (isPlaceholder) {
                     displayColours_[row][col] = targetColor;
                     UIConstants::drawPlaceholderOutline(g, squareBounds, squareCornerRadius);
@@ -244,9 +247,12 @@ private:
             target = target.withAlpha(nonVisibleRowOpacity);
 
         if (isDraggingLength) {
+            // Steps that will remain in-bounds preview in orange; steps that
+            // will fall out of bounds render as transparent dashed placeholders
+            // (handled in the paint loop), matching the static out-of-bounds look.
             target = (stepIndex < dragTargetLength)
                 ? juce::Colour(dragPreviewOrangeHex)
-                : juce::Colour(outOfBoundsGreyHex);
+                : juce::Colours::transparentBlack;
         }
 
         return target;

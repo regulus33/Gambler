@@ -94,16 +94,25 @@ public:
 
         for (int i = 0; i < SequencerStepsConstants::numVisibleSteps; ++i) {
             auto bounds = stepButtons_[i]->getBounds().toFloat();
-            juce::Colour fill = (i <= dragTargetLocalIndex_)
-                ? juce::Colour(SequenceGridConstants::dragPreviewOrangeHex)
-                : juce::Colour(SequenceGridConstants::outOfBoundsGreyHex);
-            g.setColour(fill);
-            g.fillRoundedRectangle(bounds, StepButtonConstants::cornerRadius);
 
-            if (i == dragTargetLocalIndex_) {
-                g.setColour(UIConstants::stepIndicatorWhite.withAlpha(0.5f));
-                g.drawRoundedRectangle(bounds.reduced(1.0f),
-                                       StepButtonConstants::cornerRadius, 1.5f);
+            if (i <= dragTargetLocalIndex_) {
+                // Will remain in-bounds: orange preview fill.
+                g.setColour(juce::Colour(SequenceGridConstants::dragPreviewOrangeHex));
+                g.fillRoundedRectangle(bounds, StepButtonConstants::cornerRadius);
+
+                if (i == dragTargetLocalIndex_) {
+                    g.setColour(UIConstants::stepIndicatorWhite.withAlpha(0.5f));
+                    g.drawRoundedRectangle(bounds.reduced(1.0f),
+                                           StepButtonConstants::cornerRadius, 1.5f);
+                }
+            } else {
+                // Will fall out of bounds: preview as a dashed placeholder.
+                // The step buttons underneath are opaque, so first paint over
+                // them with the app background (what a real out-of-bounds step's
+                // transparent fill reveals), then draw the dashed outline.
+                g.setColour(UIConstants::appBackgroundColour);
+                g.fillRoundedRectangle(bounds, StepButtonConstants::cornerRadius);
+                UIConstants::drawPlaceholderOutline(g, bounds, StepButtonConstants::cornerRadius);
             }
         }
     }

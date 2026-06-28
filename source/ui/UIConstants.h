@@ -22,6 +22,12 @@ namespace UIConstants {
     // real step yet", distinct from rests (which keep a solid grey fill).
     inline juce::Colour placeholderOutlineColour { 0x80a0a0a0 }; // semi-transparent light grey
 
+    // App background colour. Real placeholder steps fill transparent and reveal
+    // this (it is the main screen's bg). Used to "erase" opaque content when an
+    // overlay needs to preview a step as a placeholder — e.g. the length-drag
+    // preview painted on top of the opaque step buttons.
+    inline juce::Colour appBackgroundColour { 0xFF1E1E1E };
+
     /** Draws a dashed rounded-rectangle outline for a placeholder/out-of-bounds step. */
     inline void drawPlaceholderOutline (juce::Graphics& g,
                                         juce::Rectangle<float> bounds,
