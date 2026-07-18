@@ -1026,9 +1026,17 @@ void PluginProcessor::routeLearnableMessage (MidiMessageType type,
         return;
     }
 
-    MidiControlId controlId = midiLearnRegistry.findUserMapping(type, channel, midiNumber);
-    if (controlId == MidiControlId::COUNT)
-        return;
+    MidiControlId controlId;
+    if (type == MidiMessageType::NOTE) {
+        // Notes always route somewhere: user mapping first, else default scale key.
+        // Safe against learn mode: the isLearning() branch above already returned,
+        // so notes pressed while mapping never toggle scale keys.
+        controlId = MidiNoteRouter::resolve(midiLearnRegistry, channel, midiNumber);
+    } else {
+        controlId = midiLearnRegistry.findUserMapping(type, channel, midiNumber);
+        if (controlId == MidiControlId::COUNT)
+            return;
+    }
 
     MidiMapping mapping { type, midiNumber, controlId };
 

@@ -232,6 +232,72 @@ TEST_CASE ("Visual - Subsequence length 2 note and rest", "[visual]")
     snap (f.getMainScreen().getSubsequenceControls(), "subsequence_length2_note_rest");
 }
 
+static juce::MouseEvent tmpMouseEvent (juce::Component& comp, juce::Point<float> pos)
+{
+    return juce::MouseEvent (
+        juce::Desktop::getInstance().getMainMouseSource(),
+        pos, juce::ModifierKeys(),
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        &comp, &comp,
+        juce::Time::getCurrentTime(),
+        pos, juce::Time::getCurrentTime(),
+        1, false);
+}
+
+TEST_CASE ("TEMP grid drag commits length", "[temp]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    f.getState().setLength(16);
+    auto& grid = f.getMainScreen().getSequenceOverview().getSequenceGrid();
+    grid.mouseDown (tmpMouseEvent (grid, { 10.0f, 10.0f }));   // square 0
+    grid.mouseDrag (tmpMouseEvent (grid, { 110.0f, 10.0f }));  // square 4
+    grid.mouseUp   (tmpMouseEvent (grid, { 110.0f, 10.0f }));
+    f.processMessages();
+    INFO("grid length after drag = " << f.getState().getLength());
+    CHECK (f.getState().getLength() == 5);
+}
+
+TEST_CASE ("TEMP grid drag GROWS length", "[temp]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    f.getState().setLength(3);
+    auto& grid = f.getMainScreen().getSequenceOverview().getSequenceGrid();
+    grid.mouseDown (tmpMouseEvent (grid, { 10.0f, 10.0f }));    // square 0
+    grid.mouseDrag (tmpMouseEvent (grid, { 160.0f, 10.0f }));   // square 6
+    grid.mouseUp   (tmpMouseEvent (grid, { 160.0f, 10.0f }));
+    f.processMessages();
+    INFO("grid grown length = " << f.getState().getLength());
+    CHECK (f.getState().getLength() == 7);
+}
+
+TEST_CASE ("TEMP grid click (no drag) selects", "[temp]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    auto& grid = f.getMainScreen().getSequenceOverview().getSequenceGrid();
+    grid.mouseDown (tmpMouseEvent (grid, { 60.0f, 10.0f }));    // square 2, no drag
+    grid.mouseUp   (tmpMouseEvent (grid, { 60.0f, 10.0f }));
+    f.processMessages();
+    INFO("selected step = " << f.getState().getSelectedStepForEditing());
+    CHECK (f.getState().getSelectedStepForEditing() == 2);
+}
+
+TEST_CASE ("TEMP steps drag commits length", "[temp]")
+{
+    getJuceInit();
+    PluginTestFixture f;
+    f.getState().setLength(16);
+    auto& steps = f.getMainScreen().getSequencerSteps();
+    steps.mouseDown (tmpMouseEvent (steps, { 46.0f, 46.0f }));    // step 0
+    steps.mouseDrag (tmpMouseEvent (steps, { 486.0f, 46.0f }));   // step 4
+    steps.mouseUp   (tmpMouseEvent (steps, { 486.0f, 46.0f }));
+    f.processMessages();
+    INFO("steps length after drag = " << f.getState().getLength());
+    CHECK (f.getState().getLength() == 5);
+}
+
 TEST_CASE ("Visual - NoteRangeControlsComponent", "[visual]")
 {
     getJuceInit();
