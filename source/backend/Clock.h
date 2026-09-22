@@ -293,17 +293,20 @@ public:
      * MIDI clock runs at 24 PPQN (pulses per quarter note)
      * For 16th note subdivision: 24 / 4 = 6 MIDI clocks per tick
      *
-     * @return Number of MIDI clock messages to send (0-6 for 16th notes)
+     * @return Number of MIDI clock messages to send (6 per tick for 16th notes)
      */
     int getMidiClockPulsesToSend() {
         if (mode != ClockMode::INTERNAL) {
             return 0;  // Only send MIDI clock in internal mode
         }
 
-        int pulsesPerTick = getPulsesPerMidiClock(subdivision);
+        // Return everything accumulated — capping at one tick's worth while
+        // zeroing the accumulator silently dropped pulses whenever two
+        // sequencer ticks landed in the same audio block, drifting external
+        // gear behind by a tick each time.
         int pulsesToSend = midiClockPulsesAccumulated;
         midiClockPulsesAccumulated = 0;  // Reset after reading
-        return pulsesToSend > pulsesPerTick ? pulsesPerTick : pulsesToSend;
+        return pulsesToSend;
     }
 
     /**

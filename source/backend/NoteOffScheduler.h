@@ -37,7 +37,11 @@ public:
 
         juce::int64 bufferEndSample = currentSamplePos + numSamples;
 
-        if (scheduledNoteOffSample >= currentSamplePos && scheduledNoteOffSample < bufferEndSample)
+        // Past-due targets (scheduled inside the block that created them,
+        // which is always processed one block later) fire at offset 0 —
+        // a few ms late beats never, which left the note ringing until
+        // the next step's immediate note-off.
+        if (scheduledNoteOffSample < bufferEndSample)
         {
             int sampleOffset = static_cast<int> (scheduledNoteOffSample - currentSamplePos);
             sampleOffset = juce::jlimit (0, numSamples - 1, sampleOffset);

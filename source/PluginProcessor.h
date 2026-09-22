@@ -313,11 +313,12 @@ private:
     // --- handleMidiMapping helpers (split by control category) ---
     void fireTickCallback();
     void setTriggerParam(const juce::String& paramId, bool isOn);
+    void sendPreviewNoteWithMods(int note, const std::vector<StepModulationData>& mods);
     void handleOctaveSlider(int midiValue);
     void handleNoteSlider(int midiValue);
     void handleProbabilitySlider(float normalizedValue);
     void handleShiftAwareButton(const juce::String& primaryParam, const juce::String& shiftParam, bool isOn);
-    void handleShiftToggle(bool isOn);
+    void toggleParamOnPress(const juce::String& paramId, bool isOn);
     void handleStepSelect(MidiControlId controlId);
     void handleSubseqMinus();
     void handleSubseqPlus();

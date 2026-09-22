@@ -650,38 +650,15 @@ void PluginProcessor::handleClockParam (const juce::String& id, float newValue) 
 // UI Preview Methods
 //==============================================================================
 
-void PluginProcessor::triggerStepMidi (int stepIndex) {
-    if (stepIndex < 0 || stepIndex >= 64)
-        return;
-
-    // A step press takes ownership of the preview channel; cancel any
-    // pending slider-preview gate so it can't fire a stale note-off
-    // while the user is still holding the step button.
-    previewGateTimer.stopTimer();
-
-    auto& state = getState();
-
-    // Set the selected step for editing via APVTS (thread-safe)
-    state.setSelectedStepForEditing (stepIndex);
-
-    // Get the selected substep's note for this step from APVTS-backed state
-    int note = state.getSelectedNoteForStep (stepIndex);
-
-    // Get step modulations from APVTS-backed state
-    std::vector<StepModulationData> selectedMods;
-    for (int i = 0; i < ParamConstants::NUM_MODULATIONS; i++) {
-        if (state.getStepModSelected (stepIndex, i)) {
-            StepModulationData mod;
-            mod.type = state.getStepModType (stepIndex, i);
-            mod.ccNumber = state.getStepModCCNum (stepIndex, i);
-            mod.value = state.getStepModValue (stepIndex, i);
-            selectedMods.push_back (mod);
-        }
-    }
-
+/**
+ * Shared preview-note path for triggerStepMidi / triggerCurrentStepMidi:
+ * note-off for the previous preview note, then CC mods + note-on for the new
+ * one — via the standalone MIDI output when available, else the DAW FIFO.
+ */
+void PluginProcessor::sendPreviewNoteWithMods (int note, const std::vector<StepModulationData>& mods) {
     // Determine velocity (default to 100 if no velocity modulation is selected)
     juce::uint8 velocity = 100;
-    for (const auto& mod : selectedMods) {
+    for (const auto& mod : mods) {
         if (mod.getType() == ModulationType::Velocity) {
             velocity = static_cast<juce::uint8> (mod.getValue());
             break;
@@ -691,31 +668,44 @@ void PluginProcessor::triggerStepMidi (int stepIndex) {
     // Send note off for previous note (if any)
     noteOffScheduler.sendPreviewNoteOff (getMidiOutputChannel(), midiOutput.get(), previewMidiFifo);
 
-    // Send note on for the new note
-    if (note >= 0) {
+    if (note < 0) {
+        noteOffScheduler.setLastPlayedNote (-1);
+        return;
+    }
+
+    if (midiOutput) {
         // Send CC messages first (only in standalone mode for now)
-        if (midiOutput) {
-            for (const auto& mod : selectedMods) {
-                if (mod.getType() == ModulationType::CC) {
-                    auto ccMsg = juce::MidiMessage::controllerEvent (getMidiOutputChannel(), mod.getCCNumber(), mod.getValue());
-                    midiOutput->sendMessageNow (ccMsg);
-                    DBG ("Preview MIDI CC (standalone): " << mod.getCCNumber() << " = " << mod.getValue());
-                }
+        for (const auto& mod : mods) {
+            if (mod.getType() == ModulationType::CC) {
+                auto ccMsg = juce::MidiMessage::controllerEvent (getMidiOutputChannel(), mod.getCCNumber(), mod.getValue());
+                midiOutput->sendMessageNow (ccMsg);
+                DBG ("Preview MIDI CC (standalone): " << mod.getCCNumber() << " = " << mod.getValue());
             }
         }
-
-        if (midiOutput) {
-            auto noteOn = juce::MidiMessage::noteOn (getMidiOutputChannel(), note, velocity);
-            midiOutput->sendMessageNow (noteOn);
-            DBG ("Preview MIDI Note ON (standalone): " << note << " (velocity " << (int) velocity << ", step " << stepIndex << ")");
-        } else {
-            previewMidiFifo.push ({ note, true, velocity });
-            DBG ("Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int) velocity << ", step " << stepIndex << ")");
-        }
-        noteOffScheduler.setLastPlayedNote (note);
+        auto noteOn = juce::MidiMessage::noteOn (getMidiOutputChannel(), note, velocity);
+        midiOutput->sendMessageNow (noteOn);
+        DBG ("Preview MIDI Note ON (standalone): " << note << " (velocity " << (int) velocity << ")");
     } else {
-        noteOffScheduler.setLastPlayedNote (-1);
+        previewMidiFifo.push ({ note, true, velocity });
+        DBG ("Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int) velocity << ")");
     }
+    noteOffScheduler.setLastPlayedNote (note);
+}
+
+void PluginProcessor::triggerStepMidi (int stepIndex) {
+    if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS)
+        return;
+
+    // A step press takes ownership of the preview channel; cancel any
+    // pending slider-preview gate so it can't fire a stale note-off
+    // while the user is still holding the step button.
+    previewGateTimer.stopTimer();
+
+    auto& state = getState();
+    state.setSelectedStepForEditing (stepIndex);
+
+    sendPreviewNoteWithMods (state.getSelectedNoteForStep (stepIndex),
+                             state.getSelectedModulations (stepIndex));
 
     // Notify UI that state changed
     // Make a local copy to avoid race condition with UI thread clearing the callback
@@ -726,75 +716,21 @@ void PluginProcessor::triggerStepMidi (int stepIndex) {
 }
 
 void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
-    DBG ("=== triggerCurrentStepMidi() called ===");
-    DBG ("  midiOutput is " << (midiOutput ? "VALID" : "NULL"));
-    DBG ("  noteOverride: " << noteOverride);
-
     auto& state = getState();
 
     int selectedStep = state.getSelectedStepForEditing();
-    if (selectedStep < 0 || selectedStep >= 64) {
-        DBG ("  ERROR: Invalid selected step: " << selectedStep);
+    if (selectedStep < 0 || selectedStep >= ParamConstants::MAX_STEPS) {
+        DBG ("triggerCurrentStepMidi: invalid selected step: " << selectedStep);
         return;
     }
 
-    // Get step modulations from APVTS-backed state
-    std::vector<StepModulationData> selectedMods;
-    for (int i = 0; i < ParamConstants::NUM_MODULATIONS; i++) {
-        if (state.getStepModSelected (selectedStep, i)) {
-            StepModulationData mod;
-            mod.type = state.getStepModType (selectedStep, i);
-            mod.ccNumber = state.getStepModCCNum (selectedStep, i);
-            mod.value = state.getStepModValue (selectedStep, i);
-            selectedMods.push_back (mod);
-        }
-    }
-
-    // Determine velocity (default to 100 if no velocity modulation is selected)
-    juce::uint8 velocity = 100;
-    for (const auto& mod : selectedMods) {
-        if (mod.getType() == ModulationType::Velocity) {
-            velocity = static_cast<juce::uint8> (mod.getValue());
-            break;
-        }
-    }
-
     // Use override note if provided, otherwise read from step
-    int note = 0;
-    if (noteOverride >= 0) {
-        note = noteOverride;
-        DBG ("  Using override note: " << note);
-    } else {
-        note = state.getSelectedNoteForStep (selectedStep);
-        DBG ("  Selected step: " << selectedStep << ", Note from step: " << note);
-    }
+    const int note = (noteOverride >= 0) ? noteOverride
+                                         : state.getSelectedNoteForStep (selectedStep);
 
-    // Send note off for previous note (if any)
-    noteOffScheduler.sendPreviewNoteOff (getMidiOutputChannel(), midiOutput.get(), previewMidiFifo);
+    sendPreviewNoteWithMods (note, state.getSelectedModulations (selectedStep));
 
-    // Send note on for the new note
     if (note >= 0) {
-        // Send CC messages first (only in standalone mode for now)
-        if (midiOutput) {
-            for (const auto& mod : selectedMods) {
-                if (mod.getType() == ModulationType::CC) {
-                    auto ccMsg = juce::MidiMessage::controllerEvent (getMidiOutputChannel(), mod.getCCNumber(), mod.getValue());
-                    midiOutput->sendMessageNow (ccMsg);
-                    DBG ("  Preview MIDI CC (standalone): " << mod.getCCNumber() << " = " << mod.getValue());
-                }
-            }
-        }
-
-        if (midiOutput) {
-            auto noteOn = juce::MidiMessage::noteOn (getMidiOutputChannel(), note, velocity);
-            midiOutput->sendMessageNow (noteOn);
-            DBG ("  Preview MIDI Note ON sent (standalone): " << note << " (velocity " << (int) velocity << ")");
-        } else {
-            previewMidiFifo.push ({ note, true, velocity });
-            DBG ("  Preview MIDI Note ON queued (DAW): " << note << " (velocity " << (int) velocity << ")");
-        }
-        noteOffScheduler.setLastPlayedNote (note);
-
         // Schedule a matching preview note-off after `noteLength × stepDuration`
         // so a slider tweak doesn't leave the previewed note ringing forever.
         // Fallback when the DAW BPM is unavailable (standalone idle, tests):
@@ -807,11 +743,7 @@ void PluginProcessor::triggerCurrentStepMidi (int noteOverride) {
             stepMs = samplesPerStep * 1000.0 / sr;
         const int gateMs = juce::jmax (1, static_cast<int> (stepMs * noteLength));
         previewGateTimer.startTimer (gateMs);
-    } else {
-        noteOffScheduler.setLastPlayedNote (-1);
-        DBG ("  No note to play (note < 0)");
     }
-    DBG ("=== triggerCurrentStepMidi() complete ===");
 }
 
 void PluginProcessor::releasePreviewMidi() {
@@ -1079,6 +1011,9 @@ void PluginProcessor::handleOctaveSlider (int midiValue) {
     const int octaveIndex = MidiValueConverter::midiToDiscreteIndex (midiValue, 9);
     const int selectedStep = state.getSelectedStepForEditing();
     const int currentNote = state.getSelectedNoteForStep (selectedStep);
+    // A rest has no pitch class (-1 % 12 == -1 would fabricate octave*12 - 1).
+    // The UI hides the octave slider on rests; the MIDI path is a no-op.
+    if (currentNote < 0) return;
     const int pitchClass = currentNote % 12;
     const int newNote = octaveIndex * 12 + pitchClass;
     state.updateSelectedNoteForStep (selectedStep, newNote);
@@ -1112,12 +1047,14 @@ void PluginProcessor::handleShiftAwareButton (const juce::String& primaryParam,
     setTriggerParam (isShiftActive ? shiftParam : primaryParam, isOn);
 }
 
-void PluginProcessor::handleShiftToggle (bool isOn) {
+// Toggle a bool param on the rising edge (press toggles, release is ignored) —
+// matches the click semantics of the UI toggle buttons these map to.
+void PluginProcessor::toggleParamOnPress (const juce::String& paramId, bool isOn) {
     if (! isOn) return;
-    if (auto* param = apvts.getParameter (Params::Keys::ID::SEQ_IS_SHIFT)) {
+    if (auto* param = apvts.getParameter (paramId)) {
         const bool currentState = param->getValue() > 0.5f;
         param->setValueNotifyingHost (currentState ? 0.0f : 1.0f);
-        DBG ("  → SEQ_IS_SHIFT toggled to " << (! currentState ? "ON" : "OFF"));
+        DBG ("  → " << paramId << " toggled to " << (! currentState ? "ON" : "OFF"));
     }
 }
 
@@ -1244,7 +1181,7 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             break;
 
         case MidiControlId::BUTTON_SHIFT:
-            handleShiftToggle (isNoteOnOrCCPositive);
+            toggleParamOnPress (Params::Keys::ID::SEQ_IS_SHIFT, isNoteOnOrCCPositive);
             break;
 
         case MidiControlId::STEP_0: case MidiControlId::STEP_1:
@@ -1299,6 +1236,13 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             break;
         case MidiControlId::SCALE_LATCH:
             setTriggerParam (Params::Keys::ID::SCALE_LATCH, isNoteOnOrCCPositive);
+            break;
+
+        case MidiControlId::DESTRUCTIVE_SCALE:
+            toggleParamOnPress (Params::Keys::ID::PREF_DESTRUCTIVE_SCALE, isNoteOnOrCCPositive);
+            break;
+        case MidiControlId::DESTRUCTIVE_RANGE:
+            toggleParamOnPress (Params::Keys::ID::PREF_DESTRUCTIVE_RANGE, isNoteOnOrCCPositive);
             break;
 
         case MidiControlId::COUNT:

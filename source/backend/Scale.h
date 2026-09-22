@@ -84,15 +84,11 @@ public:
         if (noteNumber < MIN_MIDI_NOTE || noteNumber > MAX_MIDI_NOTE) {
             return false;
         }
-        
+
         int pitchClass = noteNumber % NUM_CHROMATIC_NOTES;
         return scaleNotes[pitchClass] == 1;
     }
-    
-    bool isNoteInRange(int noteNumber) const {
-        return noteNumber >= rangeMin && noteNumber <= rangeMax;
-    }
-    
+
     // Setters
     void setRangeMin(int min) {
         if (min >= MIN_MIDI_NOTE && min <= MAX_MIDI_NOTE && min <= rangeMax) {
@@ -102,13 +98,6 @@ public:
     
     void setRangeMax(int max) {
         if (max >= MIN_MIDI_NOTE && max <= MAX_MIDI_NOTE && max >= rangeMin) {
-            rangeMax = max;
-        }
-    }
-    
-    void setRange(int min, int max) {
-        if (min >= MIN_MIDI_NOTE && max <= MAX_MIDI_NOTE && min <= max) {
-            rangeMin = min;
             rangeMax = max;
         }
     }
@@ -134,58 +123,11 @@ public:
         }
     }
     
-    /**
-     * Quantize a MIDI note to the nearest note in the scale
-     * If no notes are in the scale, returns -1 (rest)
-     *
-     * @param noteNumber MIDI note to quantize (0-127)
-     * @return Quantized MIDI note, or -1 if no scale notes are enabled
-     */
-    int quantize(int noteNumber) const {
-        // Clamp to valid MIDI range first
-        if (noteNumber < MIN_MIDI_NOTE) noteNumber = MIN_MIDI_NOTE;
-        if (noteNumber > MAX_MIDI_NOTE) noteNumber = MAX_MIDI_NOTE;
+    // NOTE: quantization deliberately does NOT live here. ScaleQuantizer is
+    // the single authority — a duplicate quantize() used to exist on this
+    // class with subtly different behaviour (±12 search, raw-note fallback)
+    // and no callers. Don't re-add one; use ScaleQuantizer::quantize().
 
-        // Check if any notes are enabled in scale
-        bool anyEnabled = false;
-        for (int i = 0; i < NUM_CHROMATIC_NOTES; i++) {
-            if (scaleNotes[i] == 1) {
-                anyEnabled = true;
-                break;
-            }
-        }
-
-        // If no scale is set, return -1 (rest) to indicate "no note should play"
-        if (!anyEnabled) {
-            return -1;
-        }
-
-        // If note is already in scale, return it
-        if (isNoteInScale(noteNumber)) {
-            return noteNumber;
-        }
-
-        // Find nearest note in scale
-        // When equidistant, prefer going down (lower note)
-        int searchRadius = NUM_CHROMATIC_NOTES;
-        for (int distance = 1; distance <= searchRadius; distance++) {
-            // Check down first (prefer lower note when equidistant)
-            int downNote = noteNumber - distance;
-            if (downNote >= MIN_MIDI_NOTE && isNoteInScale(downNote)) {
-                return downNote;
-            }
-
-            // Then check up
-            int upNote = noteNumber + distance;
-            if (upNote <= MAX_MIDI_NOTE && isNoteInScale(upNote)) {
-                return upNote;
-            }
-        }
-
-        // Fallback (shouldn't reach here if anyEnabled is true)
-        return noteNumber;
-    }
-    
     /**
      * Serialize to XML
      */

@@ -50,7 +50,10 @@ void InternalState::setStepNote(int stepIndex, int substepIndex, int noteNumber)
 
 int InternalState::getStepNotesLength(int stepIndex) const {
     if (stepIndex < 0 || stepIndex >= ParamConstants::MAX_STEPS) return 1;
-    return tree.getProperty(IDs::stepNotesLength(stepIndex), 1);
+    // Clamp on read too: setState() swallows whole trees from preset XML,
+    // and a 0 here reaches (x + 1) % count on the audio thread.
+    return juce::jlimit(1, ParamConstants::MAX_SUBSTEPS,
+                        static_cast<int>(tree.getProperty(IDs::stepNotesLength(stepIndex), 1)));
 }
 
 void InternalState::setStepNotesLength(int stepIndex, int length) {
