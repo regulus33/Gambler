@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Gambler</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!--APP-->
+<div id="app" class="app">
+
+  <header class="bar">
+    <div class="logo">Gambler<span data-icon="dice"></span></div>
+
+    <div class="preset">
+      <button id="preset-prev" class="icon-btn" data-icon="chevL" data-learn="preset-prev" aria-label="Previous preset"></button>
+      <button id="preset-name" class="preset-name" aria-haspopup="true"><span id="preset-label">Presets</span><span data-icon="chevDown"></span></button>
+      <button id="preset-next" class="icon-btn" data-icon="chevR" data-learn="preset-next" aria-label="Next preset"></button>
+    </div>
+
+    <div class="bar-spacer"></div>
+
+    <button id="tempo" class="tempo" aria-label="Tempo. Drag up or down to change"><b id="tempo-val">120</b><small>BPM</small></button>
+    <button id="subdiv" class="chip" data-learn="subdivision" aria-label="Step size">1/16</button>
+
+    <div class="transport">
+      <button id="play" class="icon-btn play" data-learn="play" aria-label="Play or pause"><span class="when-stopped" data-icon="play"></span><span class="when-playing" data-icon="pause"></span></button>
+      <button id="stop" class="icon-btn" data-icon="stop" data-learn="stop" aria-label="Stop"></button>
+    </div>
+
+    <button id="menu-btn" class="icon-btn" data-icon="more" aria-label="More" aria-haspopup="true"></button>
+  </header>
+
+  <section class="upper">
+    <div class="scale-panel">
+      <div class="keys-wrap">
+        <svg id="keys" class="keys" preserveAspectRatio="none" role="group" aria-label="Scale keys"></svg>
+        <div id="key-labels" class="key-labels"></div>
+      </div>
+      <div class="scale-tools">
+        <button id="latch" class="chip" data-learn="latch" title="On: tap keys to toggle them. Off: a key is in the scale only while held.">Latch</button>
+        <button id="bake-scale" class="chip" data-learn="bake-scale" title="Write the scale into the stored notes instead of applying it while playing.">Bake scale</button>
+        <div id="range" class="range" data-learn="range" role="group" aria-label="Note range">
+          <div class="range-track"><div class="range-fill"></div><div class="range-handle" data-h="min"></div><div class="range-handle" data-h="max"></div></div>
+        </div>
+        <span id="range-label" class="range-label">C3–C5</span>
+        <button id="bake-range" class="chip" data-learn="bake-range" title="Write the range into the stored notes instead of applying it while playing.">Bake range</button>
+      </div>
+    </div>
+
+    <div class="prob-panel">
+      <div class="panel-head"><span class="label">Chance</span><b id="prob-val">100%</b></div>
+      <div class="prob-box"><div id="prob-grid" class="prob-grid" data-learn="probability" aria-label="Chance pattern. Drag to paint cells"></div></div>
+      <div class="prob-tools">
+        <button id="prob-dice" class="icon-btn small" data-icon="dice" aria-label="Scatter the pattern again"></button>
+        <input id="prob-slider" class="slider" type="range" min="0" max="100" step="1" value="100" aria-label="Chance that a rolled step plays">
+        <button id="prob-div" class="chip small" aria-label="Pattern size">8×8</button>
+      </div>
+    </div>
+
+    <div class="grid-panel">
+      <div id="seq-grid" class="seq-grid" aria-label="Sequence overview. Tap a row to page, drag to set length"><div class="page-frame"></div></div>
+    </div>
+  </section>
+
+  <section class="lane">
+    <div class="lane-title"><span class="label">Cycle</span><span id="lane-step">Step 1</span></div>
+    <div id="cycle" class="cycle"></div>
+    <div class="lane-right">
+      <div id="pages" class="pages" aria-label="Pages"></div>
+      <div id="len" class="len" role="group" aria-label="Sequence length. Drag sideways, or tap either side">
+        <span data-icon="chevL"></span><span class="label">Len</span><b id="len-val">16</b><span data-icon="chevR"></span>
+      </div>
+    </div>
+  </section>
+
+  <section id="pads" class="pads" aria-label="Steps"></section>
+  <section id="actions" class="actions" aria-label="Sequence actions"></section>
+</div>
+
+<div id="learn-banner" class="learn-banner" hidden>
+  <span data-icon="learn"></span>
+  <span id="learn-text">MIDI learn: tap a control, then move a knob or key on your controller.</span>
+  <button id="learn-clear" class="chip" hidden>Remove mapping</button>
+  <button id="learn-done" class="chip solid">Done</button>
+</div>
+
+<div id="popover" class="popover" hidden></div>
+
+<div id="sheet" class="sheet" hidden>
+  <div class="sheet-card" role="dialog" aria-label="Settings">
+    <div class="sheet-head"><h2>Settings</h2><button id="sheet-close" class="icon-btn" data-icon="close" aria-label="Close settings"></button></div>
+    <div class="sheet-body">
+      <fieldset>
+        <legend>Clock</legend>
+        <div class="row"><span>Source</span><div id="set-clock" class="seg" data-param="clockMode"><button data-v="0">Internal</button><button data-v="1">Host</button><button data-v="2">MIDI clock</button></div></div>
+        <div class="row"><label for="set-bpm">Tempo</label><input id="set-bpm" type="number" min="20" max="999" step="1" inputmode="numeric"></div>
+        <div class="row"><span>Step size</span><div id="set-subdiv" class="seg" data-param="subdivision"><button data-v="0">1/4</button><button data-v="1">1/8</button><button data-v="2">1/16</button><button data-v="3">1/32</button></div></div>
+      </fieldset>
+      <fieldset>
+        <legend>MIDI</legend>
+        <div class="row"><label for="set-channel">Output channel</label><select id="set-channel"></select></div>
+        <div class="row"><label for="set-notelen">Note length <b id="set-notelen-val"></b></label><input id="set-notelen" class="slider" type="range" min="10" max="200" step="5"></div>
+        <div class="row"><label for="set-preview">Play notes while editing</label><input id="set-preview" class="switch" type="checkbox"></div>
+        <div class="row"><label for="set-follow">Follow the playhead</label><input id="set-follow" class="switch" type="checkbox"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Note colours</legend>
+        <div id="set-colours" class="colours"></div>
+        <div class="row"><span></span><button id="set-colours-reset" class="chip">Reset colours</button></div>
+      </fieldset>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" hidden></div>
+<!--/APP-->
+<script src="js/icons.js"></script>
+<script src="js/mock-engine.js"></script>
+<script src="js/bridge.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
