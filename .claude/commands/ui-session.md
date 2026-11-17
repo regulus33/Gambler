@@ -1,6 +1,6 @@
 ---
 name: dev:ui-session
-description: Start a UI development session with visual snapshot baseline and iterative change verification.
+description: Start a UI development session on the legacy JUCE component editor (source/ui, rendered by the visual snapshot tests) with a snapshot baseline and iterative change verification. For the live web UI, work in web/ and preview web/index.html in a browser.
 allowed-tools:
   - Bash
   - Read

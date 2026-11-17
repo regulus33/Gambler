@@ -1,1 +1,0 @@
- cmake --build cmake-build-debug -j 12 --target Tests & ./cmake-build-debug/Tests --reporter rspec

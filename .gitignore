@@ -52,3 +52,8 @@ tests/snapshots/*_ACTUAL.png
 tests/snapshots/*_DIFF.png
 
 .cache
+# Personal editor settings
+.vscode/
+
+# Local design explorations (not part of the app)
+design_photos/

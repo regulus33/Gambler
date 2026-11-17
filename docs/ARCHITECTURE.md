@@ -2,18 +2,18 @@
 
 This document is the high-level guide to Gambler's architecture, information flow, and the decisions that shape the codebase. It is aimed at developers who need to understand where logic lives, how data moves, and what the common traps are. It is **not** a class-by-class API reference; follow the file links and read the headers for that.
 
-For environment-specific how-tos (iOS builds, IDE setup, etc.), see the remaining files in [`docs/`](docs/).
+For building, testing and using the app, see the [README](../README.md).
 
 ---
 
 ## 1. What Gambler Is
 
-Gambler is a JUCE-based MIDI effect / sequencer. It generates MIDI notes from a 64-step sequence, where each step can hold 1–8 substeps. It runs as a standalone app and as a plugin (VST3, AU, AUv3 on iOS). The core loop is: a clock ticks, the sequencer advances, and the app emits note-on/off events (plus optional CC/velocity modulations) on a configurable MIDI channel.
+Gambler is a JUCE-based MIDI effect / sequencer. It generates MIDI notes from a 64-step sequence, where each step can hold 1–8 substeps. It runs as a standalone app and as a plugin (AU, VST3, CLAP on macOS; AUv3 on iPad). The core loop is: a clock ticks, the sequencer advances, and the app emits note-on/off events (plus optional CC/velocity modulations) on a configurable MIDI channel.
 
 Key concepts:
 
 - **Step / substep**: 64 top-level steps. Each step has 1–8 substeps that cycle when the step is triggered. Substeps are the actual playable notes.
-- **Scale & range**: A global 12-note scale and a MIDI note range window constrain which notes can sound. Quantization can be live (non-destructive) or baked into stored data.
+- **Scale & ranges**: A global 12-note scale and up to three MIDI note ranges constrain which notes can sound. A chord held on MIDI input can stand in for the ranges. Quantization can be live (non-destructive) or baked into stored data.
 - **Probability / Roll**: An Eden-growth probability pattern decides which steps/rests play. A separate "random mode" (Roll) replaces stored notes with random ones from the range.
 - **Clock modes**: Internal clock, DAW-synced clock, or external MIDI clock.
 - **MIDI Learn**: Map external CC or note messages to on-screen controls.
@@ -28,9 +28,9 @@ The code is organized into a few clear layers. Know them before you change anyth
 ```
 ┌─────────────────────────────────────────┐
 │  UI Layer (message thread)              │
-│  PluginEditor → ApplicationComponent    │
-│    → MainScreenComponent / Settings...  │
-│    → individual control components      │
+│  WebEditor (web view showing /web)      │
+│    ↕ UiBridge (JSON events / actions)   │
+│  [legacy: PluginEditor → JUCE comps]    │
 ├─────────────────────────────────────────┤
 │  Application / Controller Layer         │
 │  PluginProcessor                        │
@@ -117,35 +117,37 @@ processBlock(buffer, midiMessages)
 5. Schedule a future note-off after `noteLength × samplesPerStep`.
 6. Fire `onSequenceTick` callback so the UI can repaint.
 
-### 3.2 UI thread: callbacks and AsyncUpdater
+### 3.2 UI thread: actions and state pushes
 
-User interactions generally follow this path:
+With the web editor, user interactions follow this path:
 
 ```
-UI component callback
-  ├─ calls SequenceState setter (e.g. setStepNote, setLength)
-  │    ├─ writes APVTS parameter OR InternalState ValueTree property
-  │    └─ InternalState notifies its listeners
-  ├─ some callbacks call PluginProcessor helpers directly
-  │    (preview MIDI, transport, preset loading)
-  └─ ApplicationComponent::handleAsyncUpdate() repaints the world
+web/js/app.js gesture
+  └─ send(action, payload)                      // web/js/bridge.js
+       └─ WebEditor → UiBridge::handleAction()  // message thread
+            ├─ SequenceState setter (setStepNote, setLength, …)
+            │    ├─ writes an APVTS parameter OR an InternalState property
+            │    └─ InternalState notifies its listeners (UiBridge marks itself dirty)
+            └─ or a PluginProcessor helper (preview MIDI, transport, presets)
+UiBridge timer (60 Hz)
+  └─ if dirty: build one `state` snapshot and push it to the page
 ```
 
-`ApplicationComponent` is the central UI coordinator. It wires all component callbacks to the processor, listens to `onSequenceTick` / `onNoteOff` / `onMidiLearned` via `juce::AsyncUpdater`, and calls `MainScreenComponent::updateFromSequence()` to refresh the view.
+The legacy JUCE editor does the same job with component callbacks wired in `ApplicationComponent`, which repaints from `handleAsyncUpdate()`.
 
 ### 3.3 Audio → UI notifications
 
-The audio thread must not touch UI components directly. It uses `std::function` callbacks:
+The audio thread must not touch the UI directly. It uses `std::function` callbacks on `PluginProcessor`, which `UiBridge` sets to flip atomic flags; its timer turns those flags into events on the message thread:
 
-| Callback | Fired when | UI handler |
+| Callback | Fired when | What UiBridge does |
 |----------|------------|------------|
-| `onSequenceTick` | Sequencer advanced | `ApplicationComponent::triggerAsyncUpdate()` → `handleAsyncUpdate()` |
-| `onNoteOff` | Scheduled note-off emitted | `MessageManager::callAsync()` to clear the active-note highlight |
-| `onMidiLearned` | A new MIDI mapping was learned | `ApplicationComponent::triggerAsyncUpdate()` |
-| `onPresetCycleUp/Down` | MIDI preset-cycle triggered | `MessageManager::callAsync()` to cycle presets |
-| `onPlayPauseTriggered` / `onStopTriggered` | Transport triggered by MIDI | `MessageManager::callAsync()` to update button state |
+| `onSequenceTick` | Sequencer advanced | sends a `tick` event and marks state dirty |
+| `onNoteOff` | Scheduled note-off emitted | sends `noteOff` (clears the key highlight) |
+| `onMidiLearned` | A new MIDI mapping was learned | marks state dirty |
+| `onPresetCycleUp/Down` | MIDI preset-cycle triggered | cycles presets on the message thread |
+| `onPlayPauseTriggered` / `onStopTriggered` | Transport triggered by MIDI | marks state dirty |
 
-Always make local copies of these callbacks before calling them (the processor does this everywhere) to avoid races with the UI detaching them.
+Always make local copies of these callbacks before calling them (the processor does this everywhere) to avoid races with the editor detaching them.
 
 ### 3.4 UI → Audio preview MIDI
 
@@ -186,7 +188,7 @@ The two were conflated in earlier versions and are now separate. Editing the not
 
 ### 4.2 Scale, range, and quantization
 
-The global scale is a 12-bit chromatic mask stored in APVTS. The range is stored as an offset + size window (`SCALE_WINDOW_OFFSET`, `SCALE_WINDOW_SIZE`) and exposed as `rangeMin` / `rangeMax`.
+The global scale is a 12-bit chromatic mask stored in APVTS. Note ranges (1 to `ParamConstants::MAX_NOTE_RANGES`, currently 3) are stored in APVTS too; a note is allowed if it falls inside any range. `ScaleQuantizer` owns the range logic, including **range follow** (`RANGE_FOLLOW`: off / span / exact), where a chord held on MIDI input replaces the ranges while it is held.
 
 `ScaleQuantizer` provides two operations:
 
@@ -263,16 +265,17 @@ Loading a preset calls `PluginProcessor::loadStateFromXml()`, which replaces APV
 
 ## 5. UI Architecture
 
-The UI is built from JUCE components. The key top-level pieces:
+The editor is a web page. `GAMBLER_WEB_UI=1` (set in `CMakeLists.txt`) selects it; `0` builds the original JUCE component editor instead.
 
-- `PluginEditor` — JUCE editor shell. Handles aspect ratio / compact mode.
-- `ApplicationComponent` — owns the navbar, main screen, settings screen, preset selector, and all processor-facing callbacks.
-- `MainScreenComponent` — the main sequencer view: piano roll, main controls, sequence overview, subsequencer, sequencer steps/controls, note range.
-- `SettingsScreenComponent` — clock, preferences, MIDI output settings.
+- `WebEditor` (`source/web/`) — the plugin window. One `juce::WebBrowserComponent` that serves the files in `/web` from `BinaryData`, forwards UI actions to the bridge and bridge events to the page, and owns the native dialogs the page can't show (MIDI export).
+- `UiBridge` (`source/bridge/`) — the only seam between engine and UI. It pushes a coalesced `state` snapshot after anything changes, plus `tick`, `noteOff` and `toast` events, and turns incoming actions (`setNote`, `setRange`, `randomize`, …) into `SequenceState` / APVTS calls. Everything runs on the message thread; the audio thread only sets atomic flags that a bridge timer picks up.
+- `web/` — `index.html`, `css/style.css` and `js/`: `app.js` (rendering and gestures), `bridge.js` (the message contract, documented at the top of the file) and `mock-engine.js` (a JavaScript stand-in for the engine, so the UI runs in a plain browser).
 
-`ApplicationComponent::handleAsyncUpdate()` is the single place that updates the UI after audio or state changes. It calls `applyPendingNoteWrites()` first, then `MainScreenComponent::updateFromSequence()`.
+The web files are embedded with `juce_add_binary_data` (`cmake/Assets.cmake`). BinaryData flattens directories, so every file name under `web/` must be unique.
 
-Most subcomponents use callback lambdas rather than direct processor access. This keeps the UI tree decoupled but means `ApplicationComponent` is the central wiring point.
+### Legacy JUCE editor
+
+`source/ui/` holds the original component editor (`PluginEditor` → `ApplicationComponent` → `MainScreenComponent` / `SettingsScreenComponent`). It is still compiled and is what the visual snapshot tests (`tests/VisualSnapshotTests.cpp`, goldens in `tests/snapshots/`) render, but it is not what users see when `GAMBLER_WEB_UI=1`.
 
 ---
 
@@ -300,7 +303,7 @@ In **plugin** mode:
 - iOS assertions are disabled in release builds (`JUCE_DISABLE_ASSERTIONS=1`).
 - Standalone app installation also registers the AUv3 extension on the device.
 
-See [`docs/no-bullshit-ios.md`](docs/no-bullshit-ios.md) and the remaining iOS guides for build/run procedures.
+The iOS build is iPad-only for now (`TARGETED_DEVICE_FAMILY "2"`). See the README for build steps.
 
 ---
 
@@ -318,7 +321,7 @@ Older docs mention a `ProcessorCommandQueue` pattern. That has been removed. The
 
 ### 7.3 Random-mode note writes cross the audio→message boundary
 
-When `Roll` is on, the audio thread generates random notes and wants to store them. It does not write directly to `InternalState`; it pushes them into a lock-free `pendingNoteBuffer`. The UI thread drains this buffer in `ApplicationComponent::handleAsyncUpdate()` via `SequenceState::applyPendingNoteWrites()`. If the UI is not updating, pending writes accumulate and may be dropped when the ring buffer fills.
+When `Roll` is on, the audio thread generates random notes and wants to store them. It does not write directly to `InternalState`; it pushes them into a lock-free `pendingNoteBuffer`. A `UiBridge` timer on the message thread drains it via `SequenceState::applyPendingNoteWrites()`, so notes are stored even while no editor is open. If the message thread stalls, pending writes accumulate and may be dropped when the ring buffer fills.
 
 ### 7.4 `processBlock` consumes incoming MIDI
 
@@ -359,7 +362,7 @@ If you disable scale degrees or shrink the range, stored notes may no longer qua
 | **Change clock / sync** | `source/backend/Clock.h`, `source/backend/DawSync.h`, `source/PluginProcessor.cpp` (`handleClockParam`, `processClockForBlock`). |
 | **Change scale / quantization** | `source/backend/ScaleQuantizer.h`, `source/backend/Scale.h`. |
 | **Change probability / Roll** | `source/algorithms/probability/EdenGrowthPattern.h`, `source/backend/Sequence.h` (`setProbabilityPercentage`, `tick`). |
-| **Add / wire a UI control** | The component header in `source/ui/...`, then `source/ui/ApplicationComponent.h` to wire callbacks and refresh. |
+| **Add / wire a UI control** | `web/index.html` + `web/js/app.js` for the control, a new action in the contract at the top of `web/js/bridge.js`, then handle it in `source/bridge/UiBridge.cpp` (and in `web/js/mock-engine.js` so the browser preview keeps working). |
 | **Add a preset field** | Ensure it lives in APVTS or InternalState; `getStateAsXml` / `loadStateFromXml` / `getStateInformation` / `setStateInformation` already save both stores. |
 | **Add MIDI learn support** | `source/backend/MidiLearnRegistry/`, `source/backend/MidiMapping/`, and `handleMidiMapping()` in `PluginProcessor.cpp`. |
 | **Add tests** | `tests/` uses Catch2. Add cases that exercise `SequenceState`, `Sequence`, `DawSync`, or `ScaleQuantizer`. |
@@ -377,20 +380,17 @@ cmake --build build --target Gambler2_Standalone
 cmake --build build --target Tests
 ./build/Tests
 
-# iOS (see docs/ for full details)
-./build-ios.sh
+# iPad (see the README for signing)
+./build-ios.sh -s
 ```
 
-Key CMake targets: `Gambler2_Standalone`, `Gambler2_VST3`, `Gambler2_AU`, `Gambler2_AUv3`, `Tests`, `Benchmarks`.
+Key CMake targets: `Gambler2_Standalone`, `Gambler2_VST3`, `Gambler2_AU`, `Gambler2_CLAP`, `Gambler2_AUv3`, `Tests`, `Benchmarks`.
 
 ---
 
 ## 10. Related Documentation
 
-- [`docs/no-bullshit-ios.md`](docs/no-bullshit-ios.md) — blunt iOS build/run cheat sheet.
-- [`docs/iOS-Build-Guide.md`](docs/iOS-Build-Guide.md) — full iOS build walkthrough.
-- [`docs/iOS-Quick-Reference.md`](docs/iOS-Quick-Reference.md) — iOS commands and config values.
-- [`docs/CLion-iOS-Setup.md`](docs/CLion-iOS-Setup.md) — CLion iOS profile setup.
-- [`docs/VSCODE_SETUP.md`](docs/VSCODE_SETUP.md) — VS Code tasks and launch configs.
+- [`README.md`](../README.md) — features, how to use the app, building and testing.
+- [`web/js/bridge.js`](../web/js/bridge.js) — the UI ⇄ engine message contract.
 
 If you are trying to understand a specific algorithm, read the header files linked above. This document is the map; the headers are the territory.

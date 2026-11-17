@@ -3,7 +3,7 @@
 # If the project doesn't exist, it will configure it first
 
 BUILD_DIR="build-ios"
-CMAKE_EXECUTABLE="/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake"
+CMAKE_EXECUTABLE="${CMAKE:-$(command -v cmake || echo /Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake)}"
 
 if [ ! -d "$BUILD_DIR" ] || [ ! -f "$BUILD_DIR/Gambler2.xcodeproj/project.pbxproj" ]; then
     echo "Xcode project not found. Configuring..."

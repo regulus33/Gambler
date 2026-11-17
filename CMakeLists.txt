@@ -69,8 +69,13 @@ add_subdirectory (modules/melatonin_inspector)
 
 # See `docs/CMake API.md` in the JUCE repo for all config options
 juce_add_plugin("${PROJECT_NAME}"
-    # Icons for the standalone app
+    # Icons for the standalone app (macOS/Windows)
     ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icon.png"
+
+    # iOS: our own asset catalog with a single opaque 1024px icon (App Store rejects
+    # icons with an alpha channel, which JUCE's generated ones have).
+    # Regenerate it from packaging/icon-ios.svg with scripts/render-icons.sh
+    CUSTOM_XCASSETS_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/packaging/ios/Images.xcassets"
 
     # Change me!
     COMPANY_NAME "${COMPANY_NAME}"
@@ -106,6 +111,9 @@ juce_add_plugin("${PROJECT_NAME}"
     PRODUCT_NAME "${PRODUCT_NAME}"
 
     # iOS-specific configuration
+    # iPad-only for now (2 = iPad, "1,2" = iPhone + iPad): the web UI doesn't fit iPhone screens yet
+    TARGETED_DEVICE_FAMILY "2"
+
     # Screen orientations - support all orientations for flexibility
     IPHONE_SCREEN_ORIENTATIONS UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
     IPAD_SCREEN_ORIENTATIONS UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight

@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gambler App Store Kit</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800;900&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #121212; --card: #1b1b1b; --raised: #232323; --line: #2e2e2e;
+    --text: #f2ece4; --muted: #9a948d; --coral: #FF6B6B; --gold: #FFD700; --ok: #5fd38d; --warn: #ffb44d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 Inter, system-ui, sans-serif; }
+  a { color: var(--coral); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+  header.top { padding: 36px 0 20px; display: flex; gap: 18px; align-items: center; }
+  header.top img { width: 64px; height: 64px; border-radius: 22.5%; }
+  header.top h1 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+  header.top p { margin: 2px 0 0; color: var(--muted); }
+  nav.tabs { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  nav.tabs .wrap { display: flex; gap: 4px; overflow-x: auto; }
+  nav.tabs a { color: var(--muted); text-decoration: none; padding: 12px 14px; font-weight: 600; white-space: nowrap; border-bottom: 2px solid transparent; }
+  nav.tabs a:hover { color: var(--text); }
+  section { padding: 36px 0 8px; }
+  section > h2 { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--coral); font-family: 'Space Grotesk', sans-serif; margin: 0 0 16px; }
+
+  /* ---------- store listing preview ---------- */
+  .listing { background: #000; border-radius: 20px; border: 1px solid var(--line); overflow: hidden; }
+  .lhead { display: flex; gap: 22px; padding: 28px; align-items: center; flex-wrap: wrap; }
+  .lhead img { width: 128px; height: 128px; border-radius: 22.5%; box-shadow: 0 0 0 1px #333; }
+  .lhead .t { flex: 1; min-width: 220px; }
+  .lhead h3 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+  .lhead .subt { color: var(--muted); font-size: 17px; margin-top: 2px; }
+  .lhead .dev { color: var(--coral); font-size: 14px; margin-top: 6px; }
+  .get { margin-top: 14px; display: inline-block; background: var(--coral); color: #1a1a1a; font-weight: 800; border-radius: 999px; padding: 6px 22px; letter-spacing: .02em; }
+  .facts { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid #222; border-bottom: 1px solid #222; }
+  .facts div { padding: 12px 8px; text-align: center; border-left: 1px solid #222; }
+  .facts div:first-child { border-left: 0; }
+  .facts small { display: block; color: #777; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+  .facts b { display: block; font-size: 18px; color: #ddd; }
+  .facts span { color: #777; font-size: 12px; }
+  .shots { display: flex; gap: 14px; overflow-x: auto; padding: 22px 28px; scroll-snap-type: x mandatory; }
+  .shots img { height: 380px; border-radius: 14px; scroll-snap-align: start; box-shadow: 0 0 0 1px #2a2a2a; flex: none; }
+  .lbody { padding: 4px 28px 28px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; }
+  .lbody h4 { margin: 18px 0 6px; font-size: 18px; }
+  .promo { font-size: 16px; color: #e8e2da; }
+  .desc { white-space: pre-line; color: #bdb6ae; font-size: 14px; max-height: 210px; overflow: hidden; position: relative; }
+  .desc.open { max-height: none; }
+  .desc:not(.open)::after { content: ''; position: absolute; inset: auto 0 0; height: 60px; background: linear-gradient(transparent, #000); }
+  .more { background: none; border: 0; color: var(--coral); font: inherit; padding: 4px 0; cursor: pointer; }
+  .privacy { border: 1px solid #222; border-radius: 14px; padding: 16px; text-align: center; color: #bbb; }
+  .privacy b { display: block; color: #eee; font-size: 16px; margin: 6px 0 2px; }
+  .info { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .info td { padding: 9px 0; border-bottom: 1px solid #1d1d1d; }
+  .info td:first-child { color: #777; }
+  .info td:last-child { text-align: right; color: #ddd; }
+
+  /* ---------- fields ---------- */
+  .fields { display: grid; gap: 14px; }
+  .field { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .fhead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .fhead b { font-size: 15px; }
+  .fhead .hint { color: var(--muted); font-size: 13px; flex: 1; min-width: 200px; }
+  .count { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ok); font-weight: 600; }
+  .count.over { color: var(--coral); }
+  textarea, input.v {
+    width: 100%; background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; font: 14px/1.5 Inter, sans-serif; resize: vertical;
+  }
+  textarea:focus, input.v:focus { outline: 2px solid var(--coral); outline-offset: -1px; }
+  .factions { display: flex; gap: 8px; margin-top: 8px; }
+  .btn { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font: 600 13px Inter, sans-serif; cursor: pointer; }
+  .btn:hover { border-color: var(--coral); }
+  .btn.done { border-color: var(--ok); color: var(--ok); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  /* ---------- screenshots ---------- */
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .gallery figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px; }
+  .gallery img { width: 100%; border-radius: 8px; display: block; }
+  .gallery figcaption { font-size: 12px; color: var(--muted); margin-top: 8px; display: flex; justify-content: space-between; }
+  .note { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--gold); border-radius: 10px; padding: 12px 16px; color: #d8d1c8; margin-top: 14px; }
+  code { background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: 13px; }
+
+  /* ---------- checklist ---------- */
+  .checks { display: grid; gap: 10px; }
+  .check { display: flex; gap: 12px; align-items: flex-start; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .check input { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--coral); flex: none; }
+  .check .tag { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; border-radius: 999px; padding: 2px 8px; margin-right: 6px; }
+  .tag.block { background: rgba(255,107,107,.15); color: var(--coral); }
+  .tag.risk { background: rgba(255,180,77,.15); color: var(--warn); }
+  .tag.todo { background: rgba(255,255,255,.07); color: var(--muted); }
+  .check p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  .check.done > div { opacity: .5; }
+  footer { color: var(--muted); font-size: 13px; padding: 40px 0 60px; }
+
+  @media (max-width: 760px) {
+    .lbody, .two { grid-template-columns: 1fr; }
+    .facts { grid-template-columns: repeat(3, 1fr); }
+    .facts div:nth-child(n+4) { display: none; }
+    .shots img { height: 220px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <img src="source/icon.png" alt="Gambler icon">
+    <div>
+      <h1>App Store kit</h1>
+      <p>Store listing draft, paste-ready fields and the screenshot set for Gambler on iOS. Edits to the fields are kept in this browser.</p>
+    </div>
+  </header>
+</div>
+<nav class="tabs"><div class="wrap">
+  <a href="#preview">Listing preview</a><a href="#fields">Fields</a><a href="#screenshots">Screenshots</a><a href="#review">Privacy &amp; review</a><a href="#checklist">Before you submit</a>
+</div></nav>
+
+<main class="wrap">
+  <!-- ======================================================= PREVIEW -->
+  <section id="preview">
+    <h2>Listing preview</h2>
+    <div class="listing">
+      <div class="lhead">
+        <img src="source/icon.png" alt="">
+        <div class="t">
+          <h3 data-bind="name"></h3>
+          <div class="subt" data-bind="subtitle"></div>
+          <div class="dev" data-bind="seller"></div>
+          <span class="get">GET</span>
+        </div>
+      </div>
+      <div class="facts">
+        <div><small>Price</small><b>Free</b><span>No IAP</span></div>
+        <div><small>Age</small><b>4+</b><span>Years old</span></div>
+        <div><small>Category</small><b>♫</b><span>Music</span></div>
+        <div><small>Developer</small><b>⌂</b><span data-bind="seller"></span></div>
+        <div><small>Size</small><b>~20</b><span>MB</span></div>
+      </div>
+      <div class="shots" id="shots"></div>
+      <div class="lbody">
+        <div>
+          <p class="promo" data-bind="promo"></p>
+          <div class="desc" id="desc" data-bind="description"></div>
+          <button class="more" id="more">more</button>
+          <h4>What’s New</h4>
+          <div class="desc open" data-bind="whatsnew" style="max-height:none"></div>
+        </div>
+        <div>
+          <h4>App Privacy</h4>
+          <div class="privacy">✓<b>Data Not Collected</b>The developer does not collect any data from this app.</div>
+          <h4>Information</h4>
+          <table class="info">
+            <tr><td>Seller</td><td data-bind="seller"></td></tr>
+            <tr><td>Category</td><td>Music</td></tr>
+            <tr><td>Compatibility</td><td>iPad · iOS 15.0 or later</td></tr>
+            <tr><td>Languages</td><td>English</td></tr>
+            <tr><td>Age Rating</td><td>4+</td></tr>
+            <tr><td>Copyright</td><td data-bind="copyright"></td></tr>
+            <tr><td>Price</td><td>Free</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= FIELDS -->
+  <section id="fields">
+    <h2>App Store Connect fields</h2>
+    <div class="fields" id="fieldlist"></div>
+    <div class="two" style="margin-top:14px">
+      <div class="field">
+        <div class="fhead"><b>Categories</b></div>
+        Primary: <b>Music</b><br>Secondary: <b>Utilities</b> <span style="color:var(--muted)">(optional — or leave blank)</span>
+      </div>
+      <div class="field">
+        <div class="fhead"><b>Pricing &amp; availability</b></div>
+        Free · all territories · no in-app purchases
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= SCREENSHOTS -->
+  <section id="screenshots">
+    <h2>Screenshots</h2>
+    <div class="gallery" id="gallery"></div>
+    <div class="note">
+      <b>These are iPad 13" landscape (2752 × 2064), the size App Store Connect asks for;</b> it scales them down for smaller iPads.
+      The app screens inside are real iPad mini landscape captures (<code>source/mini-scale.png</code>, <code>source/mini-melody.png</code>),
+      whose proportions suit the UI best. To change them, retake those captures and run <code>./scripts/render-appstore-screenshots.sh</code>.
+      The app is iPad-only, so no iPhone set is needed.
+    </div>
+  </section>
+
+  <!-- ======================================================= PRIVACY & REVIEW -->
+  <section id="review">
+    <h2>Privacy &amp; App Review</h2>
+    <div class="fields" id="reviewlist"></div>
+    <div class="two" style="margin-top:14px">
+      <div class="field">
+        <div class="fhead"><b>App Privacy questionnaire</b></div>
+        Answer <b>“No, we do not collect data from this app.”</b> The app makes no network calls, has no analytics, accounts or ads (checked in <code>source/</code>), so the label reads “Data Not Collected”.
+      </div>
+      <div class="field">
+        <div class="fhead"><b>Age rating questionnaire</b></div>
+        Answer <b>None</b> to everything, including <b>Simulated Gambling</b> — the dice are a musical randomiser, no wagering or casino games. Result: <b>4+</b>.
+        Export compliance: <b>uses no encryption</b> beyond what iOS provides.
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= CHECKLIST -->
+  <section id="checklist">
+    <h2>Before you submit</h2>
+    <div class="checks" id="checks"></div>
+  </section>
+
+  <footer>Files: <code>packaging/appstore/</code> · icon source <code>packaging/icon-ios.svg</code> → <code>scripts/render-icons.sh</code> · screenshots → <code>scripts/render-appstore-screenshots.sh</code></footer>
+</main>
+
+<script>
+const REPO = 'https://github.com/regulus33/Gambler';
+
+const FIELDS = [
+  { id: 'name', label: 'App name', limit: 30, hint: 'Must be unique on the store. “Gambler” alone is likely taken — the suffix also helps search.',
+    value: 'Gambler: Chance Sequencer' },
+  { id: 'subtitle', label: 'Subtitle', limit: 30, hint: 'Shown under the name everywhere. Words here are indexed for search.',
+    value: 'Probability MIDI sequencer' },
+  { id: 'promo', label: 'Promotional text', limit: 170, hint: 'Above the description. Can be changed any time without a new review.',
+    value: 'Free and open source. Let chance write your next riff with a probability-driven MIDI sequencer that always stays in key. Play it standalone or as an AUv3 plugin.' },
+  { id: 'description', label: 'Description', limit: 4000, rows: 18, hint: 'Plain text, no formatting. The first three lines show before “more”.',
+    value:
+`Gambler is a step sequencer that rolls the dice for you. Set the odds, pick a scale, and let it improvise MIDI patterns that surprise you but always stay musical.
+
+Gambler doesn’t make sound on its own: it plays your synths. Load it as an AUv3 MIDI plugin in your favourite host, or run it standalone and send MIDI to other apps and hardware.
+
+HOW IT WORKS
+• Up to 64 steps, each holding up to 8 notes that cycle every time the step comes round
+• An 8×8 chance grid decides how likely each step is to play
+• Roll swaps in fresh random notes from your range whenever you want a new idea
+• Scale lock keeps everything in key: choose any of the 12 notes and a note range
+• Play a chord into it to set the notes on the fly, with or without Latch
+• Melody view to see and edit the whole line at once
+• Shuffle, nudge, duplicate and undo
+
+MADE FOR PLAYING LIVE
+• Internal clock, host sync, or external MIDI clock
+• MIDI Learn: map controls to the knobs, pads and keys on your controller
+• Presets to save and recall your patterns
+• Export your sequence as a MIDI file
+
+FREE AND OPEN SOURCE
+No ads, no in-app purchases, no account, no tracking. The full source code is on GitHub: ${REPO}` },
+  { id: 'keywords', label: 'Keywords', limit: 100, hint: 'Comma-separated, no spaces after commas. Don’t repeat words from the name or subtitle, and don’t use other apps’ names.',
+    value: 'generative,random,auv3,step,melody,scale,arpeggiator,dice,pattern,chord,quantize,riff,improvise' },
+  { id: 'whatsnew', label: 'What’s New (version notes)', limit: 4000, rows: 3, hint: 'Not shown for the very first version, but fill it in from 1.0.1 onwards.',
+    value: 'First release. Thanks for trying Gambler. Found a bug or have an idea? Open an issue on GitHub.' },
+  { id: 'seller', label: 'Seller / developer name', limit: 0, hint: 'Comes from your Apple Developer account. An individual account shows your legal name, not “ToneGarden”.',
+    value: 'ToneGarden' },
+  { id: 'copyright', label: 'Copyright', limit: 0, hint: 'Year and owner.', value: '© 2026 ToneGarden' },
+  { id: 'support', label: 'Support URL', limit: 0, hint: 'Required. GitHub Issues works if the repo is public.', value: REPO + '/issues' },
+  { id: 'marketing', label: 'Marketing URL', limit: 0, hint: 'Optional.', value: REPO },
+  { id: 'privacyurl', label: 'Privacy policy URL', limit: 0, hint: 'Required for every app, even ones that collect nothing. Commit the policy below as PRIVACY.md and link it.',
+    value: REPO + '/blob/main/PRIVACY.md' },
+];
+
+const REVIEW = [
+  { id: 'reviewnotes', label: 'Notes for App Review', limit: 4000, rows: 12,
+    hint: 'The most common rejection for MIDI-only apps is “the app doesn’t do anything” because the reviewer hears nothing. Explain it, and link a short demo video.',
+    value:
+`Gambler is a MIDI sequencer. It generates MIDI notes, not audio, so on its own it is silent. That is by design, just like other MIDI effect apps.
+
+How to test:
+1. Install any AUv3 host that supports MIDI processor plugins (for example AUM or Loopy Pro) and a synth.
+2. Add Gambler as a MIDI plugin and route it to the synth.
+3. Press play in Gambler. Each step plays a note and the chance grid decides whether a step fires. Tap the scale keys to change which notes it may play.
+
+The standalone app sends MIDI to connected MIDI devices and apps.
+
+Demo video: <add an unlisted YouTube/Vimeo link showing it driving a synth>
+
+No account or login is needed. The app is free and open source: ${REPO}` },
+  { id: 'privacypolicy', label: 'Privacy policy (commit as PRIVACY.md)', limit: 0, rows: 10, hint: 'Plain and true: the app collects nothing.',
+    value:
+`# Gambler privacy policy
+
+Last updated: November 2026
+
+Gambler does not collect, store, or share any personal data.
+
+- No accounts, analytics, advertising, or tracking.
+- The app does not connect to the internet.
+- Presets and settings are saved only on your device.
+- Microphone or Bluetooth permission prompts, if shown, are only used for audio/MIDI connections on your device; nothing is recorded or sent anywhere.
+
+Questions: open an issue at ${REPO}/issues` },
+];
+
+const CHECKS = [
+  { tag: 'todo', title: 'iPad-only for v1 (done)',
+    body: 'TARGETED_DEVICE_FAMILY is now "2". The iPhone layout runs off-screen and under the Dynamic Island; fix that before switching back to "1,2", which will also need a 6.9" iPhone screenshot set.' },
+  { tag: 'block', title: 'App name shows as “Gambler2”',
+    body: 'PRODUCT_NAME is “Gambler2”, so that’s the home-screen label and what hosts list. Change PRODUCT_NAME (or set CFBundleDisplayName) to “Gambler”. The bundle ID com.ToneGarden.Gambler2 can stay but cannot change after the first upload — decide now.' },
+  { tag: 'todo', title: 'LICENSE updated (done)',
+    body: 'MIT, © 2026 ToneGarden, keeping the Pamplejuce template notice.' },
+  { tag: 'risk', title: 'Check JUCE licensing for an App Store release',
+    body: 'JUCE 8 is dual-licensed AGPLv3 / commercial. AGPL’s terms are generally seen as conflicting with App Store distribution terms. JUCE’s free Starter licence (under its revenue limit) avoids that question. Read the JUCE licence page and pick one before shipping.' },
+  { tag: 'risk', title: 'Remove the microphone permission if you don’t use audio input',
+    body: 'Info-iOS.plist asks for microphone access. A MIDI-only app requesting the mic can be flagged under the privacy guidelines. Remove NSMicrophoneUsageDescription (and the Bluetooth strings if you don’t add BLE MIDI pairing) unless something actually uses them.' },
+  { tag: 'risk', title: 'Make sure a reviewer can hear something',
+    body: 'Fill in the review notes and add a demo video link. A tiny built-in preview synth in the standalone app would make review (and first-run for users) much easier.' },
+  { tag: 'todo', title: 'Make the GitHub repo public and add PRIVACY.md', body: 'The support, marketing and privacy URLs all point at it.' },
+    { tag: 'todo', title: 'Update the in-app logo to match the new icon', body: 'The nav bar still shows the old dice mark next to “Gambler”.' },
+  { tag: 'todo', title: 'Release build + archive', body: 'Xcode → Any iOS Device → Product → Archive → Distribute App → App Store Connect. Bump VERSION / build number for each upload.' },
+];
+
+// ---- state (per-browser convenience only) ----
+const store = {
+  get(k) { try { return localStorage.getItem('gambler.kit.' + k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem('gambler.kit.' + k, v); } catch (e) {} },
+};
+const values = {};
+[...FIELDS, ...REVIEW].forEach(f => values[f.id] = store.get(f.id) ?? f.value);
+
+function fieldHTML(f) {
+  const multi = f.rows || f.limit > 30;
+  const input = multi
+    ? `<textarea rows="${f.rows || 3}" data-id="${f.id}"></textarea>`
+    : `<input class="v" data-id="${f.id}">`;
+  return `<div class="field">
+    <div class="fhead"><b>${f.label}</b><span class="hint">${f.hint || ''}</span>
+      ${f.limit ? `<span class="count" data-count="${f.id}"></span>` : ''}</div>
+    ${input}
+    <div class="factions"><button class="btn" data-copy="${f.id}">Copy</button>
+      <button class="btn" data-reset="${f.id}">Reset</button></div>
+  </div>`;
+}
+document.getElementById('fieldlist').innerHTML = FIELDS.map(fieldHTML).join('');
+document.getElementById('reviewlist').innerHTML = REVIEW.map(fieldHTML).join('');
+
+const all = Object.fromEntries([...FIELDS, ...REVIEW].map(f => [f.id, f]));
+function refresh(id) {
+  const f = all[id], v = values[id];
+  const c = document.querySelector(`[data-count="${id}"]`);
+  if (c) { c.textContent = `${[...v].length} / ${f.limit}`; c.classList.toggle('over', [...v].length > f.limit); }
+  document.querySelectorAll(`[data-bind="${id}"]`).forEach(el => el.textContent = v);
+}
+document.querySelectorAll('[data-id]').forEach(el => {
+  const id = el.dataset.id;
+  el.value = values[id];
+  el.addEventListener('input', () => { values[id] = el.value; store.set(id, el.value); refresh(id); });
+  refresh(id);
+});
+document.addEventListener('click', e => {
+  const copy = e.target.closest('[data-copy]'), reset = e.target.closest('[data-reset]');
+  if (copy) {
+    navigator.clipboard.writeText(values[copy.dataset.copy]).then(() => {
+      copy.textContent = 'Copied'; copy.classList.add('done');
+      setTimeout(() => { copy.textContent = 'Copy'; copy.classList.remove('done'); }, 1200);
+    });
+  }
+  if (reset) {
+    const id = reset.dataset.reset; values[id] = all[id].value; store.set(id, values[id]);
+    document.querySelector(`[data-id="${id}"]`).value = values[id]; refresh(id);
+  }
+});
+document.getElementById('more').onclick = e => {
+  const d = document.getElementById('desc'); d.classList.toggle('open');
+  e.target.textContent = d.classList.contains('open') ? 'less' : 'more';
+};
+
+// ---- screenshots ----
+const SHOTS = ['Every step rolls the dice', 'See the whole line', 'Always in key', 'Set the odds', 'Up to 8 notes per step', 'Play it anywhere'];
+const bust = '?v=' + Date.now();
+document.getElementById('shots').innerHTML = SHOTS.map((t, i) => `<img src="screenshots/ipad-${i + 1}.png${bust}" alt="${t}">`).join('');
+document.getElementById('gallery').innerHTML = SHOTS.map((t, i) => `<figure>
+  <a href="screenshots/ipad-${i + 1}.png" download><img src="screenshots/ipad-${i + 1}.png${bust}" alt="${t}"></a>
+  <figcaption><span>${i + 1}. ${t}</span><a href="frame.html?n=${i + 1}" target="_blank">frame</a></figcaption></figure>`).join('');
+
+// ---- checklist ----
+document.getElementById('checks').innerHTML = CHECKS.map((c, i) => `<label class="check" data-i="${i}">
+  <input type="checkbox" data-check="${i}"><div><span class="tag ${c.tag}">${{ block: 'Blocker', risk: 'Review risk', todo: 'To do' }[c.tag]}</span>
+  <b>${c.title}</b><p>${c.body}</p></div></label>`).join('');
+document.querySelectorAll('[data-check]').forEach(cb => {
+  const i = cb.dataset.check;
+  cb.checked = store.get('check.' + i) === '1';
+  cb.closest('.check').classList.toggle('done', cb.checked);
+  cb.addEventListener('change', () => { store.set('check.' + i, cb.checked ? '1' : '0'); cb.closest('.check').classList.toggle('done', cb.checked); });
+});
+</script>
+</body>
+</html>

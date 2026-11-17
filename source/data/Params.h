@@ -1,7 +1,4 @@
-//
-// Created by Gambler developers on 15.10.2025.
-//
-    // Comprehensive APVTS parameter definitions for Gambler.
+// Comprehensive APVTS parameter definitions for Gambler.
 // All sequencer state is backed by APVTS parameters for thread-safe access
 // and automatic DAW automation support.
 //

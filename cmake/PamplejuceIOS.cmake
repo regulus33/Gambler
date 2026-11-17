@@ -36,7 +36,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic" CACHE STRING "Code signing style")
     
     # Set targeted device family (1 = iPhone, 2 = iPad, 1,2 = Universal)
-    set(CMAKE_XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2" CACHE STRING "Targeted device family")
+    # iPad-only for now: the web UI does not fit iPhone screens yet
+    set(CMAKE_XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "2" CACHE STRING "Targeted device family")
     
     # Skip install for iOS builds (we'll use Xcode's archive instead)
     set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY TRUE)

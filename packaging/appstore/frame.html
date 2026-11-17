@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gambler Screenshot Frame</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;800;900&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
+<!--
+  One App Store screenshot at its exact pixel size: iPad 13" landscape, 2752 x 2064.
+  Usage: frame.html?n=1   (n = 1..6)
+  The app captures inside are iPad mini landscape (2266 x 1488), whose proportions suit the UI best.
+  Render all of them with scripts/render-appstore-screenshots.sh
+-->
+<style>
+  :root {
+    --ink: #1E1E1E; --deep: #141414; --bone: #F6EFE6; --muted: #A8A098;
+    --coral: #FF6B6B; --gold: #FFD700;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: var(--deep); }
+  body { font-family: Inter, sans-serif; color: var(--bone); overflow: hidden; }
+  .frame {
+    position: relative; overflow: hidden;
+    width: var(--w); height: var(--h);
+    background:
+      radial-gradient(ellipse 60% 45% at 50% 0%, rgba(255,107,107,.22), transparent 70%),
+      radial-gradient(ellipse 50% 40% at 90% 100%, rgba(255,215,0,.08), transparent 70%),
+      linear-gradient(180deg, #232323, var(--deep));
+    display: flex; flex-direction: column; align-items: center;
+    padding-top: calc(var(--u) * 5.2);
+  }
+  .kicker {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--coral); font-size: calc(var(--u) * 2.1); margin-bottom: calc(var(--u) * 1.1);
+  }
+  h1 {
+    font-weight: 900; letter-spacing: -0.035em; line-height: 1.02; text-align: center;
+    font-size: calc(var(--u) * 6.6); max-width: 22ch; text-wrap: balance;
+  }
+  h1 em { font-style: normal; color: var(--coral); }
+  .sub {
+    margin-top: calc(var(--u) * 1.5); color: var(--muted); font-weight: 500; text-align: center;
+    font-size: calc(var(--u) * 2.5); line-height: 1.35; max-width: 46ch; text-wrap: balance;
+  }
+  .stage { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: calc(var(--u) * 3) 0 calc(var(--u) * 4); }
+  /* Whole screen inside a thin iPad-style bezel */
+  .device {
+    border-radius: calc(var(--u) * 3.6); padding: calc(var(--u) * 1.1);
+    background: #0B0B0B; box-shadow: 0 0 0 3px #333, 0 50px 140px rgba(0,0,0,.6);
+  }
+  .screen { border-radius: calc(var(--u) * 2.5); background-repeat: no-repeat; background-color: var(--ink); }
+  /* Close-up: a zoomed crop floated as a card */
+  .closeup {
+    border-radius: calc(var(--u) * 2.6); background-repeat: no-repeat; background-color: var(--ink);
+    box-shadow: 0 0 0 3px rgba(255,255,255,.08), 0 50px 140px rgba(0,0,0,.65);
+  }
+  .closing { display: flex; align-items: center; gap: calc(var(--u) * 7); }
+  .closing img { width: calc(var(--u) * 34); border-radius: 22.5%; box-shadow: 0 40px 120px rgba(255,107,107,.25), 0 0 0 2px #333; }
+  .pills { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 1.4); max-width: calc(var(--u) * 72); }
+  .pills span {
+    border: 2px solid #3a3a3a; border-radius: 999px; color: var(--bone); background: rgba(255,255,255,.03);
+    padding: calc(var(--u) * 1.1) calc(var(--u) * 2.4); font-size: calc(var(--u) * 2.4); font-weight: 500;
+  }
+  .pills span.hot { border-color: var(--coral); color: var(--coral); }
+</style>
+</head>
+<body>
+<div class="frame" id="frame"></div>
+<script>
+const W = 2752, H = 2064;                      // App Store iPad 13" landscape
+const SRC = { scale: 'source/mini-scale.png', melody: 'source/mini-melody.png' };
+const SRC_W = 2266, SRC_H = 1488;              // iPad mini landscape capture
+
+// Crops are in source pixels: [x, y, w, h]. Re-tune if you retake the captures with a different layout.
+const SLIDES = [
+  { kicker: 'Probability sequencer', title: 'Every step <em>rolls the dice.</em>',
+    sub: 'A MIDI sequencer that lets chance write the riff and keeps it musical.',
+    kind: 'device', src: 'scale' },
+  { kicker: 'Melody view', title: 'See the <em>whole line.</em>',
+    sub: 'Every roll laid out on a piano roll, ready to tweak.',
+    kind: 'device', src: 'melody' },
+  { kicker: 'Scale lock', title: 'Always <em>in key.</em>',
+    sub: 'Pick the notes it may play and a range. Every roll is quantized live.',
+    kind: 'closeup', src: 'scale', crop: [24, 136, 1180, 510] },
+  { kicker: 'Chance grid', title: 'Set <em>the odds.</em>',
+    sub: 'Paint how likely each step is to fire, and watch the pattern fill in.',
+    kind: 'closeup', src: 'scale', crop: [1214, 136, 1025, 600] },
+  { kicker: 'Substeps', title: 'Up to <em>8 notes</em> per step.',
+    sub: 'Each step cycles through its own little melody. Roll, nudge and shuffle in one tap.',
+    kind: 'closeup', src: 'scale', crop: [24, 736, 2218, 690] },
+  { kicker: 'Free & open source', title: 'Play it <em>anywhere.</em>',
+    sub: 'Run it on its own or as an AUv3 MIDI plugin inside your favourite host.',
+    kind: 'closing' },
+];
+
+const n = Math.min(Math.max(parseInt(new URLSearchParams(location.search).get('n'), 10) || 1, 1), SLIDES.length);
+const slide = SLIDES[n - 1];
+const frame = document.getElementById('frame');
+const u = Math.min(W, H) / 100;
+frame.style.cssText = `--w:${W}px; --h:${H}px; --u:${u}px`;
+frame.innerHTML = `<div class="kicker">${slide.kicker}</div><h1>${slide.title}</h1>
+  <p class="sub">${slide.sub}</p><div class="stage" id="stage"></div>`;
+
+// Size the visual to whatever space the caption leaves
+const stage = document.getElementById('stage');
+const cs = getComputedStyle(stage);
+const availW = W * 0.9;
+const availH = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+const url = SRC[slide.src];
+
+if (slide.kind === 'device') {
+  const bezel = u * 1.1 * 2;
+  const scale = Math.min((availW - bezel) / SRC_W, (availH - bezel) / SRC_H);
+  stage.innerHTML = `<div class="device"><div class="screen" style="width:${SRC_W * scale}px;height:${SRC_H * scale}px;
+    background-image:url(${url});background-size:100% 100%"></div></div>`;
+} else if (slide.kind === 'closeup') {
+  const [cx, cy, cw, ch] = slide.crop;
+  const scale = Math.min(availW / cw, availH / ch);
+  stage.innerHTML = `<div class="closeup" style="width:${cw * scale}px;height:${ch * scale}px;
+    background-image:url(${url});background-size:${SRC_W * scale}px ${SRC_H * scale}px;
+    background-position:${-cx * scale}px ${-cy * scale}px"></div>`;
+} else {
+  stage.innerHTML = `<div class="closing"><img src="source/icon.png" alt="">
+    <div class="pills">
+      <span class="hot">Free</span><span class="hot">Open source</span><span>AUv3 MIDI plugin</span>
+      <span>Standalone app</span><span>Host &amp; MIDI clock sync</span><span>MIDI Learn</span>
+      <span>Melody view</span><span>Presets</span><span>MIDI file export</span>
+    </div></div>`;
+}
+</script>
+</body>
+</html>

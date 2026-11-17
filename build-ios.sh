@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 BUILD_DIR="build-ios"
-CMAKE_EXECUTABLE="/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake"
+CMAKE_EXECUTABLE="${CMAKE:-$(command -v cmake || echo /Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake)}"
 
 # Parse command line arguments
 BUILD_TYPE="Debug"
@@ -24,13 +24,13 @@ print_usage() {
     echo ""
     echo "Options:"
     echo "  -r, --release          Build in Release mode (default: Debug)"
-    echo "  -d, --device           Build for device (default: simulator)"
-    echo "  -s, --simulator        Build for simulator"
+    echo "  -d, --device           Build for device (default)"
+    echo "  -s, --simulator        Build for the iOS Simulator"
     echo "  -c, --clean            Clean build directory before building"
     echo "  -h, --help             Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0                     # Build Debug for simulator"
+    echo "  $0                     # Build Debug for device"
     echo "  $0 -r -d               # Build Release for device"
     echo "  $0 -c -s               # Clean build Debug for simulator"
 }
