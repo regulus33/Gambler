@@ -26,7 +26,7 @@
 //   addSub {step}                    removeSub {step, sub}
 //   setLength {length}               roll {on}     setPage {page}  (which 8 steps are visible)
 //   nudge {dir}  duplicate  shuffle  randomize {scope}  clear {scope}  undo
-//                                    scope: 'step' | 'all'
+//                                    scope: 'step' | 'page' (clear only) | 'all'
 //   setScaleNote {pc, on}            setRange {index, min, max}  addRange  removeRange {index}
 //   setProbPercent {percent}         probPaint {cell, on}  probReseed  probDivision
 //   playPause  stop

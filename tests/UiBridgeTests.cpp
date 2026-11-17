@@ -217,6 +217,17 @@ TEST_CASE ("Destructive actions can be undone", "[bridge][undo]") {
         REQUIRE_FALSE (static_cast<bool> (f.snapshot()["canUndo"]));
     }
 
+    SECTION ("clear page empties the eight visible steps only") {
+        f.send ("setLength", payload ({ { "length", 16 } }));
+        f.state().setStepNote (8, 0, 70);
+        f.send ("setPage", payload ({ { "page", 1 } }));
+        f.send ("clear", payload ({ { "scope", "page" } }));
+        REQUIRE (f.shownNote (8) == -1);
+        REQUIRE (f.shownNote (3) == 63);
+        f.send ("undo");
+        REQUIRE (f.shownNote (8) == 70);
+    }
+
     SECTION ("duplicate doubles the length and undo restores it") {
         f.send ("duplicate");
         REQUIRE (static_cast<int> (f.snapshot()["length"]) == 16);

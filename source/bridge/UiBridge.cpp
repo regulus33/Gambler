@@ -21,8 +21,10 @@ namespace {
                 { "nudge-right", MidiControlId::BUTTON_NUDGE_RIGHT },
                 { "duplicate", MidiControlId::BUTTON_DUPLICATE },
                 { "shuffle", MidiControlId::BUTTON_SHUFFLE },
-                { "randomize", MidiControlId::BUTTON_RANDOMIZE },
-                { "clear", MidiControlId::BUTTON_CLEAR },
+                { "randomize-step", MidiControlId::BUTTON_RANDOMIZE },
+                { "randomize-all", MidiControlId::BUTTON_RANDOMIZE_ALL },
+                { "clear-step", MidiControlId::BUTTON_CLEAR },
+                { "clear-page", MidiControlId::BUTTON_CLEAR_PAGE },
                 { "play", MidiControlId::PLAY_PAUSE },
                 { "stop", MidiControlId::STOP },
                 { "subdivision", MidiControlId::SUBDIVISION_SLIDER },
@@ -327,8 +329,9 @@ void UiBridge::handleAction (const juce::String& action, const juce::var& payloa
     }
     else if (action == "clear") {
         pushUndo();
-        if (payload["scope"].toString() == "all") clearAll();
-        else pulseParam (P::CLEAR_STEP);
+        const auto scope = payload["scope"].toString();
+        if (scope == "all") clearAll();
+        else pulseParam (scope == "page" ? P::CLEAR_WINDOW : P::CLEAR_STEP);
     }
     else if (action == "undo") {
         undo();

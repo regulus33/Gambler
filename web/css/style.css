@@ -215,6 +215,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 
 /* ------------------------------------------------------------ pads */
 .pads, .actions { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: clamp(6px, 1.4vw, 16px); min-height: 0; }
+.actions { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: clamp(4px, 0.9vw, 12px); }
 
 .pad {
   position: relative; border-radius: var(--r); background: var(--c, var(--rest)); color: var(--on-colour);
@@ -236,21 +237,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 /* ------------------------------------------------------------ actions */
 .action {
   position: relative; overflow: hidden;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   border: 1.5px solid var(--line); border-radius: var(--r); background: var(--panel); color: var(--ink);
   touch-action: none;
 }
-.action-text { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.action-text { display: flex; align-items: baseline; gap: 4px; min-width: 0; }
+.action .icon { width: 1.35em; height: 1.35em; }
 .action-text b { font-size: 12.5px; font-weight: 700; }
 .action-text small { font-size: 9.5px; font-weight: 600; color: var(--mute); white-space: nowrap; }
 .action:active, .action.is-pressed { background: var(--raise); }
 .action.is-on { background: var(--accent); border-color: var(--accent); color: var(--on-colour); }
 .action:disabled { opacity: 0.35; }
-/* hold-to-apply-to-all: a bar fills while the finger stays down */
-.action::after { content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--cream); }
-.action.is-holding::after { width: 100%; transition: width 0.55s linear; }
-.action.is-fired { background: var(--cream); color: var(--on-colour); }
-.action.is-fired small { color: var(--on-colour); }
 
 /* ------------------------------------------------------------ sliders, switches */
 .slider { -webkit-appearance: none; appearance: none; height: 26px; background: none; margin: 0; touch-action: none; }
@@ -381,7 +378,9 @@ legend { padding: 14px 0 6px; font-size: 10px; font-weight: 700; letter-spacing:
   .pad { aspect-ratio: 1; max-width: 100%; }
   .pad-index { display: none; }
   .pad-note { font-size: 12px; }
-  .actions { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 52px; }
+  .actions { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: 52px; }
+  .action-text { flex-direction: column; align-items: center; gap: 0; }
+  .actions { grid-auto-rows: 62px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

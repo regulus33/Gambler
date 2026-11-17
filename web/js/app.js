@@ -24,7 +24,6 @@
   const noteName = (n) => (n < 0 ? '' : NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 1));
 
   const PITCH_PX = 16;    // vertical drag distance per scale degree
-  const HOLD_MS = 550;    // hold time for "apply to all"
 
   let S = null; // latest engine snapshot
   const ui = { page: 0, drag: null, lenPreview: null, playedPc: -1, range: 0 };
@@ -96,8 +95,10 @@
     { id: 'nudge-right', label: 'Nudge', icon: 'arrowR', run: () => send('nudge', { dir: 1 }) },
     { id: 'duplicate', label: 'Duplicate', icon: 'duplicate', run: () => send('duplicate') },
     { id: 'shuffle', label: 'Shuffle', icon: 'shuffle', run: () => send('shuffle') },
-    { id: 'randomize', label: 'Random', hint: 'hold: all', icon: 'random', kind: 'scoped' },
-    { id: 'clear', label: 'Clear', hint: 'hold: all', icon: 'clear', kind: 'scoped' },
+    { id: 'randomize-step', label: 'Random', hint: 'step', icon: 'random', run: () => send('randomize', { scope: 'step' }) },
+    { id: 'randomize-all', label: 'Random', hint: 'all', icon: 'random', run: () => send('randomize', { scope: 'all' }) },
+    { id: 'clear-step', label: 'Clear', hint: 'step', icon: 'clear', run: () => send('clear', { scope: 'step' }) },
+    { id: 'clear-page', label: 'Clear', hint: 'page', icon: 'clear', run: () => send('clear', { scope: 'page' }) },
     { id: 'undo', label: 'Undo', icon: 'undo', run: () => send('undo') },
   ];
   const actionEls = {};
@@ -113,24 +114,6 @@
       btn.addEventListener('pointerdown', (e) => { btn.setPointerCapture(e.pointerId); set(true)(); });
       btn.addEventListener('pointerup', set(false));
       btn.addEventListener('pointercancel', set(false));
-    } else if (a.kind === 'scoped') {
-      let timer = null;
-      let fired = false;
-      const reset = () => { clearTimeout(timer); timer = null; btn.classList.remove('is-holding'); };
-      btn.addEventListener('pointerdown', (e) => {
-        btn.setPointerCapture(e.pointerId);
-        fired = false;
-        btn.classList.add('is-holding');
-        timer = setTimeout(() => {
-          fired = true;
-          reset();
-          send(a.id, { scope: 'all' });
-          btn.classList.add('is-fired');
-          setTimeout(() => btn.classList.remove('is-fired'), 260);
-        }, HOLD_MS);
-      });
-      btn.addEventListener('pointerup', () => { if (timer && !fired) send(a.id, { scope: 'step' }); reset(); });
-      btn.addEventListener('pointercancel', reset);
     } else {
       btn.addEventListener('click', a.run);
     }

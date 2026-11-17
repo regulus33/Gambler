@@ -33,6 +33,7 @@
       currentStep: -1,
       transport: 'stopped',
       roll: false,
+      page: 0,
       steps: [],
       scale: [1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0].map(Boolean), // C minor pentatonic
       latch: true,
@@ -341,7 +342,9 @@
         s.length = clamp(length, 1, MAX_STEPS);
         if (s.currentStep >= s.length) s.currentStep = -1;
       },
-      setPage() {},
+      setPage({ page }) {
+        s.page = clamp(page, 0, 7);
+      },
       roll({ on }) {
         s.roll = !!on;
       },
@@ -380,6 +383,8 @@
         pushUndo();
         if (scope === 'all') {
           for (let i = 0; i < s.length; i++) s.steps[i] = makeStep(-1);
+        } else if (scope === 'page') {
+          for (let i = s.page * 8; i < s.page * 8 + 8; i++) s.steps[i] = makeStep(-1);
         } else {
           const st = s.steps[s.selectedStep];
           st.notes[st.sel] = -1;

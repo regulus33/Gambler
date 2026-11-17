@@ -531,6 +531,14 @@ void PluginProcessor::handleSecondaryRowParam (const juce::String& id, bool isOn
         DBG ("DUPLICATE triggered - new length: " + juce::String (newLength));
         return;
     }
+    if (id == Params::Keys::ID::CLEAR_WINDOW) {
+        const int windowStart = state.getViewWindowStart();
+        for (int i = windowStart; i < windowStart + 8 && i < ParamConstants::MAX_STEPS; i++)
+            for (int n = 0; n < ParamConstants::MAX_SUBSTEPS; n++)
+                state.setStepNote (i, n, -1);
+        DBG ("CLEAR_WINDOW triggered - cleared steps from " + juce::String (windowStart));
+        return;
+    }
     if (id == Params::Keys::ID::CLEAR_STEP) {
         const int selectedStep = state.getSelectedStepForEditing();
         int sub = state.getSelectedSubstepIndex (selectedStep);
@@ -1273,6 +1281,12 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             break;
         case MidiControlId::BUTTON_CLEAR:
             setTriggerParam (Params::Keys::ID::CLEAR_STEP, isNoteOnOrCCPositive);
+            break;
+        case MidiControlId::BUTTON_RANDOMIZE_ALL:
+            setTriggerParam (Params::Keys::ID::RANDOMIZE_ALL, isNoteOnOrCCPositive);
+            break;
+        case MidiControlId::BUTTON_CLEAR_PAGE:
+            setTriggerParam (Params::Keys::ID::CLEAR_WINDOW, isNoteOnOrCCPositive);
             break;
 
         case MidiControlId::COUNT:
