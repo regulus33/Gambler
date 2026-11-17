@@ -2,9 +2,9 @@
 # This file handles iOS deployment target, architectures, and build settings
 
 # Set iOS deployment target
-# iOS 12.0 is a good minimum for modern features while maintaining compatibility
+# iOS 15.0 is the oldest target current Xcode (27.x) still accepts
 if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum iOS deployment version" FORCE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum iOS deployment version" FORCE)
     message(STATUS "Building for iOS with deployment target: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
     
     # Set iOS architectures

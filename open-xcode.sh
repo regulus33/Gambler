@@ -9,7 +9,7 @@ if [ ! -d "$BUILD_DIR" ] || [ ! -f "$BUILD_DIR/Gambler2.xcodeproj/project.pbxpro
     echo "Xcode project not found. Configuring..."
     "$CMAKE_EXECUTABLE" -B"$BUILD_DIR" -GXcode \
         -DCMAKE_SYSTEM_NAME=iOS \
-        -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
         -DCMAKE_OSX_SYSROOT=iphonesimulator
     echo "Configuration complete!"
 fi
