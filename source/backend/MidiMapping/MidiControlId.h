@@ -87,6 +87,7 @@ enum class MidiControlId {
     BUTTON_CLEAR,
     BUTTON_RANDOMIZE_ALL,
     BUTTON_CLEAR_PAGE,
+    RANGE_FOLLOW,
 
     // ========== Total count ==========
     COUNT
@@ -167,6 +168,7 @@ inline std::string getMidiControlName(MidiControlId id) {
         case MidiControlId::BUTTON_CLEAR:     return "Clear Step";
         case MidiControlId::BUTTON_RANDOMIZE_ALL: return "Randomize All";
         case MidiControlId::BUTTON_CLEAR_PAGE:    return "Clear Page";
+        case MidiControlId::RANGE_FOLLOW:         return "Range Follows Chord";
 
         default: return "Unknown Control";
     }

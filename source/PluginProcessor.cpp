@@ -265,6 +265,8 @@ void PluginProcessor::detectDawTransport() {
             DBG("DAW started - sequencer auto-resumed");
         }
     }
+    if (! dawIsPlaying && previousDawIsPlaying)
+        releaseHeldMidiNotes();  // hosts often drop note-offs when they stop
     previousDawIsPlaying = dawIsPlaying;
 }
 
@@ -829,7 +831,28 @@ void PluginProcessor::stopSequencer() {
     // Send note off for any playing note and clear all scheduling state
     noteOffScheduler.stopAndClear (getMidiOutputChannel(), midiOutput.get());
 
+    releaseHeldMidiNotes();
+
     DBG ("Sequencer stopped and reset to step 0");
+}
+
+void PluginProcessor::releaseHeldMidiNotes() {
+    auto& state = getState();
+    state.scaleQuantizer().heldNotes().releaseAll();
+
+    bool isLatched = false;
+    if (auto* latchParam = apvts.getParameter (Params::Keys::ID::SCALE_LATCH))
+        isLatched = latchParam->getValue() > 0.5f;
+
+    for (int pc = 0; pc < 12; ++pc) {
+        auto& count = heldScaleNotes[static_cast<size_t> (pc)];
+        if (count > 0 && ! isLatched)
+            state.setGlobalScaleNote (pc, false);
+        count = 0;
+    }
+
+    auto callback = onChordChanged;
+    if (callback) callback();
 }
 
 //==============================================================================
@@ -938,6 +961,9 @@ bool PluginProcessor::handleTransportMessage (const juce::MidiMessage& msg, int 
 }
 
 void PluginProcessor::handleControlChange (const juce::MidiMessage& msg) {
+    if (msg.isAllNotesOff() || msg.isAllSoundOff())
+        releaseHeldMidiNotes();
+
     const int ccNumber = msg.getControllerNumber();
     const int ccValue  = msg.getControllerValue();
     const int channel  = msg.getChannel();
@@ -988,6 +1014,15 @@ void PluginProcessor::routeLearnableMessage (MidiMessageType type,
         controlId = midiLearnRegistry.findUserMapping(type, channel, midiNumber);
         if (controlId == MidiControlId::COUNT)
             return;
+    }
+
+    // Unmapped notes play the scale keys; they also make up the chord range follow uses.
+    if (type == MidiMessageType::NOTE
+        && ! MidiNoteRouter::hasUserMapping (midiLearnRegistry, channel, midiNumber)) {
+        auto& held = getState().scaleQuantizer().heldNotes();
+        if (isOnOrPositive) held.noteOn (midiNumber); else held.noteOff (midiNumber);
+        auto callback = onChordChanged;
+        if (callback) callback();
     }
 
     MidiMapping mapping { type, midiNumber, controlId };
@@ -1287,6 +1322,16 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             break;
         case MidiControlId::BUTTON_CLEAR_PAGE:
             setTriggerParam (Params::Keys::ID::CLEAR_WINDOW, isNoteOnOrCCPositive);
+            break;
+
+        case MidiControlId::RANGE_FOLLOW:
+            if (isNoteOnOrCCPositive) {
+                if (auto* param = apvts.getParameter (Params::Keys::ID::RANGE_FOLLOW)) {
+                    const int next = (getState().scaleQuantizer().followMode() == ScaleQuantizer::Follow::Exact)
+                                         ? 0 : static_cast<int> (getState().scaleQuantizer().followMode()) + 1;
+                    param->setValueNotifyingHost (param->convertTo0to1 (static_cast<float> (next)));
+                }
+            }
             break;
 
         case MidiControlId::COUNT:

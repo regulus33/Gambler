@@ -173,6 +173,10 @@
     $('#latch').classList.toggle('is-on', S.latch);
     $('#bake-scale').classList.toggle('is-on', S.bakeScale);
     $('#bake-range').classList.toggle('is-on', S.bakeRange);
+    const followNames = ['Chord off', 'Chord span', 'Chord exact'];
+    $('#follow').textContent = followNames[S.rangeFollow || 0];
+    $('#follow').classList.toggle('is-follow', !!S.rangeFollow);
+    $('#bake-range').classList.toggle('is-ignored', !!S.rangeFollow && S.bakeRange);
 
     // ---- range
     drawRanges();
@@ -252,10 +256,12 @@
   }
 
   let rangeEls = [];
+  let chordMarks = []; // the held chord drawn over the range track
   function drawRanges() {
     const track = $('#range-track');
     if (rangeEls.length !== S.ranges.length) {
       track.innerHTML = '';
+      chordMarks = [];
       rangeEls = S.ranges.map(() => {
         const parts = { fill: el('div', 'range-fill'), min: el('div', 'range-handle'), max: el('div', 'range-handle') };
         track.append(parts.fill, parts.min, parts.max);
@@ -273,8 +279,28 @@
       parts.max.style.left = hi + '%';
       Object.values(parts).forEach((node) => node.classList.toggle('is-active', i === ui.range));
     });
+    // a chord on MIDI input is setting the range: draw it over the manual ranges
+    const chord = S.chord || [];
+    const following = !!S.rangeFollow && chord.length > 0;
+    $('#range').classList.toggle('is-following', following);
+    const marks = following ? (S.rangeFollow === 1 ? 1 : chord.length) : 0;
+    while (chordMarks.length > marks) chordMarks.pop().remove();
+    while (chordMarks.length < marks) chordMarks.push(track.appendChild(el('div')));
+    const pct = (n) => (n / 127) * 100 + '%';
+    if (following && S.rangeFollow === 1) {
+      chordMarks[0].className = 'range-chord';
+      chordMarks[0].style.left = pct(chord[0]);
+      chordMarks[0].style.width = ((chord[chord.length - 1] - chord[0]) / 127) * 100 + '%';
+    } else {
+      chordMarks.forEach((mark, i) => { mark.className = 'range-tick'; mark.style.left = pct(chord[i]); mark.style.width = ''; });
+    }
+
     const active = S.ranges[ui.range];
-    $('#range-label').textContent = noteName(active.min) + '\u2013' + noteName(active.max);
+    const label = $('#range-label');
+    label.classList.toggle('is-following', following);
+    label.textContent = !following ? noteName(active.min) + '\u2013' + noteName(active.max)
+      : S.rangeFollow === 1 ? noteName(chord[0]) + '\u2013' + noteName(chord[chord.length - 1])
+      : chord.length + (chord.length === 1 ? ' note' : ' notes');
     $('#range-add').hidden = S.ranges.length >= 3;
     $('#range-remove').hidden = S.ranges.length < 2;
   }
@@ -630,6 +656,7 @@
   $('#subdiv').addEventListener('click', () => send('setParam', { id: 'subdivision', value: (S.subdivision + 1) % 4 }));
   $('#latch').addEventListener('click', () => send('setParam', { id: 'latch', value: !S.latch }));
   $('#bake-scale').addEventListener('click', () => send('setParam', { id: 'bakeScale', value: !S.bakeScale }));
+  $('#follow').addEventListener('click', () => send('setParam', { id: 'rangeFollow', value: ((S.rangeFollow || 0) + 1) % 3 }));
   $('#bake-range').addEventListener('click', () => send('setParam', { id: 'bakeRange', value: !S.bakeRange }));
   $('#preset-prev').addEventListener('click', () => send('cyclePreset', { dir: -1 }));
   $('#preset-next').addEventListener('click', () => send('cyclePreset', { dir: 1 }));
@@ -673,12 +700,10 @@
     let geo = null;
     let scroll = null; // index of the top visible row; null until first layout
 
-    // Rows: every note the scale and ranges allow, plus any note already in the sequence.
+    // Rows: every note the engine allows right now (scale, ranges, a held chord),
+    // plus any note already in the sequence.
     function rowNotes(len) {
-      const notes = new Set();
-      for (let n = 0; n <= 127; n++) {
-        if (S.scale[n % 12] && S.ranges.some((r) => n >= r.min && n <= r.max)) notes.add(n);
-      }
+      const notes = new Set(S.allowed);
       for (let i = 0; i < len; i++) {
         const st = S.steps[i];
         for (let k = 0; k < st.count; k++) if (st.notes[k] >= 0) notes.add(st.notes[k]);

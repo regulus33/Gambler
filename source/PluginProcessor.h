@@ -90,6 +90,17 @@ public:
     std::function<void()> onPlayPauseTriggered;
     std::function<void()> onStopTriggered;
 
+    // Called (often from the audio thread) when the chord held on MIDI input changes.
+    std::function<void()> onChordChanged;
+
+    /**
+     * Forget every MIDI note we think is held: clears the chord used by range
+     * follow and, with Latch off, releases scale keys held from MIDI. Used for
+     * All Notes Off and when the transport stops, so a lost note-off can't leave
+     * a key stuck on. Safe to call from any thread.
+     */
+    void releaseHeldMidiNotes();
+
     /**
      * Trigger MIDI note for a specific step (for UI preview/audition)
      * This sets the current index to the given step and sends MIDI note on/off.

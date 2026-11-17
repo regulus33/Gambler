@@ -25,6 +25,7 @@ namespace {
                 { "randomize-all", MidiControlId::BUTTON_RANDOMIZE_ALL },
                 { "clear-step", MidiControlId::BUTTON_CLEAR },
                 { "clear-page", MidiControlId::BUTTON_CLEAR_PAGE },
+                { "follow", MidiControlId::RANGE_FOLLOW },
                 { "play", MidiControlId::PLAY_PAUSE },
                 { "stop", MidiControlId::STOP },
                 { "subdivision", MidiControlId::SUBDIVISION_SLIDER },
@@ -105,6 +106,7 @@ UiBridge::UiBridge (PluginProcessor& p) : processor (p) {
     processor.onStopTriggered = [this] { dirty = true; };
     processor.onPresetCycleUp = [this] { presetCyclePending = 1; };
     processor.onPresetCycleDown = [this] { presetCyclePending = -1; };
+    processor.onChordChanged = [this] { dirty = true; };
 
     // The shift layer is gone from the UI; make sure a saved "shift on" can't redirect MIDI buttons.
     processor.getState().setIsShift (false);
@@ -121,6 +123,7 @@ UiBridge::~UiBridge() {
     processor.onStopTriggered = nullptr;
     processor.onPresetCycleUp = nullptr;
     processor.onPresetCycleDown = nullptr;
+    processor.onChordChanged = nullptr;
 
     processor.getInternalState().removeListener (this);
     for (auto* param : processor.getParameters())
@@ -210,6 +213,20 @@ juce::var UiBridge::buildSnapshot() const {
     }
     root->setProperty ("ranges", ranges);
 
+    // Range follow: the chord in use (empty when off or nothing is held) and the
+    // notes a gesture or Roll can land on right now, which the melody grid uses as rows.
+    const auto& quantizer = state.scaleQuantizer();
+    root->setProperty ("rangeFollow", static_cast<int> (quantizer.followMode()));
+    juce::Array<juce::var> chord, allowed;
+    const auto chordNotes = quantizer.followChord();
+    const auto editable = quantizer.editFilter().allowed;
+    for (int n = 0; n <= 127; ++n) {
+        if (chordNotes.test (static_cast<size_t> (n))) chord.add (n);
+        if (editable.test (static_cast<size_t> (n))) allowed.add (n);
+    }
+    root->setProperty ("chord", chord);
+    root->setProperty ("allowed", allowed);
+
     // Chance grid: 64 underlying cells, shown as dim x dim blocks.
     const int dim = state.getProbabilityGridDim();
     const int block = 8 / dim;
@@ -295,7 +312,7 @@ void UiBridge::handleAction (const juce::String& action, const juce::var& payloa
         // One drawn stroke sends many of these; only the first asks for an undo point.
         if (boolOf (payload, "undo")) pushUndo();
         const int note = intOf (payload, "note", -1);
-        state.setStepNote (step, sub, note < 0 ? -1 : state.bakeNoteForStorage (juce::jlimit (0, 127, note)));
+        state.setStepNote (step, sub, state.storedNoteFor (note < 0 ? -1 : juce::jlimit (0, 127, note)));
         if (note >= 0) previewSelected (state.getQuantizedStepNote (step, sub));
     }
     else if (action == "addSub" && validStep (step)) {
@@ -450,6 +467,7 @@ void UiBridge::setParam (const juce::String& id, const juce::var& value) {
     else if (id == "latch")        setFloatParam (P::SCALE_LATCH, flag);
     else if (id == "bakeScale")    setFloatParam (P::PREF_DESTRUCTIVE_SCALE, flag);
     else if (id == "bakeRange")    setFloatParam (P::PREF_DESTRUCTIVE_RANGE, flag);
+    else if (id == "rangeFollow")  setFloatParam (P::RANGE_FOLLOW, number);
 }
 
 /** Set a parameter from its real-world value (clamped to the parameter's range). */

@@ -192,8 +192,15 @@ public:
             }
         }
 
-        step(stepIndex).setNote(substepIndex, note);
+        step(stepIndex).setNote(substepIndex, filter.unproject(note));
         return note;
+    }
+
+    /** What to store so a note plays as `shownNote` (undoes the projection onto a held chord). */
+    int storedNoteFor(int shownNote) const {
+        if (shownNote < 0) return -1;
+        const auto filter = scaleQ.editFilter();
+        return filter.remap ? filter.unproject(shownNote) : bakeNoteForStorage(shownNote);
     }
 
     /** Append a substep that starts as a copy of the selected one, and select it. */

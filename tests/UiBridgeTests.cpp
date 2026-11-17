@@ -394,3 +394,181 @@ TEST_CASE ("A tick is reported to the UI", "[bridge]") {
     REQUIRE (std::count (f.events.begin(), f.events.end(), juce::String ("tick")) == 1);
     REQUIRE (static_cast<int> (f.snapshot()["currentStep"]) >= 0);
 }
+
+// ============================================================================
+// Range follows the chord held on MIDI input
+// ============================================================================
+
+namespace {
+    void holdChord (BridgeFixture& f, std::initializer_list<int> notes) {
+        for (int n : notes) f.midi (juce::MidiMessage::noteOn (1, n, (juce::uint8) 100));
+    }
+    void releaseChord (BridgeFixture& f, std::initializer_list<int> notes) {
+        for (int n : notes) f.midi (juce::MidiMessage::noteOff (1, n));
+    }
+    std::vector<int> ints (const juce::var& array) {
+        std::vector<int> out;
+        for (int i = 0; i < array.size(); ++i) out.push_back (static_cast<int> (array[i]));
+        return out;
+    }
+    void setFollow (BridgeFixture& f, int mode) {
+        f.send ("setParam", payload ({ { "id", "rangeFollow" }, { "value", mode } }));
+    }
+    void setLatch (BridgeFixture& f, bool on) {
+        f.send ("setParam", payload ({ { "id", "latch" }, { "value", on } }));
+    }
+}
+
+TEST_CASE ("Range follow Off ignores the chord", "[bridge][follow]") {
+    BridgeFixture f;
+    setLatch (f, false);
+    f.setScale ({});
+    holdChord (f, { 36, 52, 79 });  // C2 E3 G5
+
+    REQUIRE (static_cast<int> (f.snapshot()["rangeFollow"]) == 0);
+    REQUIRE (f.snapshot()["chord"].size() == 0);
+    f.state().setStepNote (0, 0, 100);
+    REQUIRE (f.shownNote (0) == 100);  // full manual range, C/E/G scale: 100 is E7
+}
+
+TEST_CASE ("Range follow Span: lowest to highest held note, scale still applies", "[bridge][follow]") {
+    BridgeFixture f;
+    setLatch (f, false);
+    f.setScale ({});
+    setFollow (f, 1);
+    holdChord (f, { 36, 52, 79 });
+
+    REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 36, 52, 79 });
+
+    // The manual range (0-127) is stretched over the chord's span, so the melody keeps its shape.
+    f.state().setStepNote (0, 0, 0);
+    f.state().setStepNote (1, 0, 127);
+    REQUIRE (f.shownNote (0) == 36);
+    REQUIRE (f.shownNote (1) == 79);
+
+    int previous = 36;
+    for (int stored = 0; stored <= 127; stored += 9) {
+        f.state().setStepNote (2, 0, stored);
+        const int shown = f.shownNote (2);
+        REQUIRE (shown >= previous);  // never runs backwards
+        REQUIRE ((shown % 12 == 0 || shown % 12 == 4 || shown % 12 == 7));
+        previous = shown;
+    }
+
+    const auto allowed = ints (f.snapshot()["allowed"]);
+    REQUIRE (allowed.front() == 36);
+    REQUIRE (allowed.back() == 79);
+    REQUIRE (allowed.size() == 12);  // every C, E and G from C2 to G5: four octaves of three
+}
+
+TEST_CASE ("Range follow Exact: only the held notes", "[bridge][follow]") {
+    BridgeFixture f;
+    setLatch (f, false);
+    setFollow (f, 2);
+    holdChord (f, { 36, 52, 79 });
+
+    REQUIRE (ints (f.snapshot()["allowed"]) == std::vector<int> { 36, 52, 79 });
+
+    // Low, middle and high stored notes spread over the whole chord instead of piling onto one note.
+    f.state().setStepNote (0, 0, 10);
+    f.state().setStepNote (1, 0, 60);
+    f.state().setStepNote (2, 0, 120);
+    REQUIRE (f.shownNote (0) == 36);
+    REQUIRE (f.shownNote (1) == 52);
+    REQUIRE (f.shownNote (2) == 79);
+
+    std::set<int> rolled;
+    for (int i = 0; i < 300; ++i)
+        rolled.insert (f.state().quantizeNoteToGlobalScale (f.state().generateRandomNoteUnquantized()));
+    REQUIRE (rolled == std::set<int> { 36, 52, 79 });
+
+    // Edits made while the chord is held land where they were put.
+    f.send ("shiftNote", payload ({ { "step", 1 }, { "sub", 0 }, { "delta", 1 } }));
+    REQUIRE (f.shownNote (1) == 79);
+    f.send ("setNote", payload ({ { "step", 1 }, { "sub", 0 }, { "note", 36 }, { "undo", true } }));
+    REQUIRE (f.shownNote (1) == 36);
+}
+
+TEST_CASE ("Range follow with Latch off: releasing the chord gives the manual range back", "[bridge][follow]") {
+    BridgeFixture f;
+    setLatch (f, false);
+    setFollow (f, 2);
+    holdChord (f, { 36, 52, 79 });
+    releaseChord (f, { 36 });
+    REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 52, 79 });  // follows the keys still down
+
+    releaseChord (f, { 52, 79 });
+    REQUIRE (f.snapshot()["chord"].size() == 0);
+}
+
+TEST_CASE ("Range follow with Latch on: the last chord stays until a new one starts", "[bridge][follow]") {
+    BridgeFixture f;
+    setLatch (f, true);
+    setFollow (f, 2);
+
+    holdChord (f, { 36, 52, 79 });
+    releaseChord (f, { 36, 52, 79 });
+    REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 36, 52, 79 });
+
+    holdChord (f, { 41, 45 });  // a new chord after all keys were up replaces it
+    REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 41, 45 });
+    releaseChord (f, { 41 });
+    REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 41, 45 });  // releases don't shrink it
+}
+
+TEST_CASE ("Range follow leaves out notes mapped to controls", "[bridge][follow]") {
+    BridgeFixture f;
+    setLatch (f, false);
+    f.send ("learnToggle");
+    f.send ("learnSelect", payload ({ { "id", "roll" } }));
+    f.midi (juce::MidiMessage::noteOn (1, 62, (juce::uint8) 100));
+    f.send ("learnToggle");
+    f.midi (juce::MidiMessage::noteOff (1, 62));
+
+    setFollow (f, 2);
+    holdChord (f, { 48, 62, 67 });
+    REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 48, 67 });
+}
+
+TEST_CASE ("Stuck notes are cleared by All Notes Off and by Stop", "[bridge][follow]") {
+    BridgeFixture f;
+    setLatch (f, false);
+    setFollow (f, 1);
+    f.setScale ({});
+
+    holdChord (f, { 48, 64 });
+    REQUIRE (f.snapshot()["chord"].size() == 2);
+    REQUIRE (static_cast<bool> (f.snapshot()["scale"][0]));
+
+    SECTION ("All Notes Off (CC 123)") {
+        f.midi (juce::MidiMessage::allNotesOff (1));
+    }
+    SECTION ("Stop") {
+        f.send ("stop");
+    }
+
+    REQUIRE (f.snapshot()["chord"].size() == 0);
+    REQUIRE_FALSE (static_cast<bool> (f.snapshot()["scale"][0]));  // the scale keys let go too
+    REQUIRE_FALSE (static_cast<bool> (f.snapshot()["scale"][4]));
+
+    // and nothing is left counted: a fresh press and release works normally
+    holdChord (f, { 60 });
+    releaseChord (f, { 60 });
+    REQUIRE_FALSE (static_cast<bool> (f.snapshot()["scale"][0]));
+}
+
+TEST_CASE ("Bake range is ignored while the range follows a chord", "[bridge][follow]") {
+    BridgeFixture f;
+    setLatch (f, false);
+    f.state().setStepNote (0, 0, 60);
+    f.send ("setParam", payload ({ { "id", "bakeRange" }, { "value", true } }));
+    setFollow (f, 1);
+
+    holdChord (f, { 36, 48 });
+    REQUIRE (f.shownNote (0) >= 36);              // sounds inside the chord
+    REQUIRE (f.shownNote (0) <= 48);
+    REQUIRE (f.state().getStepNote (0, 0) == 60);  // but the stored note is untouched
+
+    f.send ("setRange", payload ({ { "index", 0 }, { "min", 40 }, { "max", 50 } }));
+    REQUIRE (f.state().getStepNote (0, 0) == 60);
+}

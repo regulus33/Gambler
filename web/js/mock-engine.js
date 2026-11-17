@@ -40,6 +40,8 @@
       ranges: [{ min: 48, max: 72 }], // up to MAX_RANGES; a note is allowed if it falls in any of them
       bakeScale: false,
       bakeRange: false,
+      rangeFollow: 0,
+      chord: [], // set by the test-only action midiChord: there is no MIDI input in a browser
       prob: Array(64).fill(true),
       probDim: 8,
       probTick: -1,
@@ -66,7 +68,15 @@
     const inScale = (n) => s.scale[((n % 12) + 12) % 12];
     const anyScale = () => s.scale.some(Boolean);
 
-    const inRange = (n) => s.ranges.some((r) => n >= r.min && n <= r.max);
+    // Range follow: a chord on MIDI input replaces the ranges (span) or the whole filter (exact).
+    const chord = () => (s.rangeFollow && s.chord.length ? s.chord : null);
+    const exactChord = () => (s.rangeFollow === 2 ? chord() : null);
+    function inRange(n) {
+      const c = chord();
+      if (c) return n >= c[0] && n <= c[c.length - 1];
+      return s.ranges.some((r) => n >= r.min && n <= r.max);
+    }
+    const rangeBaked = () => s.bakeRange && !s.rangeFollow;
 
     // Closest note that passes `ok`, preferring the lower one on a tie.
     function nearest(n, ok) {
@@ -79,25 +89,58 @@
     }
 
     // What a stored note sounds as: baked constraints are already in the data, so skip them.
-    function quantize(n) {
-      if (n < 0) return n;
-      if (!s.bakeScale && !anyScale()) return -1;
-      return nearest(n, (m) => (s.bakeRange || inRange(m)) && (s.bakeScale || inScale(m)));
+    // Project a stored note from the manual range onto the held chord, keeping its relative height.
+    const manualLo = () => Math.min(...s.ranges.map((r) => r.min));
+    const manualHi = () => Math.max(...s.ranges.map((r) => r.max));
+    const position = (n, lo, hi) => (hi <= lo ? 0.5 : clamp((n - lo) / (hi - lo), 0, 1));
+    function project(n) {
+      const c = chord();
+      const t = position(n, manualLo(), manualHi());
+      if (s.rangeFollow === 2) return c[Math.round(t * (c.length - 1))];
+      return c[0] + Math.round(t * (c[c.length - 1] - c[0]));
+    }
+    function unproject(m) {
+      const c = chord();
+      if (!c) return m;
+      let t = 0.5;
+      if (s.rangeFollow === 2) {
+        let best = 0;
+        c.forEach((note, i) => { if (Math.abs(note - m) < Math.abs(c[best] - m)) best = i; });
+        if (c.length > 1) t = best / (c.length - 1);
+      } else {
+        t = position(m, c[0], c[c.length - 1]);
+      }
+      return manualLo() + Math.round(t * (manualHi() - manualLo()));
     }
 
-    function bake(n) {
-      if (n < 0 || (!s.bakeRange && !s.bakeScale)) return n;
-      if (s.bakeScale && !anyScale()) return -1;
-      return nearest(n, (m) => (!s.bakeRange || inRange(m)) && (!s.bakeScale || inScale(m)));
+    function quantize(n) {
+      if (n < 0) return n;
+      if (chord()) n = project(n);
+      const exact = exactChord();
+      if (exact) return nearest(n, (m) => exact.includes(m));
+      if (!s.bakeScale && !anyScale()) return -1;
+      return nearest(n, (m) => (rangeBaked() || inRange(m)) && (s.bakeScale || inScale(m)));
     }
+
+    // Baking never uses the chord: stored notes only change through the manual scale and ranges.
+    function bake(n) {
+      if (n < 0 || (!rangeBaked() && !s.bakeScale)) return n;
+      if (s.bakeScale && !anyScale()) return -1;
+      const manualRange = (m) => s.ranges.some((r) => m >= r.min && m <= r.max);
+      return nearest(n, (m) => (!rangeBaked() || manualRange(m)) && (!s.bakeScale || inScale(m)));
+    }
+
+    // Notes a gesture or Roll can land on right now.
+    const allowedNote = (n) => (exactChord() ? exactChord().includes(n) : inScale(n) && inRange(n));
 
     function bakeAll() {
       s.steps.forEach((st) => (st.notes = st.notes.map(bake)));
     }
 
+    // Random notes are made in the manual range; playback projects them onto a held chord.
     function randomNote() {
       const pool = [];
-      for (let n = 0; n <= 127; n++) if (inRange(n)) pool.push(n);
+      for (let n = 0; n <= 127; n++) if (s.ranges.some((r) => n >= r.min && n <= r.max)) pool.push(n);
       return pool[Math.floor(Math.random() * pool.length)];
     }
 
@@ -262,6 +305,8 @@
         probPercent: measuredProbPercent(),
         canUndo: undoStack.length > 0,
         ranges: s.ranges.map((r) => ({ ...r })),
+        chord: chord() ? s.chord.slice() : [],
+        allowed: Array.from({ length: 128 }, (_, n) => n).filter(allowedNote),
         learn: { ...s.learn, mappings: { ...s.learn.mappings } },
       };
     }
@@ -302,7 +347,7 @@
         if (!anyScale()) return;
         const st = s.steps[step];
         let n = quantize(st.notes[sub]);
-        const allowed = (m) => inScale(m) && inRange(m);
+        const allowed = allowedNote;
         if (n < 0) {
           n = nearest(Math.round((s.ranges[0].min + s.ranges[0].max) / 2), allowed);
           if (n < 0) return;
@@ -315,14 +360,14 @@
             n = m;
           }
         }
-        st.notes[sub] = n;
+        st.notes[sub] = chord() ? unproject(n) : n;
         audition(step, sub);
       },
       setNote({ step, sub, note, undo }) {
         const st = s.steps[step];
         if (!st || sub < 0 || sub >= st.count) return;
         if (undo) pushUndo();
-        st.notes[sub] = note < 0 ? -1 : bake(clamp(note, 0, 127));
+        st.notes[sub] = note < 0 ? -1 : chord() ? unproject(note) : bake(clamp(note, 0, 127));
         if (note >= 0) audition(step, sub);
       },
       addSub({ step }) {
@@ -348,6 +393,9 @@
       setLength({ length }) {
         s.length = clamp(length, 1, MAX_STEPS);
         if (s.currentStep >= s.length) s.currentStep = -1;
+      },
+      midiChord({ notes }) {
+        s.chord = (notes || []).filter((n) => n >= 0 && n <= 127).sort((a, b) => a - b);
       },
       setPage({ page }) {
         s.page = clamp(page, 0, 7);
@@ -477,6 +525,7 @@
           case 'latch': s.latch = !!value; break;
           case 'bakeScale': s.bakeScale = !!value; if (value) bakeAll(); break;
           case 'bakeRange': s.bakeRange = !!value; if (value) bakeAll(); break;
+          case 'rangeFollow': s.rangeFollow = clamp(Math.round(value), 0, 2); break;
           case 'sound': s.sound = !!value; break;
         }
       },

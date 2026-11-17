@@ -9,6 +9,8 @@
 //     steps[64]   { count, cur, sel, notes[8] }  notes are quantized for display, -1 = rest
 //     scale[12]   bool per pitch class;  latch, bakeScale, bakeRange
 //     ranges[1..3] { min, max } MIDI notes; a note is allowed if it is inside any range
+//     rangeFollow 0 off | 1 span | 2 exact;  chord[] the MIDI chord in use (empty if none)
+//     allowed[]   every note editing and Roll can land on right now (melody grid rows)
 //     prob[64]    bool grid;  probDim (8|4|2), probPercent, probTick
 //     colours[12] '#rrggbb'
 //     bpm, subdivision (0..3), clockMode (0 internal, 1 host, 2 MIDI clock)
@@ -32,11 +34,12 @@
 //   setProbPercent {percent}         probPaint {cell, on}  probReseed  probDivision
 //   playPause  stop
 //   setParam {id, value}             ids: bpm subdivision clockMode channel noteLength
-//                                         previewNotes followStep latch bakeScale bakeRange
+//                                         previewNotes followStep latch bakeScale bakeRange rangeFollow
 //   setColour {pc, colour}           resetColours
 //   savePreset {name}  loadPreset {name}  deletePreset {name}  cyclePreset {dir}
 //   learnToggle  learnSelect {id}  learnClear {id}
 //   exportMidi
+//   midiChord {notes}               mock engine only: stands in for a chord held on MIDI input
 // -------------------------------------------------------------------------
 (function () {
   'use strict';

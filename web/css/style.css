@@ -138,6 +138,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 }
 .range-fill { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--cream); opacity: 0.45; }
 .range-fill.is-active { opacity: 1; }
+/* while a chord sets the range, the manual ranges step back and the chord is drawn on top */
+.range.is-following .range-fill, .range.is-following .range-handle { opacity: 0.25; }
+.range-chord { position: absolute; top: -3px; bottom: -3px; border-radius: 5px; background: var(--accent); pointer-events: none; }
+.range-tick { position: absolute; top: -5px; bottom: -5px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--accent); pointer-events: none; }
+.range-label.is-following { color: var(--accent); }
+.chip.is-follow { background: var(--accent); border-color: var(--accent); color: var(--on-colour); }
+.chip.is-ignored { text-decoration: line-through; opacity: 0.5; }
 .range-handle {
   position: absolute; top: 50%; width: 14px; height: 20px; margin: -10px 0 0 -7px;
   border-radius: 4px; background: var(--mute); border: 2px solid var(--bg);

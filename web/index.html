@@ -50,6 +50,7 @@
         <span id="range-label" class="range-label">C3&#8211;C5</span>
         <button id="range-remove" class="icon-btn small" data-icon="close" aria-label="Remove the selected note range" hidden></button>
         <button id="range-add" class="icon-btn small" data-icon="plus" aria-label="Add a note range"></button>
+        <button id="follow" class="chip" data-learn="follow" title="Let a chord played on MIDI input set the range. Span: from its lowest to its highest note. Exact: only the notes you hold.">Chord off</button>
         <button id="bake-range" class="chip" data-learn="bake-range" title="Write the range into the stored notes instead of applying it while playing.">Bake range</button>
       </div>
     </div>
@@ -109,6 +110,7 @@
         <div class="row"><label for="set-notelen">Note length <b id="set-notelen-val"></b></label><input id="set-notelen" class="slider" type="range" min="10" max="200" step="5"></div>
         <div class="row"><label for="set-preview">Play notes while editing</label><input id="set-preview" class="switch" type="checkbox"></div>
         <div class="row"><label for="set-follow">Follow the playhead</label><input id="set-follow" class="switch" type="checkbox"></div>
+        <div class="row"><span>Chord on MIDI input sets the range</span><div id="set-range-follow" class="seg" data-param="rangeFollow"><button data-v="0">Off</button><button data-v="1">Span</button><button data-v="2">Exact</button></div></div>
       </fieldset>
       <fieldset>
         <legend>Note colours</legend>

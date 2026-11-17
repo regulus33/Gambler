@@ -155,6 +155,9 @@ namespace Params
                 return "note_range_" + String(rangeIndex + 1) + "_max";
             }
 
+            // Range follows the chord held on MIDI input: 0 = off, 1 = span, 2 = exact
+            inline const String RANGE_FOLLOW = "range_follow";
+
             // Scale Latch mode (false = momentary, true = latched)
             inline const String SCALE_LATCH = "scale_latch";
 
@@ -387,6 +390,8 @@ namespace Params
             params.push_back(createIntParam(Keys::ID::extraNoteRangeMin(r), "Note Range " + String(r + 1) + " Min", 0, 127, 60));
             params.push_back(createIntParam(Keys::ID::extraNoteRangeMax(r), "Note Range " + String(r + 1) + " Max", 0, 127, 72));
         }
+
+        params.push_back(createIntParam(Keys::ID::RANGE_FOLLOW, "Range Follows Chord", 0, 2, 0));
 
         // NOTE: Note colours (12 customizable note colors) are now in InternalState
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../data/Params.h"
+#include "HeldNotes.h"
 #include "Scale.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <array>
@@ -15,6 +16,16 @@
  * A note is "allowed" when it is in the scale and inside at least one note range
  * (there can be up to ParamConstants::MAX_NOTE_RANGES of them). Quantizing moves a
  * note to the nearest allowed one, preferring the lower note on a tie.
+ *
+ * Range follow: a chord held on MIDI input can stand in for the ranges.
+ *   Span  - one range from the chord's lowest to highest note (scale still applies)
+ *   Exact - only the chord's notes are allowed (the scale is ignored)
+ * Stored notes are moved proportionally from the manual range onto the chord
+ * rather than to the nearest chord note, so a melody keeps its shape and spreads
+ * over the whole chord the way an arpeggiator would. Editing while a chord is
+ * held stores the inverse, so the note lands where it was put.
+ * It affects playback, editing and random notes, never baked data, and it turns
+ * off Bake range so a chord can't rewrite stored notes.
  *
  * Usage:
  *   ScaleQuantizer sq(apvts);
@@ -184,6 +195,28 @@ public:
     }
 
     // ========================================
+    // RANGE FOLLOWS CHORD
+    // ========================================
+
+    enum class Follow { Off = 0, Span = 1, Exact = 2 };
+
+    Follow followMode() const {
+        return static_cast<Follow>(juce::jlimit(0, 2, getInt(Params::Keys::ID::RANGE_FOLLOW)));
+    }
+
+    HeldNotes& heldNotes() { return held; }
+    const HeldNotes& heldNotes() const { return held; }
+
+    /**
+     * The chord currently standing in for the ranges, or an empty set when it should not.
+     * With Latch off this is the keys down right now; with Latch on, the last chord played.
+     */
+    HeldNotes::Set followChord() const {
+        if (followMode() == Follow::Off) return {};
+        return getBool(Params::Keys::ID::SCALE_LATCH) ? held.latched() : held.held();
+    }
+
+    // ========================================
     // DESTRUCTIVE MODE
     // ========================================
 
@@ -214,6 +247,43 @@ public:
     struct Filter {
         std::bitset<128> allowed;
 
+        // Set when a held chord stands in for the ranges: notes are first projected
+        // from the manual range [fromLo, fromHi] onto the chord.
+        bool remap = false;
+        int fromLo = 0, fromHi = 127;
+        int toLo = 0, toHi = 127;                // Span: the chord's lowest and highest note
+        std::array<int, 128> chordNotes{};       // Exact: the chord, low to high
+        int chordCount = 0;
+
+        /** Where a stored note lands on the chord, before snapping to an allowed note. */
+        int project(int noteNumber) const {
+            const double t = position(noteNumber, fromLo, fromHi);
+            if (chordCount > 0)
+                return chordNotes[static_cast<size_t>(juce::roundToInt(t * (chordCount - 1)))];
+            return toLo + juce::roundToInt(t * (toHi - toLo));
+        }
+
+        /** The stored note that plays as `shownNote` (the inverse of project). */
+        int unproject(int shownNote) const {
+            if (!remap) return shownNote;
+            double t = 0.5;
+            if (chordCount > 0) {
+                int best = 0;
+                for (int i = 1; i < chordCount; ++i)
+                    if (std::abs(chordNotes[static_cast<size_t>(i)] - shownNote)
+                        < std::abs(chordNotes[static_cast<size_t>(best)] - shownNote)) best = i;
+                if (chordCount > 1) t = best / static_cast<double>(chordCount - 1);
+            } else {
+                t = position(shownNote, toLo, toHi);
+            }
+            return fromLo + juce::roundToInt(t * (fromHi - fromLo));
+        }
+
+        static double position(int note, int lo, int hi) {
+            if (hi <= lo) return 0.5;
+            return juce::jlimit(0.0, 1.0, (note - lo) / static_cast<double>(hi - lo));
+        }
+
         /** Nearest allowed note (lower one wins a tie), or -1 if nothing is allowed. */
         int nearest(int noteNumber) const {
             noteNumber = juce::jlimit(0, 127, noteNumber);
@@ -228,18 +298,46 @@ public:
         }
 
         int quantize(int noteNumber) const {
-            return noteNumber < 0 ? noteNumber : nearest(noteNumber);
+            if (noteNumber < 0) return noteNumber;
+            return nearest(remap ? project(noteNumber) : noteNumber);
         }
     };
 
-    Filter makeFilter(bool applyScale, bool applyRange) const {
+    Filter makeFilter(bool applyScale, bool applyRange, bool useChord = true) const {
         Filter f;
-        std::array<bool, 12> scale{};
-        for (int i = 0; i < 12; i++) scale[static_cast<size_t>(i)] = scaleNote(i);
 
         std::array<NoteRange, ParamConstants::MAX_NOTE_RANGES> ranges{};
-        const int count = rangeCount();
+        int count = rangeCount();
         for (int i = 0; i < count; ++i) ranges[static_cast<size_t>(i)] = range(i);
+
+        const auto chord = useChord ? followChord() : HeldNotes::Set{};
+        if (chord.any()) {
+            f.remap = true;
+            f.fromLo = 127;
+            f.fromHi = 0;
+            for (int i = 0; i < count; ++i) {
+                f.fromLo = juce::jmin(f.fromLo, ranges[static_cast<size_t>(i)].min);
+                f.fromHi = juce::jmax(f.fromHi, ranges[static_cast<size_t>(i)].max);
+            }
+            for (int n = 0; n <= 127; ++n)
+                if (chord.test(static_cast<size_t>(n))) f.chordNotes[static_cast<size_t>(f.chordCount++)] = n;
+            f.toLo = f.chordNotes[0];
+            f.toHi = f.chordNotes[static_cast<size_t>(f.chordCount - 1)];
+
+            if (followMode() == Follow::Exact) {
+                f.allowed = chord;
+                return f;
+            }
+
+            // Span: one range from the lowest to the highest chord note
+            f.chordCount = 0;
+            ranges[0] = { f.toLo, f.toHi };
+            count = 1;
+            applyRange = true;
+        }
+
+        std::array<bool, 12> scale{};
+        for (int i = 0; i < 12; i++) scale[static_cast<size_t>(i)] = scaleNote(i);
 
         for (int n = 0; n <= 127; ++n) {
             bool ok = !applyScale || scale[static_cast<size_t>(n % 12)];
@@ -254,13 +352,19 @@ public:
     }
 
     /** What stored notes sound as. Constraints already baked into the data are skipped. */
-    Filter playbackFilter() const { return makeFilter(!destructiveScale(), !destructiveRange()); }
+    Filter playbackFilter() const { return makeFilter(!destructiveScale(), !rangeIsBaked()); }
+
+    /** Bake range only takes effect while range follow is off. */
+    bool rangeIsBaked() const { return destructiveRange() && followMode() == Follow::Off; }
 
     /** Scale and ranges both applied, regardless of destructive mode (for editing gestures). */
     Filter editFilter() const { return makeFilter(true, true); }
 
-    /** Every note inside any range, ignoring the scale (for random generation). */
-    Filter rangeFilter() const { return makeFilter(false, true); }
+    /**
+     * Every note inside any manual range, ignoring the scale (for random generation).
+     * Random notes are made in the manual range; playback projects them onto a held chord.
+     */
+    Filter rangeFilter() const { return makeFilter(false, true, false); }
 
     /**
      * Quantize a note to the global scale and note ranges.
@@ -268,7 +372,7 @@ public:
      * Returns -1 if no note is allowed.
      */
     int quantize(int noteNumber) const {
-        return playbackFilter().nearest(noteNumber);
+        return playbackFilter().quantize(noteNumber);
     }
 
     /**
@@ -278,15 +382,16 @@ public:
     int bake(int noteNumber) const {
         if (noteNumber < 0) return noteNumber;
 
-        const bool bakeR = destructiveRange();
+        const bool bakeR = rangeIsBaked();
         const bool bakeS = destructiveScale();
         if (!bakeR && !bakeS) return noteNumber;
 
-        return makeFilter(bakeS, bakeR).nearest(noteNumber);
+        return makeFilter(bakeS, bakeR, false).nearest(noteNumber);
     }
 
 private:
     APVTS& apvts;
+    HeldNotes held;
 
     int getInt(const juce::String& id) const {
         if (auto* p = apvts.getRawParameterValue(id))
