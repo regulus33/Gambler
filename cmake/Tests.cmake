@@ -40,6 +40,13 @@ target_compile_definitions(Tests PRIVATE $<TARGET_PROPERTY:${PROJECT_NAME},COMPI
 # And give tests access to our shared code
 target_link_libraries(Tests PRIVATE SharedCode Catch2::Catch2)
 
+# On Linux the web view needs the GTK/WebKit headers; juce_add_plugin sets this up
+# for the plugin targets (NEEDS_WEB_BROWSER) but not for this executable.
+if (TARGET juce::pkgconfig_JUCE_BROWSER_LINUX_DEPS)
+    target_link_libraries(Tests PRIVATE juce::pkgconfig_JUCE_BROWSER_LINUX_DEPS)
+    juce_link_with_embedded_linux_subprocess(Tests)
+endif ()
+
 # Make an Xcode Scheme for the test executable so we can run tests in the IDE
 set_target_properties(Tests PROPERTIES
     XCODE_GENERATE_SCHEME ON

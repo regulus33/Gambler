@@ -8,6 +8,7 @@
 #include "Sequence.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <array>
+#include <cstdlib>
 #include <vector>
 
 /**
@@ -169,6 +170,57 @@ public:
         return step(stepIndex).isRest();
     }
 
+    /**
+     * Move a substep's note by whole scale degrees, staying inside the note ranges.
+     * A rest becomes the allowed note nearest the middle of the first range.
+     * @return the new note, or -1 if nothing is allowed.
+     */
+    int shiftStepNote(int stepIndex, int substepIndex, int delta) {
+        const auto filter = scaleQ.editFilter();
+        int note = getQuantizedStepNote(stepIndex, substepIndex);
+
+        if (note < 0) {
+            note = filter.nearest((scaleQ.rangeMin() + scaleQ.rangeMax() + 1) / 2);
+            if (note < 0) return -1;
+        } else {
+            const int dir = delta > 0 ? 1 : -1;
+            for (int k = std::abs(delta); k > 0; --k) {
+                int next = note + dir;
+                while (next >= 0 && next <= 127 && !filter.allowed.test(static_cast<size_t>(next))) next += dir;
+                if (next < 0 || next > 127) break;
+                note = next;
+            }
+        }
+
+        step(stepIndex).setNote(substepIndex, note);
+        return note;
+    }
+
+    /** Append a substep that starts as a copy of the selected one, and select it. */
+    bool addSubstep(int stepIndex) {
+        Step s = step(stepIndex);
+        const int count = s.substepCount();
+        if (count >= ParamConstants::MAX_SUBSTEPS) return false;
+        s.setNote(count, s.note(juce::jlimit(0, count - 1, s.selectedSubstep())));
+        s.setSubstepCount(count + 1);
+        s.setSelectedSubstep(count);
+        return true;
+    }
+
+    /** Remove one substep; later substeps move down. A step always keeps at least one. */
+    bool removeSubstep(int stepIndex, int substepIndex) {
+        Step s = step(stepIndex);
+        const int count = s.substepCount();
+        if (count <= 1 || substepIndex < 0 || substepIndex >= count) return false;
+        for (int i = substepIndex; i < count - 1; ++i)
+            s.setNote(i, s.note(i + 1));
+        s.setNote(count - 1, -1);
+        s.setSubstepCount(count - 1);
+        s.setSelectedSubstep(juce::jlimit(0, count - 2, s.selectedSubstep()));
+        if (s.currentSubstep() >= count - 1) s.setCurrentSubstep(-1);
+        return true;
+    }
+
     // ========================================
     // STEP MODULATIONS (delegated through Step)
     // ========================================
@@ -217,6 +269,12 @@ public:
     void setScaleWindowOffset(int offset) { scaleQ.setWindowOffset(offset); }
     int getScaleWindowSize() const { return scaleQ.windowSize(); }
     void setScaleWindowSize(int size) { scaleQ.setWindowSize(size); }
+
+    int getNoteRangeCount() const { return scaleQ.rangeCount(); }
+    ScaleQuantizer::NoteRange getNoteRange(int index) const { return scaleQ.range(index); }
+    void setNoteRange(int index, int min, int max) { scaleQ.setRange(index, min, max); }
+    bool addNoteRange() { return scaleQ.addRange(); }
+    bool removeNoteRange(int index) { return scaleQ.removeRange(index); }
 
     int getScaleRangeMin() const { return scaleQ.rangeMin(); }
     int getScaleRangeMax() const { return scaleQ.rangeMax(); }

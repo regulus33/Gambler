@@ -203,6 +203,11 @@ void InternalState::setNoteColour(int chromaticNote, juce::Colour colour) {
     tree.setProperty(IDs::noteColour(index), static_cast<int>(colour.getARGB()), nullptr);
 }
 
+void InternalState::resetNoteColours() {
+    for (int i = 0; i < 12; ++i)
+        tree.setProperty(IDs::noteColour(i), defaultNoteColours[i], nullptr);
+}
+
 // ========================================
 // SERIALIZATION
 // ========================================

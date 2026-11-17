@@ -1,5 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "bridge/UiBridge.h"
+#include "web/WebEditor.h"
 
 //==============================================================================
 PluginProcessor::PluginProcessor()
@@ -355,7 +357,17 @@ bool PluginProcessor::hasEditor() const {
 }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor() {
+#if GAMBLER_WEB_UI
+    return new WebEditor (*this);
+#else
     return new PluginEditor (*this);
+#endif
+}
+
+UiBridge& PluginProcessor::getUiBridge() {
+    if (uiBridge == nullptr)
+        uiBridge = std::make_unique<UiBridge> (*this);
+    return *uiBridge;
 }
 
 //==============================================================================
@@ -1140,9 +1152,14 @@ void PluginProcessor::handleScaleNote (MidiControlId controlId, bool isOn) {
             fireTickCallback();
         }
     } else {
-        if (isOn != currentState) {
-            state.setGlobalScaleNote (noteIndex, isOn);
-            DBG ("  → Global scale note " << noteIndex << " momentary set to " << (isOn ? "ON" : "OFF"));
+        // Several MIDI notes can share a pitch class (C3 and C4 in one chord), so a key
+        // stays on until the last of them is released.
+        auto& held = heldScaleNotes[static_cast<size_t> (noteIndex)];
+        held = isOn ? held + 1 : juce::jmax (0, held - 1);
+        const bool shouldBeOn = held > 0;
+        if (shouldBeOn != currentState) {
+            state.setGlobalScaleNote (noteIndex, shouldBeOn);
+            DBG ("  → Global scale note " << noteIndex << " momentary set to " << (shouldBeOn ? "ON" : "OFF"));
             fireTickCallback();
         }
     }
@@ -1243,6 +1260,19 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             break;
         case MidiControlId::DESTRUCTIVE_RANGE:
             toggleParamOnPress (Params::Keys::ID::PREF_DESTRUCTIVE_RANGE, isNoteOnOrCCPositive);
+            break;
+
+        case MidiControlId::BUTTON_DUPLICATE:
+            setTriggerParam (Params::Keys::ID::DUPLICATE, isNoteOnOrCCPositive);
+            break;
+        case MidiControlId::BUTTON_SHUFFLE:
+            setTriggerParam (Params::Keys::ID::SHUFFLE, isNoteOnOrCCPositive);
+            break;
+        case MidiControlId::BUTTON_RANDOMIZE:
+            setTriggerParam (Params::Keys::ID::RANDOMIZE_STEP, isNoteOnOrCCPositive);
+            break;
+        case MidiControlId::BUTTON_CLEAR:
+            setTriggerParam (Params::Keys::ID::CLEAR_STEP, isNoteOnOrCCPositive);
             break;
 
         case MidiControlId::COUNT:

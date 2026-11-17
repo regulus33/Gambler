@@ -11,8 +11,8 @@
   const MAX_RANGES = 3;
   const PPQ = [1, 2, 4, 8]; // quarter, eighth, sixteenth, thirty-second
   const DEFAULT_COLOURS = [
-    '#FF6B6B', '#FF9F6B', '#FFD66B', '#FFE66B', '#E6FF6B', '#6BFFB4',
-    '#6BFFD6', '#6BD6FF', '#6BB4FF', '#9F6BFF', '#D66BFF', '#FF6BD6',
+    '#ff6b6b', '#ff8e53', '#ffd93d', '#6bcb77', '#4ecdc4', '#45b7d1',
+    '#5c7aea', '#9b59b6', '#e056fd', '#ff6b9d', '#ff9f43', '#feca57',
   ];
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -341,6 +341,7 @@
         s.length = clamp(length, 1, MAX_STEPS);
         if (s.currentStep >= s.length) s.currentStep = -1;
       },
+      setPage() {},
       roll({ on }) {
         s.roll = !!on;
       },

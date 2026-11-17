@@ -163,6 +163,7 @@ public:
     // ========================================
     juce::Colour getNoteColour(int chromaticNote) const;
     void setNoteColour(int chromaticNote, juce::Colour colour);
+    void resetNoteColours();
 
     // ========================================
     // SERIALIZATION

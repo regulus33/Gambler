@@ -79,6 +79,13 @@ enum class MidiControlId {
     DESTRUCTIVE_SCALE,
     DESTRUCTIVE_RANGE,
 
+    // ========== FLAT ACTION BUTTONS (web UI: no shift layer) ==========
+    // Appended after the original ids: mappings are saved by number, so the order above must not change.
+    BUTTON_DUPLICATE,
+    BUTTON_SHUFFLE,
+    BUTTON_RANDOMIZE,
+    BUTTON_CLEAR,
+
     // ========== Total count ==========
     COUNT
 };
@@ -151,6 +158,11 @@ inline std::string getMidiControlName(MidiControlId id) {
 
         case MidiControlId::DESTRUCTIVE_SCALE: return "Bake Scale";
         case MidiControlId::DESTRUCTIVE_RANGE: return "Bake Range";
+
+        case MidiControlId::BUTTON_DUPLICATE: return "Duplicate";
+        case MidiControlId::BUTTON_SHUFFLE:   return "Shuffle";
+        case MidiControlId::BUTTON_RANDOMIZE: return "Randomize Step";
+        case MidiControlId::BUTTON_CLEAR:     return "Clear Step";
 
         default: return "Unknown Control";
     }

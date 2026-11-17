@@ -21,6 +21,7 @@ namespace ParamConstants {
     constexpr int MAX_SUBSTEPS = 8;
     constexpr int NUM_MODULATIONS = 7;
     constexpr int NUM_SCALE_NOTES = 12;
+    constexpr int MAX_NOTE_RANGES = 3;
     constexpr int DEFAULT_NOTE = 60;  // Middle C
     constexpr int DEFAULT_VELOCITY = 100;
     constexpr int DEFAULT_LENGTH = 8;
@@ -143,6 +144,16 @@ namespace Params
             // Note range
             inline const String NOTE_RANGE_MIN = "note_range_min";
             inline const String NOTE_RANGE_MAX = "note_range_max";
+
+            // Additional note ranges. Range 1 is the scale window above; ranges 2..N are
+            // plain MIDI min/max pairs. A note is allowed if it falls inside any active range.
+            inline const String NOTE_RANGE_COUNT = "note_range_count";  // 1..MAX_NOTE_RANGES
+            inline String extraNoteRangeMin(int rangeIndex) {  // rangeIndex 1..MAX_NOTE_RANGES-1
+                return "note_range_" + String(rangeIndex + 1) + "_min";
+            }
+            inline String extraNoteRangeMax(int rangeIndex) {
+                return "note_range_" + String(rangeIndex + 1) + "_max";
+            }
 
             // Scale Latch mode (false = momentary, true = latched)
             inline const String SCALE_LATCH = "scale_latch";
@@ -370,6 +381,12 @@ namespace Params
 
         params.push_back(createIntParam(Keys::ID::NOTE_RANGE_MIN, Keys::LABEL::NOTE_RANGE_MIN, 0, 127, 0));
         params.push_back(createIntParam(Keys::ID::NOTE_RANGE_MAX, Keys::LABEL::NOTE_RANGE_MAX, 0, 127, 127));
+
+        params.push_back(createIntParam(Keys::ID::NOTE_RANGE_COUNT, "Note Range Count", 1, ParamConstants::MAX_NOTE_RANGES, 1));
+        for (int r = 1; r < ParamConstants::MAX_NOTE_RANGES; ++r) {
+            params.push_back(createIntParam(Keys::ID::extraNoteRangeMin(r), "Note Range " + String(r + 1) + " Min", 0, 127, 60));
+            params.push_back(createIntParam(Keys::ID::extraNoteRangeMax(r), "Note Range " + String(r + 1) + " Max", 0, 127, 72));
+        }
 
         // NOTE: Note colours (12 customizable note colors) are now in InternalState
 

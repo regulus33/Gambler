@@ -17,13 +17,14 @@
 //     learn       { active, selected, mappings: { controlId: 'CC 21' } }
 //     canUndo
 //   tick   { step, sub, note, probTick }  once per sequencer step
+//   noteOff  the sounding note ended (clears the key highlight)
 //   toast  string
 //
 // UI -> engine actions: send(action, payload)
 //   selectStep {step, audition}      selectSub {step, sub, audition}   jumpTo {step}
 //   shiftNote {step, sub, delta}     delta in scale degrees, staying inside the note ranges
 //   addSub {step}                    removeSub {step, sub}
-//   setLength {length}               roll {on}
+//   setLength {length}               roll {on}     setPage {page}  (which 8 steps are visible)
 //   nudge {dir}  duplicate  shuffle  randomize {scope}  clear {scope}  undo
 //                                    scope: 'step' | 'all'
 //   setScaleNote {pc, on}            setRange {index, min, max}  addRange  removeRange {index}
@@ -40,7 +41,7 @@
   'use strict';
   const G = (window.Gambler = window.Gambler || {});
 
-  const handlers = { state: [], tick: [], toast: [] };
+  const handlers = { state: [], tick: [], noteOff: [], toast: [] };
   const emit = (type, data) => (handlers[type] || []).forEach((fn) => fn(data));
 
   const native = window.__JUCE__ && window.__JUCE__.backend;

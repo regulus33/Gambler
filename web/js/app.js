@@ -1,6 +1,9 @@
 // Gambler UI. Renders the latest engine snapshot and turns gestures into
 // bridge actions. It holds no sequencer logic of its own; the only local state
 // is view state (which page is showing, what is being dragged).
+//
+// Keep every file under web/ ASCII-only (use \uXXXX escapes or HTML entities):
+// some web views misread non-ASCII bytes in resources the plugin serves.
 (function () {
   'use strict';
   const { bridge, icons, keys: keyGeom } = window.Gambler;
@@ -101,7 +104,7 @@
   ACTIONS.forEach((a) => {
     const btn = el('button', 'action', icons[a.icon] +
       '<span class="action-text"><b>' + a.label + '</b>' + (a.hint ? '<small>' + a.hint + '</small>' : '') + '</span>');
-    btn.dataset.learn = a.id;
+    if (a.id !== 'undo') btn.dataset.learn = a.id;
     $('#actions').appendChild(btn);
     actionEls[a.id] = btn;
 
@@ -160,6 +163,10 @@
   function draw() {
     const len = ui.lenPreview != null ? ui.lenPreview : S.length;
     ui.page = clamp(ui.page, 0, Math.min(7, Math.floor(S.length / 8)));
+    if (ui.page !== ui.sentPage) {
+      ui.sentPage = ui.page; // MIDI-mapped step buttons act on the visible page
+      send('setPage', { page: ui.page });
+    }
     const playing = S.transport !== 'stopped';
 
     document.body.classList.toggle('is-playing', S.transport === 'playing');
@@ -217,8 +224,8 @@
         (isNote && selStep.count > 1 ? ' can-remove' : '') +
         (isNote && selStep.count > 1 && i === shownSub(selStep) ? ' is-cur' : '');
       root.style.setProperty('--c', note >= 0 ? S.colours[note % 12] : '');
-      slot.note.innerHTML = isAdd ? icons.plus : note >= 0 ? noteName(note) : '–';
-      root.setAttribute('aria-label', isAdd ? 'Add a note to this step’s cycle' : 'Cycle note ' + (i + 1));
+      slot.note.innerHTML = isAdd ? icons.plus : note >= 0 ? noteName(note) : '\u2013';
+      root.setAttribute('aria-label', isAdd ? 'Add a note to this step\u2019s cycle' : 'Cycle note ' + (i + 1));
     });
 
     pageDots.forEach((dot, i) => {
@@ -241,7 +248,7 @@
         (editing ? ' is-dragging' : '');
       pad.root.style.setProperty('--c', note >= 0 ? S.colours[note % 12] : '');
       pad.index.textContent = abs + 1;
-      pad.note.textContent = ghost ? '' : note >= 0 ? noteName(note) : '–';
+      pad.note.textContent = ghost ? '' : note >= 0 ? noteName(note) : '\u2013';
       pad.pips.innerHTML = !ghost && st.count > 1
         ? Array.from({ length: st.count }, (_, k) => '<i' + (k === shownSub(st) ? ' class="is-cur"' : '') + '></i>').join('')
         : '';
@@ -279,7 +286,7 @@
       Object.values(parts).forEach((node) => node.classList.toggle('is-active', i === ui.range));
     });
     const active = S.ranges[ui.range];
-    $('#range-label').textContent = noteName(active.min) + '–' + noteName(active.max);
+    $('#range-label').textContent = noteName(active.min) + '\u2013' + noteName(active.max);
     $('#range-add').hidden = S.ranges.length >= 3;
     $('#range-remove').hidden = S.ranges.length < 2;
   }
@@ -306,7 +313,7 @@
       cell.classList.toggle('is-tick', S.transport !== 'stopped' && i === S.probTick);
     });
     $('#prob-val').textContent = S.probPercent + '%';
-    $('#prob-div').textContent = probDim + '×' + probDim;
+    $('#prob-div').textContent = probDim + '\u00d7' + probDim;
     const slider = $('#prob-slider');
     if (document.activeElement !== slider || !slider.matches(':active')) slider.value = S.probPercent;
   }
@@ -323,7 +330,7 @@
       node.classList.toggle('is-learn-selected', S.learn.active && id === selected);
     });
     const canClear = !!(ui.learnFocus && S.learn.mappings[ui.learnFocus]);
-    $('#learn-text').textContent = selected ? 'Move a knob or play a key…' : 'Tap a control to map it';
+    $('#learn-text').textContent = selected ? 'Move a knob or play a key\u2026' : 'Tap a control to map it';
     $('#learn-text').hidden = canClear && !selected;
     $('#learn-clear').hidden = !canClear || !!selected;
   }
@@ -790,6 +797,11 @@
     S.steps[t.step].cur = t.sub;
     ui.playedPc = t.note >= 0 ? t.note % 12 : -1;
     if (S.followStep) ui.page = Math.floor(t.step / 8);
+    render();
+  });
+
+  bridge.on('noteOff', () => {
+    ui.playedPc = -1;
     render();
   });
 

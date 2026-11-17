@@ -96,6 +96,9 @@ juce_add_plugin("${PROJECT_NAME}"
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT TRUE
 
+    # The editor is a web view (see /web and source/web/WebEditor)
+    NEEDS_WEB_BROWSER TRUE
+
     # The name of your final executable
     # This is how it's listed in the DAW
     # This can be different from PROJECT_NAME and can have spaces!
@@ -157,8 +160,8 @@ target_compile_definitions(SharedCode
     SHOW_MIDI_KEYBOARD=0  # Set to 1 to show the virtual MIDI keyboard strip in standalone
     TAKE_SNAPSHOTS_OF_COMPONENTS=0  # Set to 1 enable hitting s snapshots every component in tree...
     SNAPSHOT_DESTINATION="${CMAKE_SOURCE_DIR}/component_snapshots"
-    # JUCE_WEB_BROWSER and JUCE_USE_CURL off by default
-    JUCE_WEB_BROWSER=0  # If you set this to 1, add `NEEDS_WEB_BROWSER TRUE` to the `juce_add_plugin` call
+    GAMBLER_WEB_UI=1  # 1 = web view editor (/web), 0 = the original JUCE component editor
+    JUCE_WEB_BROWSER=1  # needs `NEEDS_WEB_BROWSER TRUE` in the `juce_add_plugin` call
     JUCE_USE_CURL=0     # If you set this to 1, add `NEEDS_CURL TRUE` to the `juce_add_plugin` call
     JUCE_VST3_CAN_REPLACE_VST2=0
     JUCE_CONTENT_SHARING=1

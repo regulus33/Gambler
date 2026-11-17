@@ -268,10 +268,15 @@ public:
         thread_local std::random_device rd;
         thread_local std::mt19937 gen(rd());
 
-        int rMin = scaleQ.rangeMin();
-        int rMax = scaleQ.rangeMax();
-        std::uniform_int_distribution<> dis(rMin, rMax);
-        return dis(gen);
+        // Uniform over every note that sits inside any range.
+        const auto pool = scaleQ.rangeFilter().allowed;
+        const int count = static_cast<int>(pool.count());
+        if (count == 0) return scaleQ.rangeMin();
+        std::uniform_int_distribution<> dis(0, count - 1);
+        int pick = dis(gen);
+        for (int n = 0; n <= 127; ++n)
+            if (pool.test(static_cast<size_t>(n)) && pick-- == 0) return n;
+        return scaleQ.rangeMin();
     }
 
     void randomizeStepNote(int stepIndex) {

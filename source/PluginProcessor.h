@@ -20,6 +20,8 @@
 
 using APVTS = juce::AudioProcessorValueTreeState;
 
+class UiBridge;
+
 class PluginProcessor : public juce::AudioProcessor, private juce::AudioProcessorValueTreeState::Listener
 {
 public:
@@ -164,6 +166,12 @@ public:
     juce::MidiKeyboardState& getKeyboardState() noexcept { return keyboardState; }
 
     /**
+     * The bridge the web UI talks to. Created on first use (message thread) and
+     * kept for the life of the processor, so it keeps running between editor opens.
+     */
+    UiBridge& getUiBridge();
+
+    /**
      * Get the current plugin state as XML (for preset saving)
      * This creates a complete snapshot of all state that should be saved.
      */
@@ -267,6 +275,12 @@ private:
     // Virtual keyboard state — MidiKeyboardComponent writes note-on/off here from the UI thread,
     // processNextMidiBuffer() drains them into the audio MIDI buffer.
     juce::MidiKeyboardState keyboardState;
+
+    // How many held MIDI notes currently map to each scale key (momentary mode).
+    std::array<int, 12> heldScaleNotes {};
+
+    // Declared after everything it observes so it is destroyed first.
+    std::unique_ptr<UiBridge> uiBridge;
 
     // Helper function to create parameter layout
     static APVTS::ParameterLayout createParameterLayout();
