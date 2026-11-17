@@ -300,10 +300,10 @@
       else delete node.dataset.map;
       node.classList.toggle('is-learn-selected', S.learn.active && id === selected);
     });
-    $('#learn-text').textContent = selected
-      ? 'Now move a knob or play a key on your controller…'
-      : 'MIDI learn: tap a control, then move a knob or key on your controller.';
-    $('#learn-clear').hidden = !(ui.learnFocus && S.learn.mappings[ui.learnFocus]);
+    const canClear = !!(ui.learnFocus && S.learn.mappings[ui.learnFocus]);
+    $('#learn-text').textContent = selected ? 'Move a knob or play a key…' : 'Tap a control to map it';
+    $('#learn-text').hidden = canClear && !selected;
+    $('#learn-clear').hidden = !canClear || !!selected;
   }
 
   function drawSettings() {
@@ -641,7 +641,9 @@
     const a = anchor.getBoundingClientRect();
     const p = popover.getBoundingClientRect();
     popover.style.top = Math.min(a.bottom + 6, window.innerHeight - p.height - 8) + 'px';
-    popover.style.left = clamp(a.right - p.width, 8, window.innerWidth - p.width - 8) + 'px';
+    // open towards whichever side of the window has room
+    const left = a.left + a.width / 2 < window.innerWidth / 2 ? a.left : a.right - p.width;
+    popover.style.left = clamp(left, 8, window.innerWidth - p.width - 8) + 'px';
   }
   function closePopover() {
     popover.hidden = true;

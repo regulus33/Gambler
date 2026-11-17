@@ -144,8 +144,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .range-label { font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 4.8em; text-align: center; }
 
 .prob-panel {
-  flex: none; width: clamp(118px, 15vw, 180px);
-  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px;
+  flex: none; width: clamp(140px, 18vw, 200px);
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px;
   padding: 8px; border: 1.5px solid var(--line); border-radius: var(--r);
 }
 .panel-head { display: flex; align-items: baseline; justify-content: space-between; }
@@ -318,6 +318,9 @@ legend { padding: 14px 0 6px; font-size: 10px; font-weight: 700; letter-spacing:
   content: attr(data-map); position: absolute; top: 2px; right: 2px; z-index: 3;
   padding: 2px 5px; border-radius: 4px; background: var(--accent); color: var(--on-colour); font-size: 9.5px; font-weight: 700; white-space: nowrap;
 }
+/* keys are SVG paths: mark them with their own stroke instead of a bounding-box outline */
+.is-learning .keys path { outline: none; stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 6 4; }
+.is-learning .keys path.is-learn-selected { stroke: var(--cream); stroke-dasharray: none; animation: none; }
 .is-learning .chip[data-learn], .is-learning .icon-btn[data-learn], .is-learning .range { position: relative; }
 @keyframes learn-pulse { from { outline-color: var(--accent); } to { outline-color: var(--cream); } }
 
