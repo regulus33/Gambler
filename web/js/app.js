@@ -761,7 +761,14 @@
       // rows and note names
       ctx.textBaseline = 'middle';
       ctx.font = '600 ' + Math.min(11, Math.max(8, rowH - 3)) + 'px Inter, system-ui, sans-serif';
-      for (let v = 0; v < visible; v++) {
+      // nothing allowed (e.g. Latch off with no scale keys held): say so instead of an empty row
+      if (!rows.length) {
+        ctx.fillStyle = C.mute;
+        ctx.textAlign = 'center';
+        ctx.fillText('No notes allowed: turn on scale keys or hold a chord', GUTTER + (w - GUTTER) / 2, gridH / 2);
+        ctx.textAlign = 'left';
+      }
+      for (let v = 0; v < Math.min(visible, rows.length); v++) {
         const note = rows[scroll + v];
         const y = v * rowH;
         if (note % 12 === 0) { ctx.fillStyle = 'rgba(255,255,255,0.045)'; ctx.fillRect(GUTTER, y, w - GUTTER, rowH); }
@@ -870,7 +877,8 @@
         y,
         gutter: x < GUTTER,
         col: Math.floor((x - GUTTER) / geo.colW),
-        note: y >= geo.gridH ? -1 : geo.rows[scroll + row],
+        // null: over the grid but there are no rows to land on
+        note: y >= geo.gridH ? -1 : geo.rows.length ? geo.rows[scroll + row] : null,
       };
     }
 
@@ -893,6 +901,7 @@
 
       if (at.gutter) { g = { mode: 'scroll', y: at.y, from: scroll }; return; }
       if (at.col >= geo.len) { g = { mode: 'extend', col: at.col }; return; }
+      if (at.note == null) return;
 
       const st = S.steps[at.col];
       const shown = shownSub(st);
@@ -923,6 +932,8 @@
       if (g.mode === 'scroll') {
         scroll = clamp(g.from - Math.round((at.y - g.y) / geo.rowH), 0, geo.maxScroll);
         render();
+      } else if (at.note == null) {
+        return;
       } else if (g.mode === 'move') {
         if (at.note === g.note) return;
         g.note = at.note;
