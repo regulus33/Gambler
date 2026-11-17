@@ -8,7 +8,7 @@
 //     length, selectedStep, currentStep, transport ('stopped'|'playing'|'paused'), roll
 //     steps[64]   { count, cur, sel, notes[8] }  notes are quantized for display, -1 = rest
 //     scale[12]   bool per pitch class;  latch, bakeScale, bakeRange
-//     rangeMin, rangeMax (MIDI notes)
+//     ranges[1..3] { min, max } MIDI notes; a note is allowed if it is inside any range
 //     prob[64]    bool grid;  probDim (8|4|2), probPercent, probTick
 //     colours[12] '#rrggbb'
 //     bpm, subdivision (0..3), clockMode (0 internal, 1 host, 2 MIDI clock)
@@ -21,12 +21,12 @@
 //
 // UI -> engine actions: send(action, payload)
 //   selectStep {step, audition}      selectSub {step, sub, audition}   jumpTo {step}
-//   shiftNote {step, sub, delta}     delta in scale degrees, clamped to the note range
+//   shiftNote {step, sub, delta}     delta in scale degrees, staying inside the note ranges
 //   addSub {step}                    removeSub {step, sub}
 //   setLength {length}               roll {on}
 //   nudge {dir}  duplicate  shuffle  randomize {scope}  clear {scope}  undo
 //                                    scope: 'step' | 'all'
-//   setScaleNote {pc, on}            setRange {min, max}
+//   setScaleNote {pc, on}            setRange {index, min, max}  addRange  removeRange {index}
 //   setProbPercent {percent}         probPaint {cell, on}  probReseed  probDivision
 //   playPause  stop
 //   setParam {id, value}             ids: bpm subdivision clockMode channel noteLength

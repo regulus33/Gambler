@@ -41,10 +41,12 @@
       <div class="scale-tools">
         <button id="latch" class="chip" data-learn="latch" title="On: tap keys to toggle them. Off: a key is in the scale only while held.">Latch</button>
         <button id="bake-scale" class="chip" data-learn="bake-scale" title="Write the scale into the stored notes instead of applying it while playing.">Bake scale</button>
-        <div id="range" class="range" data-learn="range" role="group" aria-label="Note range">
-          <div class="range-track"><div class="range-fill"></div><div class="range-handle" data-h="min"></div><div class="range-handle" data-h="max"></div></div>
+        <div id="range" class="range" data-learn="range" role="group" aria-label="Note ranges">
+          <div id="range-track" class="range-track"></div>
         </div>
         <span id="range-label" class="range-label">C3–C5</span>
+        <button id="range-remove" class="icon-btn small" data-icon="close" aria-label="Remove the selected note range" hidden></button>
+        <button id="range-add" class="icon-btn small" data-icon="plus" aria-label="Add a note range"></button>
         <button id="bake-range" class="chip" data-learn="bake-range" title="Write the range into the stored notes instead of applying it while playing.">Bake range</button>
       </div>
     </div>

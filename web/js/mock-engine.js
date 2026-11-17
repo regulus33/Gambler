@@ -8,6 +8,7 @@
 
   const MAX_STEPS = 64;
   const MAX_SUBS = 8;
+  const MAX_RANGES = 3;
   const PPQ = [1, 2, 4, 8]; // quarter, eighth, sixteenth, thirty-second
   const DEFAULT_COLOURS = [
     '#FF6B6B', '#FF9F6B', '#FFD66B', '#FFE66B', '#E6FF6B', '#6BFFB4',
@@ -35,8 +36,7 @@
       steps: [],
       scale: [1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0].map(Boolean), // C minor pentatonic
       latch: true,
-      rangeMin: 48,
-      rangeMax: 72,
+      ranges: [{ min: 48, max: 72 }], // up to MAX_RANGES; a note is allowed if it falls in any of them
       bakeScale: false,
       bakeRange: false,
       prob: Array(64).fill(true),
@@ -65,41 +65,40 @@
     const inScale = (n) => s.scale[((n % 12) + 12) % 12];
     const anyScale = () => s.scale.some(Boolean);
 
-    function nearestInScale(n, lo, hi) {
-      if (inScale(n)) return n;
+    const inRange = (n) => s.ranges.some((r) => n >= r.min && n <= r.max);
+
+    // Closest note that passes `ok`, preferring the lower one on a tie.
+    function nearest(n, ok) {
+      if (ok(n)) return n;
       for (let d = 1; d <= 127; d++) {
-        const down = n - d;
-        const up = n + d;
-        if (down >= lo && inScale(down)) return down;
-        if (up <= hi && inScale(up)) return up;
-        if (down < lo && up > hi) break;
+        if (n - d >= 0 && ok(n - d)) return n - d;
+        if (n + d <= 127 && ok(n + d)) return n + d;
       }
       return -1;
     }
 
+    // What a stored note sounds as: baked constraints are already in the data, so skip them.
     function quantize(n) {
       if (n < 0) return n;
-      if (!s.bakeRange) n = clamp(n, s.rangeMin, s.rangeMax);
-      if (s.bakeScale) return n;
-      if (!anyScale()) return -1;
-      return nearestInScale(n, s.bakeRange ? 0 : s.rangeMin, s.bakeRange ? 127 : s.rangeMax);
+      if (!s.bakeScale && !anyScale()) return -1;
+      return nearest(n, (m) => (s.bakeRange || inRange(m)) && (s.bakeScale || inScale(m)));
     }
 
     function bake(n) {
       if (n < 0 || (!s.bakeRange && !s.bakeScale)) return n;
-      if (s.bakeRange) n = clamp(n, s.rangeMin, s.rangeMax);
-      if (s.bakeScale) {
-        if (!anyScale()) return -1;
-        n = nearestInScale(n, s.bakeRange ? s.rangeMin : 0, s.bakeRange ? s.rangeMax : 127);
-      }
-      return n;
+      if (s.bakeScale && !anyScale()) return -1;
+      return nearest(n, (m) => (!s.bakeRange || inRange(m)) && (!s.bakeScale || inScale(m)));
     }
 
     function bakeAll() {
       s.steps.forEach((st) => (st.notes = st.notes.map(bake)));
     }
 
-    const randomNote = () => s.rangeMin + Math.floor(Math.random() * (s.rangeMax - s.rangeMin + 1));
+    function randomNote() {
+      const pool = [];
+      for (let n = 0; n <= 127; n++) if (inRange(n)) pool.push(n);
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
 
     // ---------- probability ----------
     let probOrder = [];
@@ -261,6 +260,7 @@
         })),
         probPercent: measuredProbPercent(),
         canUndo: undoStack.length > 0,
+        ranges: s.ranges.map((r) => ({ ...r })),
         learn: { ...s.learn, mappings: { ...s.learn.mappings } },
       };
     }
@@ -301,15 +301,16 @@
         if (!anyScale()) return;
         const st = s.steps[step];
         let n = quantize(st.notes[sub]);
+        const allowed = (m) => inScale(m) && inRange(m);
         if (n < 0) {
-          n = nearestInScale(Math.round((s.rangeMin + s.rangeMax) / 2), s.rangeMin, s.rangeMax);
+          n = nearest(Math.round((s.ranges[0].min + s.ranges[0].max) / 2), allowed);
           if (n < 0) return;
         } else {
           const dir = Math.sign(delta);
           for (let k = Math.abs(delta); k > 0; k--) {
             let m = n + dir;
-            while (m >= s.rangeMin && m <= s.rangeMax && !inScale(m)) m += dir;
-            if (m < s.rangeMin || m > s.rangeMax) break;
+            while (m >= 0 && m <= 127 && !allowed(m)) m += dir;
+            if (m < 0 || m > 127) break;
             n = m;
           }
         }
@@ -395,9 +396,24 @@
         s.scale[pc] = !!on;
         if (s.bakeScale) bakeAll();
       },
-      setRange({ min, max }) {
-        s.rangeMin = clamp(Math.min(min, max), 0, 127);
-        s.rangeMax = clamp(Math.max(min, max), 0, 127);
+      setRange({ index, min, max }) {
+        if (!s.ranges[index]) return;
+        s.ranges[index] = { min: clamp(Math.min(min, max), 0, 127), max: clamp(Math.max(min, max), 0, 127) };
+        if (s.bakeRange) bakeAll();
+      },
+      // New ranges start as the octave above the highest one, or below the lowest if there is no room.
+      addRange() {
+        if (s.ranges.length >= MAX_RANGES) return;
+        const top = Math.max(...s.ranges.map((r) => r.max));
+        const bottom = Math.min(...s.ranges.map((r) => r.min));
+        if (top + 13 <= 127) s.ranges.push({ min: top + 2, max: top + 13 });
+        else if (bottom - 13 >= 0) s.ranges.push({ min: bottom - 13, max: bottom - 2 });
+        else s.ranges.push({ min: 60, max: 71 });
+        if (s.bakeRange) bakeAll();
+      },
+      removeRange({ index }) {
+        if (s.ranges.length <= 1 || !s.ranges[index]) return;
+        s.ranges.splice(index, 1);
         if (s.bakeRange) bakeAll();
       },
 

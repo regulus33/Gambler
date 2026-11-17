@@ -24,7 +24,7 @@
   const HOLD_MS = 550;    // hold time for "apply to all"
 
   let S = null; // latest engine snapshot
-  const ui = { page: 0, drag: null, lenPreview: null, playedPc: -1 };
+  const ui = { page: 0, drag: null, lenPreview: null, playedPc: -1, range: 0 };
 
   // ================================================================ build
   $$('[data-icon]').forEach((node) => node.insertAdjacentHTML('afterbegin', icons[node.dataset.icon]));
@@ -184,13 +184,7 @@
     $('#bake-range').classList.toggle('is-on', S.bakeRange);
 
     // ---- range
-    const lo = (S.rangeMin / 127) * 100;
-    const hi = (S.rangeMax / 127) * 100;
-    $('.range-fill').style.left = lo + '%';
-    $('.range-fill').style.width = hi - lo + '%';
-    $('[data-h="min"]').style.left = lo + '%';
-    $('[data-h="max"]').style.left = hi + '%';
-    $('#range-label').textContent = noteName(S.rangeMin) + '–' + noteName(S.rangeMax);
+    drawRanges();
 
     // ---- chance
     drawProb();
@@ -260,6 +254,34 @@
 
     drawLearn();
     if (!$('#sheet').hidden) drawSettings();
+  }
+
+  let rangeEls = [];
+  function drawRanges() {
+    const track = $('#range-track');
+    if (rangeEls.length !== S.ranges.length) {
+      track.innerHTML = '';
+      rangeEls = S.ranges.map(() => {
+        const parts = { fill: el('div', 'range-fill'), min: el('div', 'range-handle'), max: el('div', 'range-handle') };
+        track.append(parts.fill, parts.min, parts.max);
+        return parts;
+      });
+    }
+    ui.range = clamp(ui.range, 0, S.ranges.length - 1);
+    S.ranges.forEach((r, i) => {
+      const lo = (r.min / 127) * 100;
+      const hi = (r.max / 127) * 100;
+      const parts = rangeEls[i];
+      parts.fill.style.left = lo + '%';
+      parts.fill.style.width = hi - lo + '%';
+      parts.min.style.left = lo + '%';
+      parts.max.style.left = hi + '%';
+      Object.values(parts).forEach((node) => node.classList.toggle('is-active', i === ui.range));
+    });
+    const active = S.ranges[ui.range];
+    $('#range-label').textContent = noteName(active.min) + '–' + noteName(active.max);
+    $('#range-add').hidden = S.ranges.length >= 3;
+    $('#range-remove').hidden = S.ranges.length < 2;
   }
 
   let probDim = 0;
@@ -504,7 +526,7 @@
   // ---- note range: drag a handle, or drag the filled part to move the whole range
   (function () {
     const range = $('#range');
-    const track = $('.range-track');
+    const track = $('#range-track');
     let g = null;
     const noteAt = (e) => {
       const r = track.getBoundingClientRect();
@@ -513,25 +535,32 @@
     range.addEventListener('pointerdown', (e) => {
       range.setPointerCapture(e.pointerId);
       const n = noteAt(e);
-      const r = track.getBoundingClientRect();
-      const px = (note) => r.left + (note / 127) * r.width;
-      const nearMin = Math.abs(e.clientX - px(S.rangeMin));
-      const nearMax = Math.abs(e.clientX - px(S.rangeMax));
-      let mode;
-      if (Math.min(nearMin, nearMax) <= 16) mode = nearMin < nearMax || (nearMin === nearMax && n < S.rangeMin) ? 'min' : 'max';
-      else if (n > S.rangeMin && n < S.rangeMax) mode = 'move';
-      else mode = n <= S.rangeMin ? 'min' : 'max';
-      g = { mode, from: n, min: S.rangeMin, max: S.rangeMax };
+      const rect = track.getBoundingClientRect();
+      const px = (note) => rect.left + (note / 127) * rect.width;
+      // nearest handle across all ranges; the selected range wins ties
+      let best = null;
+      S.ranges.forEach((r, index) => ['min', 'max'].forEach((mode) => {
+        const dist = Math.abs(e.clientX - px(r[mode])) - (index === ui.range ? 0.5 : 0);
+        if (!best || dist < best.dist) best = { index, mode, dist };
+      }));
+      const inside = S.ranges.findIndex((r, i) => n > r.min && n < r.max && (i === ui.range || !(n > S.ranges[ui.range].min && n < S.ranges[ui.range].max)));
+      const index = best.dist <= 12 || inside < 0 ? best.index : inside;
+      const mode = best.dist <= 12 || inside < 0 ? best.mode : 'move';
+      ui.range = index;
+      g = { index, mode, from: n, min: S.ranges[index].min, max: S.ranges[index].max };
       if (mode !== 'move') drag(e);
+      render();
     });
     function drag(e) {
       if (!g) return;
       const n = noteAt(e);
-      if (g.mode === 'min') send('setRange', { min: Math.min(n, S.rangeMax), max: S.rangeMax });
-      else if (g.mode === 'max') send('setRange', { min: S.rangeMin, max: Math.max(n, S.rangeMin) });
+      const r = S.ranges[g.index];
+      if (!r) return;
+      if (g.mode === 'min') send('setRange', { index: g.index, min: Math.min(n, r.max), max: r.max });
+      else if (g.mode === 'max') send('setRange', { index: g.index, min: r.min, max: Math.max(n, r.min) });
       else {
         const shift = clamp(n - g.from, -g.min, 127 - g.max);
-        send('setRange', { min: g.min + shift, max: g.max + shift });
+        send('setRange', { index: g.index, min: g.min + shift, max: g.max + shift });
       }
     }
     range.addEventListener('pointermove', drag);
@@ -539,6 +568,9 @@
     range.addEventListener('pointerup', end);
     range.addEventListener('pointercancel', end);
   })();
+
+  $('#range-add').addEventListener('click', () => { ui.range = S.ranges.length; send('addRange'); });
+  $('#range-remove').addEventListener('click', () => send('removeRange', { index: ui.range }));
 
   // ---- chance: drag across the dots to paint them on or off
   (function () {
