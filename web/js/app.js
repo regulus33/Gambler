@@ -26,7 +26,8 @@
   const PITCH_PX = 16;    // vertical drag distance per scale degree
 
   let S = null; // latest engine snapshot
-  const ui = { page: 0, drag: null, lenPreview: null, playedPc: -1, range: 0 };
+  const ui = { page: 0, drag: null, lenPreview: null, playedPc: -1, range: 0, view: 'scale' };
+  try { ui.view = localStorage.getItem('gambler.view') === 'melody' ? 'melody' : 'scale'; } catch (e) { /* storage unavailable */ }
 
   // ================================================================ build
   $$('[data-icon]').forEach((node) => node.insertAdjacentHTML('afterbegin', icons[node.dataset.icon]));
@@ -241,6 +242,10 @@
     actionEls.roll.classList.toggle('is-on', S.roll);
     actionEls.undo.disabled = !S.canUndo;
     actionEls.duplicate.disabled = S.length >= 64;
+
+    document.body.classList.toggle('view-melody', ui.view === 'melody');
+    $$('#view-seg button').forEach((b) => b.classList.toggle('is-on', b.dataset.v === ui.view));
+    if (ui.view === 'melody') roll.draw(len);
 
     drawLearn();
     if (!$('#sheet').hidden) drawSettings();
@@ -650,6 +655,291 @@
     });
     tempo.addEventListener('pointercancel', () => { g = null; });
   })();
+
+  // ================================================================ melody view
+  // The whole sequence as a grid: steps left to right, allowed notes bottom to top.
+  // The note a step plays next is a solid block; its other cycle notes are ghosts.
+  const roll = (function () {
+    const panel = $('#roll');
+    const canvas = $('#roll-canvas');
+    const ctx = canvas.getContext('2d');
+    const GUTTER = 48;   // note names
+    const REST_H = 16;   // lane along the bottom for rests
+    const MIN_ROW = 13;  // rows never get thinner than this; extra rows scroll
+    const token = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const C = { panel: token('--panel'), raise: token('--raise'), line: token('--line'), ink: token('--ink'),
+      mute: token('--mute'), cream: token('--cream'), rest: token('--rest'), bg: token('--bg') };
+
+    let geo = null;
+    let scroll = null; // index of the top visible row; null until first layout
+
+    // Rows: every note the scale and ranges allow, plus any note already in the sequence.
+    function rowNotes(len) {
+      const notes = new Set();
+      for (let n = 0; n <= 127; n++) {
+        if (S.scale[n % 12] && S.ranges.some((r) => n >= r.min && n <= r.max)) notes.add(n);
+      }
+      for (let i = 0; i < len; i++) {
+        const st = S.steps[i];
+        for (let k = 0; k < st.count; k++) if (st.notes[k] >= 0) notes.add(st.notes[k]);
+      }
+      return Array.from(notes).sort((a, b) => b - a);
+    }
+
+    function layout(len) {
+      const w = panel.clientWidth;
+      const h = panel.clientHeight;
+      const dpr = window.devicePixelRatio || 1;
+      if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const rows = rowNotes(len);
+      const index = new Map(rows.map((n, i) => [n, i]));
+      const gridH = h - REST_H;
+      const visible = Math.max(1, Math.min(rows.length, Math.floor(gridH / MIN_ROW)));
+      const maxScroll = Math.max(0, rows.length - visible);
+      if (scroll == null) {
+        // start centred on the notes in use
+        const used = [];
+        for (let i = 0; i < len; i++) { const n = S.steps[i].notes[shownSub(S.steps[i])]; if (n >= 0) used.push(index.get(n)); }
+        used.sort((a, b) => a - b);
+        scroll = used.length ? used[Math.floor(used.length / 2)] - Math.floor(visible / 2) : 0;
+      }
+      scroll = clamp(Math.round(scroll), 0, maxScroll);
+      const cols = Math.min(64, Math.max(16, Math.ceil(len / 8) * 8));
+      geo = { w, h, rows, index, gridH, visible, maxScroll, cols, len, rowH: gridH / visible, colW: (w - GUTTER) / cols };
+    }
+
+    function block(x, y, w, h, radius) {
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, w, h, radius); else ctx.rect(x, y, w, h);
+    }
+
+    function draw(len) {
+      if (!panel.clientWidth) return;
+      layout(len);
+      const { w, h, rows, index, gridH, visible, cols, rowH, colW } = geo;
+      const playing = S.transport !== 'stopped';
+      const colX = (col) => GUTTER + col * colW;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = C.panel;
+      ctx.fillRect(0, 0, w, h);
+
+      // the eight steps the pads below are showing
+      ctx.fillStyle = C.raise;
+      ctx.fillRect(colX(ui.page * 8), 0, colW * 8, h);
+
+      // rows and note names
+      ctx.textBaseline = 'middle';
+      ctx.font = '600 ' + Math.min(11, Math.max(8, rowH - 3)) + 'px Inter, system-ui, sans-serif';
+      for (let v = 0; v < visible; v++) {
+        const note = rows[scroll + v];
+        const y = v * rowH;
+        if (note % 12 === 0) { ctx.fillStyle = 'rgba(255,255,255,0.045)'; ctx.fillRect(GUTTER, y, w - GUTTER, rowH); }
+        ctx.fillStyle = S.colours[note % 12];
+        ctx.fillRect(0, y + 1, 5, rowH - 2);
+        ctx.fillStyle = note % 12 === 0 ? C.ink : C.mute;
+        ctx.fillText(noteName(note), 10, y + rowH / 2 + 0.5);
+        ctx.fillStyle = C.line;
+        ctx.globalAlpha = 0.35;
+        ctx.fillRect(GUTTER, Math.round(y + rowH) - 0.5, w - GUTTER, 1);
+        ctx.globalAlpha = 1;
+      }
+
+      // column lines: faint per step, stronger per beat of four, strongest per page of eight
+      for (let col = 0; col <= cols; col++) {
+        ctx.fillStyle = C.line;
+        ctx.globalAlpha = col % 8 === 0 ? 1 : col % 4 === 0 ? 0.6 : 0.25;
+        ctx.fillRect(Math.round(colX(col)) - 0.5, 0, 1, h);
+      }
+      ctx.globalAlpha = 1;
+
+      // rest lane
+      ctx.fillStyle = C.bg;
+      ctx.globalAlpha = 0.55;
+      ctx.fillRect(GUTTER, gridH, w - GUTTER, REST_H);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = C.mute;
+      ctx.fillText('rest', 10, gridH + REST_H / 2 + 0.5);
+
+      // playhead column
+      if (playing && S.currentStep >= 0 && S.currentStep < len) {
+        ctx.fillStyle = C.cream;
+        ctx.globalAlpha = 0.1;
+        ctx.fillRect(colX(S.currentStep), 0, colW, h);
+        ctx.globalAlpha = 1;
+      }
+
+      // notes: ghosts first so the solid "plays next" block sits on top
+      const pad = Math.min(2, colW * 0.12);
+      for (const pass of ['ghost', 'main']) {
+        for (let step = 0; step < len; step++) {
+          const st = S.steps[step];
+          const shown = shownSub(st);
+          for (let k = 0; k < st.count; k++) {
+            const isMain = k === shown;
+            if (isMain !== (pass === 'main')) continue;
+            const note = st.notes[k];
+            const selected = step === S.selectedStep && k === st.sel;
+            const x = colX(step) + pad;
+            const bw = colW - pad * 2;
+
+            if (note < 0) {
+              if (!isMain) continue;
+              ctx.fillStyle = C.rest;
+              block(x, gridH + 3, bw, REST_H - 6, 3);
+              ctx.fill();
+              if (selected) { ctx.strokeStyle = C.cream; ctx.lineWidth = 2; ctx.stroke(); }
+              continue;
+            }
+
+            const v = index.get(note) - scroll;
+            if (v < 0 || v >= visible) {
+              if (!isMain) continue; // off-screen: a small marker at the edge it left through
+              ctx.fillStyle = S.colours[note % 12];
+              const top = v < 0;
+              ctx.beginPath();
+              ctx.moveTo(x + bw / 2, top ? 2 : gridH - 2);
+              ctx.lineTo(x + bw / 2 - 4, top ? 8 : gridH - 8);
+              ctx.lineTo(x + bw / 2 + 4, top ? 8 : gridH - 8);
+              ctx.fill();
+              continue;
+            }
+
+            const isPlaying = isMain && playing && step === S.currentStep;
+            ctx.globalAlpha = isMain ? 1 : 0.36;
+            ctx.fillStyle = isPlaying ? C.cream : S.colours[note % 12];
+            block(x, v * rowH + 1.5, bw, rowH - 3, 3);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            if (selected) { ctx.strokeStyle = C.cream; ctx.lineWidth = 2; ctx.stroke(); }
+          }
+        }
+      }
+
+      // steps beyond the sequence length
+      if (len < cols) {
+        ctx.fillStyle = C.bg;
+        ctx.globalAlpha = 0.6;
+        ctx.fillRect(colX(len), 0, w - colX(len), h);
+        ctx.globalAlpha = 1;
+      }
+
+      // more rows above or below
+      ctx.fillStyle = C.mute;
+      if (scroll > 0) { ctx.beginPath(); ctx.moveTo(GUTTER - 12, 3); ctx.lineTo(GUTTER - 16, 9); ctx.lineTo(GUTTER - 8, 9); ctx.fill(); }
+      if (scroll < geo.maxScroll) { ctx.beginPath(); ctx.moveTo(GUTTER - 12, gridH - 3); ctx.lineTo(GUTTER - 16, gridH - 9); ctx.lineTo(GUTTER - 8, gridH - 9); ctx.fill(); }
+    }
+
+    // ---- gestures
+    function locate(e) {
+      const r = canvas.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      const row = clamp(Math.floor(y / geo.rowH), 0, geo.visible - 1);
+      return {
+        y,
+        gutter: x < GUTTER,
+        col: Math.floor((x - GUTTER) / geo.colW),
+        note: y >= geo.gridH ? -1 : geo.rows[scroll + row],
+      };
+    }
+
+    let g = null;
+
+    // Drawing: put the step's "plays next" note where the pointer is, one step at a time.
+    function paint(at) {
+      if (at.col < 0 || at.col >= geo.len) return;
+      if (at.col === g.col && at.note === g.note) return;
+      g.col = at.col;
+      g.note = at.note;
+      send('setNote', { step: at.col, sub: shownSub(S.steps[at.col]), note: at.note, undo: !g.changed });
+      g.changed = true;
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.button || !geo) return;
+      canvas.setPointerCapture(e.pointerId);
+      const at = locate(e);
+
+      if (at.gutter) { g = { mode: 'scroll', y: at.y, from: scroll }; return; }
+      if (at.col >= geo.len) { g = { mode: 'extend', col: at.col }; return; }
+
+      const st = S.steps[at.col];
+      const shown = shownSub(st);
+      let sub = -1;
+      if (at.note >= 0) {
+        if (st.notes[shown] === at.note) sub = shown;
+        else for (let k = 0; k < st.count && sub < 0; k++) if (st.notes[k] === at.note) sub = k;
+      } else if (st.notes[shown] < 0) {
+        sub = shown;
+      }
+
+      ui.page = Math.floor(at.col / 8);
+      if (sub >= 0) {
+        // grabbed an existing note: drag it, or just tap to select it
+        g = { mode: 'move', step: at.col, sub, note: at.note, changed: false };
+        send('selectStep', { step: at.col, audition: false });
+        send('selectSub', { step: at.col, sub, audition: false });
+      } else {
+        g = { mode: 'draw', col: -1, note: null, changed: false };
+        send('selectStep', { step: at.col, audition: false });
+        paint(at);
+      }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!g) return;
+      const at = locate(e);
+      if (g.mode === 'scroll') {
+        scroll = clamp(g.from - Math.round((at.y - g.y) / geo.rowH), 0, geo.maxScroll);
+        render();
+      } else if (g.mode === 'move') {
+        if (at.note === g.note) return;
+        g.note = at.note;
+        send('setNote', { step: g.step, sub: g.sub, note: at.note, undo: !g.changed });
+        g.changed = true;
+      } else if (g.mode === 'draw') {
+        paint(at);
+      }
+    });
+
+    const end = (e) => {
+      if (!g) return;
+      if (e.type === 'pointerup') {
+        if (g.mode === 'move' && !g.changed) send('selectSub', { step: g.step, sub: g.sub, audition: true });
+        if (g.mode === 'draw' && g.col >= 0) { ui.page = Math.floor(g.col / 8); send('selectStep', { step: g.col, audition: false }); }
+        if (g.mode === 'extend' && locate(e).col === g.col) send('setLength', { length: g.col + 1 });
+      }
+      g = null;
+      render();
+    };
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+    canvas.addEventListener('wheel', (e) => {
+      if (!geo || !geo.maxScroll) return;
+      e.preventDefault();
+      scroll = clamp(scroll + (e.deltaY > 0 ? 1 : -1), 0, geo.maxScroll);
+      render();
+    }, { passive: false });
+
+    if (window.ResizeObserver) new ResizeObserver(() => render()).observe(panel);
+    else window.addEventListener('resize', () => render());
+
+    return { draw };
+  })();
+
+  $('#view-seg').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    ui.view = b.dataset.v;
+    try { localStorage.setItem('gambler.view', ui.view); } catch (err) { /* storage unavailable */ }
+    render();
+  });
 
   // ================================================================ popovers
   const popover = $('#popover');

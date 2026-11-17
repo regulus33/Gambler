@@ -19,6 +19,8 @@
       <button id="preset-next" class="icon-btn" data-icon="chevR" data-learn="preset-next" aria-label="Next preset"></button>
     </div>
 
+    <div id="view-seg" class="seg view-seg" role="group" aria-label="Upper view"><button data-v="scale">Scale</button><button data-v="melody">Melody</button></div>
+
     <div class="bar-spacer"></div>
 
     <button id="tempo" class="tempo" aria-label="Tempo. Drag up or down to change"><b id="tempo-val">120</b><small>BPM</small></button>
@@ -33,6 +35,7 @@
   </header>
 
   <section class="upper">
+    <div id="roll" class="roll-panel"><canvas id="roll-canvas" aria-label="Melody. Drag a note to change it, drag across steps to draw, drag the note names to scroll"></canvas></div>
     <div class="scale-panel">
       <div class="keys-wrap">
         <svg id="keys" class="keys" preserveAspectRatio="none" role="group" aria-label="Scale keys"></svg>

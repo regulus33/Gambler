@@ -318,6 +318,13 @@
         st.notes[sub] = n;
         audition(step, sub);
       },
+      setNote({ step, sub, note, undo }) {
+        const st = s.steps[step];
+        if (!st || sub < 0 || sub >= st.count) return;
+        if (undo) pushUndo();
+        st.notes[sub] = note < 0 ? -1 : bake(clamp(note, 0, 127));
+        if (note >= 0) audition(step, sub);
+      },
       addSub({ step }) {
         const st = s.steps[step];
         if (st.count >= MAX_SUBS) return;

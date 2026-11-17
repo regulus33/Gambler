@@ -23,6 +23,7 @@
 // UI -> engine actions: send(action, payload)
 //   selectStep {step, audition}      selectSub {step, sub, audition}   jumpTo {step}
 //   shiftNote {step, sub, delta}     delta in scale degrees, staying inside the note ranges
+//   setNote {step, sub, note, undo}  absolute pitch (-1 = rest); undo: true on the first change of a gesture
 //   addSub {step}                    removeSub {step, sub}
 //   setLength {length}               roll {on}     setPage {page}  (which 8 steps are visible)
 //   nudge {dir}  duplicate  shuffle  randomize {scope}  clear {scope}  undo
