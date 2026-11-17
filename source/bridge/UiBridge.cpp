@@ -291,6 +291,13 @@ void UiBridge::handleAction (const juce::String& action, const juce::var& payloa
         const int note = state.shiftStepNote (step, sub, intOf (payload, "delta"));
         if (note >= 0 && step == state.getSelectedStepForEditing()) previewSelected (note);
     }
+    else if (action == "setNote" && validStep (step) && sub >= 0 && sub < state.getStepNotesLength (step)) {
+        // One drawn stroke sends many of these; only the first asks for an undo point.
+        if (boolOf (payload, "undo")) pushUndo();
+        const int note = intOf (payload, "note", -1);
+        state.setStepNote (step, sub, note < 0 ? -1 : state.bakeNoteForStorage (juce::jlimit (0, 127, note)));
+        if (note >= 0) previewSelected (state.getQuantizedStepNote (step, sub));
+    }
     else if (action == "addSub" && validStep (step)) {
         pushUndo();
         if (state.addSubstep (step)) previewSelected();

@@ -98,6 +98,27 @@ TEST_CASE ("shiftNote moves by scale degrees and stops at the range edge", "[bri
     REQUIRE (f.shownNote (0) == 72);  // top of the range
 }
 
+TEST_CASE ("setNote places a note at an absolute pitch, one undo per stroke", "[bridge][notes]") {
+    BridgeFixture f;
+
+    // a drawn stroke across three steps: only the first change asks for an undo point
+    f.send ("setNote", payload ({ { "step", 0 }, { "sub", 0 }, { "note", 62 }, { "undo", true } }));
+    f.send ("setNote", payload ({ { "step", 1 }, { "sub", 0 }, { "note", 64 }, { "undo", false } }));
+    f.send ("setNote", payload ({ { "step", 2 }, { "sub", 0 }, { "note", -1 }, { "undo", false } }));
+    REQUIRE (f.shownNote (0) == 62);
+    REQUIRE (f.shownNote (1) == 64);
+    REQUIRE (f.shownNote (2) == -1);
+
+    f.send ("undo");
+    for (int i = 0; i < 3; ++i) REQUIRE (f.shownNote (i) == ParamConstants::DEFAULT_NOTE);
+    REQUIRE_FALSE (static_cast<bool> (f.snapshot()["canUndo"]));
+
+    // a cycle note that does not exist is ignored
+    f.send ("setNote", payload ({ { "step", 0 }, { "sub", 3 }, { "note", 70 }, { "undo", true } }));
+    REQUIRE (f.state().getStepNote (0, 3) != 70);
+    REQUIRE_FALSE (static_cast<bool> (f.snapshot()["canUndo"]));
+}
+
 TEST_CASE ("shiftNote gives a rest a note", "[bridge][notes]") {
     BridgeFixture f;
     f.send ("selectStep", payload ({ { "step", 1 }, { "audition", false } }));
