@@ -353,6 +353,9 @@ TEST_CASE ("Held MIDI notes define the scale when latch is off", "[bridge][midi-
         f.midi (juce::MidiMessage::noteOff (1, 48));
         REQUIRE (static_cast<bool> (f.snapshot()["scale"][0]));
         f.midi (juce::MidiMessage::noteOff (1, 60));
+        REQUIRE (static_cast<bool> (f.snapshot()["scale"][0]));  // releases wait briefly for a next chord
+        juce::AudioBuffer<float> buffer (2, 512);
+        for (int i = 0; i < 20; ++i) { juce::MidiBuffer none; f.processor.processBlock (buffer, none); }
         REQUIRE_FALSE (static_cast<bool> (f.snapshot()["scale"][0]));
         REQUIRE (static_cast<bool> (f.snapshot()["scale"][4]));
     }
@@ -416,6 +419,19 @@ namespace {
     }
     void setLatch (BridgeFixture& f, bool on) {
         f.send ("setParam", payload ({ { "id", "latch" }, { "value", on } }));
+    }
+    // Let audio blocks pass with no MIDI, long enough for releases to take effect.
+    void waitPastGrace (BridgeFixture& f) {
+        juce::AudioBuffer<float> buffer (2, 512);
+        for (int i = 0; i < 20; ++i) {  // ~230 ms at 44.1 kHz
+            juce::MidiBuffer none;
+            f.processor.processBlock (buffer, none);
+        }
+    }
+    std::set<int> scaleKeys (BridgeFixture& f) {
+        std::set<int> on;
+        for (int pc = 0; pc < 12; ++pc) if (static_cast<bool> (f.snapshot()["scale"][pc])) on.insert (pc);
+        return on;
     }
 }
 
@@ -495,10 +511,14 @@ TEST_CASE ("Range follow with Latch off: releasing the chord gives the manual ra
     setFollow (f, 2);
     holdChord (f, { 36, 52, 79 });
     releaseChord (f, { 36 });
-    REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 52, 79 });  // follows the keys still down
+    REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 36, 52, 79 });  // a release waits briefly
+    waitPastGrace (f);
+    REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 52, 79 });  // then follows the keys still down
 
     releaseChord (f, { 52, 79 });
+    waitPastGrace (f);
     REQUIRE (f.snapshot()["chord"].size() == 0);
+    REQUIRE (scaleKeys (f).empty());
 }
 
 TEST_CASE ("Range follow with Latch on: the last chord stays until a new one starts", "[bridge][follow]") {
@@ -510,10 +530,12 @@ TEST_CASE ("Range follow with Latch on: the last chord stays until a new one sta
     releaseChord (f, { 36, 52, 79 });
     REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 36, 52, 79 });
 
-    holdChord (f, { 41, 45 });  // a new chord after all keys were up replaces it
+    waitPastGrace (f);
+    REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 36, 52, 79 });  // kept with every key up
+
+    holdChord (f, { 41, 45 });  // a new chord replaces it
     REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 41, 45 });
-    releaseChord (f, { 41 });
-    REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 41, 45 });  // releases don't shrink it
+    REQUIRE (scaleKeys (f) == std::set<int> { 5, 9 });  // the keys show the chord, not toggles
 }
 
 TEST_CASE ("Range follow leaves out notes mapped to controls", "[bridge][follow]") {
@@ -554,6 +576,7 @@ TEST_CASE ("Stuck notes are cleared by All Notes Off and by Stop", "[bridge][fol
     // and nothing is left counted: a fresh press and release works normally
     holdChord (f, { 60 });
     releaseChord (f, { 60 });
+    waitPastGrace (f);
     REQUIRE_FALSE (static_cast<bool> (f.snapshot()["scale"][0]));
 }
 
@@ -571,4 +594,83 @@ TEST_CASE ("Bake range is ignored while the range follows a chord", "[bridge][fo
 
     f.send ("setRange", payload ({ { "index", 0 }, { "min", 40 }, { "max", 50 } }));
     REQUIRE (f.state().getStepNote (0, 0) == 60);
+}
+
+// A chord app changing chord sends the old chord's note-offs, then the new chord's note-ons,
+// often in separate audio blocks. Steps that fall in that gap must not go silent.
+TEST_CASE ("The gap between two chords does not empty the chord or the scale", "[bridge][follow]") {
+    for (int mode : { 0, 1, 2 }) {
+        for (bool latch : { false, true }) {
+            DYNAMIC_SECTION ("follow " << mode << ", latch " << latch) {
+                BridgeFixture f;
+                f.setScale ({});
+                setLatch (f, latch);
+                setFollow (f, mode);
+                f.state().setStepNote (0, 0, 60);
+                for (int s = 1; s < 8; ++s) f.state().setStepNote (s, 0, 30 + s * 10);
+
+                holdChord (f, { 48, 52, 55 });   // C E G
+                releaseChord (f, { 48, 52, 55 });
+                for (int s = 0; s < 8; ++s) REQUIRE (f.shownNote (s) >= 0);  // still playing in the gap
+
+                holdChord (f, { 48, 53, 57 });   // C F A, a few blocks later
+                if (mode != 0 || ! latch)  // (Latch on with follow off keeps toggling keys, tested below)
+                    REQUIRE (scaleKeys (f) == std::set<int> { 0, 5, 9 });  // exactly the new chord: nothing leaks
+                if (mode != 0) REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 48, 53, 57 });
+            }
+        }
+    }
+}
+
+TEST_CASE ("Overlapping chords settle on the newest one", "[bridge][follow]") {
+    for (bool latch : { false, true }) {
+        DYNAMIC_SECTION ("latch " << latch) {
+            BridgeFixture f;
+            setLatch (f, latch);
+            setFollow (f, 2);
+            holdChord (f, { 48, 52, 55 });
+            holdChord (f, { 50, 53, 57 });   // the next chord arrives before the last is released
+            releaseChord (f, { 48, 52, 55 });
+            waitPastGrace (f);
+            REQUIRE (ints (f.snapshot()["chord"]) == std::vector<int> { 50, 53, 57 });
+            REQUIRE (scaleKeys (f) == std::set<int> { 2, 5, 9 });
+        }
+    }
+}
+
+TEST_CASE ("With Latch on and range follow off, MIDI notes still toggle scale keys", "[bridge][follow]") {
+    BridgeFixture f;
+    f.setScale ({});
+    setLatch (f, true);
+    holdChord (f, { 60, 64 });
+    releaseChord (f, { 60, 64 });
+    holdChord (f, { 60, 67 });
+    releaseChord (f, { 60, 67 });
+    waitPastGrace (f);
+    REQUIRE (scaleKeys (f) == std::set<int> { 4, 7 });  // C toggled on, then off again
+}
+
+TEST_CASE ("Turning Latch off lets go of keys left on while it was on", "[bridge][follow]") {
+    for (int mode : { 0, 2 }) {
+        DYNAMIC_SECTION ("follow " << mode) {
+            BridgeFixture f;
+            f.setScale ({});
+            setLatch (f, true);
+            setFollow (f, mode);
+            holdChord (f, { 60, 64, 67 });
+            releaseChord (f, { 60, 64, 67 });
+            f.send ("setScaleNote", payload ({ { "pc", 2 }, { "on", true } }));
+            waitPastGrace (f);
+            REQUIRE_FALSE (scaleKeys (f).empty());
+
+            holdChord (f, { 53 });            // a key still down when Latch goes off stays on
+            setLatch (f, false);
+            REQUIRE (scaleKeys (f) == std::set<int> { 5 });
+            REQUIRE (f.snapshot()["chord"].size() == (mode ? 1u : 0u));
+
+            releaseChord (f, { 53 });
+            waitPastGrace (f);
+            REQUIRE (scaleKeys (f).empty());
+        }
+    }
 }

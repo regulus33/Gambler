@@ -188,6 +188,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
 
     drainVirtualKeyboard(midiMessages, buffer.getNumSamples());
     processMidiInput (midiMessages);
+    updateHeldChord();
     midiMessages.clear();
 
     previewMidiFifo.drainInto (midiMessages, getMidiOutputChannel());
@@ -838,12 +839,10 @@ void PluginProcessor::stopSequencer() {
 
 void PluginProcessor::releaseHeldMidiNotes() {
     auto& state = getState();
-    state.scaleQuantizer().heldNotes().releaseAll();
+    const bool isLatched = isLatchOn();
+    const bool chordReleased = state.scaleQuantizer().heldNotes().releaseAll (isLatched);
 
-    bool isLatched = false;
-    if (auto* latchParam = apvts.getParameter (Params::Keys::ID::SCALE_LATCH))
-        isLatched = latchParam->getValue() > 0.5f;
-
+    // scale keys held through an explicit mapping (counted in handleScaleNote)
     for (int pc = 0; pc < 12; ++pc) {
         auto& count = heldScaleNotes[static_cast<size_t> (pc)];
         if (count > 0 && ! isLatched)
@@ -851,8 +850,55 @@ void PluginProcessor::releaseHeldMidiNotes() {
         count = 0;
     }
 
+    // Only touch the scale if a chord was actually let go: a scale set from the UI stays.
+    if (chordReleased) chordChanged();
+}
+
+void PluginProcessor::latchTurnedOff() {
+    getState().scaleQuantizer().heldNotes().applyReleasesNow (false);
+    chordChanged();
+}
+
+bool PluginProcessor::isLatchOn() const {
+    if (auto* latchParam = apvts.getParameter (Params::Keys::ID::SCALE_LATCH))
+        return latchParam->getValue() > 0.5f;
+    return false;
+}
+
+bool PluginProcessor::scaleMirrorsChord() const {
+    return ! isLatchOn()
+        || sequenceState->scaleQuantizer().followMode() != ScaleQuantizer::Follow::Off;
+}
+
+void PluginProcessor::updateHeldChord() {
+    const double sampleRate = getSampleRate() > 0 ? getSampleRate() : 44100.0;
+    const auto grace = static_cast<juce::int64> (sampleRate * chordReleaseGraceSeconds);
+    if (getState().scaleQuantizer().heldNotes().update (currentSamplePosition, grace, isLatchOn()))
+        chordChanged();
+}
+
+void PluginProcessor::chordChanged() {
+    if (scaleMirrorsChord())
+        syncScaleToChord();
     auto callback = onChordChanged;
     if (callback) callback();
+}
+
+void PluginProcessor::syncScaleToChord() {
+    auto& state = getState();
+    const auto chord = state.scaleQuantizer().heldNotes().chord();
+    std::array<bool, 12> pitchClasses {};
+    for (int n = 0; n <= 127; ++n)
+        if (chord.test (static_cast<size_t> (n))) pitchClasses[static_cast<size_t> (n % 12)] = true;
+
+    bool changed = false;
+    for (int pc = 0; pc < 12; ++pc) {
+        if (state.getGlobalScaleNote (pc) != pitchClasses[static_cast<size_t> (pc)]) {
+            state.setGlobalScaleNote (pc, pitchClasses[static_cast<size_t> (pc)]);
+            changed = true;
+        }
+    }
+    if (changed) fireTickCallback();
 }
 
 //==============================================================================
@@ -1016,13 +1062,18 @@ void PluginProcessor::routeLearnableMessage (MidiMessageType type,
             return;
     }
 
-    // Unmapped notes play the scale keys; they also make up the chord range follow uses.
+    // Unmapped notes make up the chord (range follow, and the scale keys that mirror it).
     if (type == MidiMessageType::NOTE
         && ! MidiNoteRouter::hasUserMapping (midiLearnRegistry, channel, midiNumber)) {
         auto& held = getState().scaleQuantizer().heldNotes();
-        if (isOnOrPositive) held.noteOn (midiNumber); else held.noteOff (midiNumber);
-        auto callback = onChordChanged;
-        if (callback) callback();
+        if (isOnOrPositive) {
+            if (held.noteOn (midiNumber)) chordChanged();
+        } else {
+            held.noteOff (midiNumber, currentSamplePosition);  // takes effect in updateHeldChord
+        }
+        // While the scale keys mirror the chord they are set from it, not toggled per note.
+        if (scaleMirrorsChord())
+            return;
     }
 
     MidiMapping mapping { type, midiNumber, controlId };
@@ -1296,6 +1347,7 @@ void PluginProcessor::handleMidiMapping (const MidiMapping& mapping, int midiVal
             break;
         case MidiControlId::SCALE_LATCH:
             setTriggerParam (Params::Keys::ID::SCALE_LATCH, isNoteOnOrCCPositive);
+            if (! isNoteOnOrCCPositive) latchTurnedOff();
             break;
 
         case MidiControlId::DESTRUCTIVE_SCALE:

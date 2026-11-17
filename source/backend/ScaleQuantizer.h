@@ -207,13 +207,10 @@ public:
     HeldNotes& heldNotes() { return held; }
     const HeldNotes& heldNotes() const { return held; }
 
-    /**
-     * The chord currently standing in for the ranges, or an empty set when it should not.
-     * With Latch off this is the keys down right now; with Latch on, the last chord played.
-     */
+    /** The chord currently standing in for the ranges, or an empty set when it should not. */
     HeldNotes::Set followChord() const {
         if (followMode() == Follow::Off) return {};
-        return getBool(Params::Keys::ID::SCALE_LATCH) ? held.latched() : held.held();
+        return held.chord();
     }
 
     // ========================================

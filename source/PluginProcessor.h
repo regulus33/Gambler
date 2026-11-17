@@ -102,6 +102,12 @@ public:
     void releaseHeldMidiNotes();
 
     /**
+     * Latch was switched off by the user: let go of a kept chord and of scale keys that
+     * were toggled on while Latch was on, so the keys show only what is held.
+     */
+    void latchTurnedOff();
+
+    /**
      * Trigger MIDI note for a specific step (for UI preview/audition)
      * This sets the current index to the given step and sends MIDI note on/off.
      * Called from UI thread when user clicks a step or edits note controls.
@@ -289,6 +295,17 @@ private:
 
     // How many held MIDI notes currently map to each scale key (momentary mode).
     std::array<int, 12> heldScaleNotes {};
+
+    // How long a release waits for the next chord before it takes effect (see HeldNotes).
+    static constexpr double chordReleaseGraceSeconds = 0.1;
+
+    bool isLatchOn() const;
+    // The scale keys show the chord played on MIDI input: always with Latch off, and with
+    // Latch on while range follow is on. Otherwise (Latch on, follow off) notes toggle keys.
+    bool scaleMirrorsChord() const;
+    void updateHeldChord();
+    void chordChanged();
+    void syncScaleToChord();
 
     // Declared after everything it observes so it is destroyed first.
     std::unique_ptr<UiBridge> uiBridge;

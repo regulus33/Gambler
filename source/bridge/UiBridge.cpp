@@ -464,7 +464,7 @@ void UiBridge::setParam (const juce::String& id, const juce::var& value) {
     else if (id == "noteLength")   setFloatParam (P::PREF_NOTE_LENGTH, number);
     else if (id == "previewNotes") setFloatParam (P::PREF_PREVIEW_NOTES, flag);
     else if (id == "followStep")   setFloatParam (P::PREF_FOLLOW_STEP, flag);
-    else if (id == "latch")        setFloatParam (P::SCALE_LATCH, flag);
+    else if (id == "latch")      { setFloatParam (P::SCALE_LATCH, flag); if (! flag) processor.latchTurnedOff(); }
     else if (id == "bakeScale")    setFloatParam (P::PREF_DESTRUCTIVE_SCALE, flag);
     else if (id == "bakeRange")    setFloatParam (P::PREF_DESTRUCTIVE_RANGE, flag);
     else if (id == "rangeFollow")  setFloatParam (P::RANGE_FOLLOW, number);
