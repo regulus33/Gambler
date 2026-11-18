@@ -36,7 +36,7 @@ Gambler makes no sound of its own: it plays your synths. Load it as a MIDI plugi
 
 | | Area | What it does |
 |---|---|---|
-| **1** | **Top bar** | Presets (‹ › to step through, tap the name to save or load). **Scale / Melody** switches the upper half. Drag the tempo up or down; **1/16** sets the step size. Play/pause, stop, and **⋯** for *Export MIDI file*, *MIDI learn* and *Settings*. |
+| **1** | **Top bar** | Presets (‹ › to step through, tap the name to save or load). **Scale / Melody** switches the upper half. Drag the tempo up or down; **1/16** sets the step size. Play/pause, stop, and **⋯** for *Export MIDI file*, *MIDI learn*, *Settings* and *Report a bug*. |
 | **2** | **Scale keys** | The notes Gambler is allowed to play. With **Latch** on, tap a key to add or remove it; with Latch off, a key is only in the scale while you hold it. |
 | **3** | **Range & scale tools** | Drag the handles to set the note range; **+** adds up to three ranges. **Chord off / Span / Exact** lets a chord on MIDI input set the range. **Bake scale / Bake range** write the scale or range into the stored notes instead of applying them while playing. |
 | **4** | **Chance** | How likely each step is to fire. Drag across the dots to paint them on or off, use the slider to set the overall chance, the dice to scatter a new pattern, and **8×8** to change the pattern size. |
@@ -52,6 +52,8 @@ The **Melody view** shows the same sequence as a piano roll. Drag a note to chan
 **Settings** (⋯ → Settings): clock source (Internal / Host / MIDI clock), tempo and step size, MIDI output channel, note length, *Play notes while editing*, *Follow the playhead*, and the note colours.
 
 **MIDI Learn** (⋯ → MIDI learn): tap a control, then move a knob or press a key or pad on your controller to map it.
+
+**Report a bug** (⋯ → Report a bug): opens a GitHub bug report with the app version, device and host already filled in. Inside an AUv3 host, iOS doesn't let plugins open links, so the link is copied instead; paste it into Safari.
 
 ### Getting sound out of it
 
@@ -140,7 +142,7 @@ Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full tour: threading
 
 ## Contributing
 
-Issues and pull requests are welcome.
+Issues and pull requests are welcome. Found a bug? Use **⋯ → Report a bug** in the app, or [open an issue](https://github.com/regulus33/Gambler/issues/new?template=bug_report.yml).
 
 1. Fork the repo and create a branch.
 2. Make your change and add or update tests in `tests/` where it makes sense.

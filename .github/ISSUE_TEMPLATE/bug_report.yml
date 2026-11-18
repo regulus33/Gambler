@@ -1,0 +1,44 @@
+name: Bug report
+description: Something in Gambler isn't working the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this! If you opened this form from the app's **⋯ → Report a bug** menu,
+        the version, platform and host below are already filled in.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect to happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The steps that lead to the bug, as exactly as you can.
+      placeholder: |
+        1. Set the length to 32
+        2. Hold Roll
+        3. ...
+  - type: input
+    id: version
+    attributes:
+      label: Gambler version
+  - type: input
+    id: platform
+    attributes:
+      label: Device and OS
+      placeholder: e.g. iPadOS 18.6 (iPad mini), macOS 15.5
+  - type: input
+    id: host
+    attributes:
+      label: Where are you running it?
+      placeholder: Standalone app, or the plugin host / DAW name
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, screen recordings, MIDI files or presets help a lot. You can drag files in here.

@@ -28,6 +28,15 @@
     chevR: svg('<path d="M9 5l7 7-7 7"/>'),
     chevDown: svg('<path d="M5 9l7 7 7-7"/>'),
     download: svg('<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>'),
+    bug: svg('<rect x="8" y="7" width="8" height="13" rx="4"/><path d="M9.5 7.5 8 4.5M14.5 7.5 16 4.5M8 11H4M8 16H4.5M16 11h4M16 16h3.5M12 11v9"/>'),
+    // The app icon's mark: a die outline holding four chance bars. Fixed brand colours, not currentColor.
+    mark: '<svg class="mark" viewBox="-0.5 -0.5 25 25" aria-hidden="true">' +
+      '<rect x="0.9" y="0.9" width="22.2" height="22.2" rx="4.6" fill="none" stroke="#FF6B6B" stroke-width="1.8"/>' +
+      '<g stroke="#FF6B6B" stroke-opacity=".45" stroke-width="1.3" stroke-linecap="round">' +
+      '<path d="M5.65 19.8V8.5M9.9 19.8v-4.3M14.1 19.8V4.9M18.35 19.8v-7.1"/></g>' +
+      '<circle cx="14.1" cy="4.9" r="3.6" fill="#FFD700" opacity=".18"/>' +
+      '<circle cx="5.65" cy="8.5" r="1.95" fill="#FF6B6B"/><circle cx="9.9" cy="15.5" r="1.95" fill="#FF6B6B"/>' +
+      '<circle cx="14.1" cy="4.9" r="1.95" fill="#FFD700"/><circle cx="18.35" cy="12.7" r="1.95" fill="#FF6B6B"/></svg>',
     learn: svg('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>'),
     settings: svg('<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>'),
     sound: svg('<path d="M4 9v6h4l5 4V5L8 9H4zM16.5 8.5a5 5 0 0 1 0 7"/>'),

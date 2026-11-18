@@ -1,5 +1,6 @@
 #include "UiBridge.h"
 #include "../PluginProcessor.h"
+#include "../util/PlatformUtils.h"
 
 namespace {
     using ID = juce::String;
@@ -137,6 +138,30 @@ void UiBridge::emit (const juce::Identifier& event, const juce::var& payload) co
 
 void UiBridge::toast (const juce::String& text) const {
     emit ("toast", text);
+}
+
+void UiBridge::reportBug() const {
+    // Field ids match .github/ISSUE_TEMPLATE/bug_report.yml, which GitHub pre-fills from the query string
+    const auto format = juce::String (juce::AudioProcessor::getWrapperTypeDescription (processor.wrapperType));
+    const auto host = processor.wrapperType == juce::AudioProcessor::wrapperType_Standalone
+                          ? juce::String ("Standalone app")
+                          : format + " in " + juce::PluginHostType().getHostDescription();
+    const auto url = juce::URL ("https://github.com/regulus33/Gambler/issues/new")
+                         .withParameter ("template", "bug_report.yml")
+                         .withParameter ("labels", "bug")
+                         .withParameter ("version", JucePlugin_VersionString)
+                         .withParameter ("platform", juce::SystemStats::getOperatingSystemName()
+                                                         + " (" + juce::SystemStats::getDeviceDescription() + ")")
+                         .withParameter ("host", host);
+
+    // App extensions (AUv3) have no access to UIApplication, so opening a URL silently does nothing there
+    const bool canOpenUrls = ! (PlatformUtils::isIOS() && processor.wrapperType == juce::AudioProcessor::wrapperType_AudioUnitv3);
+
+    if (canOpenUrls && url.launchInDefaultBrowser())
+        return;
+
+    juce::SystemClipboard::copyTextToClipboard (url.toString (true));
+    toast ("Bug report link copied. Paste it into Safari to open the form.");
 }
 
 void UiBridge::flush() {
@@ -447,6 +472,9 @@ void UiBridge::handleAction (const juce::String& action, const juce::var& payloa
     }
     else if (action == "exportMidi") {
         if (onExportRequested) onExportRequested();
+    }
+    else if (action == "reportBug") {
+        reportBug();
     }
     else {
         DBG ("UiBridge: ignored action '" << action << "'");

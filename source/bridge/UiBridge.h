@@ -56,6 +56,8 @@ private:
 
     void emit (const juce::Identifier& event, const juce::var& payload) const;
     void toast (const juce::String& text) const;
+    /** Opens a pre-filled GitHub bug report, or copies its link where a plugin can't open URLs (AUv3). */
+    void reportBug() const;
 
     // actions
     void setParam (const juce::String& id, const juce::var& value);

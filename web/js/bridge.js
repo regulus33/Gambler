@@ -39,6 +39,7 @@
 //   savePreset {name}  loadPreset {name}  deletePreset {name}  cyclePreset {dir}
 //   learnToggle  learnSelect {id}  learnClear {id}
 //   exportMidi
+//   reportBug                       opens a pre-filled GitHub issue (an AUv3 copies the link and toasts instead)
 //   midiChord {notes}               mock engine only: stands in for a chord held on MIDI input
 // -------------------------------------------------------------------------
 (function () {

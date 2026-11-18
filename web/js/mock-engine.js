@@ -579,6 +579,10 @@
       exportMidi() {
         emit('toast', 'MIDI export runs in the plugin, not in this prototype');
       },
+      reportBug() {
+        const url = 'https://github.com/regulus33/Gambler/issues/new?template=bug_report.yml&labels=bug&host=Browser%20prototype';
+        if (!window.open(url, '_blank')) emit('toast', 'Report bugs at github.com/regulus33/Gambler/issues');
+      },
     };
 
     savePreset('Night Bus');

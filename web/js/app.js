@@ -1014,6 +1014,8 @@
       root.appendChild(menuItem('download', 'Export MIDI file', () => { closePopover(); send('exportMidi'); }));
       root.appendChild(menuItem('learn', 'MIDI learn', () => { closePopover(); send('learnToggle'); }, S.learn.active ? 'on' : ''));
       root.appendChild(menuItem('settings', 'Settings', () => { closePopover(); openSettings(); }));
+      root.appendChild(el('div', 'menu-sep'));
+      root.appendChild(menuItem('bug', 'Report a bug', () => { closePopover(); send('reportBug'); }));
       if (bridge.isMock) {
         root.appendChild(el('div', 'menu-sep'));
         root.appendChild(menuItem('sound', 'Prototype sound', () => { closePopover(); send('setParam', { id: 'sound', value: !S.sound }); }, S.sound ? 'on' : 'off'));
