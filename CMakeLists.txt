@@ -32,13 +32,14 @@ set(PROJECT_NAME "Gambler2")
 #   set(PROJECT_NAME "MyPlugin_v${MAJOR_VERSION}")
 # Doing so enables major versions to show up in IDEs and DAWs as separate plugins
 # allowing you to change parameters and behavior without breaking existing user projects
-set(PRODUCT_NAME "Gambler2")
+set(PRODUCT_NAME "Gambler")
 
 # Change me! Used for the MacOS bundle name and Installers
 set(COMPANY_NAME "ToneGarden")
 
-# Change me! Used for the MacOS bundle identifier (and signing)
-set(BUNDLE_ID "com.ToneGarden.Gambler2")
+# The bundle identifier (and signing). It is registered with Apple and must never change after release.
+# The AUv3 extension gets "<BUNDLE_ID>.<PRODUCT_NAME>AUv3".
+set(BUNDLE_ID "com.tonegarden.Gambler")
 
 # Change me! Set the plugin formats you want built
 # Valid choices: AAX Unity VST VST3 AU AUv3 Standalone
@@ -51,6 +52,15 @@ set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded CACHE STRING "" FORCE)
 
 # For simplicity, the name of the CMake project is also the name of the target
 project(${PROJECT_NAME} VERSION ${CURRENT_VERSION})
+
+# The build number (CFBundleVersion). The marketing version comes from the VERSION file;
+# App Store Connect needs a higher build number for every upload, so CI passes one in.
+set(GAMBLER_BUILD_NUMBER "" CACHE STRING "Build number (CFBundleVersion); empty = the VERSION file")
+if(GAMBLER_BUILD_NUMBER)
+    set(GAMBLER_BUILD_VERSION "${GAMBLER_BUILD_NUMBER}")
+else()
+    set(GAMBLER_BUILD_VERSION "${CURRENT_VERSION}")
+endif()
 
 # JUCE is setup as a submodule in the /JUCE folder
 # Locally, you must run `git submodule update --init --recursive` once
@@ -66,6 +76,9 @@ add_subdirectory(modules/clap-juce-extensions EXCLUDE_FROM_ALL)
 
 # This adds the melatonin inspector module
 add_subdirectory (modules/melatonin_inspector)
+
+# PLIST_TO_MERGE takes the XML itself, not a file path
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/packaging/Info-iOS.plist" GAMBLER_IOS_PLIST)
 
 # See `docs/CMake API.md` in the JUCE repo for all config options
 juce_add_plugin("${PROJECT_NAME}"
@@ -84,15 +97,12 @@ juce_add_plugin("${PROJECT_NAME}"
     # On MacOS, plugin is copied to /Users/yourname/Library/Audio/Plug-Ins/
     COPY_PLUGIN_AFTER_BUILD TRUE
 
-    # Change me!
-    # A four-character plugin id
-    # First character MUST be uppercase for AU formats
-    PLUGIN_MANUFACTURER_CODE Pamp
-
-    # Change me!
-    # A unique four-character plugin id
-    # Note: this must have at least one upper-case character
-    PLUGIN_CODE P002
+    # Hosts identify the plugin by these two codes: never change them after release,
+    # or saved host sessions lose the plugin.
+    # Manufacturer code: four characters, first one uppercase (AU requirement)
+    PLUGIN_MANUFACTURER_CODE Tngd
+    # Plugin code: four characters, at least one uppercase
+    PLUGIN_CODE Gmbl
     FORMATS "${FORMATS}"
 
     # Pure MIDI effect configuration
@@ -109,6 +119,7 @@ juce_add_plugin("${PROJECT_NAME}"
     # This can be different from PROJECT_NAME and can have spaces!
     # You might want to use v${MAJOR_VERSION} here once you go to v2...
     PRODUCT_NAME "${PRODUCT_NAME}"
+    BUILD_VERSION "${GAMBLER_BUILD_VERSION}"
 
     # iOS-specific configuration
     # iPad-only for now (2 = iPad, "1,2" = iPhone + iPad): the web UI doesn't fit iPhone screens yet
@@ -118,8 +129,37 @@ juce_add_plugin("${PROJECT_NAME}"
     IPHONE_SCREEN_ORIENTATIONS UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
     IPAD_SCREEN_ORIENTATIONS UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
 
-    # Merge custom iOS plist entries
-    PLIST_TO_MERGE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/Info-iOS.plist")
+    # Permission texts. Gambler is a MIDI effect with no audio input, so iOS never shows the microphone
+    # prompt, but the texts must exist: JUCE's audio code references these APIs, and App Store Connect
+    # rejects uploads (ITMS-90683) when a referenced API has no purpose string.
+    MICROPHONE_PERMISSION_ENABLED TRUE
+    MICROPHONE_PERMISSION_TEXT "Gambler doesn't record audio. This is only requested if an audio input is turned on."
+    BLUETOOTH_PERMISSION_ENABLED TRUE
+    BLUETOOTH_PERMISSION_TEXT "Gambler uses Bluetooth to connect to Bluetooth MIDI devices."
+
+    # Extra plist keys (export compliance)
+    PLIST_TO_MERGE "${GAMBLER_IOS_PLIST}")
+
+if(IOS)
+    # A shared scheme so `xcodebuild archive -scheme ${PROJECT_NAME}_Standalone` works (CI release builds)
+    set_target_properties(${PROJECT_NAME}_Standalone PROPERTIES XCODE_GENERATE_SCHEME ON)
+
+    # CI release builds sign manually with an Apple Distribution certificate and App Store
+    # provisioning profiles (see .github/workflows/release-ios.yml). Local builds keep automatic signing.
+    set(GAMBLER_IOS_APP_PROFILE "" CACHE STRING "App Store provisioning profile name for the app (manual signing)")
+    set(GAMBLER_IOS_AUV3_PROFILE "" CACHE STRING "App Store provisioning profile name for the AUv3 extension (manual signing)")
+    if(GAMBLER_IOS_APP_PROFILE AND GAMBLER_IOS_AUV3_PROFILE)
+        foreach(target_and_profile "Standalone|${GAMBLER_IOS_APP_PROFILE}" "AUv3|${GAMBLER_IOS_AUV3_PROFILE}")
+            string(REPLACE "|" ";" pair "${target_and_profile}")
+            list(GET pair 0 format)
+            list(GET pair 1 profile)
+            set_target_properties(${PROJECT_NAME}_${format} PROPERTIES
+                XCODE_ATTRIBUTE_CODE_SIGN_STYLE Manual
+                XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Apple Distribution"
+                XCODE_ATTRIBUTE_PROVISIONING_PROFILE_SPECIFIER "${profile}")
+        endforeach()
+    endif()
+endif()
 
 # This lets us use our code in both the JUCE targets and our Test target
 # Without running into ODR violations

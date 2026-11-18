@@ -99,6 +99,10 @@ This generates `build-ios/Gambler2.xcodeproj` and opens it in Xcode. Choose the 
 
 **Signing:** the development team is set in [`cmake/PamplejuceIOS.cmake`](cmake/PamplejuceIOS.cmake) (`CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM`). Put in your own Team ID (or pass `-DCMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM=XXXXXXXXXX`). Use separate build folders for simulator and device builds, or add `-c` for a clean build when switching.
 
+### Releasing
+
+iPad releases are built, signed and uploaded to App Store Connect by GitHub Actions when a version tag is pushed (`git tag v1.0.1 && git push origin v1.0.1`). See [`docs/RELEASING.md`](docs/RELEASING.md) for the one-time signing setup.
+
 ### Tests
 
 ```bash

@@ -49,14 +49,14 @@ if [ ! -f "$PLUGINVAL_BIN" ]; then
 fi
 
 # Find the VST3 plugin
-VST3_PATH="$PROJECT_ROOT/build/Gambler2_artefacts/VST3/Gambler2.vst3"
+VST3_PATH="$PROJECT_ROOT/build/Gambler2_artefacts/VST3/Gambler.vst3"
 if [ ! -e "$VST3_PATH" ]; then
     # Try Debug subfolder
-    VST3_PATH="$PROJECT_ROOT/build/Gambler2_artefacts/Debug/VST3/Gambler2.vst3"
+    VST3_PATH="$PROJECT_ROOT/build/Gambler2_artefacts/Debug/VST3/Gambler.vst3"
 fi
 
 if [ ! -e "$VST3_PATH" ]; then
-    echo "ERROR: Could not find Gambler2.vst3. Build the plugin first:" >&2
+    echo "ERROR: Could not find Gambler.vst3. Build the plugin first:" >&2
     echo "  cmake -B build && cmake --build build" >&2
     exit 1
 fi

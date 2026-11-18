@@ -154,7 +154,7 @@
           <table class="info">
             <tr><td>Seller</td><td data-bind="seller"></td></tr>
             <tr><td>Category</td><td>Music</td></tr>
-            <tr><td>Compatibility</td><td>iPad · iOS 15.0 or later</td></tr>
+            <tr><td>Compatibility</td><td>iPad · iPadOS 15.0 or later</td></tr>
             <tr><td>Languages</td><td>English</td></tr>
             <tr><td>Age Rating</td><td>4+</td></tr>
             <tr><td>Copyright</td><td data-bind="copyright"></td></tr>
@@ -259,8 +259,8 @@ Gambler is actively developed and every report helps. Tap ⋯ → Report a bug i
     value: 'generative,random,auv3,step,melody,scale,arpeggiator,dice,pattern,chord,quantize,riff,improvise' },
   { id: 'whatsnew', label: 'What’s New (version notes)', limit: 4000, rows: 3, hint: 'Not shown for the very first version, but fill it in from 1.0.1 onwards.',
     value: 'First release. Thanks for trying Gambler. Found a bug or have an idea? Open an issue on GitHub.' },
-  { id: 'seller', label: 'Seller / developer name', limit: 0, hint: 'Comes from your Apple Developer account. An individual account shows your legal name, not “ToneGarden”.',
-    value: 'ToneGarden' },
+  { id: 'seller', label: 'Seller / developer name', limit: 0, hint: 'Comes from your Apple Developer account (individual), so it shows as your name.',
+    value: 'Zachary Rowden' },
   { id: 'copyright', label: 'Copyright', limit: 0, hint: 'Year and owner.', value: '© 2026 ToneGarden' },
   { id: 'support', label: 'Support URL', limit: 0, hint: 'Required. GitHub Issues works if the repo is public.', value: REPO + '/issues' },
   { id: 'marketing', label: 'Marketing URL', limit: 0, hint: 'Optional.', value: REPO },
@@ -303,19 +303,19 @@ Questions: open an issue at ${REPO}/issues` },
 const CHECKS = [
   { tag: 'todo', title: 'iPad-only for v1 (done)',
     body: 'TARGETED_DEVICE_FAMILY is now "2". The iPhone layout runs off-screen and under the Dynamic Island; fix that before switching back to "1,2", which will also need a 6.9" iPhone screenshot set.' },
-  { tag: 'block', title: 'App name shows as “Gambler2”',
-    body: 'PRODUCT_NAME is “Gambler2”, so that’s the home-screen label and what hosts list. Change PRODUCT_NAME (or set CFBundleDisplayName) to “Gambler”. The bundle ID com.ToneGarden.Gambler2 can stay but cannot change after the first upload — decide now.' },
+  { tag: 'todo', title: 'Name and bundle ID set (done)',
+    body: 'The app is called Gambler on the home screen and in hosts. Bundle ID com.tonegarden.Gambler (AUv3: com.tonegarden.Gambler.GamblerAUv3), plugin codes Tngd / Gmbl. None of these may change after the first upload.' },
   { tag: 'todo', title: 'LICENSE updated (done)',
     body: 'MIT, © 2026 ToneGarden, keeping the Pamplejuce template notice.' },
   { tag: 'risk', title: 'Check JUCE licensing for an App Store release',
     body: 'JUCE 8 is dual-licensed AGPLv3 / commercial. AGPL’s terms are generally seen as conflicting with App Store distribution terms. JUCE’s free Starter licence (under its revenue limit) avoids that question. Read the JUCE licence page and pick one before shipping.' },
-  { tag: 'risk', title: 'Remove the microphone permission if you don’t use audio input',
-    body: 'Info-iOS.plist asks for microphone access. A MIDI-only app requesting the mic can be flagged under the privacy guidelines. Remove NSMicrophoneUsageDescription (and the Bluetooth strings if you don’t add BLE MIDI pairing) unless something actually uses them.' },
+  { tag: 'todo', title: 'Permission texts and export compliance (done)',
+    body: 'The microphone and Bluetooth texts stay (App Store Connect rejects uploads without them, error ITMS-90683) but are never shown, because Gambler has no audio input. ITSAppUsesNonExemptEncryption = NO skips the encryption question on every upload.' },
   { tag: 'risk', title: 'Make sure a reviewer can hear something',
     body: 'Fill in the review notes and add a demo video link. A tiny built-in preview synth in the standalone app would make review (and first-run for users) much easier.' },
   { tag: 'todo', title: 'Make the GitHub repo public and add PRIVACY.md', body: 'The support, marketing and privacy URLs all point at it.' },
     { tag: 'todo', title: 'Update the in-app logo to match the new icon', body: 'The nav bar still shows the old dice mark next to “Gambler”.' },
-  { tag: 'todo', title: 'Release build + archive', body: 'Xcode → Any iOS Device → Product → Archive → Distribute App → App Store Connect. Bump VERSION / build number for each upload.' },
+  { tag: 'todo', title: 'Set up the release pipeline', body: 'Follow docs/RELEASING.md: App IDs, distribution certificate, two App Store profiles, App Store Connect API key, the app record, then ./scripts/set-release-secrets.sh. After that, pushing a tag like v1.0.0 builds, signs and uploads.' },
 ];
 
 // ---- state (per-browser convenience only) ----

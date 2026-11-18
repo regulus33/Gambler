@@ -1,0 +1,251 @@
+# Builds the iPad app (standalone + AUv3), signs it for the App Store and uploads it to App Store Connect.
+#
+#   Release:     bump VERSION, commit, then push a matching tag:  git tag v1.0.0 && git push origin v1.0.0
+#   Test build:  Actions → "Release (iOS)" → Run workflow (leave "upload" off to only build and sign)
+#
+# Without the signing secrets the workflow still runs, but only does an unsigned archive (a build check).
+# Secrets live in the "app-store" environment (Settings → Environments). See docs/RELEASING.md.
+name: Release (iOS)
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: Upload the signed build to App Store Connect
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-ios
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    name: Build, sign and upload
+    runs-on: macos-26
+    timeout-minutes: 90
+    environment: app-store
+    env:
+      MIN_XCODE_MAJOR: "26" # App Store Connect only accepts builds from Xcode 26+ (since April 2026)
+      BUILD_DIR: build-ios-release
+      ARCHIVE: ${{ github.workspace }}/build-ios-release/Gambler.xcarchive
+      HAS_SIGNING: ${{ secrets.IOS_DIST_CERT_P12 != '' && secrets.IOS_APP_PROFILE != '' && secrets.IOS_AUV3_PROFILE != '' }}
+      HAS_ASC_KEY: ${{ secrets.ASC_KEY_P8 != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' }}
+      UPLOAD: ${{ github.event_name == 'push' || inputs.upload }}
+
+    steps:
+      - name: Check out (with submodules)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Check Xcode
+        run: |
+          xcodebuild -version
+          major=$(xcodebuild -version | awk '/^Xcode/{split($2, v, "."); print v[1]}')
+          if [ "$major" -lt "$MIN_XCODE_MAJOR" ]; then
+            echo "::error::Xcode $major is too old: App Store Connect requires Xcode $MIN_XCODE_MAJOR or later."
+            exit 1
+          fi
+
+      - name: Work out version and build number
+        run: |
+          version=$(tr -d '[:space:]' < VERSION)
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match VERSION ($version). Bump VERSION first, or tag v$version."
+            exit 1
+          fi
+          # Must increase with every upload; re-running a job bumps the attempt part (12.1 → 12.2)
+          build="${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$build" >> "$GITHUB_ENV"
+          echo "### Gambler $version ($build)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail early if a release is missing secrets
+        if: env.UPLOAD == 'true' && (env.HAS_SIGNING != 'true' || env.HAS_ASC_KEY != 'true')
+        run: |
+          echo "::error::Uploading needs the signing secrets and the App Store Connect API key in the app-store environment. See docs/RELEASING.md."
+          exit 1
+
+      - name: Install signing certificate and profiles
+        if: env.HAS_SIGNING == 'true'
+        env:
+          IOS_DIST_CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_APP_PROFILE: ${{ secrets.IOS_APP_PROFILE }}
+          IOS_AUV3_PROFILE: ${{ secrets.IOS_AUV3_PROFILE }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password=$(uuidgen)
+          echo "KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+          # A throwaway keychain that only exists for this job
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          printf '%s' "$IOS_DIST_CERT_P12" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -P "$IOS_DIST_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$keychain" >/dev/null
+          rm -f "$RUNNER_TEMP/dist.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
+          # Put the new keychain first in the search list, keeping the existing ones (paths have no spaces)
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning "$keychain" | grep -q "Apple Distribution" \
+            || { echo "::error::The .p12 doesn't contain an Apple Distribution identity."; exit 1; }
+
+          # Install both App Store profiles and remember their names for CMake and the export options
+          for kind in APP AUV3; do
+            var="IOS_${kind}_PROFILE"
+            file="$RUNNER_TEMP/$kind.mobileprovision"
+            printf '%s' "${!var}" | base64 --decode > "$file"
+            security cms -D -i "$file" > "$RUNNER_TEMP/$kind.plist"
+            uuid=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/$kind.plist")
+            name=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/$kind.plist")
+            team=$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$RUNNER_TEMP/$kind.plist")
+            appid=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$RUNNER_TEMP/$kind.plist")
+            expires=$(/usr/libexec/PlistBuddy -c 'Print :ExpirationDate' "$RUNNER_TEMP/$kind.plist")
+            echo "$kind profile: '$name' for $appid (expires $expires)"
+            for dir in "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+              mkdir -p "$dir"; cp "$file" "$dir/$uuid.mobileprovision"
+            done
+            {
+              echo "${kind}_PROFILE_NAME=$name"
+              echo "${kind}_PROFILE_APPID=${appid#*.}"
+              echo "TEAM_ID=$team"
+            } >> "$GITHUB_ENV"
+          done
+
+      - name: Configure (CMake → Xcode project)
+        run: |
+          set -euo pipefail
+          args=(-B "$BUILD_DIR" -G Xcode
+                -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
+                -DGAMBLER_BUILD_NUMBER="$BUILD_NUMBER")
+          if [ "$HAS_SIGNING" = "true" ]; then
+            args+=(-DCMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM="$TEAM_ID"
+                   -DGAMBLER_IOS_APP_PROFILE="$APP_PROFILE_NAME"
+                   -DGAMBLER_IOS_AUV3_PROFILE="$AUV3_PROFILE_NAME")
+          fi
+          cmake "${args[@]}"
+
+      - name: Archive
+        run: |
+          set -euo pipefail
+          extra=()
+          if [ "$HAS_SIGNING" = "true" ]; then
+            extra+=(OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN")
+          else
+            echo "::notice::No signing secrets: building an unsigned archive (build check only)."
+            extra+=(CODE_SIGNING_ALLOWED=NO)
+          fi
+          status=0
+          xcodebuild archive \
+            -project "$BUILD_DIR/Gambler2.xcodeproj" \
+            -scheme Gambler2_Standalone \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$ARCHIVE" \
+            "${extra[@]}" > "$RUNNER_TEMP/archive.log" 2>&1 || status=$?
+          grep -E "error:|warning: .*(sign|profile)|ARCHIVE (SUCCEEDED|FAILED)" "$RUNNER_TEMP/archive.log" || true
+          [ "$status" -eq 0 ] || { tail -60 "$RUNNER_TEMP/archive.log"; exit "$status"; }
+
+      - name: Check the archive
+        run: |
+          set -euo pipefail
+          app=$(ls -d "$ARCHIVE"/Products/Applications/*.app)
+          appex=$(ls -d "$app"/PlugIns/*.appex)
+          for b in "$app" "$appex"; do
+            printf '%-12s %-45s version %s (%s)\n' "$(basename "$b")" \
+              "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$b/Info.plist")" \
+              "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$b/Info.plist")" \
+              "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$b/Info.plist")"
+          done | tee -a "$GITHUB_STEP_SUMMARY"
+          app_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")
+          appex_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$appex/Info.plist")
+          echo "APP_BUNDLE_ID=$app_id" >> "$GITHUB_ENV"
+          echo "AUV3_BUNDLE_ID=$appex_id" >> "$GITHUB_ENV"
+          if [ "$HAS_SIGNING" = "true" ]; then
+            [ "$APP_PROFILE_APPID" = "$app_id" ] || { echo "::error::App profile is for $APP_PROFILE_APPID, but the app is $app_id"; exit 1; }
+            [ "$AUV3_PROFILE_APPID" = "$appex_id" ] || { echo "::error::AUv3 profile is for $AUV3_PROFILE_APPID, but the extension is $appex_id"; exit 1; }
+            codesign --verify --deep --strict "$app" && echo "Signature OK"
+          fi
+
+      - name: Export (and upload) for App Store Connect
+        if: env.HAS_SIGNING == 'true'
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          destination=$([ "$UPLOAD" = "true" ] && echo upload || echo export)
+          options="$RUNNER_TEMP/ExportOptions.plist"
+          /usr/libexec/PlistBuddy \
+            -c "Add :method string app-store-connect" \
+            -c "Add :destination string $destination" \
+            -c "Add :teamID string $TEAM_ID" \
+            -c "Add :signingStyle string manual" \
+            -c "Add :signingCertificate string Apple Distribution" \
+            -c "Add :uploadSymbols bool true" \
+            -c "Add :manageAppVersionAndBuildNumber bool false" \
+            -c "Add :provisioningProfiles dict" \
+            -c "Add :provisioningProfiles:$APP_BUNDLE_ID string $APP_PROFILE_NAME" \
+            -c "Add :provisioningProfiles:$AUV3_BUNDLE_ID string $AUV3_PROFILE_NAME" \
+            "$options"
+
+          auth=()
+          if [ "$destination" = "upload" ]; then
+            key="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+            printf '%s' "$ASC_KEY_P8" | base64 --decode > "$key"
+            auth=(-authenticationKeyPath "$key" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          fi
+
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE" \
+            -exportOptionsPlist "$options" \
+            -exportPath "$RUNNER_TEMP/export" \
+            "${auth[@]}"
+          rm -f "$RUNNER_TEMP"/AuthKey_*.p8
+
+          if [ "$destination" = "upload" ]; then
+            echo "Uploaded $VERSION ($BUILD_NUMBER) to App Store Connect. It shows up under TestFlight once Apple has processed it." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            ls -la "$RUNNER_TEMP/export"
+            echo "Signed and exported $VERSION ($BUILD_NUMBER), not uploaded." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Keep the build log if something failed
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: archive-log
+          path: ${{ runner.temp }}/archive.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Remove signing material
+        if: always()
+        run: |
+          [ -n "${KEYCHAIN:-}" ] && security delete-keychain "$KEYCHAIN" 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP"/*.mobileprovision "$RUNNER_TEMP"/*.plist "$RUNNER_TEMP"/AuthKey_*.p8 "$RUNNER_TEMP"/dist.p12 \
+                 "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+
+  github-release:
+    name: GitHub release
+    needs: ios
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create the GitHub release for this tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "Gambler $GITHUB_REF_NAME"

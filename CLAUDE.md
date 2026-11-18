@@ -17,7 +17,7 @@ cmake --build build --target Tests && ./build/Tests      # Catch2; all tests mus
 open web/index.html                                      # UI in a browser against the mock engine
 ```
 
-Targets are named `Gambler2_*` (`PROJECT_NAME` is `Gambler2`).
+Targets are named `Gambler2_*` (`PROJECT_NAME` is `Gambler2`); the built products are called `Gambler` (`PRODUCT_NAME`).
 
 ## Layout
 
@@ -37,5 +37,8 @@ Targets are named `Gambler2_*` (`PROJECT_NAME` is `Gambler2`).
 - **State split**: small automatable values live in APVTS (`source/data/Params.h`); per-step data lives in InternalState. Go through `SequenceState` rather than touching either directly.
 - **Audio thread**: no UI calls, no allocation-heavy work in `processBlock`/`Sequence::tick()`. Audio → UI uses the processor callbacks, which `UiBridge` turns into atomic flags.
 - **Visual snapshots**: never run `UPDATE_SNAPSHOTS=1` without the user confirming the new render is correct.
+- **Releases** go through `.github/workflows/release-ios.yml` (tag `vX.Y.Z` matching `VERSION` → build, sign, upload to App Store Connect on a `macos-26` runner; Xcode 26+ is required for uploads). Setup and renewal: `docs/RELEASING.md`. Never print, log or commit signing material; secrets live in the `app-store` environment.
+- **Never change** `BUNDLE_ID`, `PRODUCT_NAME`, `PLUGIN_MANUFACTURER_CODE` (`Tngd`) or `PLUGIN_CODE` (`Gmbl`) in `CMakeLists.txt` after release: they identify the app on the App Store and the plugin in users' saved host sessions.
+- **iOS Info.plist keys**: `PLIST_TO_MERGE` takes XML text, so `CMakeLists.txt` reads `packaging/Info-iOS.plist`. Permission texts and other keys JUCE manages go through `juce_add_plugin` options instead.
 - **iOS** is iPad-only for now (`TARGETED_DEVICE_FAMILY "2"` in `CMakeLists.txt`); the web UI doesn't fit iPhone yet. Simulator screenshots from `xcrun simctl io` come out in portrait orientation; rotate them with `sips -r 270`.
 - **Commits**: one-line, plain-English summary of the behaviour change (e.g. "Make chords on MIDI input change cleanly, with or without Latch"). No AI attribution or co-author trailers (`.claude/settings.json` turns them off).
