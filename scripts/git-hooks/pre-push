@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Runs before every `git push` that updates main:
+#   1. refuses to push signing files, keys or other secrets
+#   2. builds and runs the test suite (about 2 minutes)
+# Enable once per clone:  git config core.hooksPath scripts/git-hooks
+# Skip in an emergency:   git push --no-verify
+set -euo pipefail
+
+zero=0000000000000000000000000000000000000000
+cd "$(git rev-parse --show-toplevel)"
+
+pushing_main=false
+ranges=()
+while read -r _local_ref local_sha remote_ref remote_sha; do
+    [ "$remote_ref" = "refs/heads/main" ] || continue
+    [ "$local_sha" = "$zero" ] && continue   # deleting main; the ruleset on GitHub refuses that anyway
+    pushing_main=true
+    pushed_sha=$local_sha
+    if [ "$remote_sha" = "$zero" ] || ! git cat-file -e "$remote_sha" 2>/dev/null; then
+        ranges+=("$local_sha" --not --remotes)
+    else
+        ranges+=("$remote_sha..$local_sha")
+    fi
+done
+
+$pushing_main || exit 0
+
+fail() { printf '\n\033[31mpre-push: %s\033[0m\n' "$1" >&2; printf 'To push anyway: git push --no-verify\n' >&2; exit 1; }
+
+# 1. Secrets ----------------------------------------------------------------
+echo "pre-push: checking the commits for secrets…"
+files=$(git log --format= --name-only --diff-filter=AM "${ranges[@]}" | sort -u)
+bad_files=$(printf '%s\n' "$files" | grep -i -E '\.(p12|pfx|p8|pem|key|mobileprovision|cer|keychain(-db)?)$|(^|/)\.env(\..*)?$|(^|/)AuthKey_' || true)
+[ -z "$bad_files" ] || fail "these look like signing files or keys and must not be committed:
+$bad_files"
+
+added=$(git log -p --format= "${ranges[@]}" | grep -E '^\+' | grep -v -E '^\+\+\+ ' || true)
+if printf '%s\n' "$added" | grep -q -E -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
+    -e 'gh[pousr]_[A-Za-z0-9]{36}' -e 'github_pat_[A-Za-z0-9_]{40,}' -e 'AKIA[0-9A-Z]{16}' \
+    -e 'sk-(ant-)?[A-Za-z0-9_-]{24,}' -e 'xox[abp]-[A-Za-z0-9-]{10,}' -e 'AIza[0-9A-Za-z_-]{35}'; then
+    fail "the commits add something that looks like a private key or access token."
+fi
+
+# 2. Build and test ---------------------------------------------------------
+if [ "$pushed_sha" != "$(git rev-parse HEAD)" ] || ! git diff --quiet HEAD -- . ':!JUCE' ':!modules'; then
+    fail "the tests run on your working copy, which doesn't match what you're pushing.
+Commit or stash your changes (or check out the branch you're pushing) first."
+fi
+
+command -v cmake >/dev/null || fail "cmake not found (brew install cmake ninja)."
+if [ ! -f build/CMakeCache.txt ]; then
+    echo "pre-push: configuring build/ (first time only)…"
+    cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug >/dev/null || fail "CMake configure failed."
+fi
+
+echo "pre-push: building tests…"
+log=$(mktemp -t gambler-prepush)
+if ! cmake --build build --target Tests >"$log" 2>&1; then
+    grep -E 'error|FAILED' "$log" | head -20 >&2
+    fail "the build failed (full log: $log)."
+fi
+
+echo "pre-push: running tests (about 2 minutes)…"
+if ! ./build/Tests >"$log" 2>&1; then
+    grep -E 'FAILED|failed|REQUIRE|CHECK' "$log" | head -30 >&2
+    fail "tests failed (full log: $log)."
+fi
+tail -n 3 "$log" | grep -E 'passed' || true
+rm -f "$log"
+echo "pre-push: all good."

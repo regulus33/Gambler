@@ -150,7 +150,7 @@ Issues and pull requests are welcome. Found a bug? Use **⋯ → Report a bug** 
 
 1. Fork the repo and create a branch.
 2. Make your change and add or update tests in `tests/` where it makes sense.
-3. Run `./build/Tests` and make sure everything passes.
+3. Run `./build/Tests` and make sure everything passes. Optionally run `git config core.hooksPath scripts/git-hooks` once: pushes to `main` then build and run the tests first and refuse to send signing files or keys.
 4. Open a pull request against `main` describing what changed and why.
 
 Code style is set by [`.clang-format`](.clang-format).
