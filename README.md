@@ -158,6 +158,6 @@ Code style is set by [`.clang-format`](.clang-format).
 ## Credits & license
 
 - Gambler is released under the [MIT License](LICENSE).
-- Built with [JUCE](https://juce.com) (dual-licensed AGPLv3 / commercial; see JUCE's own license if you distribute builds), starting from the [Pamplejuce](https://github.com/sudara/pamplejuce) template.
+- Built with [JUCE](https://juce.com), starting from the [Pamplejuce](https://github.com/sudara/pamplejuce) template. JUCE is not covered by Gambler's MIT license: the official App Store builds use JUCE under its Starter licence, and if you distribute your own builds you need your own JUCE licence (AGPLv3, or a free/paid commercial tier).
 - Uses [clap-juce-extensions](https://github.com/free-audio/clap-juce-extensions), [melatonin_inspector](https://github.com/sudara/melatonin_inspector) and [Catch2](https://github.com/catchorg/Catch2).
 - Font: [Inter](https://rsms.me/inter/) by Rasmus Andersson, [SIL Open Font License](web/fonts/OFL.txt).
