@@ -72,6 +72,7 @@ Then delete the downloaded files, or keep them somewhere safe like a password ma
 ## Security notes
 
 - The workflow only runs on version tags and manual runs, never on pull requests, so code from forks never sees the secrets.
+- The **app-store** environment only releases its secrets to `main` and `v*` tags (Settings → Environments → app-store → Deployment branches and tags).
 - Third-party actions are pinned to exact commit SHAs.
 - The certificate lives in a throwaway keychain that is deleted at the end of the job, along with the profiles and the API key file.
 - The API key has App Manager access only. It can upload builds and edit metadata but can't manage users, certificates or banking.
