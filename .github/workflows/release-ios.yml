@@ -211,7 +211,7 @@ jobs:
             -archivePath "$ARCHIVE" \
             -exportOptionsPlist "$options" \
             -exportPath "$RUNNER_TEMP/export" \
-            "${auth[@]}"
+            ${auth[@]+"${auth[@]}"}  # macOS bash 3.2 + set -u treats an empty array as unbound
           rm -f "$RUNNER_TEMP"/AuthKey_*.p8
 
           if [ "$destination" = "upload" ]; then
